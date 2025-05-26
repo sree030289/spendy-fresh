@@ -6,9 +6,10 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function SplashScreen() {
   const navigation = useNavigation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
+  const [animationComplete, setAnimationComplete] = React.useState(false);
 
   useEffect(() => {
     // Start animations
@@ -24,19 +25,25 @@ export default function SplashScreen() {
         friction: 7,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]).start(() => {
+      setAnimationComplete(true);
+    });
+  }, []);
 
-    // Navigate after animation
-    const timer = setTimeout(() => {
-      if (isAuthenticated) {
-        navigation.navigate('Main' as never);
-      } else {
-        navigation.navigate('Login' as never);
-      }
-    }, 2500);
+  useEffect(() => {
+    // Navigate after animation and auth check is complete
+    if (animationComplete && !isLoading) {
+      const timer = setTimeout(() => {
+        if (isAuthenticated) {
+          navigation.navigate('Main' as never);
+        } else {
+          navigation.navigate('Login' as never);
+        }
+      }, 500); // Small delay for better UX
 
-    return () => clearTimeout(timer);
-  }, [isAuthenticated]);
+      return () => clearTimeout(timer);
+    }
+  }, [animationComplete, isLoading, isAuthenticated, navigation]);
 
   return (
     <LinearGradient
@@ -57,6 +64,12 @@ export default function SplashScreen() {
         </View>
         <Text style={styles.title}>Spendy</Text>
         <Text style={styles.tagline}>Track. Split. Pay.</Text>
+        
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
+        )}
       </Animated.View>
     </LinearGradient>
   );
@@ -98,5 +111,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500',
+  },
+  loadingContainer: {
+    marginTop: 32,
+  },
+  loadingText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
   },
 });

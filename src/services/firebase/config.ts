@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,12 +13,57 @@ const firebaseConfig = {
   appId: "1:394481474931:web:8a7481df9a39e2723cf906"
 };
 
-export const app = initializeApp(firebaseConfig);
+// Initialize Firebase only once
+let firebaseApp;
+let firebaseAuth;
+let firebaseDb;
+let firebaseStorage;
 
-// Fix for React Native
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+export const initializeFirebase = () => {
+  try {
+    // Check if Firebase is already initialized
+    if (getApps().length === 0) {
+      console.log('Initializing Firebase...');
+      firebaseApp = initializeApp(firebaseConfig);
+    } else {
+      console.log('Firebase already initialized');
+      firebaseApp = getApp();
+    }
 
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+    // Initialize Auth with React Native persistence
+    try {
+      firebaseAuth = getAuth(firebaseApp);
+    } catch (error) {
+      console.log('Reinitializing Auth with React Native persistence...');
+      firebaseAuth = initializeAuth(firebaseApp, {
+        persistence: getReactNativePersistence(AsyncStorage)
+      });
+    }
+
+    // Initialize Firestore
+    firebaseDb = getFirestore(firebaseApp);
+
+    // Initialize Storage
+    firebaseStorage = getStorage(firebaseApp);
+
+    console.log('Firebase initialized successfully');
+    
+    return { 
+      app: firebaseApp, 
+      auth: firebaseAuth, 
+      db: firebaseDb, 
+      storage: firebaseStorage 
+    };
+  } catch (error) {
+    console.error('Firebase initialization error:', error);
+    throw error;
+  }
+};
+
+// Initialize immediately and export
+const firebaseServices = initializeFirebase();
+
+export const app = firebaseServices.app;
+export const auth = firebaseServices.auth;
+export const db = firebaseServices.db;
+export const storage = firebaseServices.storage;
