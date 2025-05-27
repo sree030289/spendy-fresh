@@ -14,6 +14,7 @@ import RegisterScreen from './src/screens/auth/RegisterScreen';
 import SplashScreen from './src/screens/auth/SplashScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import MainTabNavigator from './src/navigation/MainTabNavigator';
+import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
 
 const Stack = createStackNavigator();
 
@@ -50,6 +51,8 @@ const AppNavigator = () => {
           // User is authenticated - show main app
           <>
             <Stack.Screen name="Main" component={MainTabNavigator} />
+             {/* Add ChangePassword screen here */}
+            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
           </>
         ) : (
           // User is not authenticated - show auth screens

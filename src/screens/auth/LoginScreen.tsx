@@ -18,6 +18,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
+import { AuthService } from '@/services/firebase/auth';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
@@ -31,9 +32,11 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [lastUserEmail, setLastUserEmail] = useState<string | null>(null);
+  const [lastUserBiometric, setLastUserBiometric] = useState(false);
 
   useEffect(() => {
-    checkBiometricAndAutoLogin();
+    initializeScreen();
   }, []);
 
   // Log when user changes to help debug
@@ -41,31 +44,83 @@ export default function LoginScreen() {
     console.log('LoginScreen - User changed:', user ? 'Logged in' : 'Not logged in');
   }, [user]);
 
-  const checkBiometricAndAutoLogin = async () => {
+  const initializeScreen = async () => {
     try {
+      // Check biometric availability
       const available = await BiometricService.isAvailable();
       setBiometricAvailable(available);
 
-      // Auto-prompt biometric if available and user has enabled it
-      if (available) {
-        // You can store biometric preference in AsyncStorage
-        // For now, we'll show biometric option
+      // Get last user's email and biometric setting
+      const lastEmail = await AuthService.getLastEmail();
+      const lastBiometric = await AuthService.getLastBiometricSetting();
+      
+      console.log('🔍 Last user session:', { lastEmail, lastBiometric });
+      
+      setLastUserEmail(lastEmail);
+      setLastUserBiometric(lastBiometric);
+      
+      // Pre-fill email if we have it
+      if (lastEmail) {
+        setEmail(lastEmail);
+      }
+
+      // Auto-prompt biometric if available and was enabled for last user
+      if (available && lastBiometric && lastEmail) {
         setTimeout(() => {
           Alert.alert(
             'Quick Login',
-            'Use biometric authentication for faster login?',
+            `Continue as ${lastEmail}?\n\nUse biometric authentication for faster login?`,
             [
-              { text: 'Use Password', style: 'cancel' },
+              { 
+                text: 'Use Password', 
+                style: 'cancel',
+                onPress: () => setEmail(lastEmail) 
+              },
               { 
                 text: 'Use Biometric', 
                 onPress: handleBiometricLogin 
+              },
+              {
+                text: 'Different User',
+                onPress: handleClearSession
+              }
+            ]
+          );
+        }, 500);
+      } else if (lastEmail) {
+        // Show option for different user if there's a stored email
+        setTimeout(() => {
+          Alert.alert(
+            'Welcome Back',
+            `Continue as ${lastEmail}?`,
+            [
+              { 
+                text: 'Yes', 
+                onPress: () => setEmail(lastEmail)
+              },
+              {
+                text: 'Different User',
+                onPress: handleClearSession
               }
             ]
           );
         }, 500);
       }
     } catch (error) {
-      console.log('Biometric check failed:', error);
+      console.log('Screen initialization failed:', error);
+    }
+  };
+
+  const handleClearSession = async () => {
+    try {
+      console.log('🧹 Clearing previous user session...');
+      await AuthService.clearUserSession();
+      setEmail('');
+      setLastUserEmail(null);
+      setLastUserBiometric(false);
+      Alert.alert('Session Cleared', 'You can now login with a different account.');
+    } catch (error) {
+      console.error('Failed to clear session:', error);
     }
   };
 
@@ -163,20 +218,28 @@ export default function LoginScreen() {
     try {
       const result = await BiometricService.authenticate();
       if (result.success) {
-        // In production, you'd retrieve stored credentials and auto-login
-        Alert.alert(
-          'Biometric Success', 
-          'Biometric authentication successful! In production, this would auto-login with stored credentials.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // For demo, pre-fill last used email
-                setEmail('sree1@g.com'); // You'd get this from secure storage
+        if (lastUserEmail) {
+          // In production, you'd have stored encrypted credentials
+          // For demo, we'll show success and let user enter password
+          Alert.alert(
+            'Biometric Authentication Successful',
+            'Biometric verification completed successfully!\n\nIn production, this would automatically log you in with stored secure credentials.',
+            [
+              {
+                text: 'Continue with Password',
+                onPress: () => {
+                  setEmail(lastUserEmail);
+                  // Focus on password field
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+        } else {
+          Alert.alert(
+            'Biometric Success', 
+            'Biometric authentication successful! Please enter your credentials to continue.',
+          );
+        }
       } else {
         Alert.alert('Authentication Failed', result.error || 'Biometric authentication failed');
       }
@@ -204,6 +267,20 @@ export default function LoginScreen() {
               <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                 Sign in to your account
               </Text>
+              
+              {/* Show session info if available */}
+              {lastUserEmail && (
+                <View style={styles.sessionInfo}>
+                  <Text style={[styles.sessionText, { color: theme.colors.textSecondary }]}>
+                    Last logged in as: {lastUserEmail}
+                  </Text>
+                  <TouchableOpacity onPress={handleClearSession}>
+                    <Text style={[styles.clearSessionText, { color: theme.colors.primary }]}>
+                      Switch Account
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             <View style={styles.form}>
@@ -294,9 +371,9 @@ export default function LoginScreen() {
                 style={styles.loginButton}
               />
 
-              {biometricAvailable && (
+              {biometricAvailable && lastUserBiometric && lastUserEmail && (
                 <Button
-                  title="Login with Biometric"
+                  title={`Login with Biometric (${lastUserEmail})`}
                   onPress={handleBiometricLogin}
                   loading={biometricLoading}
                   variant="outline"
@@ -354,6 +431,22 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
+    marginBottom: 16,
+  },
+  sessionInfo: {
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  sessionText: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  clearSessionText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   form: {
     gap: 20,
