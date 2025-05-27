@@ -52,6 +52,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('Attempting login...');
       const userData = await AuthService.login(email, password);
       setUser(userData);
+      setIsLoading(false);
       console.log('Login successful');
     } catch (error) {
       console.error('Login error:', error);
@@ -61,26 +62,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const register = async (userData: {
-    fullName: string;
-    email: string;
-    mobile: string;
-    password: string;
-    country: string;
-    currency: string;
-    biometricEnabled: boolean;
-  }) => {
-    try {
-      setIsLoading(true);
-      console.log('Attempting registration...');
-      const newUser = await AuthService.register(userData);
-      setUser(newUser);
-      console.log('Registration successful');
-    } catch (error) {
-      console.error('Registration error:', error);
-      setIsLoading(false);
-      throw error;
-    }
-  };
+  fullName: string;
+  email: string;
+  mobile: string;
+  password: string;
+  country: string;
+  currency: string;
+  biometricEnabled: boolean;
+}) => {
+  try {
+    setIsLoading(true);
+    console.log('Attempting registration...');
+    const newUser = await AuthService.register(userData);
+    setUser(newUser);
+    setIsLoading(false); 
+    console.log('Registration successful');
+  } catch (error) {
+    console.error('Registration error:', error);
+    setIsLoading(false);
+    throw error;
+  }
+};
 
   const logout = async () => {
     try {

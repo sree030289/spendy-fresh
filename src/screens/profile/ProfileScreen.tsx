@@ -7,8 +7,6 @@ import {
   ScrollView,
   Alert,
   Image,
-  Modal,
-  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { COUNTRIES } from '@/constants/countries';
+import CurrencyModal from '@/components/modals/CurrencyModal';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
@@ -25,130 +23,6 @@ export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState(user?.currency || 'USD');
-  const [currencySearchQuery, setCurrencySearchQuery] = useState('');
-  const [currencyUpdateLoading, setCurrencyUpdateLoading] = useState(false);
-
-  // Get unique currencies from countries data
-  const currencies = [...new Set(COUNTRIES.map(c => c.currency))].sort();
-  
-  // Filter currencies based on search
-  const filteredCurrencies = currencies.filter(currency => {
-    const country = COUNTRIES.find(c => c.currency === currency);
-    return currency.toLowerCase().includes(currencySearchQuery.toLowerCase()) ||
-           (country && country.name.toLowerCase().includes(currencySearchQuery.toLowerCase()));
-  });
-
-  const getCurrencyInfo = (currency: string) => {
-    const country = COUNTRIES.find(c => c.currency === currency);
-    const countries = COUNTRIES.filter(c => c.currency === currency);
-    
-    return {
-      flag: country?.flag || '💰',
-      name: currency,
-      description: countries.length === 1 
-        ? country.name 
-        : `${countries.length} countries`,
-      countries: countries.map(c => c.name).join(', ')
-    };
-  };
-
-  const handleImagePicker = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
-
-    if (!result.canceled && user) {
-      try {
-        await updateUser({ profilePicture: result.assets[0].uri });
-        Alert.alert('Success', 'Profile picture updated successfully!');
-      } catch (error) {
-        Alert.alert('Error', 'Failed to update profile picture');
-      }
-    }
-  };
-
-  const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            await logout();
-            setLoading(false);
-          }
-        },
-      ]
-    );
-  };
-
-  const handleChangePassword = () => {
-    // Navigate to change password screen
-    navigation.navigate('ChangePassword' as never);
-  };
-
-  const openCurrencyModal = () => {
-    setSelectedCurrency(user?.currency || 'USD');
-    setCurrencySearchQuery('');
-    setShowCurrencyModal(true);
-  };
-
-  const handleCurrencyUpdate = async () => {
-    if (!user || selectedCurrency === user.currency) {
-      setShowCurrencyModal(false);
-      return;
-    }
-
-    setCurrencyUpdateLoading(true);
-    try {
-      // Update user's currency in the database
-      await updateUser({ currency: selectedCurrency });
-      
-      Alert.alert(
-        'Currency Updated!',
-        `Your currency has been successfully changed to ${selectedCurrency}. All your future transactions will use this currency.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => setShowCurrencyModal(false)
-          }
-        ]
-      );
-    } catch (error: any) {
-      console.error('Currency update error:', error);
-      Alert.alert(
-        'Update Failed',
-        'Failed to update currency. Please try again.'
-      );
-    } finally {
-      setCurrencyUpdateLoading(false);
-    }
-  };
-
-  const handleBiometricToggle = async () => {
-    if (!user) return;
-
-    try {
-      const newBiometricState = !user.biometricEnabled;
-      await updateUser({ biometricEnabled: newBiometricState });
-      
-      Alert.alert(
-        'Biometric Authentication',
-        `Biometric login has been ${newBiometricState ? 'enabled' : 'disabled'}.`,
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update biometric setting');
-    }
-  };
 
   const ProfileItem = ({ 
     icon, 
@@ -191,177 +65,67 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  const CurrencyItem = ({ currency }: { currency: string }) => {
-    const currencyInfo = getCurrencyInfo(currency);
-    const isSelected = currency === selectedCurrency;
-    const isCurrentUserCurrency = currency === user?.currency;
+  const handleImagePicker = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
 
-    return (
-      <TouchableOpacity
-        style={[
-          styles.currencyItem,
-          {
-            backgroundColor: isSelected 
-              ? `${theme.colors.primary}15` 
-              : theme.colors.background,
-            borderColor: isSelected 
-              ? theme.colors.primary 
-              : theme.colors.border,
-            borderWidth: isSelected ? 2 : 1,
+    if (!result.canceled && user) {
+      try {
+        await updateUser({ profilePicture: result.assets[0].uri });
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      } catch (error) {
+        Alert.alert('Error', 'Failed to update profile picture');
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            await logout();
+            setLoading(false);
           }
-        ]}
-        onPress={() => setSelectedCurrency(currency)}
-      >
-        <View style={styles.currencyLeft}>
-          <Text style={styles.currencyFlag}>{currencyInfo.flag}</Text>
-          <View style={styles.currencyInfo}>
-            <View style={styles.currencyHeader}>
-              <Text style={[
-                styles.currencyCode, 
-                { 
-                  color: theme.colors.text,
-                  fontWeight: isSelected ? '700' : '600'
-                }
-              ]}>
-                {currencyInfo.name}
-              </Text>
-              {isCurrentUserCurrency && (
-                <View style={[
-                  styles.currentBadge,
-                  { backgroundColor: theme.colors.success }
-                ]}>
-                  <Text style={styles.currentBadgeText}>Current</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[
-              styles.currencyDescription, 
-              { color: theme.colors.textSecondary }
-            ]}>
-              {currencyInfo.description}
-            </Text>
-          </View>
-        </View>
-        
-        <View style={styles.currencyRight}>
-          {isSelected && (
-            <Ionicons 
-              name="checkmark-circle" 
-              size={24} 
-              color={theme.colors.primary} 
-            />
-          )}
-        </View>
-      </TouchableOpacity>
+        },
+      ]
     );
   };
 
-  const CurrencyModal = () => (
-    <Modal
-      visible={showCurrencyModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
-        {/* Modal Header */}
-        <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={() => setShowCurrencyModal(false)}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-            Change Currency
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
+  const handleChangePassword = () => {
+    navigation.navigate('ChangePassword' as never);
+  };
 
-        {/* Current Currency Info */}
-        <View style={[styles.currentCurrencyCard, { backgroundColor: theme.colors.surface }]}>
-          <View style={styles.currentCurrencyHeader}>
-            <Ionicons name="card-outline" size={20} color={theme.colors.primary} />
-            <Text style={[styles.currentCurrencyTitle, { color: theme.colors.text }]}>
-              Current: {user?.currency}
-            </Text>
-          </View>
-        </View>
+  const handleCurrencyUpdate = async (newCurrency: string) => {
+    await updateUser({ currency: newCurrency });
+  };
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={[
-              styles.searchInput,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                color: theme.colors.text
-              }
-            ]}
-            placeholder="Search currencies..."
-            placeholderTextColor={theme.colors.textSecondary}
-            value={currencySearchQuery}
-            onChangeText={setCurrencySearchQuery}
-            returnKeyType="search"
-          />
-          <Ionicons
-            name="search-outline"
-            size={20}
-            color={theme.colors.textSecondary}
-            style={styles.searchIcon}
-          />
-        </View>
+  const handleBiometricToggle = async () => {
+    if (!user) return;
 
-        {/* Currency List */}
-        <ScrollView style={styles.currencyList} showsVerticalScrollIndicator={false}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Available Currencies ({filteredCurrencies.length})
-          </Text>
-          
-          {filteredCurrencies.map((currency) => (
-            <CurrencyItem key={currency} currency={currency} />
-          ))}
-          
-          {filteredCurrencies.length === 0 && (
-            <View style={styles.emptyState}>
-              <Ionicons name="search-outline" size={48} color={theme.colors.textSecondary} />
-              <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>
-                No currencies found
-              </Text>
-              <Text style={[styles.emptyStateSubtitle, { color: theme.colors.textSecondary }]}>
-                Try searching with a different term
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Update Button */}
-        <View style={styles.modalFooter}>
-          {selectedCurrency !== user?.currency && (
-            <View style={[styles.changeInfo, { backgroundColor: `${theme.colors.primary}10` }]}>
-              <Ionicons name="information-circle-outline" size={16} color={theme.colors.primary} />
-              <Text style={[styles.changeInfoText, { color: theme.colors.primary }]}>
-                Changing from {user?.currency} to {selectedCurrency}
-              </Text>
-            </View>
-          )}
-          
-          <View style={styles.modalButtons}>
-            <Button
-              title="Cancel"
-              onPress={() => setShowCurrencyModal(false)}
-              variant="outline"
-              style={styles.modalButton}
-            />
-            <Button
-              title={selectedCurrency === user?.currency ? "No Changes" : "Update Currency"}
-              onPress={handleCurrencyUpdate}
-              loading={currencyUpdateLoading}
-              disabled={selectedCurrency === user?.currency}
-              style={styles.modalButton}
-            />
-          </View>
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
+    try {
+      const newBiometricState = !user.biometricEnabled;
+      await updateUser({ biometricEnabled: newBiometricState });
+      
+      Alert.alert(
+        'Biometric Authentication',
+        `Biometric login has been ${newBiometricState ? 'enabled' : 'disabled'}.`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update biometric setting');
+    }
+  };
 
   if (!user) return null;
 
@@ -407,7 +171,7 @@ export default function ProfileScreen() {
           {/* User Stats */}
           <View style={styles.userStats}>
             <View style={[styles.statItem, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              <Text style={[styles.statValue, { color: theme.colors.text }]} numberOfLines={1}>
                 {user.country}
               </Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
@@ -415,21 +179,24 @@ export default function ProfileScreen() {
               </Text>
             </View>
             <View style={[styles.statItem, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              <Text style={[styles.statValue, { color: theme.colors.text }]} numberOfLines={1}>
                 {user.currency}
               </Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
                 Currency
               </Text>
             </View>
-            <View style={[styles.statItem, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.statValue, { color: theme.colors.text }]}>
+            <TouchableOpacity 
+              style={[styles.statItem, styles.mobileStatItem, { backgroundColor: theme.colors.surface }]}
+              onPress={() => Alert.alert('Mobile Number', user.mobile)}
+            >
+              <Text style={[styles.statValue, { color: theme.colors.text }]} numberOfLines={1} ellipsizeMode="middle">
                 {user.mobile}
               </Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-                Mobile
+                Mobile (tap to view)
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -443,7 +210,7 @@ export default function ProfileScreen() {
             icon="card-outline"
             title="Currency"
             value={user.currency}
-            onPress={openCurrencyModal}
+            onPress={() => setShowCurrencyModal(true)}
             valueColor={theme.colors.primary}
           />
           
@@ -545,8 +312,13 @@ export default function ProfileScreen() {
         </Text>
       </ScrollView>
 
-      {/* Currency Change Modal */}
-      <CurrencyModal />
+      {/* Currency Modal */}
+      <CurrencyModal
+        visible={showCurrencyModal}
+        currentCurrency={user?.currency || 'USD'}
+        onClose={() => setShowCurrencyModal(false)}
+        onUpdate={handleCurrencyUpdate}
+      />
     </SafeAreaView>
   );
 }
@@ -616,22 +388,28 @@ const styles = StyleSheet.create({
   },
   userStats: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 6,
     width: '100%',
   },
   statItem: {
     flex: 1,
-    padding: 12,
+    padding: 10,
     borderRadius: 8,
     alignItems: 'center',
+    minWidth: 0, // Allow shrinking
+  },
+  mobileStatItem: {
+    flex: 1.2, // Give mobile section slightly more space
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
     marginBottom: 4,
+    textAlign: 'center',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
+    textAlign: 'center',
   },
   sectionContainer: {
     marginBottom: 24,
@@ -688,140 +466,5 @@ const styles = StyleSheet.create({
   appVersion: {
     fontSize: 12,
     textAlign: 'center',
-  },
-  
-  // Modal Styles
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  currentCurrencyCard: {
-    margin: 20,
-    padding: 16,
-    borderRadius: 12,
-  },
-  currentCurrencyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  currentCurrencyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  searchContainer: {
-    position: 'relative',
-    marginHorizontal: 20,
-    marginBottom: 16,
-  },
-  searchInput: {
-    paddingHorizontal: 48,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    fontSize: 16,
-  },
-  searchIcon: {
-    position: 'absolute',
-    left: 16,
-    top: 14,
-  },
-  currencyList: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  currencyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  currencyLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  currencyFlag: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  currencyInfo: {
-    flex: 1,
-  },
-  currencyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  currencyCode: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  currentBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 8,
-  },
-  currentBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'white',
-  },
-  currencyDescription: {
-    fontSize: 12,
-  },
-  currencyRight: {
-    marginLeft: 12,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateSubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  modalFooter: {
-    padding: 20,
-    paddingTop: 16,
-  },
-  changeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 12,
-  },
-  changeInfoText: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 6,
-    flex: 1,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
   },
 });
