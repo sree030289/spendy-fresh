@@ -188,3 +188,5 @@ export class PushNotificationService {
     console.log('Push notification service cleanup');
   }
 }
+
+export default PushNotificationService;

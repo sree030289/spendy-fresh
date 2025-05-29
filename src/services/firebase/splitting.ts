@@ -439,63 +439,67 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
   }
   
   // EXPENSES MANAGEMENT
-  static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    try {
-      const batch = writeBatch(db);
-      
-      const newExpense: Omit<Expense, 'id'> = {
-        ...expenseData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      const expenseRef = doc(collection(db, 'expenses'));
-      batch.set(expenseRef, newExpense);
-      
-      // Update group total expenses
-      batch.update(doc(db, 'groups', expenseData.groupId), {
-        totalExpenses: increment(expenseData.amount),
-        updatedAt: new Date()
-      });
-      
-      // Update member balances
-      expenseData.splitData.forEach(split => {
-        if (split.userId !== expenseData.paidBy) {
-          // Update friend relationships
-          this.updateFriendBalance(expenseData.paidBy, split.userId, split.amount);
-          this.updateFriendBalance(split.userId, expenseData.paidBy, -split.amount);
-        }
-      });
-      
-      await batch.commit();
-      
-      // Send notifications to group members
-      const group = await getDoc(doc(db, 'groups', expenseData.groupId));
-      const groupData = group.data() as Group;
-      
-      const notifications = groupData.members
-        .filter(member => member.userId !== expenseData.paidBy)
-        .map(member => 
-          this.createNotification({
-            userId: member.userId,
-            type: 'expense_added',
-            title: 'New Expense Added',
-            message: `${expenseData.paidByData.fullName} added "${expenseData.description}" for $${expenseData.amount}`,
-            data: { expenseId: expenseRef.id, groupId: expenseData.groupId },
-            isRead: false,
-            createdAt: new Date()
-          })
-        );
-      
-      await Promise.all(notifications);
-      
-      return expenseRef.id;
-      
-    } catch (error) {
-      console.error('Add expense error:', error);
-      throw error;
+static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  try {
+    console.log('Adding expense:', expenseData.description, 'for group:', expenseData.groupId);
+    
+    const batch = writeBatch(db);
+    
+    const newExpense: Omit<Expense, 'id'> = {
+      ...expenseData,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const expenseRef = doc(collection(db, 'expenses'));
+    batch.set(expenseRef, newExpense);
+    console.log('Expense document prepared with ID:', expenseRef.id);
+    
+    // Update group total expenses
+    batch.update(doc(db, 'groups', expenseData.groupId), {
+      totalExpenses: increment(expenseData.amount),
+      updatedAt: serverTimestamp()
+    });
+    console.log('Group update prepared');
+    
+    // Add expense notification to group chat
+    const expenseMessage = {
+      groupId: expenseData.groupId,
+      userId: expenseData.paidBy,
+      userName: expenseData.paidByData.fullName,
+      message: `Added expense: ${expenseData.description}`,
+      timestamp: serverTimestamp(),
+      type: 'expense',
+      expenseData: {
+        id: expenseRef.id,
+        description: expenseData.description,
+        amount: expenseData.amount,
+        currency: expenseData.currency
+      }
+    };
+    
+    batch.set(doc(collection(db, 'groupMessages')), expenseMessage);
+    console.log('Chat message prepared');
+    
+    // Update member balances
+    for (const split of expenseData.splitData) {
+      if (split.userId !== expenseData.paidBy) {
+        await this.updateFriendBalance(expenseData.paidBy, split.userId, split.amount);
+        await this.updateFriendBalance(split.userId, expenseData.paidBy, -split.amount);
+      }
     }
+    console.log('Friend balances updated');
+    
+    await batch.commit();
+    console.log('✅ Expense added successfully:', expenseRef.id);
+    
+    return expenseRef.id;
+    
+  } catch (error) {
+    console.error('❌ Add expense error:', error);
+    throw error;
   }
+}
   
   static async updateFriendBalance(userId: string, friendId: string, amount: number): Promise<void> {
     try {
@@ -518,6 +522,29 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
       console.error('Update friend balance error:', error);
     }
   }
+
+  static async getGroupExpenses(groupId: string): Promise<Expense[]> {
+  try {
+    const expensesQuery = query(
+      collection(db, 'expenses'),
+      where('groupId', '==', groupId),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const snapshot = await getDocs(expensesQuery);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      date: doc.data().date?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as Expense[];
+  } catch (error) {
+    console.error('Get group expenses error:', error);
+    return [];
+  }
+}
+
   
   // NOTIFICATIONS
   static async createNotification(notificationData: Omit<Notification, 'id'>): Promise<void> {
@@ -701,6 +728,46 @@ static async getUserGroups(userId: string): Promise<Group[]> {
     return [];
   }
 }
+// LEAVE GROUP
+static async leaveGroup(groupId: string, userId: string): Promise<void> {
+  try {
+    const groupRef = doc(db, 'groups', groupId);
+    const groupDoc = await getDoc(groupRef);
+    
+    if (!groupDoc.exists()) {
+      throw new Error('Group not found');
+    }
+    
+    const groupData = groupDoc.data() as Group;
+    const updatedMembers = groupData.members.filter(member => member.userId !== userId);
+    
+    if (updatedMembers.length === 0) {
+      // If no members left, deactivate the group
+      await updateDoc(groupRef, {
+        isActive: false,
+        members: updatedMembers,
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      // If user was admin, make another member admin
+      const leavingMember = groupData.members.find(member => member.userId === userId);
+      if (leavingMember?.role === 'admin' && updatedMembers.length > 0) {
+        updatedMembers[0].role = 'admin';
+      }
+      
+      await updateDoc(groupRef, {
+        members: updatedMembers,
+        updatedAt: serverTimestamp()
+      });
+    }
+    
+    console.log('User left group successfully');
+  } catch (error) {
+    console.error('Leave group error:', error);
+    throw error;
+  }
+}
+
   // GET USER EXPENSES
 static async getUserExpenses(userId: string, limitCount: number = 20): Promise<Expense[]> {
   try {
@@ -760,6 +827,26 @@ static async getUserExpenses(userId: string, limitCount: number = 20): Promise<E
       return null;
     }
   }
+  // REAL TIME MESSAGE LISTENERS
+  static onGroupMessages(groupId: string, callback: (messages: ChatMessage[]) => void): () => void {
+  const messagesQuery = query(
+    collection(db, 'groupMessages'),
+    where('groupId', '==', groupId),
+    orderBy('timestamp', 'asc'),
+    limit(100)
+  );
+  
+  return onSnapshot(messagesQuery, (snapshot) => {
+    const messages = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp?.toDate() || new Date(),
+    })) as ChatMessage[];
+    callback(messages);
+  }, (error) => {
+    console.error('Message listener error:', error);
+  });
+}
 
   // UPDATE USER (add this method if missing)
   static async updateUser(userId: string, updates: Partial<any>): Promise<void> {
@@ -784,9 +871,9 @@ static async sendGroupMessage(messageData: {
   expenseData?: any;
 }): Promise<string> {
   try {
-    const chatMessage: Omit<ChatMessage, 'id'> = {
+    const chatMessage = {
       ...messageData,
-      timestamp: new Date()
+      timestamp: serverTimestamp()
     };
     
     const docRef = await addDoc(collection(db, 'groupMessages'), chatMessage);
@@ -822,10 +909,8 @@ static async getGroupMessages(groupId: string, limitCount: number = 50): Promise
     console.error('Get group messages error:', error);
     return [];
   }
-
 }
 }
-
 // QR Code Service
 export class QRCodeService {
   static generateInviteCode(): string {

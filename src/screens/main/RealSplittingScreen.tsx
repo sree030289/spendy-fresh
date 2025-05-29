@@ -32,8 +32,10 @@ import PaymentModal from '@/components/modals/PaymentModal';
 import GroupChatModal from '@/components/modals/GroupChatModal';
 import ReceiptScannerModal from '@/components/modals/ReceiptScannerModal';
 import GroupDetailsModal from '@/components/modals/GroupDetailsModal';
+import ExpenseRefreshService from '@/services/expenseRefreshService';
 
 export default function RealSplittingScreen() {
+  
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -54,6 +56,7 @@ export default function RealSplittingScreen() {
     netBalance: 0
   });
   const [showGroupDetails, setShowGroupDetails] = useState(false);
+  const [selectedGroupForExpense, setSelectedGroupForExpense] = useState<Group | null>(null);
 
   
   // Modal states
@@ -79,8 +82,13 @@ export default function RealSplittingScreen() {
         setLoading(true);
         
         // Initialize push notifications
-        const pushService = PushNotificationService.getInstance();
-        await pushService.initialize(user.id);
+        try {
+          const pushService = PushNotificationService.getInstance();
+          await pushService.initialize(user.id);
+        } catch (pushError) {
+          console.warn('Push notification initialization failed:', pushError);
+          // Continue without push notifications
+        }
         
         // Load initial data
         await Promise.all([
@@ -125,6 +133,18 @@ export default function RealSplittingScreen() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+  const refreshService = ExpenseRefreshService.getInstance();
+  const unsubscribe = refreshService.addListener(() => {
+    console.log('Received expense refresh notification');
+    // Refresh all data when an expense is added
+    loadRecentExpenses();
+    loadGroups();
+    loadFriends();
+  });
+
+  return unsubscribe;
+}, []);
   // Load friends data
 const loadFriends = async () => {
   try {
@@ -313,7 +333,7 @@ const handleCreateGroup = async (groupData: any) => {
 };
 
   // Handle add expense
-const handleAddExpense = async (expenseData: any) => {
+const handleAddExpense = async (expenseData: any, fromGroupDetails?: Group | null) => {
   try {
     if (!user?.id) return;
     
@@ -328,21 +348,30 @@ const handleAddExpense = async (expenseData: any) => {
       date: new Date()
     });
     
-    // Force refresh all data
-    console.log('Expense added, refreshing data...');
+    console.log('Expense added successfully:', expenseId);
+    
+    // Notify all listeners about the new expense
+    ExpenseRefreshService.getInstance().notifyExpenseAdded();
+    
+    // Force refresh local data
     await Promise.all([
       loadGroups(),
       loadRecentExpenses(),
       loadFriends()
     ]);
     
-    // Additional refresh to ensure UI updates
-    setTimeout(() => {
-      loadRecentExpenses();
-    }, 1000);
-    
     Alert.alert('Success', 'Expense added successfully!');
     setShowAddExpense(false);
+    setSelectedGroupForExpense(null);
+    
+    // If expense was added from group details, go back to group details
+    if (fromGroupDetails) {
+      setTimeout(() => {
+        setSelectedGroup(fromGroupDetails);
+        setShowGroupDetails(true);
+      }, 500);
+    }
+    
   } catch (error: any) {
     console.error('Add expense error:', error);
     Alert.alert('Error', error.message || 'Failed to add expense');
@@ -832,6 +861,7 @@ const renderFriendsTab = () => (
         onSubmit={handleAddExpense}
         groups={groups}
         friends={friends}
+        preSelectedGroup={selectedGroupForExpense} // Pass pre-selected group
       />
       
       <AddFriendModal
@@ -854,6 +884,7 @@ const renderFriendsTab = () => (
       group={selectedGroup}
       currentUser={user}
       onAddExpense={() => {
+        setSelectedGroupForExpense(selectedGroup); // Set selected group for expense
         setShowGroupDetails(false);
         setShowAddExpense(true);
       }}

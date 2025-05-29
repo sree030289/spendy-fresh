@@ -24,6 +24,8 @@ interface AddExpenseModalProps {
   onSubmit: (expenseData: any) => void;
   groups: Group[];
   friends: Friend[];
+  preSelectedGroup?: Group | null; // Add this prop
+
 }
 
 const EXPENSE_CATEGORIES = [
@@ -39,12 +41,12 @@ const EXPENSE_CATEGORIES = [
   { id: 'other', name: 'Other', icon: '💰' },
 ];
 
-export default function AddExpenseModal({ visible, onClose, onSubmit, groups, friends }: AddExpenseModalProps) {
+export default function AddExpenseModal({ visible, onClose, onSubmit, groups, friends,preSelectedGroup }: AddExpenseModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [activeStep, setActiveStep] = useState<'details' | 'split' | 'review'>('details');
   const [loading, setLoading] = useState(false);
-  
+  const [isSwipeActive, setIsSwipeActive] = useState(false);
   // Form data
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -60,13 +62,16 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
 
   useEffect(() => {
     if (visible) {
-      // Reset form when modal opens
       resetForm();
       if (user) {
         setPaidBy(user.id);
       }
+      // Set pre-selected group if provided
+      if (preSelectedGroup) {
+        setSelectedGroup(preSelectedGroup);
+      }
     }
-  }, [visible, user]);
+  }, [visible, user, preSelectedGroup]);
 
   useEffect(() => {
     if (selectedGroup) {
@@ -271,14 +276,28 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
   );
 
   const handleSwipe = (event: any) => {
-  const { translationX } = event.nativeEvent;
+  if (isSwipeActive) return; // Prevent multiple rapid swipes
   
-  if (translationX > 100 && activeStep !== 'details') {
-    // Swipe right - go back
-    handleBack();
-  } else if (translationX < -100 && activeStep !== 'review') {
-    // Swipe left - go forward
-    handleNext();
+  const { translationX, state } = event.nativeEvent;
+  
+  if (state === State.END) {
+    const swipeThreshold = 120; // Increased threshold
+    const velocity = Math.abs(event.nativeEvent.velocityX);
+    
+    if (Math.abs(translationX) > swipeThreshold && velocity > 500) {
+      setIsSwipeActive(true);
+      
+      if (translationX > 0 && activeStep !== 'details') {
+        // Swipe right - go back
+        handleBack();
+      } else if (translationX < 0 && activeStep !== 'review') {
+        // Swipe left - go forward
+        handleNext();
+      }
+      
+      // Reset swipe active after delay
+      setTimeout(() => setIsSwipeActive(false), 500);
+    }
   }
 };
 

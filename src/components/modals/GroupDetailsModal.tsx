@@ -15,6 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { Group, Expense, SplittingService } from '@/services/firebase/splitting';
+import ExpenseRefreshService from '@/services/expenseRefreshService';
+
 import { User } from '@/types';
 
 interface GroupDetailsModalProps {
@@ -38,26 +40,58 @@ export default function GroupDetailsModal({
   const [groupExpenses, setGroupExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+useEffect(() => {
+  if (!visible || !group) return;
+  
+  // Initial load
+  loadGroupExpenses();
+  
+  // Set up a refresh interval to catch new expenses
+  const refreshInterval = setInterval(() => {
     if (visible && group) {
       loadGroupExpenses();
     }
-  }, [visible, group]);
-
-  const loadGroupExpenses = async () => {
-    if (!group) return;
-    
-    setLoading(true);
-    try {
-      // Get expenses for this group
-      const expenses = await SplittingService.getGroupExpenses(group.id);
-      setGroupExpenses(expenses);
-    } catch (error) {
-      console.error('Load group expenses error:', error);
-    } finally {
-      setLoading(false);
-    }
+  }, 5000); // Refresh every 5 seconds when modal is open
+  
+  return () => {
+    clearInterval(refreshInterval);
   };
+}, [visible, group?.id]);
+
+useEffect(() => {
+  if (!visible) return;
+  
+  const refreshService = ExpenseRefreshService.getInstance();
+  const unsubscribe = refreshService.addListener(() => {
+    console.log('Group details received expense refresh notification');
+    if (group) {
+      loadGroupExpenses();
+    }
+  });
+
+  return unsubscribe;
+}, [visible, group?.id]);
+
+const handleRefresh = async () => {
+  await loadGroupExpenses();
+};
+  
+  const loadGroupExpenses = async () => {
+  if (!group) return;
+  
+  setLoading(true);
+  try {
+    console.log('Loading expenses for group:', group.id);
+    const expenses = await SplittingService.getGroupExpenses(group.id);
+    console.log('Loaded expenses:', expenses.length);
+    setGroupExpenses(expenses);
+  } catch (error) {
+    console.error('Load group expenses error:', error);
+    setGroupExpenses([]); // Set empty array on error
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleShareInviteCode = async () => {
     if (!group) return;
@@ -140,64 +174,76 @@ export default function GroupDetailsModal({
     </View>
   );
 
-  const renderExpensesList = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Recent Expenses ({groupExpenses.length})
-        </Text>
+const renderExpensesList = () => (
+  <View style={styles.section}>
+    <View style={styles.sectionHeader}>
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        Recent Expenses ({groupExpenses.length})
+      </Text>
+      <View style={styles.expensesActions}>
+        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+          <Ionicons name="refresh" size={16} color={theme.colors.primary} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={onAddExpense}>
           <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
             Add New
           </Text>
         </TouchableOpacity>
       </View>
-      
-      {groupExpenses.length === 0 ? (
-        <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="receipt-outline" size={48} color={theme.colors.textSecondary} />
-          <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
-            No expenses yet
-          </Text>
-          <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-            Add your first expense to start tracking
-          </Text>
-        </View>
-      ) : (
-        groupExpenses.slice(0, 5).map((expense) => (
-          <View key={expense.id} style={styles.expenseItem}>
-            <View style={styles.expenseLeft}>
-              <Text style={styles.expenseIcon}>{expense.categoryIcon}</Text>
-              <View>
-                <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
-                  {expense.description}
-                </Text>
-                <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
-                  {expense.date.toLocaleDateString()} • {expense.paidByData.fullName}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.expenseRight}>
-              <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-                ${expense.amount.toFixed(2)}
+    </View>
+    
+    {loading ? (
+      <View style={styles.loadingExpenses}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <Text style={[{ color: theme.colors.textSecondary, marginLeft: 8 }]}>
+          Loading expenses...
+        </Text>
+      </View>
+    ) : groupExpenses.length === 0 ? (
+      <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+        <Ionicons name="receipt-outline" size={48} color={theme.colors.textSecondary} />
+        <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
+          No expenses yet
+        </Text>
+        <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+          Add your first expense to start tracking
+        </Text>
+      </View>
+    ) : (
+      groupExpenses.slice(0, 10).map((expense) => (
+        <View key={expense.id} style={styles.expenseItem}>
+          <View style={styles.expenseLeft}>
+            <Text style={styles.expenseIcon}>{expense.categoryIcon}</Text>
+            <View>
+              <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
+                {expense.description}
               </Text>
-              <View style={[
-                styles.expenseStatus,
-                { backgroundColor: expense.isSettled ? theme.colors.success + '20' : theme.colors.error + '20' }
-              ]}>
-                <Text style={[
-                  styles.expenseStatusText,
-                  { color: expense.isSettled ? theme.colors.success : theme.colors.error }
-                ]}>
-                  {expense.isSettled ? 'Settled' : 'Pending'}
-                </Text>
-              </View>
+              <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
+                {expense.date.toLocaleDateString()} • {expense.paidByData.fullName}
+              </Text>
             </View>
           </View>
-        ))
-      )}
-    </View>
-  );
+          <View style={styles.expenseRight}>
+            <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
+              ${expense.amount.toFixed(2)}
+            </Text>
+            <View style={[
+              styles.expenseStatus,
+              { backgroundColor: expense.isSettled ? theme.colors.success + '20' : theme.colors.error + '20' }
+            ]}>
+              <Text style={[
+                styles.expenseStatusText,
+                { color: expense.isSettled ? theme.colors.success : theme.colors.error }
+              ]}>
+                {expense.isSettled ? 'Settled' : 'Pending'}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ))
+    )}
+  </View>
+);
 
   const renderGroupStats = () => (
     <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
@@ -275,52 +321,63 @@ export default function GroupDetailsModal({
 
           {/* Quick Actions */}
           <View style={styles.quickActions}>
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
-              onPress={onAddExpense}
-            >
-              <Ionicons name="add-circle" size={20} color="white" />
-              <Text style={styles.actionButtonText}>Add Expense</Text>
-            </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
+    onPress={onAddExpense}
+  >
+    <Ionicons name="add-circle" size={20} color="white" />
+    <Text style={styles.actionButtonText}>Add Expense</Text>
+  </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: theme.colors.secondary }]}
-              onPress={onOpenChat}
-            >
-              <Ionicons name="chatbubble" size={20} color="white" />
-              <Text style={styles.actionButtonText}>Group Chat</Text>
-            </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.actionButton, { backgroundColor: theme.colors.secondary || '#6366F1' }]}
+    onPress={onOpenChat}
+  >
+    <Ionicons name="chatbubble" size={20} color="white" />
+    <Text style={styles.actionButtonText}>Group Chat</Text>
+  </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border }]}
-              onPress={handleShareInviteCode}
-            >
-              <Ionicons name="share" size={20} color={theme.colors.text} />
-              <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>
-                Invite
-              </Text>
-            </TouchableOpacity>
-          </View>
+  <TouchableOpacity
+    style={[
+      styles.actionButton, 
+      { 
+        backgroundColor: theme.colors.background, 
+        borderWidth: 2, 
+        borderColor: theme.colors.primary 
+      }
+    ]}
+    onPress={handleShareInviteCode}
+  >
+    <Ionicons name="share" size={20} color={theme.colors.primary} />
+    <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>
+      Invite Friends
+    </Text>
+  </TouchableOpacity>
+</View>
 
           {/* Invite Code */}
           <View style={[styles.inviteSection, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.inviteSectionTitle, { color: theme.colors.text }]}>
-              Invite Code
-            </Text>
-            <View style={styles.inviteCodeContainer}>
-              <Text style={[styles.inviteCode, { color: theme.colors.primary }]}>
-                {group.inviteCode}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  // Copy to clipboard
-                  Alert.alert('Copied!', 'Invite code copied to clipboard');
-                }}
-              >
-                <Ionicons name="copy" size={20} color={theme.colors.primary} />
-              </TouchableOpacity>
-            </View>
-          </View>
+  <Text style={[styles.inviteSectionTitle, { color: theme.colors.text }]}>
+    Group Invite Code
+  </Text>
+  <View style={[styles.inviteCodeContainer, { backgroundColor: theme.colors.background }]}>
+    <Text style={[styles.inviteCode, { color: theme.colors.primary }]}>
+      {group.inviteCode}
+    </Text>
+    <TouchableOpacity
+      onPress={() => {
+        // Copy to clipboard functionality
+        Alert.alert('Copied!', 'Invite code copied to clipboard');
+      }}
+      style={{ padding: 8 }}
+    >
+      <Ionicons name="copy" size={20} color={theme.colors.primary} />
+    </TouchableOpacity>
+  </View>
+  <Text style={[{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 8 }]}>
+    Share this code with friends to invite them to the group
+  </Text>
+</View>
 
           {/* Members List */}
           {renderMembersList()}
@@ -429,19 +486,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14, // Increased padding
+    paddingHorizontal: 12,
     borderRadius: 12,
     gap: 8,
+    minHeight: 48, // Ensure minimum height
   },
   actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: 'white',
+    textAlign: 'center', // Center the text
   },
   inviteSection: {
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   inviteSectionTitle: {
     fontSize: 16,
@@ -452,11 +514,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 8,
   },
   inviteCode: {
-    fontSize: 24,
+    fontSize: 20, // Reduced from 24
     fontWeight: 'bold',
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
   section: {
     marginBottom: 24,
@@ -591,5 +656,19 @@ const styles = StyleSheet.create({
   dangerButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+   expensesActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  refreshButton: {
+    padding: 4,
+  },
+  loadingExpenses: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
   },
 });
