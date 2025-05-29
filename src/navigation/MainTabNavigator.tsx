@@ -9,6 +9,7 @@ import ExpensesScreen from '@/screens/main/ExpensesScreen';
 import RemindersScreen from '@/screens/main/RemindersScreen';
 import GoalsScreen from '@/screens/main/GoalsScreen';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
+import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -55,7 +56,7 @@ export default function MainTabNavigator() {
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Splitting" component={SplittingScreen} />
+      <Tab.Screen name="Splitting" component={RealSplittingScreen} />
       <Tab.Screen name="Expenses" component={ExpensesScreen} />
       <Tab.Screen name="Reminders" component={RemindersScreen} />
       <Tab.Screen name="Goals" component={GoalsScreen} />

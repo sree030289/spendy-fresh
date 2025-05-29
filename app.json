@@ -21,7 +21,14 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.spendy"
+      "package": "com.yourcompany.spendy",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [{ "scheme": "spendy" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     }
   }
 }

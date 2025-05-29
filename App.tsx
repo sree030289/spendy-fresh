@@ -15,6 +15,8 @@ import SplashScreen from './src/screens/auth/SplashScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import MainTabNavigator from './src/navigation/MainTabNavigator';
 import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
+import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
+import { QRCodeService } from '@/services/qr/QRCodeService';
 
 const Stack = createStackNavigator();
 
@@ -34,6 +36,11 @@ const AppNavigator = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Initialize QR deep links
+useEffect(() => {
+  const cleanup = QRCodeService.initializeDeepLinkListener();
+  return cleanup;
+}, []);
   if (isLoading || initializing) {
     return (
       <View style={styles.loadingContainer}>
@@ -51,6 +58,7 @@ const AppNavigator = () => {
           // User is authenticated - show main app
           <>
             <Stack.Screen name="Main" component={MainTabNavigator} />
+            <Stack.Screen name="RealSplittingScreen" component={RealSplittingScreen} />
              {/* Add ChangePassword screen here */}
             <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
           </>
