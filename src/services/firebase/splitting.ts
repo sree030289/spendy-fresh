@@ -31,13 +31,16 @@ export interface Friend {
     id: string;
     fullName: string;
     email: string;
+    mobile?: string;
     avatar?: string;
     profilePicture?: string;
   };
-  status: 'pending' | 'accepted' | 'blocked';
-  balance: number; // positive = friend owes you, negative = you owe friend
+  status: 'pending' | 'accepted' | 'blocked' | 'invited'; // Add 'invited' status
+  balance: number;
   lastActivity: Date;
   createdAt: Date;
+  invitedAt?: Date; // Track when invitation was sent
+  requestId?: string; // Link to friend request
 }
 
 export interface Group {
@@ -162,80 +165,94 @@ export interface Payment {
   createdAt: Date;
   updatedAt: Date;
 }
-
+// Chat Message Interface
+export interface ChatMessage {
+  id: string;
+  groupId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  message: string;
+  timestamp: Date;
+  type: 'message' | 'expense' | 'system';
+  expenseData?: {
+    id: string;
+    description: string;
+    amount: number;
+    currency: string;
+  };
+}
 // Splitting Service Class
 export class SplittingService {
   
   // FRIENDS MANAGEMENT
-  static async sendFriendRequest(fromUserId: string, toEmail: string, message?: string): Promise<void> {
-    try {
-      // Find user by email
-      const usersQuery = query(
-        collection(db, 'users'),
-        where('email', '==', toEmail.toLowerCase()),
-        limit(1)
-      );
-      const userSnapshot = await getDocs(usersQuery);
-      
-      if (userSnapshot.empty) {
-        throw new Error('User not found with this email address');
-      }
-      
-      const toUser = userSnapshot.docs[0];
-      const toUserId = toUser.id;
-      const toUserData = toUser.data();
-      
-      // Check if already friends or request exists
-      const existingQuery = query(
-        collection(db, 'friendRequests'),
-        where('fromUserId', '==', fromUserId),
-        where('toUserId', '==', toUserId),
-        where('status', '==', 'pending')
-      );
-      const existingSnapshot = await getDocs(existingQuery);
-      
-      if (!existingSnapshot.empty) {
-        throw new Error('Friend request already sent');
-      }
-      
-      // Get sender data
-      const fromUserDoc = await getDoc(doc(db, 'users', fromUserId));
-      const fromUserData = fromUserDoc.data();
-      
-      // Create friend request
-      const friendRequest: Omit<FriendRequest, 'id'> = {
-        fromUserId,
-        fromUserData: {
-          fullName: fromUserData?.fullName || 'Unknown User',
-          email: fromUserData?.email || '',
-          avatar: fromUserData?.profilePicture
-        },
-        toUserId,
-        toUserEmail: toEmail.toLowerCase(),
-        message,
-        status: 'pending',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      const docRef = await addDoc(collection(db, 'friendRequests'), friendRequest);
-      
-      // Send notification to recipient
-      await this.createNotification({
-        userId: toUserId,
-        type: 'friend_request',
-        title: 'New Friend Request',
-        message: `${fromUserData?.fullName} wants to be your friend`,
-        data: { friendRequestId: docRef.id, fromUserId },
-        isRead: false,
-        createdAt: new Date()
-      });
-      
-    } catch (error) {
-      console.error('Send friend request error:', error);
-      throw error;
+static async sendFriendRequest(fromUserId: string, toEmail: string, message?: string): Promise<void> {
+  try {
+    // Get current user data first
+    const fromUserDoc = await getDoc(doc(db, 'users', fromUserId));
+    if (!fromUserDoc.exists()) {
+      throw new Error('User not found');
     }
+    const fromUserData = fromUserDoc.data();
+    
+    // Find user by email
+    const usersQuery = query(
+      collection(db, 'users'),
+      where('email', '==', toEmail.toLowerCase())
+    );
+    const userSnapshot = await getDocs(usersQuery);
+    
+    if (userSnapshot.empty) {
+      throw new Error('User not found with this email address');
+    }
+    
+    const toUser = userSnapshot.docs[0];
+    const toUserId = toUser.id;
+    const toUserData = toUser.data();
+    
+    // Check if already friends or request exists
+    const existingQuery = query(
+      collection(db, 'friendRequests'),
+      where('fromUserId', '==', fromUserId),
+      where('toUserId', '==', toUserId),
+      where('status', '==', 'pending')
+    );
+    const existingSnapshot = await getDocs(existingQuery);
+    
+    if (!existingSnapshot.empty) {
+      throw new Error('Friend request already sent');
+    }
+    
+    // Create friend request with proper structure
+    const friendRequest = {
+      fromUserId,
+      fromUserData: {
+        fullName: fromUserData?.fullName || 'Unknown User',
+        email: fromUserData?.email || '',
+        avatar: fromUserData?.profilePicture || '',
+        mobile: fromUserData?.mobile || '' // Add mobile for SMS
+      },
+      toUserId,
+      toUserData: {
+        fullName: toUserData?.fullName || 'Unknown User',
+        email: toEmail.toLowerCase(),
+        avatar: toUserData?.profilePicture || '',
+        mobile: toUserData?.mobile || ''
+      },
+      message: message || '',
+      status: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await addDoc(collection(db, 'friendRequests'), friendRequest);
+    console.log('Friend request created:', docRef.id);
+    
+  } catch (error) {
+    console.error('Send friend request error:', error);
+    throw error;
   }
+}
   
   static async acceptFriendRequest(requestId: string): Promise<void> {
     try {
@@ -302,52 +319,60 @@ export class SplittingService {
     }
   }
   
-  static async getFriends(userId: string): Promise<Friend[]> {
-    try {
-      const friendsQuery = query(
-        collection(db, 'friends'),
-        where('userId', '==', userId),
-        where('status', '==', 'accepted'),
-        orderBy('lastActivity', 'desc')
-      );
-      
-      const snapshot = await getDocs(friendsQuery);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Friend[];
-      
-    } catch (error) {
-      console.error('Get friends error:', error);
-      throw error;
-    }
+static async getFriends(userId: string): Promise<Friend[]> {
+  try {
+    // Get accepted friends
+    const friendsQuery = query(
+      collection(db, 'friends'),
+      where('userId', '==', userId),
+      where('status', '==', 'accepted'),
+      orderBy('lastActivity', 'desc')
+    );
+    
+    const friendsSnapshot = await getDocs(friendsQuery);
+    const acceptedFriends = friendsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Friend[];
+    
+    // Get pending invitations
+    const pendingInvitations = await this.getPendingFriendInvitations(userId);
+    
+    // Combine and return
+    return [...acceptedFriends, ...pendingInvitations];
+    
+  } catch (error) {
+    console.error('Get friends error:', error);
+    return [];
   }
+}
   
   // GROUPS MANAGEMENT
-  static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt' | 'inviteCode'>): Promise<string> {
-    try {
-      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      
-      const newGroup: Omit<Group, 'id'> = {
-        ...groupData,
-        inviteCode,
-        totalExpenses: 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      const docRef = await addDoc(collection(db, 'groups'), newGroup);
-      
-      // Add creator as admin member
-      await this.addGroupMember(docRef.id, groupData.createdBy, 'admin');
-      
-      return docRef.id;
-      
-    } catch (error) {
-      console.error('Create group error:', error);
-      throw error;
-    }
+static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  try {
+    // Ensure inviteCode is provided or generate one
+    const inviteCode = groupData.inviteCode || Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    const newGroup: Omit<Group, 'id'> = {
+      ...groupData,
+      inviteCode,
+      totalExpenses: groupData.totalExpenses || 0,
+      isActive: groupData.isActive !== undefined ? groupData.isActive : true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    // Create the group document
+    const docRef = await addDoc(collection(db, 'groups'), newGroup);
+    
+    console.log('Group created successfully with ID:', docRef.id);
+    return docRef.id;
+    
+  } catch (error) {
+    console.error('Create group error:', error);
+    throw error;
   }
+}
   
   static async addGroupMember(groupId: string, userId: string, role: 'admin' | 'member' = 'member'): Promise<void> {
     try {
@@ -611,87 +636,107 @@ export class SplittingService {
       callback(requests);
     });
   }
-
-  // GET USER GROUPS
-  static async getUserGroups(userId: string): Promise<Group[]> {
-    try {
-      const groupsQuery = query(
-        collection(db, 'groups'),
-        where('members', 'array-contains-any', [{ userId }]),
-        where('isActive', '==', true),
-        orderBy('updatedAt', 'desc')
-      );
-      
-      const snapshot = await getDocs(groupsQuery);
-      return snapshot.docs.map(doc => ({
+  // GET PENDING FRIEND INVITATIONS
+static async getPendingFriendInvitations(userId: string): Promise<Friend[]> {
+  try {
+    const requestsQuery = query(
+      collection(db, 'friendRequests'),
+      where('fromUserId', '==', userId),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const snapshot = await getDocs(requestsQuery);
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      })) as Group[];
-      
-    } catch (error) {
-      console.error('Get user groups error:', error);
-      // Fallback query if array-contains-any doesn't work
-      try {
-        const allGroupsQuery = query(
-          collection(db, 'groups'),
-          where('isActive', '==', true)
-        );
-        
-        const snapshot = await getDocs(allGroupsQuery);
-        const allGroups = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        })) as Group[];
-        
-        // Filter groups where user is a member
-        return allGroups.filter(group => 
-          group.members.some(member => member.userId === userId)
-        );
-        
-      } catch (fallbackError) {
-        console.error('Fallback get user groups error:', fallbackError);
-        return [];
-      }
-    }
+        userId: data.fromUserId,
+        friendId: data.toUserId,
+        friendData: data.toUserData,
+        status: 'invited' as const,
+        balance: 0,
+        lastActivity: data.createdAt?.toDate() || new Date(),
+        createdAt: data.createdAt?.toDate() || new Date(),
+        invitedAt: data.createdAt?.toDate() || new Date(),
+        requestId: doc.id
+      };
+    }) as Friend[];
+  } catch (error) {
+    console.error('Get pending invitations error:', error);
+    return [];
   }
-
+}
+  // GET USER GROUPS
+static async getUserGroups(userId: string): Promise<Group[]> {
+  try {
+    // Simplified query that doesn't require complex indexing
+    // Use only isActive filter first, then sort in memory
+    const groupsQuery = query(
+      collection(db, 'groups'),
+      where('isActive', '==', true)
+      // Remove orderBy to avoid index requirement while building
+    );
+    
+    const snapshot = await getDocs(groupsQuery);
+    const allGroups = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as Group[];
+    
+    // Filter groups where user is a member and sort in memory
+    const userGroups = allGroups
+      .filter(group => 
+        group.members && group.members.some(member => member.userId === userId)
+      )
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); // Sort by updatedAt descending
+    
+    return userGroups;
+    
+  } catch (error) {
+    console.error('Get user groups error:', error);
+    // Fallback: return empty array instead of throwing
+    return [];
+  }
+}
   // GET USER EXPENSES
-  static async getUserExpenses(userId: string, limit: number = 20): Promise<Expense[]> {
-    try {
-      // First get user's groups
-      const userGroups = await this.getUserGroups(userId);
-      const groupIds = userGroups.map(group => group.id);
-      
-      if (groupIds.length === 0) {
-        return [];
-      }
-      
-      // Get expenses from user's groups
-      const expensesQuery = query(
-        collection(db, 'expenses'),
-        where('groupId', 'in', groupIds.slice(0, 10)), // Firestore 'in' limit is 10
-        orderBy('createdAt', 'desc'),
-        limit(limit)
-      );
-      
-      const snapshot = await getDocs(expensesQuery);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date?.toDate() || new Date(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      })) as Expense[];
-      
-    } catch (error) {
-      console.error('Get user expenses error:', error);
+static async getUserExpenses(userId: string, limitCount: number = 20): Promise<Expense[]> {
+  try {
+    // First get user's groups
+    const userGroups = await this.getUserGroups(userId);
+    const groupIds = userGroups.map(group => group.id);
+    
+    if (groupIds.length === 0) {
       return [];
     }
+    
+    // Import limit function correctly
+    const { query, collection, where, orderBy, limit, getDocs } = await import('firebase/firestore');
+    
+    // Get expenses from user's groups (max 10 groups due to 'in' limitation)
+    const expensesQuery = query(
+      collection(db, 'expenses'),
+      where('groupId', 'in', groupIds.slice(0, 10)),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount) // Use limitCount parameter
+    );
+    
+    const snapshot = await getDocs(expensesQuery);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      date: doc.data().date?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as Expense[];
+    
+  } catch (error) {
+    console.error('Get user expenses error:', error);
+    return [];
   }
+}
 
   // GET SINGLE GROUP
   static async getGroup(groupId: string): Promise<Group | null> {
@@ -728,6 +773,57 @@ export class SplittingService {
       throw error;
     }
   }
+// CHAT METHODS
+static async sendGroupMessage(messageData: {
+  groupId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  message: string;
+  type: 'message' | 'expense' | 'system';
+  expenseData?: any;
+}): Promise<string> {
+  try {
+    const chatMessage: Omit<ChatMessage, 'id'> = {
+      ...messageData,
+      timestamp: new Date()
+    };
+    
+    const docRef = await addDoc(collection(db, 'groupMessages'), chatMessage);
+    
+    // Update group's last activity
+    await updateDoc(doc(db, 'groups', messageData.groupId), {
+      updatedAt: serverTimestamp()
+    });
+    
+    return docRef.id;
+  } catch (error) {
+    console.error('Send group message error:', error);
+    throw error;
+  }
+}
+
+static async getGroupMessages(groupId: string, limitCount: number = 50): Promise<ChatMessage[]> {
+  try {
+    const messagesQuery = query(
+      collection(db, 'groupMessages'),
+      where('groupId', '==', groupId),
+      orderBy('timestamp', 'asc'),
+      limit(limitCount)
+    );
+    
+    const snapshot = await getDocs(messagesQuery);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp?.toDate() || new Date(),
+    })) as ChatMessage[];
+  } catch (error) {
+    console.error('Get group messages error:', error);
+    return [];
+  }
+
+}
 }
 
 // QR Code Service
@@ -766,4 +862,6 @@ export class QRCodeService {
       throw new Error('Invalid QR code format');
     }
   }
+
+
 }

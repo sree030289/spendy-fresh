@@ -31,6 +31,7 @@ import QRCodeModal from '@/components/modals/QRCodeModal';
 import PaymentModal from '@/components/modals/PaymentModal';
 import GroupChatModal from '@/components/modals/GroupChatModal';
 import ReceiptScannerModal from '@/components/modals/ReceiptScannerModal';
+import GroupDetailsModal from '@/components/modals/GroupDetailsModal';
 
 export default function RealSplittingScreen() {
   const navigation = useNavigation();
@@ -52,6 +53,8 @@ export default function RealSplittingScreen() {
     totalOwing: 0,
     netBalance: 0
   });
+  const [showGroupDetails, setShowGroupDetails] = useState(false);
+
   
   // Modal states
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -123,29 +126,34 @@ export default function RealSplittingScreen() {
   }, [user?.id]);
 
   // Load friends data
-  const loadFriends = async () => {
-    try {
-      if (!user?.id) return;
-      const friendsData = await SplittingService.getFriends(user.id);
-      setFriends(friendsData);
-      
-      // Calculate balances
-      const totalOwed = friendsData.reduce((sum, friend) => 
-        sum + (friend.balance > 0 ? friend.balance : 0), 0
-      );
-      const totalOwing = friendsData.reduce((sum, friend) => 
-        sum + (friend.balance < 0 ? Math.abs(friend.balance) : 0), 0
-      );
-      
-      setBalances({
-        totalOwed,
-        totalOwing,
-        netBalance: totalOwed - totalOwing
-      });
-    } catch (error) {
-      console.error('Load friends error:', error);
-    }
-  };
+const loadFriends = async () => {
+  try {
+    if (!user?.id) return;
+    
+    console.log('Loading friends for user:', user.id);
+    const friendsData = await SplittingService.getFriends(user.id);
+    setFriends(friendsData);
+    
+    // Calculate balances safely (only for accepted friends)
+    const acceptedFriends = friendsData.filter(friend => friend.status === 'accepted');
+    const totalOwed = acceptedFriends.reduce((sum, friend) => 
+      sum + Math.max(0, friend.balance || 0), 0
+    );
+    const totalOwing = acceptedFriends.reduce((sum, friend) => 
+      sum + Math.max(0, -(friend.balance || 0)), 0
+    );
+    
+    setBalances({
+      totalOwed,
+      totalOwing,
+      netBalance: totalOwed - totalOwing
+    });
+  } catch (error) {
+    console.error('Load friends error:', error);
+    setFriends([]); // Set empty array as fallback
+  }
+};
+
 
   // Load groups data
   const loadGroups = async () => {
@@ -239,83 +247,107 @@ export default function RealSplittingScreen() {
   };
 
   // Handle create group
-  const handleCreateGroup = async (groupData: any) => {
-    try {
-      if (!user?.id) return;
-      
-      const groupId = await SplittingService.createGroup({
-        ...groupData,
-        createdBy: user.id,
-        members: [{
-          userId: user.id,
-          userData: {
-            fullName: user.fullName,
-            email: user.email,
-            avatar: user.profilePicture
-          },
-          role: 'admin',
-          balance: 0,
-          joinedAt: new Date(),
-          isActive: true
-        }],
-        isActive: true,
-        settings: {
-          allowMemberInvites: true,
-          requireApproval: false,
-          currency: user.currency
+const handleCreateGroup = async (groupData: any) => {
+  try {
+    if (!user?.id) return;
+    
+    // Generate invite code
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    const groupId = await SplittingService.createGroup({
+      name: groupData.name,
+      description: groupData.description || '',
+      avatar: groupData.avatar,
+      createdBy: user.id,
+      currency: groupData.currency || user.currency || 'AUD',
+      inviteCode, // Add the invite code
+      totalExpenses: 0,
+      isActive: true,
+      members: [{
+        userId: user.id,
+        userData: {
+          fullName: user.fullName,
+          email: user.email,
+          avatar: user.profilePicture || ''
+        },
+        role: 'admin' as const,
+        balance: 0,
+        joinedAt: new Date(),
+        isActive: true
+      }],
+      settings: {
+        allowMemberInvites: true,
+        requireApproval: false,
+        currency: user.currency || 'AUD'
+      }
+    });
+    
+    await loadGroups(); // Refresh groups list
+    
+    // Show success with invite code
+    Alert.alert(
+      'Group Created! 🎉', 
+      `"${groupData.name}" has been created successfully!\n\nInvite Code: ${inviteCode}\n\nYou can now invite friends using this code, QR code, or direct invitations.`,
+      [
+        {
+          text: 'Share Invite Code',
+          onPress: () => {
+            // Share the invite code
+            require('react-native').Share.share({
+              message: `Join "${groupData.name}" on Spendy! Use invite code: ${inviteCode} or download the app: https://spendy.app/join/${inviteCode}`
+            });
+          }
+        },
+        {
+          text: 'Done',
+          style: 'default'
         }
-      });
-      
-      await loadGroups(); // Refresh groups list
-      Alert.alert('Success', 'Group created successfully!');
-      setShowCreateGroup(false);
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create group');
-    }
-  };
+      ]
+    );
+    
+    setShowCreateGroup(false);
+  } catch (error: any) {
+    console.error('Create group error:', error);
+    Alert.alert('Error', error.message || 'Failed to create group');
+  }
+};
 
   // Handle add expense
-  const handleAddExpense = async (expenseData: any) => {
-    try {
-      if (!user?.id) return;
-      
-      const expenseId = await SplittingService.addExpense({
-        ...expenseData,
-        paidBy: user.id,
-        paidByData: {
-          fullName: user.fullName,
-          email: user.email
-        },
-        isSettled: false,
-        date: new Date()
-      });
-      
-      await Promise.all([
-        loadGroups(),
-        loadRecentExpenses(),
-        loadFriends()
-      ]);
-      
-      // Send notifications to group members
-      await PushNotificationService.sendNotificationToGroup(
-        expenseData.groupId,
-        user.id,
-        PushNotificationService.createExpenseAddedNotification(
-          user.fullName,
-          expenseData.amount,
-          expenseData.currency,
-          expenseData.description,
-          expenseId,
-          expenseData.groupId
-        )
-      );
-      
-      Alert.alert('Success', 'Expense added successfully!');
-      setShowAddExpense(false);
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to add expense');
-    }
-  };
+const handleAddExpense = async (expenseData: any) => {
+  try {
+    if (!user?.id) return;
+    
+    const expenseId = await SplittingService.addExpense({
+      ...expenseData,
+      paidBy: user.id,
+      paidByData: {
+        fullName: user.fullName,
+        email: user.email
+      },
+      isSettled: false,
+      date: new Date()
+    });
+    
+    // Force refresh all data
+    console.log('Expense added, refreshing data...');
+    await Promise.all([
+      loadGroups(),
+      loadRecentExpenses(),
+      loadFriends()
+    ]);
+    
+    // Additional refresh to ensure UI updates
+    setTimeout(() => {
+      loadRecentExpenses();
+    }, 1000);
+    
+    Alert.alert('Success', 'Expense added successfully!');
+    setShowAddExpense(false);
+  } catch (error: any) {
+    console.error('Add expense error:', error);
+    Alert.alert('Error', error.message || 'Failed to add expense');
+  }
+};
 
   // Handle payment
   const handlePayment = async (friendId: string, amount: number, method: string) => {
@@ -502,173 +534,203 @@ export default function RealSplittingScreen() {
   );
 
   // Render groups tab
-  const renderGroupsTab = () => (
-    <ScrollView 
-      contentContainerStyle={styles.tabContent}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View style={styles.tabHeader}>
-        <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Your Groups</Text>
-        <TouchableOpacity
-          style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
-          onPress={() => setShowCreateGroup(true)}
-        >
-          <Ionicons name="add" size={20} color="white" />
-          <Text style={styles.headerButtonText}>Create</Text>
-        </TouchableOpacity>
-      </View>
+const renderGroupsTab = () => (
+  <ScrollView 
+    contentContainerStyle={styles.tabContent}
+    refreshControl={
+      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+    }
+  >
+    <View style={styles.tabHeader}>
+      <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Your Groups</Text>
+      <TouchableOpacity
+        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+        onPress={() => setShowCreateGroup(true)}
+      >
+        <Ionicons name="add" size={20} color="white" />
+        <Text style={styles.headerButtonText}>Create</Text>
+      </TouchableOpacity>
+    </View>
 
-      {groups.map((group) => (
-        <TouchableOpacity
-          key={group.id}
-          style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}
-          onPress={() => {
-            setSelectedGroup(group);
-            setShowGroupChat(true);
-          }}
-        >
-          <View style={styles.groupHeader}>
-            <View style={styles.groupLeft}>
-              <Text style={styles.groupAvatar}>{group.avatar}</Text>
-              <View>
-                <Text style={[styles.groupName, { color: theme.colors.text }]}>
-                  {group.name}
-                </Text>
-                <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
-                  {group.members.length} members
-                </Text>
-              </View>
-            </View>
-            <View style={styles.groupActions}>
-              <TouchableOpacity
-                onPress={() => setShowQRCode(true)}
-                style={styles.groupActionButton}
-              >
-                <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setSelectedGroup(group);
-                  setShowGroupChat(true);
-                }}
-                style={styles.groupActionButton}
-              >
-                <Ionicons name="chatbubble" size={20} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.groupStats}>
-            <View style={styles.groupStat}>
-              <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-                Total spent
+    {groups.map((group) => (
+      <TouchableOpacity
+        key={group.id}
+        style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}
+        onPress={() => {
+          setSelectedGroup(group);
+          setShowGroupDetails(true); // Open details instead of chat
+        }}
+      >
+        <View style={styles.groupHeader}>
+          <View style={styles.groupLeft}>
+            <Text style={styles.groupAvatar}>{group.avatar}</Text>
+            <View>
+              <Text style={[styles.groupName, { color: theme.colors.text }]}>
+                {group.name}
               </Text>
-              <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                ${group.totalExpenses.toFixed(2)}
-              </Text>
-            </View>
-            <View style={styles.groupStat}>
-              <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-                Your share
-              </Text>
-              <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                ${(group.totalExpenses / group.members.length).toFixed(2)}
+              <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
+                {group.members.length} members
               </Text>
             </View>
           </View>
-
-          <View style={styles.groupFooter}>
-            <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
-              Last activity: {group.updatedAt.toLocaleDateString()}
-            </Text>
+          <View style={styles.groupActions}>
             <TouchableOpacity
-              onPress={() => setShowAddExpense(true)}
+              onPress={(e) => {
+                e.stopPropagation();
+                setShowQRCode(true);
+              }}
+              style={styles.groupActionButton}
+            >
+              <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.groupStats}>
+          <View style={styles.groupStat}>
+            <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
+              Total spent
+            </Text>
+            <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
+              ${group.totalExpenses.toFixed(2)}
+            </Text>
+          </View>
+          <View style={styles.groupStat}>
+            <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
+              Your share
+            </Text>
+            <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
+              ${(group.totalExpenses / group.members.length).toFixed(2)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.groupFooter}>
+          <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
+            Last activity: {group.updatedAt.toLocaleDateString()}
+          </Text>
+          <View style={styles.groupFooterActions}>
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedGroup(group);
+                setShowGroupChat(true);
+              }}
+              style={[styles.chatButton, { backgroundColor: theme.colors.primary + '20' }]}
+            >
+              <Ionicons name="chatbubble" size={16} color={theme.colors.primary} />
+              <Text style={[styles.chatButtonText, { color: theme.colors.primary }]}>Chat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                setShowAddExpense(true);
+              }}
               style={[styles.addExpenseButton, { backgroundColor: theme.colors.primary }]}
             >
               <Text style={styles.addExpenseButtonText}>Add Expense</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
+        </View>
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+);
 
   // Render friends tab
-  const renderFriendsTab = () => (
-    <ScrollView 
-      contentContainerStyle={styles.tabContent}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View style={styles.tabHeader}>
-        <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Friends</Text>
-        <TouchableOpacity
-          style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
-          onPress={() => setShowAddFriend(true)}
-        >
-          <Ionicons name="person-add" size={20} color="white" />
-          <Text style={styles.headerButtonText}>Add</Text>
-        </TouchableOpacity>
-      </View>
+const renderFriendsTab = () => (
+  <ScrollView 
+    contentContainerStyle={styles.tabContent}
+    refreshControl={
+      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+    }
+  >
+    <View style={styles.tabHeader}>
+      <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Friends</Text>
+      <TouchableOpacity
+        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+        onPress={() => setShowAddFriend(true)}
+      >
+        <Ionicons name="person-add" size={20} color="white" />
+        <Text style={styles.headerButtonText}>Add</Text>
+      </TouchableOpacity>
+    </View>
 
-      {friends.map((friend) => (
-        <View key={friend.id} style={[styles.friendCard, { backgroundColor: theme.colors.surface }]}>
-          <View style={styles.friendCardHeader}>
-            <View style={styles.friendLeft}>
-              <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
-                <Text style={styles.friendAvatarText}>
-                  {friend.friendData.fullName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View>
-                <Text style={[styles.friendName, { color: theme.colors.text }]}>
-                  {friend.friendData.fullName}
-                </Text>
-                <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                  {friend.friendData.email}
-                </Text>
-              </View>
+    {friends.map((friend) => (
+      <View key={friend.id} style={[styles.friendCard, { backgroundColor: theme.colors.surface }]}>
+        <View style={styles.friendCardHeader}>
+          <View style={styles.friendLeft}>
+            <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
+              <Text style={styles.friendAvatarText}>
+                {friend.friendData.fullName.charAt(0).toUpperCase()}
+              </Text>
             </View>
-            
-            <View style={styles.friendActions}>
-              {friend.balance !== 0 && (
-                <TouchableOpacity
-                  style={[styles.payButton, { backgroundColor: theme.colors.primary }]}
-                  onPress={() => {
-                    setSelectedFriend(friend);
-                    setShowPayment(true);
-                  }}
-                >
-                  <Text style={styles.payButtonText}>
-                    {friend.balance > 0 ? 'Request' : 'Pay'}
-                  </Text>
-                </TouchableOpacity>
-              )}
+            <View>
+              <Text style={[styles.friendName, { color: theme.colors.text }]}>
+                {friend.friendData.fullName}
+              </Text>
+              <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                {friend.friendData.email}
+              </Text>
+              {/* Show friend status */}
+              <Text style={[
+                styles.friendStatus, 
+                { 
+                  color: friend.status === 'accepted' ? theme.colors.success : 
+                         friend.status === 'invited' ? theme.colors.primary : 
+                         friend.status === 'pending' ? theme.colors.primary : theme.colors.textSecondary
+                }
+              ]}>
+                {friend.status === 'accepted' ? '✓ Friends' : 
+                 friend.status === 'invited' ? '📤 Invitation Sent' : 
+                 friend.status === 'pending' ? '⏳ Pending Response' : 'Unknown'}
+              </Text>
             </View>
           </View>
-
-          <View style={styles.friendBalance}>
-            {friend.balance === 0 ? (
-              <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-                You're all settled up! 🎉
-              </Text>
-            ) : friend.balance > 0 ? (
-              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                {friend.friendData.fullName} owes you ${Math.abs(friend.balance).toFixed(2)}
-              </Text>
-            ) : (
-              <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                You owe {friend.friendData.fullName} ${Math.abs(friend.balance).toFixed(2)}
-              </Text>
+          
+          <View style={styles.friendActions}>
+            {friend.balance !== 0 && friend.status === 'accepted' && (
+              <TouchableOpacity
+                style={[styles.payButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => {
+                  setSelectedFriend(friend);
+                  setShowPayment(true);
+                }}
+              >
+                <Text style={styles.payButtonText}>
+                  {friend.balance > 0 ? 'Request' : 'Pay'}
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         </View>
-      ))}
-    </ScrollView>
-  );
+
+        <View style={styles.friendBalance}>
+          {friend.status !== 'accepted' ? (
+            <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
+              {friend.status === 'invited' && friend.invitedAt && 
+                `Invited ${friend.invitedAt.toLocaleDateString()}`
+              }
+            </Text>
+          ) : friend.balance === 0 ? (
+            <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
+              You're all settled up! 🎉
+            </Text>
+          ) : friend.balance > 0 ? (
+            <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+              {friend.friendData.fullName} owes you ${Math.abs(friend.balance).toFixed(2)}
+            </Text>
+          ) : (
+            <Text style={[styles.balanceText, { color: theme.colors.error }]}>
+              You owe {friend.friendData.fullName} ${Math.abs(friend.balance).toFixed(2)}
+            </Text>
+          )}
+        </View>
+      </View>
+    ))}
+  </ScrollView>
+);
+
 
   // Tab navigation
   const tabs = [
@@ -719,30 +781,32 @@ export default function RealSplittingScreen() {
 
       {/* Tab Navigation */}
       <View style={[styles.tabNavigation, { backgroundColor: theme.colors.background }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[
-                styles.tab,
-                activeTab === tab.id && [styles.activeTab, { backgroundColor: theme.colors.primary + '20' }]
-              ]}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Ionicons
-                name={tab.icon as any}
-                size={20}
-                color={activeTab === tab.id ? theme.colors.primary : theme.colors.textSecondary}
-              />
-              <Text style={[
-                styles.tabText,
-                { color: activeTab === tab.id ? theme.colors.primary : theme.colors.textSecondary }
-              ]}>
-                {tab.title}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={[styles.segmentedControl, { backgroundColor: theme.colors.surface }]}>
+  {tabs.map((tab, index) => (
+    <TouchableOpacity
+      key={tab.id}
+      style={[
+        styles.segment,
+        activeTab === tab.id && [styles.activeSegment, { backgroundColor: theme.colors.primary }],
+        index === 0 && styles.firstSegment,
+        index === tabs.length - 1 && styles.lastSegment,
+      ]}
+      onPress={() => setActiveTab(tab.id)}
+    >
+      <Ionicons
+        name={tab.icon as any}
+        size={18}
+        color={activeTab === tab.id ? 'white' : theme.colors.textSecondary}
+      />
+      <Text style={[
+        styles.segmentText,
+        { color: activeTab === tab.id ? 'white' : theme.colors.textSecondary }
+      ]}>
+        {tab.title}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</View>
       </View>
 
       {/* Tab Content */}
@@ -783,6 +847,22 @@ export default function RealSplittingScreen() {
         friends={friends}
       />
       
+      {/* Add the new GroupDetailsModal */}
+    <GroupDetailsModal
+      visible={showGroupDetails}
+      onClose={() => setShowGroupDetails(false)}
+      group={selectedGroup}
+      currentUser={user}
+      onAddExpense={() => {
+        setShowGroupDetails(false);
+        setShowAddExpense(true);
+      }}
+      onOpenChat={() => {
+        setShowGroupDetails(false);
+        setShowGroupChat(true);
+      }}
+    />
+    
       <QRCodeModal
         visible={showQRCode}
         onClose={() => setShowQRCode(false)}
@@ -813,6 +893,7 @@ export default function RealSplittingScreen() {
           console.log('Receipt processed:', receiptData);
         }}
       />
+
     </SafeAreaView>
   );
 }
@@ -870,8 +951,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   tabNavigation: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomWidth: 0, // Remove the problematic border
+    paddingVertical: 8,
+  },
+  tabScrollContent: {
+    paddingHorizontal: 16,
+    gap: 8,
   },
   tab: {
     flexDirection: 'row',
@@ -879,14 +964,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginHorizontal: 4,
-    borderRadius: 8,
+    borderRadius: 20, // More rounded for better look
   },
   activeTab: {
-    borderRadius: 8,
+    // Don't put backgroundColor here - it's applied inline with theme
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   tabText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     marginLeft: 6,
   },
   tabContainer: {
@@ -1177,5 +1267,66 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
+  },
+  segmentedControl: {
+  flexDirection: 'row',
+  margin: 16,
+  borderRadius: 12,
+  padding: 4,
+},
+
+segment: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 12,
+  paddingHorizontal: 8,
+  borderRadius: 8,
+  gap: 6,
+},
+
+activeSegment: {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 2,
+},
+
+firstSegment: {
+  borderTopLeftRadius: 8,
+  borderBottomLeftRadius: 8,
+},
+
+lastSegment: {
+  borderTopRightRadius: 8,
+  borderBottomRightRadius: 8,
+},
+
+segmentText: {
+  fontSize: 13,
+  fontWeight: '600',
+},
+groupFooterActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  chatButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  friendStatus: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
   },
 });

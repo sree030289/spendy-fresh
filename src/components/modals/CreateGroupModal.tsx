@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { Friend } from '@/services/firebase/splitting';
+import { Friend, SplittingService } from '@/services/firebase/splitting';
 import { InviteService } from '@/services/payments/PaymentService';
 
 interface CreateGroupModalProps {
@@ -38,7 +38,7 @@ export default function CreateGroupModal({ visible, onClose, onSubmit, friends }
   const [groupName, setGroupName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('🍕');
   const [description, setDescription] = useState('');
-  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+const [selectedFriends, setSelectedFriends] = useState<string[]>([]); // Keep this but make it optional
   const [inviteMethod, setInviteMethod] = useState<'none' | 'sms' | 'whatsapp' | 'email'>('none');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({ name: '' });
@@ -64,40 +64,38 @@ export default function CreateGroupModal({ visible, onClose, onSubmit, friends }
     );
   };
 
-  const handleCreateGroup = async () => {
-    if (!validateGroupName(groupName)) return;
 
-    setLoading(true);
-    try {
-      const groupData = {
-        name: groupName.trim(),
-        description: description.trim(),
-        avatar: selectedIcon,
-        currency: user?.currency || 'AUD',
-        selectedFriends,
-        inviteMethod
-      };
+const handleCreateGroup = async () => {
+  if (!validateGroupName(groupName)) return;
 
-      await onSubmit(groupData);
+  setLoading(true);
+  try {
+    // Simplified group data - no friends required
+    const groupData = {
+      name: groupName.trim(),
+      description: description.trim() || '',
+      avatar: selectedIcon,
+      currency: user?.currency || 'AUD',
+      // Remove selectedFriends requirement
+      // selectedFriends: [], // Empty array is fine
+      // Remove inviteMethod requirement for now
+      // inviteMethod: 'none',
+    };
 
-      // Send invitations if method is selected
-      if (inviteMethod !== 'none' && selectedFriends.length > 0) {
-        await sendInvitations();
-      }
+    await onSubmit(groupData);
 
-      // Reset form
-      setGroupName('');
-      setDescription('');
-      setSelectedIcon('🍕');
-      setSelectedFriends([]);
-      setInviteMethod('none');
-      
-    } catch (error) {
-      // Error handled in parent component
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Reset form
+    setGroupName('');
+    setDescription('');
+    setSelectedIcon('🍕');
+    setSelectedFriends([]);
+    
+  } catch (error) {
+    // Error handled in parent component
+  } finally {
+    setLoading(false);
+  }
+};
 
   const sendInvitations = async () => {
     const selectedFriendData = friends.filter(friend => 
@@ -152,139 +150,86 @@ export default function CreateGroupModal({ visible, onClose, onSubmit, friends }
     </View>
   );
 
-  const renderFriendSelector = () => (
-    <View style={styles.friendSelector}>
-      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-        Add Friends ({selectedFriends.length} selected)
-      </Text>
-      
-      {friends.length === 0 ? (
-        <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} />
-          <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
-            No friends added yet
-          </Text>
-          <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-            Add friends first to invite them to groups
-          </Text>
-        </View>
-      ) : (
-        <ScrollView style={styles.friendsList} nestedScrollEnabled>
-          {friends.map((friend) => (
-            <TouchableOpacity
-              key={friend.id}
-              style={[styles.friendItem, { backgroundColor: theme.colors.surface }]}
-              onPress={() => toggleFriendSelection(friend.id)}
-            >
-              <View style={styles.friendInfo}>
-                <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
-                  <Text style={styles.friendAvatarText}>
-                    {friend.friendData.fullName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View>
-                  <Text style={[styles.friendName, { color: theme.colors.text }]}>
-                    {friend.friendData.fullName}
-                  </Text>
-                  <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                    {friend.friendData.email}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.friendSelector}>
-                <View style={[
-                  styles.checkbox,
-                  selectedFriends.includes(friend.id) && [styles.checkedBox, { backgroundColor: theme.colors.primary }]
-                ]}>
-                  {selectedFriends.includes(friend.id) && (
-                    <Ionicons name="checkmark" size={16} color="white" />
-                  )}
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-    </View>
-  );
-
-  const renderInviteMethod = () => (
-    <View style={styles.inviteMethod}>
-      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Send Invitations</Text>
-      
-      <View style={styles.inviteOptions}>
-        <TouchableOpacity
-          style={[
-            styles.inviteOption,
-            inviteMethod === 'none' && [styles.selectedInviteOption, { backgroundColor: theme.colors.primary + '20' }]
-          ]}
-          onPress={() => setInviteMethod('none')}
-        >
-          <Ionicons 
-            name="close-circle" 
-            size={24} 
-            color={inviteMethod === 'none' ? theme.colors.primary : theme.colors.textSecondary} 
-          />
-          <Text style={[
-            styles.inviteOptionText,
-            { color: inviteMethod === 'none' ? theme.colors.primary : theme.colors.textSecondary }
-          ]}>
-            Don't send
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.inviteOption,
-            inviteMethod === 'sms' && [styles.selectedInviteOption, { backgroundColor: theme.colors.primary + '20' }]
-          ]}
-          onPress={() => setInviteMethod('sms')}
-        >
-          <Ionicons 
-            name="chatbox" 
-            size={24} 
-            color={inviteMethod === 'sms' ? theme.colors.primary : theme.colors.textSecondary} 
-          />
-          <Text style={[
-            styles.inviteOptionText,
-            { color: inviteMethod === 'sms' ? theme.colors.primary : theme.colors.textSecondary }
-          ]}>
-            SMS
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.inviteOption,
-            inviteMethod === 'whatsapp' && [styles.selectedInviteOption, { backgroundColor: theme.colors.primary + '20' }]
-          ]}
-          onPress={() => setInviteMethod('whatsapp')}
-        >
-          <Ionicons 
-            name="logo-whatsapp" 
-            size={24} 
-            color={inviteMethod === 'whatsapp' ? theme.colors.primary : theme.colors.textSecondary} 
-          />
-          <Text style={[
-            styles.inviteOptionText,
-            { color: inviteMethod === 'whatsapp' ? theme.colors.primary : theme.colors.textSecondary }
-          ]}>
-            WhatsApp
-          </Text>
-        </TouchableOpacity>
+const renderFriendSelector = () => (
+  <View style={styles.friendSelector}>
+    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+      Add Friends ({selectedFriends.length} selected)
+    </Text>
+    
+    {friends.length === 0 ? (
+      <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+        <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} />
+        <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
+          No friends added yet
+        </Text>
+        <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+          Add friends first to invite them to groups
+        </Text>
       </View>
+    ) : (
+      <ScrollView style={styles.friendsList} nestedScrollEnabled>
+        {friends.map((friend) => (
+          <TouchableOpacity
+            key={friend.id}
+            style={[styles.friendItem, { backgroundColor: theme.colors.surface }]}
+            onPress={() => toggleFriendSelection(friend.id)}
+          >
+            <View style={styles.friendInfo}>
+              <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
+                <Text style={styles.friendAvatarText}>
+                  {friend.friendData.fullName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View>
+                <Text style={[styles.friendName, { color: theme.colors.text }]}>
+                  {friend.friendData.fullName}
+                </Text>
+                <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                  {friend.friendData.email}
+                </Text>
+                {/* Show status */}
+                <Text style={[
+                  styles.friendStatus, 
+                  { 
+                    color: friend.status === 'accepted' ? theme.colors.success : 
+                           friend.status === 'invited' ? theme.colors.primary : theme.colors.textSecondary
+                  }
+                ]}>
+                  {friend.status === 'accepted' ? '✓ Friends' : 
+                   friend.status === 'invited' ? '📤 Invited' : 
+                   friend.status === 'pending' ? '⏳ Pending' : 'Unknown'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.friendSelector}>
+              <View style={[
+                styles.checkbox,
+                selectedFriends.includes(friend.id) && [styles.checkedBox, { backgroundColor: theme.colors.primary }]
+              ]}>
+                {selectedFriends.includes(friend.id) && (
+                  <Ionicons name="checkmark" size={16} color="white" />
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    )}
+  </View>
+);
 
-      {inviteMethod !== 'none' && selectedFriends.length > 0 && (
-        <View style={[styles.invitePreview, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="information-circle" size={20} color={theme.colors.primary} />
-          <Text style={[styles.invitePreviewText, { color: theme.colors.textSecondary }]}>
-            {selectedFriends.length} friend{selectedFriends.length > 1 ? 's' : ''} will receive 
-            {inviteMethod === 'sms' ? ' SMS' : ' WhatsApp'} invitations
-          </Text>
-        </View>
-      )}
+const renderInviteMethod = () => (
+  <View style={styles.inviteMethod}>
+    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>After Creation</Text>
+    
+    <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
+      <Ionicons name="information-circle" size={20} color={theme.colors.primary} />
+      <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
+        After creating the group, you'll get an invite code that you can share with friends via SMS, WhatsApp, or QR code.
+      </Text>
     </View>
-  );
+  </View>
+);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -570,4 +515,29 @@ const styles = StyleSheet.create({
   footerButton: {
     flex: 1,
   },
+    helperText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  friendStatus: {
+  fontSize: 11,
+  fontWeight: '500',
+  marginTop: 2,
+},
 });

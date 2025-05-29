@@ -16,6 +16,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { Friend, Group } from '@/services/firebase/splitting';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -268,6 +269,18 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
       ))}
     </View>
   );
+
+  const handleSwipe = (event: any) => {
+  const { translationX } = event.nativeEvent;
+  
+  if (translationX > 100 && activeStep !== 'details') {
+    // Swipe right - go back
+    handleBack();
+  } else if (translationX < -100 && activeStep !== 'review') {
+    // Swipe left - go forward
+    handleNext();
+  }
+};
 
   const renderDetailsStep = () => (
     <ScrollView contentContainerStyle={styles.stepContent}>
@@ -807,11 +820,13 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
         {renderStepIndicator()}
 
         {/* Step Content */}
-        <View style={styles.content}>
-          {activeStep === 'details' && renderDetailsStep()}
-          {activeStep === 'split' && renderSplitStep()}
-          {activeStep === 'review' && renderReviewStep()}
-        </View>
+        <PanGestureHandler onGestureEvent={handleSwipe}>
+          <View style={styles.content}>
+            {activeStep === 'details' && renderDetailsStep()}
+            {activeStep === 'split' && renderSplitStep()}
+            {activeStep === 'review' && renderReviewStep()}
+          </View>
+        </PanGestureHandler>
 
         {/* Footer */}
         <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
