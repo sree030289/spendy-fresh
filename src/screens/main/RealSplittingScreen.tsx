@@ -45,6 +45,10 @@ export default function RealSplittingScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
+  interface ContactData {
+  name: string;
+  phoneNumber: string;
+  }
   // Data state
   const [friends, setFriends] = useState<Friend[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -240,31 +244,239 @@ const loadFriends = async () => {
   };
 
   // Handle add friend
-  const handleAddFriend = async (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr') => {
-    try {
-      if (!user?.id) return;
-      
-      if (method === 'email') {
-        await SplittingService.sendFriendRequest(user.id, email);
-        Alert.alert('Success', 'Friend request sent!');
-      } else if (method === 'qr') {
-        // Generate QR code for friend invite
-        const qrData = QRCodeService.generateFriendInviteQR(
-          user.id,
-          {
-            fullName: user.fullName,
-            email: user.email,
-            profilePicture: user.profilePicture
+const handleAddFriend = async (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData) => {
+  try {
+    if (!user?.id) return;
+    
+    if (method === 'email') {
+      // Check for existing friendship before sending request
+      if (email.trim()) {
+        const existingCheck = await SplittingService.checkExistingFriendship(user.id, email);
+        
+        if (existingCheck.isFriend) {
+          const { friendData, status } = existingCheck;
+          
+          let alertMessage = '';
+          switch (status) {
+            case 'accepted':
+              alertMessage = `${friendData.fullName} is already in your friends list!`;
+              break;
+            case 'request_sent':
+              alertMessage = `You have already sent a friend request to ${friendData.fullName}. Please wait for them to respond.`;
+              break;
+            case 'request_received':
+              alertMessage = `${friendData.fullName} has already sent you a friend request. Check your notifications to accept it.`;
+              break;
+            default:
+              alertMessage = `You already have a connection with ${friendData.fullName}.`;
           }
-        );
-        setShowQRCode(true);
+          
+          Alert.alert('Already Connected', alertMessage, [{ text: 'OK' }]);
+          setShowAddFriend(false);
+          return;
+        }
       }
       
-      setShowAddFriend(false);
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to add friend');
+      await SplittingService.sendFriendRequest(user.id, email);
+      Alert.alert('Success', 'Friend request sent!');
+    } else if (method === 'sms' || method === 'whatsapp') {
+      // For SMS/WhatsApp invitations with contact data
+      if (contactData) {
+        // Create a pending friend entry to track the invitation
+        await createPendingFriendInvitation(contactData, method);
+        
+        Alert.alert(
+          'Invitation Sent!', 
+          `${method.toUpperCase()} invitation sent to ${contactData.name}. They'll appear in your friends list once they join Spendy.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } else if (method === 'qr') {
+      // Generate QR code for friend invite
+      setShowQRCode(true);
     }
-  };
+    
+    setShowAddFriend(false);
+    await loadFriends(); // Refresh friends list
+  } catch (error: any) {
+    Alert.alert('Error', error.message || 'Failed to add friend');
+  }
+};
+
+
+const createPendingFriendInvitation = async (contactData: ContactData, method: 'sms' | 'whatsapp') => {
+  try {
+    if (!user?.id) return;
+    
+    // Create a pending friend invitation record
+    const pendingInvitation = {
+      fromUserId: user.id,
+      fromUserData: {
+        fullName: user.fullName,
+        email: user.email,
+        avatar: user.profilePicture || '',
+        mobile: user.mobile || ''
+      },
+      toUserData: {
+        fullName: contactData.name,
+        email: '', // No email for phone invitations
+        mobile: contactData.phoneNumber,
+        avatar: ''
+      },
+      contactMethod: method,
+      phoneNumber: contactData.phoneNumber,
+      status: 'invited' as const,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    // Store in Firestore
+    await addDoc(collection(db, 'pendingInvitations'), pendingInvitation);
+    
+    console.log('Pending invitation created for:', contactData.name);
+  } catch (error) {
+    console.error('Create pending invitation error:', error);
+    // Don't throw error as the SMS/WhatsApp was already sent successfully
+  }
+};
+
+const handleRemoveFriend = (friend: Friend) => {
+  Alert.alert(
+    'Remove Friend',
+    `Are you sure you want to remove ${friend.friendData.fullName} from your friends list? This will also clear any pending balances between you.`,
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel'
+      },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await SplittingService.removeFriend(user!.id, friend.friendId);
+            
+            Alert.alert(
+              'Friend Removed',
+              `${friend.friendData.fullName} has been removed from your friends list.`,
+              [{ text: 'OK' }]
+            );
+            
+            // Refresh friends list
+            await loadFriends();
+          } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to remove friend');
+          }
+        }
+      }
+    ]
+  );
+};
+// Handle friend blocking (optional advanced feature)
+const handleBlockFriend = (friend: Friend) => {
+  Alert.alert(
+    'Block Friend',
+    `Are you sure you want to block ${friend.friendData.fullName}? They won't be able to send you friend requests or see your activity.`,
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel'
+      },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await SplittingService.blockFriend(user!.id, friend.friendId);
+            
+            Alert.alert(
+              'Friend Blocked',
+              `${friend.friendData.fullName} has been blocked.`,
+              [{ text: 'OK' }]
+            );
+            
+            // Refresh friends list
+            await loadFriends();
+          } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to block friend');
+          }
+        }
+      }
+    ]
+  );
+};
+const showFriendActionsMenu = (friend: Friend) => {
+  const actions = [
+    {
+      text: 'Cancel',
+      style: 'cancel' as const
+    }
+  ];
+
+  // Add payment action if there's a balance
+  if (friend.balance !== 0 && friend.status === 'accepted') {
+    actions.unshift({
+      text: friend.balance > 0 ? 'Request Payment' : 'Send Payment',
+      onPress: () => {
+        setSelectedFriend(friend);
+        setShowPayment(true);
+      }
+    });
+  }
+
+  // Add remove friend action
+  actions.unshift({
+    text: 'Remove Friend',
+    style: 'destructive' as const,
+    onPress: () => handleRemoveFriend(friend)
+  });
+
+  // Add block friend action (optional)
+  actions.unshift({
+    text: 'Block Friend',
+    style: 'destructive' as const,
+    onPress: () => handleBlockFriend(friend)
+  });
+
+  Alert.alert(
+    friend.friendData.fullName,
+    'Choose an action:',
+    actions
+  );
+};
+const handlePhoneInvitationAccepted = async (phoneNumber: string, newUser: User) => {
+  try {
+    // Find pending invitation for this phone number
+    const pendingQuery = query(
+      collection(db, 'pendingInvitations'),
+      where('phoneNumber', '==', phoneNumber),
+      where('status', '==', 'invited')
+    );
+    
+    const snapshot = await getDocs(pendingQuery);
+    
+    for (const doc of snapshot.docs) {
+      const invitationData = doc.data();
+      
+      // Create friend request from the original inviter to the new user
+      await SplittingService.sendFriendRequest(
+        invitationData.fromUserId,
+        newUser.email,
+        `Connected via phone invitation to ${invitationData.toUserData.fullName}`
+      );
+      
+      // Update pending invitation status
+      await updateDoc(doc.ref, {
+        status: 'completed',
+        completedAt: new Date(),
+        newUserId: newUser.id
+      });
+    }
+    
+  } catch (error) {
+    console.error('Handle phone invitation accepted error:', error);
+  }
+};
 
   // Handle create group
 const handleCreateGroup = async (groupData: any) => {
@@ -685,80 +897,116 @@ const renderFriendsTab = () => (
       </TouchableOpacity>
     </View>
 
-    {friends.map((friend) => (
-      <View key={friend.id} style={[styles.friendCard, { backgroundColor: theme.colors.surface }]}>
-        <View style={styles.friendCardHeader}>
-          <View style={styles.friendLeft}>
-            <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.friendAvatarText}>
-                {friend.friendData.fullName.charAt(0).toUpperCase()}
-              </Text>
+    {friends.length === 0 ? (
+      <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+        <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
+        <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Friends Yet</Text>
+        <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+          Add friends to start splitting expenses together
+        </Text>
+        <TouchableOpacity
+          style={[styles.addFirstFriendButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => setShowAddFriend(true)}
+        >
+          <Text style={styles.addFirstFriendText}>Add Your First Friend</Text>
+        </TouchableOpacity>
+      </View>
+    ) : (
+      friends.map((friend) => (
+        <TouchableOpacity
+          key={friend.id}
+          style={[styles.friendCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => showFriendActionsMenu(friend)}
+          onLongPress={() => showFriendActionsMenu(friend)}
+        >
+          <View style={styles.friendCardHeader}>
+            <View style={styles.friendLeft}>
+              <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
+                <Text style={styles.friendAvatarText}>
+                  {friend.friendData.fullName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View>
+                <Text style={[styles.friendName, { color: theme.colors.text }]}>
+                  {friend.friendData.fullName}
+                </Text>
+                <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                  {friend.friendData.email}
+                </Text>
+                {/* Show friend status */}
+                <Text style={[
+                  styles.friendStatus, 
+                  { 
+                    color: friend.status === 'accepted' ? theme.colors.success : 
+                           friend.status === 'invited' ? theme.colors.primary : 
+                           friend.status === 'pending' ? theme.colors.primary : 
+                           friend.status === 'blocked' ? theme.colors.error :
+                           theme.colors.textSecondary
+                  }
+                ]}>
+                  {friend.status === 'accepted' ? '✓ Friends' : 
+                   friend.status === 'invited' ? '📤 Invitation Sent' : 
+                   friend.status === 'pending' ? '⏳ Pending Response' : 
+                   friend.status === 'blocked' ? '🚫 Blocked' :
+                   'Unknown'}
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text style={[styles.friendName, { color: theme.colors.text }]}>
-                {friend.friendData.fullName}
-              </Text>
-              <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                {friend.friendData.email}
-              </Text>
-              {/* Show friend status */}
-              <Text style={[
-                styles.friendStatus, 
-                { 
-                  color: friend.status === 'accepted' ? theme.colors.success : 
-                         friend.status === 'invited' ? theme.colors.primary : 
-                         friend.status === 'pending' ? theme.colors.primary : theme.colors.textSecondary
-                }
-              ]}>
-                {friend.status === 'accepted' ? '✓ Friends' : 
-                 friend.status === 'invited' ? '📤 Invitation Sent' : 
-                 friend.status === 'pending' ? '⏳ Pending Response' : 'Unknown'}
-              </Text>
+            
+            <View style={styles.friendActions}>
+              {/* Quick payment button for accepted friends with balance */}
+              {friend.balance !== 0 && friend.status === 'accepted' && (
+                <TouchableOpacity
+                  style={[styles.payButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => {
+                    setSelectedFriend(friend);
+                    setShowPayment(true);
+                  }}
+                >
+                  <Text style={styles.payButtonText}>
+                    {friend.balance > 0 ? 'Request' : 'Pay'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              
+              {/* Options button */}
+              <TouchableOpacity
+                style={styles.optionsButton}
+                onPress={() => showFriendActionsMenu(friend)}
+              >
+                <Ionicons name="ellipsis-vertical" size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
             </View>
           </View>
-          
-          <View style={styles.friendActions}>
-            {friend.balance !== 0 && friend.status === 'accepted' && (
-              <TouchableOpacity
-                style={[styles.payButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => {
-                  setSelectedFriend(friend);
-                  setShowPayment(true);
-                }}
-              >
-                <Text style={styles.payButtonText}>
-                  {friend.balance > 0 ? 'Request' : 'Pay'}
-                </Text>
-              </TouchableOpacity>
+
+          <View style={styles.friendBalance}>
+            {friend.status !== 'accepted' ? (
+              <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
+                {friend.status === 'invited' && friend.invitedAt && 
+                  `Invited ${friend.invitedAt.toLocaleDateString()}`
+                }
+                {friend.status === 'blocked' && 'Blocked'}
+              </Text>
+            ) : friend.balance === 0 ? (
+              <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
+                You're all settled up! 🎉
+              </Text>
+            ) : friend.balance > 0 ? (
+              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                {friend.friendData.fullName} owes you ${Math.abs(friend.balance).toFixed(2)}
+              </Text>
+            ) : (
+              <Text style={[styles.balanceText, { color: theme.colors.error }]}>
+                You owe {friend.friendData.fullName} ${Math.abs(friend.balance).toFixed(2)}
+              </Text>
             )}
           </View>
-        </View>
-
-        <View style={styles.friendBalance}>
-          {friend.status !== 'accepted' ? (
-            <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-              {friend.status === 'invited' && friend.invitedAt && 
-                `Invited ${friend.invitedAt.toLocaleDateString()}`
-              }
-            </Text>
-          ) : friend.balance === 0 ? (
-            <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-              You're all settled up! 🎉
-            </Text>
-          ) : friend.balance > 0 ? (
-            <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-              {friend.friendData.fullName} owes you ${Math.abs(friend.balance).toFixed(2)}
-            </Text>
-          ) : (
-            <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-              You owe {friend.friendData.fullName} ${Math.abs(friend.balance).toFixed(2)}
-            </Text>
-          )}
-        </View>
-      </View>
-    ))}
+        </TouchableOpacity>
+      ))
+    )}
   </ScrollView>
 );
+
 
 
   // Tab navigation
@@ -1359,5 +1607,37 @@ groupFooterActions: {
     fontSize: 11,
     fontWeight: '500',
     marginTop: 2,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 48,
+    borderRadius: 16,
+    marginTop: 32,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  addFirstFriendButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  addFirstFriendText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  optionsButton: {
+    padding: 8,
+    marginLeft: 8,
   },
 });

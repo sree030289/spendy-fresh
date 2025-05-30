@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
   Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

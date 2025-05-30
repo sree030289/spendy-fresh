@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@/types';
+import { SplittingService } from './splitting';
+
 
 // Only import Firebase when we actually need it (lazy loading)
 let firebaseAuth: any = null;
@@ -130,65 +132,82 @@ export class AuthService {
   }
 
   // Register with enhanced session management
-  static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
-    console.log('AuthService: Registration for', userData.email);
-    
-    // Clear any existing session data before registering new user
-    await this.clearUserSession();
-    
-    // Try Firebase first
-    try {
-      if (!firebaseAuth) {
-        const initialized = await initializeFirebase();
-        if (!initialized) throw new Error('Firebase not available');
-      }
-
-      const { createUserWithEmailAndPassword } = await import('firebase/auth');
-      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-      
-      console.log('🔥 Attempting Firebase registration...');
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, userData.email, userData.password || '');
-      
-      // Store user data in Firestore
-      const userDoc = {
-        ...userData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-      
-      await setDoc(doc(firebaseDb, 'users', userCredential.user.uid), userDoc);
-      
-      const newUser: User = {
-        id: userCredential.user.uid,
-        ...userData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as User;
-      
-      // Store session info for new user
-      await this.storeUserSession(newUser);
-      
-      console.log('✅ Firebase registration successful!');
-      return newUser;
-      
-    } catch (error: any) {
-      console.log('❌ Firebase registration failed, using mock:', error.message);
-      
-      // Fallback to mock
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const mockUser: User = {
-        id: 'mock-' + Math.random().toString(36).substr(2, 9),
-        ...userData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as User;
-      
-      // Store session info for mock user
-      await this.storeUserSession(mockUser);
-      
-      return mockUser;
+static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
+  console.log('AuthService: Registration for', userData.email);
+  
+  // Clear any existing session data before registering new user
+  await this.clearUserSession();
+  
+  // Try Firebase first
+  try {
+    if (!firebaseAuth) {
+      const initialized = await initializeFirebase();
+      if (!initialized) throw new Error('Firebase not available');
     }
+
+    const { createUserWithEmailAndPassword } = await import('firebase/auth');
+    const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+    
+    console.log('🔥 Attempting Firebase registration...');
+    const userCredential = await createUserWithEmailAndPassword(firebaseAuth, userData.email, userData.password || '');
+    
+    // Store user data in Firestore
+    const userDoc = {
+      ...userData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    
+    await setDoc(doc(firebaseDb, 'users', userCredential.user.uid), userDoc);
+    
+    const newUser: User = {
+      id: userCredential.user.uid,
+      ...userData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as User;
+    
+    // Store session info for new user
+    await this.storeUserSession(newUser);
+    
+    // Process any pending email invitations
+    try {
+      await SplittingService.processEmailInvitations(userData.email, userCredential.user.uid);
+      console.log('✅ Email invitations processed for new user');
+    } catch (invitationError) {
+      console.log('⚠️ Email invitation processing failed (non-critical):', invitationError);
+      // Don't throw - this is not critical for registration
+    }
+    
+    console.log('✅ Firebase registration successful!');
+    return newUser;
+    
+  } catch (error: any) {
+    console.log('❌ Firebase registration failed, using mock:', error.message);
+    
+    // Fallback to mock
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const mockUser: User = {
+      id: 'mock-' + Math.random().toString(36).substr(2, 9),
+      ...userData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as User;
+    
+    // Store session info for mock user
+    await this.storeUserSession(mockUser);
+    
+    // Even for mock users, try to process email invitations
+    try {
+      await SplittingService.processEmailInvitations(userData.email, mockUser.id);
+      console.log('✅ Email invitations processed for mock user');
+    } catch (invitationError) {
+      console.log('⚠️ Mock email invitation processing failed (non-critical):', invitationError);
+    }
+    
+    return mockUser;
   }
+}
 
   // Login with enhanced session management
   static async login(email: string, password: string): Promise<User> {

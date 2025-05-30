@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { Friend, Group } from '@/services/firebase/splitting';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { getCurrencySymbol } from '@/utils/currency';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -333,36 +334,36 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
 
       {/* Amount */}
       <View style={styles.inputContainer}>
-        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount *</Text>
-        <View style={styles.amountInputContainer}>
-          <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
-            {user?.currency === 'USD' ? '$' : user?.currency === 'EUR' ? '€' : user?.currency === 'INR' ? '₹' : '$'}
-          </Text>
-          <TextInput
-            style={[
-              styles.amountInput,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: errors.amount ? theme.colors.error : theme.colors.border,
-                color: theme.colors.text,
-              }
-            ]}
-            placeholder="0.00"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={amount}
-            onChangeText={(text) => {
-              setAmount(text);
-              if (errors.amount) setErrors(prev => ({ ...prev, amount: '' }));
-            }}
-            keyboardType="decimal-pad"
-          />
-        </View>
-        {errors.amount && (
-          <Text style={[styles.errorText, { color: theme.colors.error }]}>
-            {errors.amount}
-          </Text>
-        )}
-      </View>
+  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount *</Text>
+  <View style={styles.amountInputContainer}>
+    <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
+      {getCurrencySymbol(user?.currency || 'USD')}
+    </Text>
+    <TextInput
+      style={[
+        styles.amountInput,
+        {
+          backgroundColor: theme.colors.surface,
+          borderColor: errors.amount ? theme.colors.error : theme.colors.border,
+          color: theme.colors.text,
+        }
+      ]}
+      placeholder="0.00"
+      placeholderTextColor={theme.colors.textSecondary}
+      value={amount}
+      onChangeText={(text) => {
+        setAmount(text);
+        if (errors.amount) setErrors(prev => ({ ...prev, amount: '' }));
+      }}
+      keyboardType="decimal-pad"
+    />
+  </View>
+  {errors.amount && (
+    <Text style={[styles.errorText, { color: theme.colors.error }]}>
+      {errors.amount}
+    </Text>
+  )}
+</View>
 
       {/* Category */}
       <View style={styles.inputContainer}>
@@ -664,10 +665,10 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
                   </View>
                 )}
                 {splitType === 'equal' && (
-                  <Text style={[styles.splitAmount, { color: theme.colors.text }]}>
-                    ${split.amount.toFixed(2)}
-                  </Text>
-                )}
+                <Text style={[styles.splitAmount, { color: theme.colors.text }]}>
+                  {getCurrencySymbol(user?.currency || 'USD')}{split.amount.toFixed(2)}
+                </Text>
+              )}
               </View>
             )}
           </View>
@@ -682,21 +683,21 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
         {/* Split Summary */}
         <View style={[styles.splitSummary, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
-              Total Amount
-            </Text>
-            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-              ${parseFloat(amount).toFixed(2)}
-            </Text>
-          </View>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
+            Total Amount
+          </Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+            {getCurrencySymbol(user?.currency || 'USD')}{parseFloat(amount).toFixed(2)}
+          </Text>
+        </View>
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
-              Split Total
-            </Text>
-            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-              ${splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0).toFixed(2)}
-            </Text>
-          </View>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
+            Split Total
+          </Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+            {getCurrencySymbol(user?.currency || 'USD')}{splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0).toFixed(2)}
+          </Text>
+        </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
@@ -710,7 +711,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
                   : theme.colors.error
               }
             ]}>
-              ${Math.abs(splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0) - parseFloat(amount)).toFixed(2)}
+              {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0) - parseFloat(amount)).toFixed(2)}
             </Text>
           </View>
         </View>
@@ -733,7 +734,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
           <View style={styles.reviewItem}>
             <Text style={[styles.reviewLabel, { color: theme.colors.textSecondary }]}>Amount</Text>
             <Text style={[styles.reviewValue, { color: theme.colors.text }]}>
-              ${parseFloat(amount).toFixed(2)} {user?.currency}
+              {getCurrencySymbol(user?.currency || 'USD')}{parseFloat(amount).toFixed(2)} {user?.currency}
             </Text>
           </View>
           
@@ -788,8 +789,8 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
               </View>
               <View style={styles.reviewSplitRight}>
                 <Text style={[styles.reviewSplitAmount, { color: theme.colors.text }]}>
-                  ${split.amount.toFixed(2)}
-                </Text>
+                {getCurrencySymbol(user?.currency || 'USD')}{split.amount.toFixed(2)}
+              </Text>
                 {splitType === 'percentage' && (
                   <Text style={[styles.reviewSplitPercentage, { color: theme.colors.textSecondary }]}>
                     ({split.percentage.toFixed(1)}%)
