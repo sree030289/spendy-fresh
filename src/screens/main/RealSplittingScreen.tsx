@@ -16,6 +16,19 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
+import { User } from '@/types'; // Add missing import
+
+// Import Firebase functions
+import { 
+  addDoc, 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  updateDoc, 
+  doc 
+} from 'firebase/firestore';
+import { db } from '@/services/firebase/config';
 
 // Import our real services
 import { SplittingService, Friend, Group, Expense, Notification } from '@/services/firebase/splitting';
@@ -35,7 +48,6 @@ import GroupDetailsModal from '@/components/modals/GroupDetailsModal';
 import ExpenseRefreshService from '@/services/expenseRefreshService';
 
 export default function RealSplittingScreen() {
-  
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -46,9 +58,10 @@ export default function RealSplittingScreen() {
   const [refreshing, setRefreshing] = useState(false);
   
   interface ContactData {
-  name: string;
-  phoneNumber: string;
+    name: string;
+    phoneNumber: string;
   }
+  
   // Data state
   const [friends, setFriends] = useState<Friend[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -62,7 +75,6 @@ export default function RealSplittingScreen() {
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [selectedGroupForExpense, setSelectedGroupForExpense] = useState<Group | null>(null);
 
-  
   // Modal states
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddFriend, setShowAddFriend] = useState(false);
@@ -138,46 +150,46 @@ export default function RealSplittingScreen() {
   }, [user?.id]);
 
   useEffect(() => {
-  const refreshService = ExpenseRefreshService.getInstance();
-  const unsubscribe = refreshService.addListener(() => {
-    console.log('Received expense refresh notification');
-    // Refresh all data when an expense is added
-    loadRecentExpenses();
-    loadGroups();
-    loadFriends();
-  });
-
-  return unsubscribe;
-}, []);
-  // Load friends data
-const loadFriends = async () => {
-  try {
-    if (!user?.id) return;
-    
-    console.log('Loading friends for user:', user.id);
-    const friendsData = await SplittingService.getFriends(user.id);
-    setFriends(friendsData);
-    
-    // Calculate balances safely (only for accepted friends)
-    const acceptedFriends = friendsData.filter(friend => friend.status === 'accepted');
-    const totalOwed = acceptedFriends.reduce((sum, friend) => 
-      sum + Math.max(0, friend.balance || 0), 0
-    );
-    const totalOwing = acceptedFriends.reduce((sum, friend) => 
-      sum + Math.max(0, -(friend.balance || 0)), 0
-    );
-    
-    setBalances({
-      totalOwed,
-      totalOwing,
-      netBalance: totalOwed - totalOwing
+    const refreshService = ExpenseRefreshService.getInstance();
+    const unsubscribe = refreshService.addListener(() => {
+      console.log('Received expense refresh notification');
+      // Refresh all data when an expense is added
+      loadRecentExpenses();
+      loadGroups();
+      loadFriends();
     });
-  } catch (error) {
-    console.error('Load friends error:', error);
-    setFriends([]); // Set empty array as fallback
-  }
-};
 
+    return unsubscribe;
+  }, []);
+
+  // Load friends data
+  const loadFriends = async () => {
+    try {
+      if (!user?.id) return;
+      
+      console.log('Loading friends for user:', user.id);
+      const friendsData = await SplittingService.getFriends(user.id);
+      setFriends(friendsData);
+      
+      // Calculate balances safely (only for accepted friends)
+      const acceptedFriends = friendsData.filter(friend => friend.status === 'accepted');
+      const totalOwed = acceptedFriends.reduce((sum, friend) => 
+        sum + Math.max(0, friend.balance || 0), 0
+      );
+      const totalOwing = acceptedFriends.reduce((sum, friend) => 
+        sum + Math.max(0, -(friend.balance || 0)), 0
+      );
+      
+      setBalances({
+        totalOwed,
+        totalOwing,
+        netBalance: totalOwed - totalOwing
+      });
+    } catch (error) {
+      console.error('Load friends error:', error);
+      setFriends([]); // Set empty array as fallback
+    }
+  };
 
   // Load groups data
   const loadGroups = async () => {
@@ -244,351 +256,357 @@ const loadFriends = async () => {
   };
 
   // Handle add friend
-const handleAddFriend = async (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData) => {
-  try {
-    if (!user?.id) return;
-    
-    if (method === 'email') {
-      // Check for existing friendship before sending request
-      if (email.trim()) {
-        const existingCheck = await SplittingService.checkExistingFriendship(user.id, email);
-        
-        if (existingCheck.isFriend) {
-          const { friendData, status } = existingCheck;
+  const handleAddFriend = async (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData) => {
+    try {
+      if (!user?.id) return;
+      
+      if (method === 'email') {
+        // Check for existing friendship before sending request
+        if (email.trim()) {
+          const existingCheck = await SplittingService.checkExistingFriendship(user.id, email);
           
-          let alertMessage = '';
-          switch (status) {
-            case 'accepted':
-              alertMessage = `${friendData.fullName} is already in your friends list!`;
-              break;
-            case 'request_sent':
-              alertMessage = `You have already sent a friend request to ${friendData.fullName}. Please wait for them to respond.`;
-              break;
-            case 'request_received':
-              alertMessage = `${friendData.fullName} has already sent you a friend request. Check your notifications to accept it.`;
-              break;
-            default:
-              alertMessage = `You already have a connection with ${friendData.fullName}.`;
+          if (existingCheck.isFriend) {
+            const { friendData, status } = existingCheck;
+            
+            let alertMessage = '';
+            switch (status) {
+              case 'accepted':
+                alertMessage = `${friendData.fullName} is already in your friends list!`;
+                break;
+              case 'request_sent':
+                alertMessage = `You have already sent a friend request to ${friendData.fullName}. Please wait for them to respond.`;
+                break;
+              case 'request_received':
+                alertMessage = `${friendData.fullName} has already sent you a friend request. Check your notifications to accept it.`;
+                break;
+              default:
+                alertMessage = `You already have a connection with ${friendData.fullName}.`;
+            }
+            
+            Alert.alert('Already Connected', alertMessage, [{ text: 'OK' }]);
+            setShowAddFriend(false);
+            return;
           }
-          
-          Alert.alert('Already Connected', alertMessage, [{ text: 'OK' }]);
-          setShowAddFriend(false);
-          return;
         }
-      }
-      
-      await SplittingService.sendFriendRequest(user.id, email);
-      Alert.alert('Success', 'Friend request sent!');
-    } else if (method === 'sms' || method === 'whatsapp') {
-      // For SMS/WhatsApp invitations with contact data
-      if (contactData) {
-        // Create a pending friend entry to track the invitation
-        await createPendingFriendInvitation(contactData, method);
         
-        Alert.alert(
-          'Invitation Sent!', 
-          `${method.toUpperCase()} invitation sent to ${contactData.name}. They'll appear in your friends list once they join Spendy.`,
-          [{ text: 'OK' }]
-        );
-      }
-    } else if (method === 'qr') {
-      // Generate QR code for friend invite
-      setShowQRCode(true);
-    }
-    
-    setShowAddFriend(false);
-    await loadFriends(); // Refresh friends list
-  } catch (error: any) {
-    Alert.alert('Error', error.message || 'Failed to add friend');
-  }
-};
-
-
-const createPendingFriendInvitation = async (contactData: ContactData, method: 'sms' | 'whatsapp') => {
-  try {
-    if (!user?.id) return;
-    
-    // Create a pending friend invitation record
-    const pendingInvitation = {
-      fromUserId: user.id,
-      fromUserData: {
-        fullName: user.fullName,
-        email: user.email,
-        avatar: user.profilePicture || '',
-        mobile: user.mobile || ''
-      },
-      toUserData: {
-        fullName: contactData.name,
-        email: '', // No email for phone invitations
-        mobile: contactData.phoneNumber,
-        avatar: ''
-      },
-      contactMethod: method,
-      phoneNumber: contactData.phoneNumber,
-      status: 'invited' as const,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    // Store in Firestore
-    await addDoc(collection(db, 'pendingInvitations'), pendingInvitation);
-    
-    console.log('Pending invitation created for:', contactData.name);
-  } catch (error) {
-    console.error('Create pending invitation error:', error);
-    // Don't throw error as the SMS/WhatsApp was already sent successfully
-  }
-};
-
-const handleRemoveFriend = (friend: Friend) => {
-  Alert.alert(
-    'Remove Friend',
-    `Are you sure you want to remove ${friend.friendData.fullName} from your friends list? This will also clear any pending balances between you.`,
-    [
-      {
-        text: 'Cancel',
-        style: 'cancel'
-      },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await SplittingService.removeFriend(user!.id, friend.friendId);
-            
-            Alert.alert(
-              'Friend Removed',
-              `${friend.friendData.fullName} has been removed from your friends list.`,
-              [{ text: 'OK' }]
-            );
-            
-            // Refresh friends list
-            await loadFriends();
-          } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to remove friend');
-          }
+        await SplittingService.sendFriendRequest(user.id, email);
+        Alert.alert('Success', 'Friend request sent!');
+      } else if (method === 'sms' || method === 'whatsapp') {
+        // For SMS/WhatsApp invitations with contact data
+        if (contactData) {
+          // Create a pending friend entry to track the invitation
+          await createPendingFriendInvitation(contactData, method);
+          
+          Alert.alert(
+            'Invitation Sent!', 
+            `${method.toUpperCase()} invitation sent to ${contactData.name}. They'll appear in your friends list once they join Spendy.`,
+            [{ text: 'OK' }]
+          );
         }
+      } else if (method === 'qr') {
+        // Generate QR code for friend invite
+        setShowQRCode(true);
       }
-    ]
-  );
-};
-// Handle friend blocking (optional advanced feature)
-const handleBlockFriend = (friend: Friend) => {
-  Alert.alert(
-    'Block Friend',
-    `Are you sure you want to block ${friend.friendData.fullName}? They won't be able to send you friend requests or see your activity.`,
-    [
-      {
-        text: 'Cancel',
-        style: 'cancel'
-      },
-      {
-        text: 'Block',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await SplittingService.blockFriend(user!.id, friend.friendId);
-            
-            Alert.alert(
-              'Friend Blocked',
-              `${friend.friendData.fullName} has been blocked.`,
-              [{ text: 'OK' }]
-            );
-            
-            // Refresh friends list
-            await loadFriends();
-          } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to block friend');
-          }
-        }
-      }
-    ]
-  );
-};
-const showFriendActionsMenu = (friend: Friend) => {
-  const actions = [
-    {
-      text: 'Cancel',
-      style: 'cancel' as const
-    }
-  ];
-
-  // Add payment action if there's a balance
-  if (friend.balance !== 0 && friend.status === 'accepted') {
-    actions.unshift({
-      text: friend.balance > 0 ? 'Request Payment' : 'Send Payment',
-      onPress: () => {
-        setSelectedFriend(friend);
-        setShowPayment(true);
-      }
-    });
-  }
-
-  // Add remove friend action
-  actions.unshift({
-    text: 'Remove Friend',
-    style: 'destructive' as const,
-    onPress: () => handleRemoveFriend(friend)
-  });
-
-  // Add block friend action (optional)
-  actions.unshift({
-    text: 'Block Friend',
-    style: 'destructive' as const,
-    onPress: () => handleBlockFriend(friend)
-  });
-
-  Alert.alert(
-    friend.friendData.fullName,
-    'Choose an action:',
-    actions
-  );
-};
-const handlePhoneInvitationAccepted = async (phoneNumber: string, newUser: User) => {
-  try {
-    // Find pending invitation for this phone number
-    const pendingQuery = query(
-      collection(db, 'pendingInvitations'),
-      where('phoneNumber', '==', phoneNumber),
-      where('status', '==', 'invited')
-    );
-    
-    const snapshot = await getDocs(pendingQuery);
-    
-    for (const doc of snapshot.docs) {
-      const invitationData = doc.data();
       
-      // Create friend request from the original inviter to the new user
-      await SplittingService.sendFriendRequest(
-        invitationData.fromUserId,
-        newUser.email,
-        `Connected via phone invitation to ${invitationData.toUserData.fullName}`
-      );
-      
-      // Update pending invitation status
-      await updateDoc(doc.ref, {
-        status: 'completed',
-        completedAt: new Date(),
-        newUserId: newUser.id
-      });
+      setShowAddFriend(false);
+      await loadFriends(); // Refresh friends list
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to add friend');
     }
-    
-  } catch (error) {
-    console.error('Handle phone invitation accepted error:', error);
-  }
-};
+  };
 
-  // Handle create group
-const handleCreateGroup = async (groupData: any) => {
-  try {
-    if (!user?.id) return;
-    
-    // Generate invite code
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    
-    const groupId = await SplittingService.createGroup({
-      name: groupData.name,
-      description: groupData.description || '',
-      avatar: groupData.avatar,
-      createdBy: user.id,
-      currency: groupData.currency || user.currency || 'AUD',
-      inviteCode, // Add the invite code
-      totalExpenses: 0,
-      isActive: true,
-      members: [{
-        userId: user.id,
-        userData: {
+  const createPendingFriendInvitation = async (contactData: ContactData, method: 'sms' | 'whatsapp') => {
+    try {
+      if (!user?.id) return;
+      
+      // Create a pending friend invitation record
+      const pendingInvitation = {
+        fromUserId: user.id,
+        fromUserData: {
           fullName: user.fullName,
           email: user.email,
-          avatar: user.profilePicture || ''
+          avatar: user.profilePicture || '',
+          mobile: user.mobile || ''
         },
-        role: 'admin' as const,
-        balance: 0,
-        joinedAt: new Date(),
-        isActive: true
-      }],
-      settings: {
-        allowMemberInvites: true,
-        requireApproval: false,
-        currency: user.currency || 'AUD'
-      }
-    });
-    
-    await loadGroups(); // Refresh groups list
-    
-    // Show success with invite code
+        toUserData: {
+          fullName: contactData.name,
+          email: '', // No email for phone invitations
+          mobile: contactData.phoneNumber,
+          avatar: ''
+        },
+        contactMethod: method,
+        phoneNumber: contactData.phoneNumber,
+        status: 'invited' as const,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      // Store in Firestore
+      await addDoc(collection(db, 'pendingInvitations'), pendingInvitation);
+      
+      console.log('Pending invitation created for:', contactData.name);
+    } catch (error) {
+      console.error('Create pending invitation error:', error);
+      // Don't throw error as the SMS/WhatsApp was already sent successfully
+    }
+  };
+
+  const handleRemoveFriend = (friend: Friend) => {
     Alert.alert(
-      'Group Created! 🎉', 
-      `"${groupData.name}" has been created successfully!\n\nInvite Code: ${inviteCode}\n\nYou can now invite friends using this code, QR code, or direct invitations.`,
+      'Remove Friend',
+      `Are you sure you want to remove ${friend.friendData.fullName} from your friends list? This will also clear any pending balances between you.`,
       [
         {
-          text: 'Share Invite Code',
-          onPress: () => {
-            // Share the invite code
-            require('react-native').Share.share({
-              message: `Join "${groupData.name}" on Spendy! Use invite code: ${inviteCode} or download the app: https://spendy.app/join/${inviteCode}`
-            });
-          }
+          text: 'Cancel',
+          style: 'cancel'
         },
         {
-          text: 'Done',
-          style: 'default'
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await SplittingService.removeFriend(user!.id, friend.friendId);
+              
+              Alert.alert(
+                'Friend Removed',
+                `${friend.friendData.fullName} has been removed from your friends list.`,
+                [{ text: 'OK' }]
+              );
+              
+              // Refresh friends list
+              await loadFriends();
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to remove friend');
+            }
+          }
         }
       ]
     );
-    
-    setShowCreateGroup(false);
-  } catch (error: any) {
-    console.error('Create group error:', error);
-    Alert.alert('Error', error.message || 'Failed to create group');
-  }
-};
+  };
+
+  // Handle friend blocking (optional advanced feature)
+  const handleBlockFriend = (friend: Friend) => {
+    Alert.alert(
+      'Block Friend',
+      `Are you sure you want to block ${friend.friendData.fullName}? They won't be able to send you friend requests or see your activity.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await SplittingService.blockFriend(user!.id, friend.friendId);
+              
+              Alert.alert(
+                'Friend Blocked',
+                `${friend.friendData.fullName} has been blocked.`,
+                [{ text: 'OK' }]
+              );
+              
+              // Refresh friends list
+              await loadFriends();
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to block friend');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const showFriendActionsMenu = (friend: Friend) => {
+    const actions: Array<{
+      text: string;
+      style?: 'cancel' | 'destructive' | 'default';
+      onPress?: () => void;
+    }> = [
+      {
+        text: 'Cancel',
+        style: 'cancel'
+      }
+    ];
+
+    // Add payment action if there's a balance
+    if (friend.balance !== 0 && friend.status === 'accepted') {
+      actions.unshift({
+        text: friend.balance > 0 ? 'Request Payment' : 'Send Payment',
+        onPress: () => {
+          setSelectedFriend(friend);
+          setShowPayment(true);
+        }
+      });
+    }
+
+    // Add remove friend action
+    actions.unshift({
+      text: 'Remove Friend',
+      style: 'destructive',
+      onPress: () => handleRemoveFriend(friend)
+    });
+
+    // Add block friend action (optional)
+    actions.unshift({
+      text: 'Block Friend',
+      style: 'destructive',
+      onPress: () => handleBlockFriend(friend)
+    });
+
+    Alert.alert(
+      friend.friendData.fullName,
+      'Choose an action:',
+      actions
+    );
+  };
+
+  const handlePhoneInvitationAccepted = async (phoneNumber: string, newUser: User) => {
+    try {
+      // Find pending invitation for this phone number
+      const pendingQuery = query(
+        collection(db, 'pendingInvitations'),
+        where('phoneNumber', '==', phoneNumber),
+        where('status', '==', 'invited')
+      );
+      
+      const snapshot = await getDocs(pendingQuery);
+      
+      for (const docSnap of snapshot.docs) {
+        const invitationData = docSnap.data();
+        
+        // Create friend request from the original inviter to the new user
+        await SplittingService.sendFriendRequest(
+          invitationData.fromUserId,
+          newUser.email,
+          `Connected via phone invitation to ${invitationData.toUserData.fullName}`
+        );
+        
+        // Update pending invitation status
+        await updateDoc(doc(db, 'pendingInvitations', docSnap.id), {
+          status: 'completed',
+          completedAt: new Date(),
+          newUserId: newUser.id
+        });
+      }
+      
+    } catch (error) {
+      console.error('Handle phone invitation accepted error:', error);
+    }
+  };
+
+  // Handle create group
+  const handleCreateGroup = async (groupData: any) => {
+    try {
+      if (!user?.id) return;
+      
+      // Generate invite code
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      
+      const groupId = await SplittingService.createGroup({
+        name: groupData.name,
+        description: groupData.description || '',
+        avatar: groupData.avatar,
+        createdBy: user.id,
+        currency: groupData.currency || user.currency || 'AUD',
+        inviteCode, // Add the invite code
+        totalExpenses: 0,
+        isActive: true,
+        members: [{
+          userId: user.id,
+          userData: {
+            fullName: user.fullName,
+            email: user.email,
+            avatar: user.profilePicture || ''
+          },
+          role: 'admin' as const,
+          balance: 0,
+          joinedAt: new Date(),
+          isActive: true
+        }],
+        settings: {
+          allowMemberInvites: true,
+          requireApproval: false,
+          currency: user.currency || 'AUD'
+        }
+      });
+      
+      await loadGroups(); // Refresh groups list
+      
+      // Show success with invite code
+      Alert.alert(
+        'Group Created! 🎉', 
+        `"${groupData.name}" has been created successfully!\n\nInvite Code: ${inviteCode}\n\nYou can now invite friends using this code, QR code, or direct invitations.`,
+        [
+          {
+            text: 'Share Invite Code',
+            onPress: () => {
+              // Share the invite code
+              require('react-native').Share.share({
+                message: `Join "${groupData.name}" on Spendy! Use invite code: ${inviteCode} or download the app: https://spendy.app/join/${inviteCode}`
+              });
+            }
+          },
+          {
+            text: 'Done',
+            style: 'default'
+          }
+        ]
+      );
+      
+      setShowCreateGroup(false);
+    } catch (error: any) {
+      console.error('Create group error:', error);
+      Alert.alert('Error', error.message || 'Failed to create group');
+    }
+  };
 
   // Handle add expense
-const handleAddExpense = async (expenseData: any, fromGroupDetails?: Group | null) => {
-  try {
-    if (!user?.id) return;
-    
-    const expenseId = await SplittingService.addExpense({
-      ...expenseData,
-      paidBy: user.id,
-      paidByData: {
-        fullName: user.fullName,
-        email: user.email
-      },
-      isSettled: false,
-      date: new Date()
-    });
-    
-    console.log('Expense added successfully:', expenseId);
-    
-    // Notify all listeners about the new expense
-    ExpenseRefreshService.getInstance().notifyExpenseAdded();
-    
-    // Force refresh local data
-    await Promise.all([
-      loadGroups(),
-      loadRecentExpenses(),
-      loadFriends()
-    ]);
-    
-    Alert.alert('Success', 'Expense added successfully!');
-    setShowAddExpense(false);
-    setSelectedGroupForExpense(null);
-    
-    // If expense was added from group details, go back to group details
-    if (fromGroupDetails) {
-      setTimeout(() => {
-        setSelectedGroup(fromGroupDetails);
-        setShowGroupDetails(true);
-      }, 500);
+  const handleAddExpense = async (expenseData: any, fromGroupDetails?: Group | null) => {
+    try {
+      if (!user?.id) return;
+      
+      const expenseId = await SplittingService.addExpense({
+        ...expenseData,
+        paidBy: user.id,
+        paidByData: {
+          fullName: user.fullName,
+          email: user.email
+        },
+        isSettled: false,
+        date: new Date()
+      });
+      
+      console.log('Expense added successfully:', expenseId);
+      
+      // Notify all listeners about the new expense
+      ExpenseRefreshService.getInstance().notifyExpenseAdded();
+      
+      // Force refresh local data
+      await Promise.all([
+        loadGroups(),
+        loadRecentExpenses(),
+        loadFriends()
+      ]);
+      
+      Alert.alert('Success', 'Expense added successfully!');
+      setShowAddExpense(false);
+      setSelectedGroupForExpense(null);
+      
+      // If expense was added from group details, go back to group details
+      if (fromGroupDetails) {
+        setTimeout(() => {
+          setSelectedGroup(fromGroupDetails);
+          setShowGroupDetails(true);
+        }, 500);
+      }
+      
+    } catch (error: any) {
+      console.error('Add expense error:', error);
+      Alert.alert('Error', error.message || 'Failed to add expense');
     }
-    
-  } catch (error: any) {
-    console.error('Add expense error:', error);
-    Alert.alert('Error', error.message || 'Failed to add expense');
-  }
-};
+  };
 
   // Handle payment
   const handlePayment = async (friendId: string, amount: number, method: string) => {
@@ -775,239 +793,237 @@ const handleAddExpense = async (expenseData: any, fromGroupDetails?: Group | nul
   );
 
   // Render groups tab
-const renderGroupsTab = () => (
-  <ScrollView 
-    contentContainerStyle={styles.tabContent}
-    refreshControl={
-      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-    }
-  >
-    <View style={styles.tabHeader}>
-      <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Your Groups</Text>
-      <TouchableOpacity
-        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
-        onPress={() => setShowCreateGroup(true)}
-      >
-        <Ionicons name="add" size={20} color="white" />
-        <Text style={styles.headerButtonText}>Create</Text>
-      </TouchableOpacity>
-    </View>
-
-    {groups.map((group) => (
-      <TouchableOpacity
-        key={group.id}
-        style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}
-        onPress={() => {
-          setSelectedGroup(group);
-          setShowGroupDetails(true); // Open details instead of chat
-        }}
-      >
-        <View style={styles.groupHeader}>
-          <View style={styles.groupLeft}>
-            <Text style={styles.groupAvatar}>{group.avatar}</Text>
-            <View>
-              <Text style={[styles.groupName, { color: theme.colors.text }]}>
-                {group.name}
-              </Text>
-              <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
-                {group.members.length} members
-              </Text>
-            </View>
-          </View>
-          <View style={styles.groupActions}>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                setShowQRCode(true);
-              }}
-              style={styles.groupActionButton}
-            >
-              <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.groupStats}>
-          <View style={styles.groupStat}>
-            <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-              Total spent
-            </Text>
-            <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-              ${group.totalExpenses.toFixed(2)}
-            </Text>
-          </View>
-          <View style={styles.groupStat}>
-            <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-              Your share
-            </Text>
-            <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-              ${(group.totalExpenses / group.members.length).toFixed(2)}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.groupFooter}>
-          <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
-            Last activity: {group.updatedAt.toLocaleDateString()}
-          </Text>
-          <View style={styles.groupFooterActions}>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                setSelectedGroup(group);
-                setShowGroupChat(true);
-              }}
-              style={[styles.chatButton, { backgroundColor: theme.colors.primary + '20' }]}
-            >
-              <Ionicons name="chatbubble" size={16} color={theme.colors.primary} />
-              <Text style={[styles.chatButtonText, { color: theme.colors.primary }]}>Chat</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                setShowAddExpense(true);
-              }}
-              style={[styles.addExpenseButton, { backgroundColor: theme.colors.primary }]}
-            >
-              <Text style={styles.addExpenseButtonText}>Add Expense</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
-    ))}
-  </ScrollView>
-);
-
-  // Render friends tab
-const renderFriendsTab = () => (
-  <ScrollView 
-    contentContainerStyle={styles.tabContent}
-    refreshControl={
-      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-    }
-  >
-    <View style={styles.tabHeader}>
-      <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Friends</Text>
-      <TouchableOpacity
-        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
-        onPress={() => setShowAddFriend(true)}
-      >
-        <Ionicons name="person-add" size={20} color="white" />
-        <Text style={styles.headerButtonText}>Add</Text>
-      </TouchableOpacity>
-    </View>
-
-    {friends.length === 0 ? (
-      <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-        <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
-        <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Friends Yet</Text>
-        <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-          Add friends to start splitting expenses together
-        </Text>
+  const renderGroupsTab = () => (
+    <ScrollView 
+      contentContainerStyle={styles.tabContent}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      <View style={styles.tabHeader}>
+        <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Your Groups</Text>
         <TouchableOpacity
-          style={[styles.addFirstFriendButton, { backgroundColor: theme.colors.primary }]}
-          onPress={() => setShowAddFriend(true)}
+          style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => setShowCreateGroup(true)}
         >
-          <Text style={styles.addFirstFriendText}>Add Your First Friend</Text>
+          <Ionicons name="add" size={20} color="white" />
+          <Text style={styles.headerButtonText}>Create</Text>
         </TouchableOpacity>
       </View>
-    ) : (
-      friends.map((friend) => (
+
+      {groups.map((group) => (
         <TouchableOpacity
-          key={friend.id}
-          style={[styles.friendCard, { backgroundColor: theme.colors.surface }]}
-          onPress={() => showFriendActionsMenu(friend)}
-          onLongPress={() => showFriendActionsMenu(friend)}
+          key={group.id}
+          style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => {
+            setSelectedGroup(group);
+            setShowGroupDetails(true); // Open details instead of chat
+          }}
         >
-          <View style={styles.friendCardHeader}>
-            <View style={styles.friendLeft}>
-              <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
-                <Text style={styles.friendAvatarText}>
-                  {friend.friendData.fullName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+          <View style={styles.groupHeader}>
+            <View style={styles.groupLeft}>
+              <Text style={styles.groupAvatar}>{group.avatar}</Text>
               <View>
-                <Text style={[styles.friendName, { color: theme.colors.text }]}>
-                  {friend.friendData.fullName}
+                <Text style={[styles.groupName, { color: theme.colors.text }]}>
+                  {group.name}
                 </Text>
-                <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                  {friend.friendData.email}
-                </Text>
-                {/* Show friend status */}
-                <Text style={[
-                  styles.friendStatus, 
-                  { 
-                    color: friend.status === 'accepted' ? theme.colors.success : 
-                           friend.status === 'invited' ? theme.colors.primary : 
-                           friend.status === 'pending' ? theme.colors.primary : 
-                           friend.status === 'blocked' ? theme.colors.error :
-                           theme.colors.textSecondary
-                  }
-                ]}>
-                  {friend.status === 'accepted' ? '✓ Friends' : 
-                   friend.status === 'invited' ? '📤 Invitation Sent' : 
-                   friend.status === 'pending' ? '⏳ Pending Response' : 
-                   friend.status === 'blocked' ? '🚫 Blocked' :
-                   'Unknown'}
+                <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
+                  {group.members.length} members
                 </Text>
               </View>
             </View>
-            
-            <View style={styles.friendActions}>
-              {/* Quick payment button for accepted friends with balance */}
-              {friend.balance !== 0 && friend.status === 'accepted' && (
-                <TouchableOpacity
-                  style={[styles.payButton, { backgroundColor: theme.colors.primary }]}
-                  onPress={() => {
-                    setSelectedFriend(friend);
-                    setShowPayment(true);
-                  }}
-                >
-                  <Text style={styles.payButtonText}>
-                    {friend.balance > 0 ? 'Request' : 'Pay'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              
-              {/* Options button */}
+            <View style={styles.groupActions}>
               <TouchableOpacity
-                style={styles.optionsButton}
-                onPress={() => showFriendActionsMenu(friend)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setShowQRCode(true);
+                }}
+                style={styles.groupActionButton}
               >
-                <Ionicons name="ellipsis-vertical" size={20} color={theme.colors.textSecondary} />
+                <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={styles.friendBalance}>
-            {friend.status !== 'accepted' ? (
-              <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-                {friend.status === 'invited' && friend.invitedAt && 
-                  `Invited ${friend.invitedAt.toLocaleDateString()}`
-                }
-                {friend.status === 'blocked' && 'Blocked'}
+          <View style={styles.groupStats}>
+            <View style={styles.groupStat}>
+              <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
+                Total spent
               </Text>
-            ) : friend.balance === 0 ? (
-              <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-                You're all settled up! 🎉
+              <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
+                ${group.totalExpenses.toFixed(2)}
               </Text>
-            ) : friend.balance > 0 ? (
-              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                {friend.friendData.fullName} owes you ${Math.abs(friend.balance).toFixed(2)}
+            </View>
+            <View style={styles.groupStat}>
+              <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
+                Your share
               </Text>
-            ) : (
-              <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                You owe {friend.friendData.fullName} ${Math.abs(friend.balance).toFixed(2)}
+              <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
+                ${(group.totalExpenses / group.members.length).toFixed(2)}
               </Text>
-            )}
+            </View>
+          </View>
+
+          <View style={styles.groupFooter}>
+            <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
+              Last activity: {group.updatedAt.toLocaleDateString()}
+            </Text>
+            <View style={styles.groupFooterActions}>
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setSelectedGroup(group);
+                  setShowGroupChat(true);
+                }}
+                style={[styles.chatButton, { backgroundColor: theme.colors.primary + '20' }]}
+              >
+                <Ionicons name="chatbubble" size={16} color={theme.colors.primary} />
+                <Text style={[styles.chatButtonText, { color: theme.colors.primary }]}>Chat</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setShowAddExpense(true);
+                }}
+                style={[styles.addExpenseButton, { backgroundColor: theme.colors.primary }]}
+              >
+                <Text style={styles.addExpenseButtonText}>Add Expense</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
-      ))
-    )}
-  </ScrollView>
-);
+      ))}
+    </ScrollView>
+  );
 
+  // Render friends tab
+  const renderFriendsTab = () => (
+    <ScrollView 
+      contentContainerStyle={styles.tabContent}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      <View style={styles.tabHeader}>
+        <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Friends</Text>
+        <TouchableOpacity
+          style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => setShowAddFriend(true)}
+        >
+          <Ionicons name="person-add" size={20} color="white" />
+          <Text style={styles.headerButtonText}>Add</Text>
+        </TouchableOpacity>
+      </View>
 
+      {friends.length === 0 ? (
+        <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+          <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Friends Yet</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+            Add friends to start splitting expenses together
+          </Text>
+          <TouchableOpacity
+            style={[styles.addFirstFriendButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => setShowAddFriend(true)}
+          >
+            <Text style={styles.addFirstFriendText}>Add Your First Friend</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        friends.map((friend) => (
+          <TouchableOpacity
+            key={friend.id}
+            style={[styles.friendCard, { backgroundColor: theme.colors.surface }]}
+            onPress={() => showFriendActionsMenu(friend)}
+            onLongPress={() => showFriendActionsMenu(friend)}
+          >
+            <View style={styles.friendCardHeader}>
+              <View style={styles.friendLeft}>
+                <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
+                  <Text style={styles.friendAvatarText}>
+                    {friend.friendData.fullName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View>
+                  <Text style={[styles.friendName, { color: theme.colors.text }]}>
+                    {friend.friendData.fullName}
+                  </Text>
+                  <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                    {friend.friendData.email}
+                  </Text>
+                  {/* Show friend status */}
+                  <Text style={[
+                    styles.friendStatus, 
+                    { 
+                      color: friend.status === 'accepted' ? theme.colors.success : 
+                             friend.status === 'invited' ? theme.colors.primary : 
+                             friend.status === 'pending' ? theme.colors.primary : 
+                             friend.status === 'blocked' ? theme.colors.error :
+                             theme.colors.textSecondary
+                    }
+                  ]}>
+                    {friend.status === 'accepted' ? '✓ Friends' : 
+                     friend.status === 'invited' ? '📤 Invitation Sent' : 
+                     friend.status === 'pending' ? '⏳ Pending Response' : 
+                     friend.status === 'blocked' ? '🚫 Blocked' :
+                     'Unknown'}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.friendActions}>
+                {/* Quick payment button for accepted friends with balance */}
+                {friend.balance !== 0 && friend.status === 'accepted' && (
+                  <TouchableOpacity
+                    style={[styles.payButton, { backgroundColor: theme.colors.primary }]}
+                    onPress={() => {
+                      setSelectedFriend(friend);
+                      setShowPayment(true);
+                    }}
+                  >
+                    <Text style={styles.payButtonText}>
+                      {friend.balance > 0 ? 'Request' : 'Pay'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                
+                {/* Options button */}
+                <TouchableOpacity
+                  style={styles.optionsButton}
+                  onPress={() => showFriendActionsMenu(friend)}
+                >
+                  <Ionicons name="ellipsis-vertical" size={20} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.friendBalance}>
+              {friend.status !== 'accepted' ? (
+                <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
+                  {friend.status === 'invited' && friend.invitedAt && 
+                    `Invited ${friend.invitedAt.toLocaleDateString()}`
+                  }
+                  {friend.status === 'blocked' && 'Blocked'}
+                </Text>
+              ) : friend.balance === 0 ? (
+                <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
+                  You're all settled up! 🎉
+                </Text>
+              ) : friend.balance > 0 ? (
+                <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                  {friend.friendData.fullName} owes you ${Math.abs(friend.balance).toFixed(2)}
+                </Text>
+              ) : (
+                <Text style={[styles.balanceText, { color: theme.colors.error }]}>
+                  You owe {friend.friendData.fullName} ${Math.abs(friend.balance).toFixed(2)}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        ))
+      )}
+    </ScrollView>
+  );
 
   // Tab navigation
   const tabs = [
@@ -1059,31 +1075,31 @@ const renderFriendsTab = () => (
       {/* Tab Navigation */}
       <View style={[styles.tabNavigation, { backgroundColor: theme.colors.background }]}>
         <View style={[styles.segmentedControl, { backgroundColor: theme.colors.surface }]}>
-  {tabs.map((tab, index) => (
-    <TouchableOpacity
-      key={tab.id}
-      style={[
-        styles.segment,
-        activeTab === tab.id && [styles.activeSegment, { backgroundColor: theme.colors.primary }],
-        index === 0 && styles.firstSegment,
-        index === tabs.length - 1 && styles.lastSegment,
-      ]}
-      onPress={() => setActiveTab(tab.id)}
-    >
-      <Ionicons
-        name={tab.icon as any}
-        size={18}
-        color={activeTab === tab.id ? 'white' : theme.colors.textSecondary}
-      />
-      <Text style={[
-        styles.segmentText,
-        { color: activeTab === tab.id ? 'white' : theme.colors.textSecondary }
-      ]}>
-        {tab.title}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</View>
+          {tabs.map((tab, index) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={[
+                styles.segment,
+                activeTab === tab.id && [styles.activeSegment, { backgroundColor: theme.colors.primary }],
+                index === 0 && styles.firstSegment,
+                index === tabs.length - 1 && styles.lastSegment,
+              ]}
+              onPress={() => setActiveTab(tab.id)}
+            >
+              <Ionicons
+                name={tab.icon as any}
+                size={18}
+                color={activeTab === tab.id ? 'white' : theme.colors.textSecondary}
+              />
+              <Text style={[
+                styles.segmentText,
+                { color: activeTab === tab.id ? 'white' : theme.colors.textSecondary }
+              ]}>
+                {tab.title}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {/* Tab Content */}
@@ -1126,22 +1142,22 @@ const renderFriendsTab = () => (
       />
       
       {/* Add the new GroupDetailsModal */}
-    <GroupDetailsModal
-      visible={showGroupDetails}
-      onClose={() => setShowGroupDetails(false)}
-      group={selectedGroup}
-      currentUser={user}
-      onAddExpense={() => {
-        setSelectedGroupForExpense(selectedGroup); // Set selected group for expense
-        setShowGroupDetails(false);
-        setShowAddExpense(true);
-      }}
-      onOpenChat={() => {
-        setShowGroupDetails(false);
-        setShowGroupChat(true);
-      }}
-    />
-    
+      <GroupDetailsModal
+        visible={showGroupDetails}
+        onClose={() => setShowGroupDetails(false)}
+        group={selectedGroup}
+        currentUser={user}
+        onAddExpense={() => {
+          setSelectedGroupForExpense(selectedGroup); // Set selected group for expense
+          setShowGroupDetails(false);
+          setShowAddExpense(true);
+        }}
+        onOpenChat={() => {
+          setShowGroupDetails(false);
+          setShowGroupChat(true);
+        }}
+      />
+      
       <QRCodeModal
         visible={showQRCode}
         onClose={() => setShowQRCode(false)}
@@ -1548,46 +1564,46 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   segmentedControl: {
-  flexDirection: 'row',
-  margin: 16,
-  borderRadius: 12,
-  padding: 4,
-},
+    flexDirection: 'row',
+    margin: 16,
+    borderRadius: 12,
+    padding: 4,
+  },
 
-segment: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingVertical: 12,
-  paddingHorizontal: 8,
-  borderRadius: 8,
-  gap: 6,
-},
+  segment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
 
-activeSegment: {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 2,
-},
+  activeSegment: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
 
-firstSegment: {
-  borderTopLeftRadius: 8,
-  borderBottomLeftRadius: 8,
-},
+  firstSegment: {
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+  },
 
-lastSegment: {
-  borderTopRightRadius: 8,
-  borderBottomRightRadius: 8,
-},
+  lastSegment: {
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+  },
 
-segmentText: {
-  fontSize: 13,
-  fontWeight: '600',
-},
-groupFooterActions: {
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  groupFooterActions: {
     flexDirection: 'row',
     gap: 8,
   },
