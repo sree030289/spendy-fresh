@@ -60,7 +60,7 @@ const CurrencyModal: React.FC<CurrencyModalProps> = ({
       flag: country?.flag || '💰',
       name: currency,
       description: countries.length === 1 
-        ? country.name 
+        ? country?.name || 'Unknown'
         : `${countries.length} countries`,
     };
   };

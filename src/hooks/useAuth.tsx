@@ -73,7 +73,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   try {
     setIsLoading(true);
     console.log('Attempting registration...');
-    const newUser = await AuthService.register(userData);
+    const { password, ...userDataWithoutPassword } = userData;
+    const newUser = await AuthService.register(userDataWithoutPassword, password);
     setUser(newUser);
     setIsLoading(false); 
     console.log('Registration successful');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Camera, CameraType, BarCodeScannedCallback } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -13,15 +13,20 @@ export default function QRCodeScanner({ onQRCodeScanned, onClose }: QRCodeScanne
   const { theme } = useTheme();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
   useEffect(() => {
     (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
+      if (!permission?.granted) {
+        const { granted } = await requestPermission();
+        setHasPermission(granted);
+      } else {
+        setHasPermission(true);
+      }
     })();
-  }, []);
+  }, [permission, requestPermission]);
 
-  const handleBarCodeScanned: BarCodeScannedCallback = ({ type, data }) => {
+  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
     if (!scanned) {
       setScanned(true);
       onQRCodeScanned(data);
@@ -38,12 +43,12 @@ export default function QRCodeScanner({ onQRCodeScanned, onClose }: QRCodeScanne
 
   return (
     <View style={styles.container}>
-      <Camera
+      <CameraView
         style={styles.camera}
-        type={CameraType.back}
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barCodeScannerSettings={{
-          barCodeTypes: ['qr'],
+        facing="back"
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{
+          barcodeTypes: ['qr'],
         }}
       />
       <View style={styles.overlay}>

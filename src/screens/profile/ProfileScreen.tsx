@@ -302,7 +302,7 @@ export default function ProfileScreen() {
           onPress={handleLogout}
           loading={loading}
           variant="outline"
-          style={[styles.logoutButton, { borderColor: theme.colors.error }]}
+          style={StyleSheet.flatten([styles.logoutButton, { borderColor: theme.colors.error }])}
           textStyle={{ color: theme.colors.error }}
         />
 

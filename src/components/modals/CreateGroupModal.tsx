@@ -70,16 +70,14 @@ const handleCreateGroup = async () => {
 
   setLoading(true);
   try {
-    // Simplified group data - no friends required
+    // Pass selected friends to group creation
     const groupData = {
       name: groupName.trim(),
       description: description.trim() || '',
       avatar: selectedIcon,
       currency: user?.currency || 'AUD',
-      // Remove selectedFriends requirement
-      // selectedFriends: [], // Empty array is fine
-      // Remove inviteMethod requirement for now
-      // inviteMethod: 'none',
+      selectedFriends: selectedFriends, // Include selected friends
+      inviteMethod: inviteMethod,
     };
 
     await onSubmit(groupData);

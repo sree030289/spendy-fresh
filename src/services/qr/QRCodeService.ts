@@ -1,4 +1,5 @@
 // src/services/qr/QRCodeService.ts
+import React from 'react';
 import QRCode from 'react-native-qrcode-svg';
 import { RNCamera } from 'react-native-camera';
 import { Linking, Alert, Share } from 'react-native';
@@ -192,7 +193,8 @@ export class QRCodeService {
       }
     } catch (error) {
       console.error('Handle QR error:', error);
-      Alert.alert('QR Code Error', error.message || 'Invalid QR code');
+      const errorMessage = error instanceof Error ? error.message : 'Invalid QR code';
+      Alert.alert('QR Code Error', errorMessage);
     }
   }
   
@@ -428,7 +430,7 @@ export class QRCodeService {
   static renderQRCode(
     qrData: QRData, 
     options: QRGenerationOptions = {}
-  ): JSX.Element {
+  ): React.ReactElement {
     const defaultOptions: QRGenerationOptions = {
       size: 200,
       backgroundColor: 'white',
@@ -543,7 +545,7 @@ export class QRCodeService {
 
 // Camera component for QR scanning
 export class QRScanner {
-  static renderScanner(onQRCodeScanned: (data: string) => void): JSX.Element {
+  static renderScanner(onQRCodeScanned: (data: string) => void): React.ReactElement {
     return React.createElement(RNCamera, {
       style: { flex: 1 },
       type: RNCamera.Constants.Type.back,

@@ -498,7 +498,7 @@ export default function PaymentModal({
               }
               onPress={step === 'confirm' ? handlePayment : handleNextStep}
               loading={loading}
-              style={[styles.footerButton, step === 'amount' && styles.fullWidthButton]}
+              style={StyleSheet.flatten([styles.footerButton, step === 'amount' && styles.fullWidthButton])}
             />
           </View>
         </View>

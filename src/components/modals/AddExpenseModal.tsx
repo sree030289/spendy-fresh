@@ -321,7 +321,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
           value={description}
           onChangeText={(text) => {
             setDescription(text);
-            if (errors.description) setErrors(prev => ({ ...prev, description: '' }));
+            if (errors.description) setErrors((prev: any) => ({ ...prev, description: '' }));
           }}
           maxLength={100}
         />
@@ -353,7 +353,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
       value={amount}
       onChangeText={(text) => {
         setAmount(text);
-        if (errors.amount) setErrors(prev => ({ ...prev, amount: '' }));
+        if (errors.amount) setErrors((prev: any) => ({ ...prev, amount: '' }));
       }}
       keyboardType="decimal-pad"
     />
@@ -866,13 +866,13 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
                 title="Add Expense"
                 onPress={handleSubmit}
                 loading={loading}
-                style={[styles.footerButton, activeStep === 'details' && styles.fullWidthButton]}
+                style={StyleSheet.flatten([styles.footerButton, activeStep === 'review' && styles.fullWidthButton])}
               />
             ) : (
               <Button
                 title="Next"
                 onPress={handleNext}
-                style={[styles.footerButton, activeStep === 'details' && styles.fullWidthButton]}
+                style={StyleSheet.flatten([styles.footerButton, activeStep === 'details' && styles.fullWidthButton])}
                 disabled={loading}
               />
             )}

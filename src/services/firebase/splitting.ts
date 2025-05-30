@@ -446,11 +446,11 @@ static async acceptFriendRequest(requestId: string): Promise<void> {
       friendId: requestData.toUserId,
       friendData: {
         id: requestData.toUserId,
-        fullName: toUserData?.fullName || requestData.toUserData?.fullName || 'Unknown User',
-        email: toUserData?.email || requestData.toUserData?.email || '',
-        mobile: toUserData?.mobile || requestData.toUserData?.mobile || '',
-        avatar: toUserData?.profilePicture || requestData.toUserData?.avatar || '',
-        profilePicture: toUserData?.profilePicture || requestData.toUserData?.avatar || ''
+        fullName: toUserData?.fullName || 'Unknown User',
+        email: toUserData?.email || requestData.toUserEmail || '',
+        mobile: toUserData?.mobile || '',
+        avatar: toUserData?.profilePicture || '',
+        profilePicture: toUserData?.profilePicture || ''
       },
       status: 'accepted',
       balance: 0,
@@ -466,7 +466,7 @@ static async acceptFriendRequest(requestId: string): Promise<void> {
         id: requestData.fromUserId,
         fullName: fromUserData?.fullName || requestData.fromUserData?.fullName || 'Unknown User',
         email: fromUserData?.email || requestData.fromUserData?.email || '',
-        mobile: fromUserData?.mobile || requestData.fromUserData?.mobile || '',
+        mobile: fromUserData?.mobile || '',
         avatar: fromUserData?.profilePicture || requestData.fromUserData?.avatar || '',
         profilePicture: fromUserData?.profilePicture || requestData.fromUserData?.avatar || ''
       },
@@ -649,19 +649,27 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
     // Ensure inviteCode is provided or generate one
     const inviteCode = groupData.inviteCode || Math.random().toString(36).substring(2, 8).toUpperCase();
     
+    // Create group without members first, then add creator
     const newGroup: Omit<Group, 'id'> = {
       ...groupData,
       inviteCode,
       totalExpenses: groupData.totalExpenses || 0,
       isActive: groupData.isActive !== undefined ? groupData.isActive : true,
+      members: [], // Start with empty members array
       createdAt: new Date(),
       updatedAt: new Date()
     };
     
     // Create the group document
     const docRef = await addDoc(collection(db, 'groups'), newGroup);
-    
     console.log('Group created successfully with ID:', docRef.id);
+    
+    // Add the creator as the first member (admin)
+    if (groupData.createdBy) {
+      await this.addGroupMember(docRef.id, groupData.createdBy, 'admin');
+      console.log('Creator added as admin to group');
+    }
+    
     return docRef.id;
     
   } catch (error) {
@@ -672,16 +680,38 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
   
   static async addGroupMember(groupId: string, userId: string, role: 'admin' | 'member' = 'member'): Promise<void> {
     try {
+      console.log('Adding member to group:', { groupId, userId, role });
+      
       // Get user data
       const userDoc = await getDoc(doc(db, 'users', userId));
+      if (!userDoc.exists()) {
+        throw new Error('User not found');
+      }
+      
       const userData = userDoc.data();
+      console.log('Found user data:', userData);
+      
+      // Get current group data
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (!groupDoc.exists()) {
+        throw new Error('Group not found');
+      }
+      
+      const groupData = groupDoc.data() as Group;
+      
+      // Check if user is already a member
+      const existingMember = groupData.members?.find(member => member.userId === userId);
+      if (existingMember) {
+        console.log('User is already a member of this group');
+        return;
+      }
       
       const member: GroupMember = {
         userId,
         userData: {
           fullName: userData?.fullName || 'Unknown User',
           email: userData?.email || '',
-          avatar: userData?.profilePicture
+          avatar: userData?.profilePicture || ''
         },
         role,
         balance: 0,
@@ -689,11 +719,18 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
         isActive: true
       };
       
-      // Add member to group
+      console.log('Adding member:', member);
+      
+      // Instead of arrayUnion, manually update the members array
+      // This avoids issues with complex object comparison in Firestore
+      const updatedMembers = [...(groupData.members || []), member];
+      
       await updateDoc(doc(db, 'groups', groupId), {
-        members: arrayUnion(member),
-        updatedAt: new Date()
+        members: updatedMembers,
+        updatedAt: serverTimestamp()
       });
+      
+      console.log('Member added successfully to group');
       
     } catch (error) {
       console.error('Add group member error:', error);
@@ -777,14 +814,22 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     batch.set(doc(collection(db, 'groupMessages')), expenseMessage);
     console.log('Chat message prepared');
     
-    // Update member balances
+    // Update member balances in the group
     for (const split of expenseData.splitData) {
       if (split.userId !== expenseData.paidBy) {
-        await this.updateFriendBalance(expenseData.paidBy, split.userId, split.amount);
-        await this.updateFriendBalance(split.userId, expenseData.paidBy, -split.amount);
+        await this.updateGroupMemberBalance(expenseData.groupId, split.userId, split.amount);
+        await this.updateGroupMemberBalance(expenseData.groupId, expenseData.paidBy, -split.amount);
+        
+        // Also update friend balances if they are friends
+        try {
+          await this.updateFriendBalance(expenseData.paidBy, split.userId, split.amount);
+          console.log(`Updated friend balance between ${expenseData.paidBy} and ${split.userId} by ${split.amount}`);
+        } catch (error) {
+          console.log(`No friendship found between ${expenseData.paidBy} and ${split.userId}, skipping friend balance update`);
+        }
       }
     }
-    console.log('Friend balances updated');
+    console.log('Group member balances updated');
     
     await batch.commit();
     console.log('✅ Expense added successfully:', expenseRef.id);
@@ -799,23 +844,53 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
   
   static async updateFriendBalance(userId: string, friendId: string, amount: number): Promise<void> {
     try {
-      const friendQuery = query(
+      console.log(`Updating balance between ${userId} and ${friendId} by ${amount}`);
+      
+      // Update both sides of the friendship with opposite amounts
+      const batch = writeBatch(db);
+      
+      // Update user's side (amount owed by friend)
+      const userFriendQuery = query(
         collection(db, 'friends'),
         where('userId', '==', userId),
         where('friendId', '==', friendId),
         limit(1)
       );
       
-      const snapshot = await getDocs(friendQuery);
-      if (!snapshot.empty) {
-        const friendDoc = snapshot.docs[0];
-        await updateDoc(friendDoc.ref, {
+      const userSnapshot = await getDocs(userFriendQuery);
+      if (!userSnapshot.empty) {
+        const userFriendDoc = userSnapshot.docs[0];
+        batch.update(userFriendDoc.ref, {
           balance: increment(amount),
           lastActivity: new Date()
         });
+        console.log(`Updated ${userId}'s side: +${amount}`);
       }
+      
+      // Update friend's side (opposite amount)
+      const friendUserQuery = query(
+        collection(db, 'friends'),
+        where('userId', '==', friendId),
+        where('friendId', '==', userId),
+        limit(1)
+      );
+      
+      const friendSnapshot = await getDocs(friendUserQuery);
+      if (!friendSnapshot.empty) {
+        const friendUserDoc = friendSnapshot.docs[0];
+        batch.update(friendUserDoc.ref, {
+          balance: increment(-amount),
+          lastActivity: new Date()
+        });
+        console.log(`Updated ${friendId}'s side: -${amount}`);
+      }
+      
+      await batch.commit();
+      console.log('Balance update completed successfully');
+      
     } catch (error) {
       console.error('Update friend balance error:', error);
+      throw error;
     }
   }
 
@@ -875,11 +950,67 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     }
   }
   
+  // Mark single notification as read
+  static async markNotificationAsRead(notificationId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'notifications', notificationId), {
+        isRead: true,
+        readAt: new Date()
+      });
+      
+      console.log('Notification marked as read:', notificationId);
+      
+    } catch (error) {
+      console.error('Mark notification as read error:', error);
+      throw error;
+    }
+  }
+
+  // Mark all notifications as read for a user
+  static async markAllNotificationsAsRead(userId: string): Promise<void> {
+    try {
+      const batch = writeBatch(db);
+      
+      // Get all unread notifications for the user
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('userId', '==', userId),
+        where('isRead', '==', false)
+      );
+      
+      const snapshot = await getDocs(notificationsQuery);
+      
+      // Mark each notification as read
+      snapshot.docs.forEach(docSnapshot => {
+        batch.update(docSnapshot.ref, {
+          isRead: true,
+          readAt: new Date()
+        });
+      });
+      
+      await batch.commit();
+      
+      console.log(`Marked ${snapshot.docs.length} notifications as read for user:`, userId);
+      
+    } catch (error) {
+      console.error('Mark all notifications as read error:', error);
+      throw error;
+    }
+  }
+  
   // PAYMENTS
   static async createPayment(paymentData: Omit<Payment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
-      const newPayment: Omit<Payment, 'id'> = {
+      // Clean the payment data to ensure no undefined values
+      const cleanPaymentData = {
         ...paymentData,
+        expenseId: paymentData.expenseId || undefined,
+        groupId: paymentData.groupId || undefined,
+        transactionId: paymentData.transactionId || undefined,
+      };
+      
+      const newPayment: Omit<Payment, 'id'> = {
+        ...cleanPaymentData,
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -1169,6 +1300,7 @@ static async sendGroupMessage(messageData: {
   try {
     const chatMessage = {
       ...messageData,
+      userAvatar: messageData.userAvatar || '', // Ensure no undefined values
       timestamp: serverTimestamp()
     };
     
@@ -1206,43 +1338,252 @@ static async getGroupMessages(groupId: string, limitCount: number = 50): Promise
     return [];
   }
 }
-}
-// QR Code Service
-export class QRCodeService {
-  static generateInviteCode(): string {
-    return Math.random().toString(36).substring(2, 10).toUpperCase();
-  }
-  
-  static generateQRData(type: 'friend' | 'group', userId: string, data?: any): string {
-    const qrData = {
-      type,
-      userId,
-      timestamp: Date.now(),
-      ...data
-    };
-    
-    return `spendy://${type}?data=${btoa(JSON.stringify(qrData))}`;
-  }
-  
-  static parseQRData(qrString: string): any {
+
+static async updateGroupMemberBalance(groupId: string, userId: string, amount: number): Promise<void> {
     try {
-      if (!qrString.startsWith('spendy://')) {
-        throw new Error('Invalid QR code');
+      console.log(`Updating group member balance: ${userId} in group ${groupId} by ${amount}`);
+      
+      // Get current group data
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (!groupDoc.exists()) {
+        throw new Error('Group not found');
       }
       
-      const url = new URL(qrString);
-      const encodedData = url.searchParams.get('data');
+      const groupData = groupDoc.data() as Group;
       
-      if (!encodedData) {
-        throw new Error('No data in QR code');
-      }
+      // Find and update the member's balance
+      const updatedMembers = groupData.members.map(member => {
+        if (member.userId === userId) {
+          return {
+            ...member,
+            balance: (member.balance || 0) + amount
+          };
+        }
+        return member;
+      });
       
-      return JSON.parse(atob(encodedData));
+      // Update the group with new member balances
+      await updateDoc(doc(db, 'groups', groupId), {
+        members: updatedMembers,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log(`Updated member ${userId} balance by ${amount}`);
+      
     } catch (error) {
-      console.error('Parse QR data error:', error);
-      throw new Error('Invalid QR code format');
+      console.error('Update group member balance error:', error);
+      throw error;
     }
   }
 
+  // UPDATE MEMBER ROLE
+  static async updateMemberRole(groupId: string, userId: string, newRole: 'admin' | 'member'): Promise<void> {
+    try {
+      console.log(`Updating member role: ${userId} in group ${groupId} to ${newRole}`);
+      
+      // Get current group data
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (!groupDoc.exists()) {
+        throw new Error('Group not found');
+      }
+
+      const groupData = groupDoc.data() as Group;
+      
+      // Find and update the member's role
+      const updatedMembers = groupData.members.map(member => {
+        if (member.userId === userId) {
+          return {
+            ...member,
+            role: newRole
+          };
+        }
+        return member;
+      });
+
+      // Update the group with new member roles
+      await updateDoc(doc(db, 'groups', groupId), {
+        members: updatedMembers,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log(`Updated member ${userId} role to ${newRole}`);
+      
+    } catch (error) {
+      console.error('Update member role error:', error);
+      throw error;
+    }
+  }
+
+  // REMOVE MEMBER FROM GROUP
+  static async removeMemberFromGroup(groupId: string, userId: string): Promise<void> {
+    try {
+      console.log(`Removing member ${userId} from group ${groupId}`);
+      
+      // Get current group data
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (!groupDoc.exists()) {
+        throw new Error('Group not found');
+      }
+
+      const groupData = groupDoc.data() as Group;
+      
+      // Find the member to be removed
+      const memberToRemove = groupData.members.find(member => member.userId === userId);
+      if (!memberToRemove) {
+        throw new Error('Member not found in group');
+      }
+
+      // Check if member has pending balances
+      if (memberToRemove.balance !== 0) {
+        throw new Error(`Cannot remove member with pending balances (${memberToRemove.balance}). Please settle all expenses first.`);
+      }
+
+      // Remove the member from the group
+      const updatedMembers = groupData.members.filter(member => member.userId !== userId);
+
+      // If removing the last admin and there are other members, make someone else admin
+      const remainingAdmins = updatedMembers.filter(member => member.role === 'admin');
+      if (remainingAdmins.length === 0 && updatedMembers.length > 0) {
+        updatedMembers[0].role = 'admin';
+        console.log(`Made ${updatedMembers[0].userData.fullName} admin after removing last admin`);
+      }
+
+      // Update the group
+      await updateDoc(doc(db, 'groups', groupId), {
+        members: updatedMembers,
+        updatedAt: serverTimestamp()
+      });
+
+      // Add system message to group chat
+      await this.sendGroupMessage({
+        groupId: groupId,
+        userId: 'system',
+        userName: 'System',
+        message: `${memberToRemove.userData.fullName} has been removed from the group`,
+        type: 'system'
+      });
+      
+      console.log(`Successfully removed member ${userId} from group ${groupId}`);
+      
+    } catch (error) {
+      console.error('Remove member from group error:', error);
+      throw error;
+    }
+  }
+
+  // UPDATE EXPENSE
+  static async updateExpense(expenseData: any): Promise<void> {
+    try {
+      const expenseId = expenseData.id;
+      console.log('Updating expense:', expenseId, expenseData.description);
+      
+      // Get the current expense to compare amounts for balance adjustments
+      const currentExpenseDoc = await getDoc(doc(db, 'expenses', expenseId));
+      if (!currentExpenseDoc.exists()) {
+        throw new Error('Expense not found');
+      }
+      
+      const currentExpense = {
+        id: currentExpenseDoc.id,
+        ...currentExpenseDoc.data(),
+        date: currentExpenseDoc.data()?.date?.toDate() || new Date(),
+        createdAt: currentExpenseDoc.data()?.createdAt?.toDate() || new Date(),
+        updatedAt: currentExpenseDoc.data()?.updatedAt?.toDate() || new Date(),
+      } as Expense;
+      
+      const batch = writeBatch(db);
+      
+      // Update the expense document
+      const updatedExpense = {
+        ...expenseData,
+        id: undefined, // Remove id from the data to be saved
+        updatedAt: new Date()
+      };
+      
+      batch.update(doc(db, 'expenses', expenseId), updatedExpense);
+      console.log('Expense update prepared');
+      
+      // Calculate the difference in amount to adjust group total
+      const amountDifference = expenseData.amount - currentExpense.amount;
+      
+      if (amountDifference !== 0) {
+        // Update group total expenses
+        batch.update(doc(db, 'groups', expenseData.groupId), {
+          totalExpenses: increment(amountDifference),
+          updatedAt: serverTimestamp()
+        });
+        console.log('Group total update prepared, difference:', amountDifference);
+      }
+      
+      // Add update notification to group chat
+      const updateMessage = {
+        groupId: expenseData.groupId,
+        userId: expenseData.paidBy,
+        userName: currentExpense.paidByData?.fullName || 'Unknown User',
+        message: `Updated expense: ${expenseData.description}`,
+        timestamp: serverTimestamp(),
+        type: 'system' as const,
+        expenseData: {
+          id: expenseId,
+          description: expenseData.description,
+          amount: expenseData.amount,
+          currency: expenseData.currency
+        }
+      };
+      
+      batch.set(doc(collection(db, 'groupMessages')), updateMessage);
+      console.log('Update message prepared');
+      
+      // Handle balance adjustments if amounts changed
+      if (amountDifference !== 0 || 
+          JSON.stringify(currentExpense.splitData) !== JSON.stringify(expenseData.splitData)) {
+        
+        console.log('Recalculating balances due to amount or split changes');
+        
+        // First, reverse the old balance calculations
+        for (const oldSplit of currentExpense.splitData) {
+          if (oldSplit.userId !== currentExpense.paidBy) {
+            // Reverse group member balance
+            await this.updateGroupMemberBalance(currentExpense.groupId, oldSplit.userId, -oldSplit.amount);
+            await this.updateGroupMemberBalance(currentExpense.groupId, currentExpense.paidBy, oldSplit.amount);
+            
+            // Reverse friend balance if they are friends
+            try {
+              await this.updateFriendBalance(currentExpense.paidBy, oldSplit.userId, -oldSplit.amount);
+              console.log(`Reversed friend balance between ${currentExpense.paidBy} and ${oldSplit.userId} by ${-oldSplit.amount}`);
+            } catch (error) {
+              console.log(`No friendship found, skipping friend balance reversal`);
+            }
+          }
+        }
+        
+        // Then, apply the new balance calculations
+        for (const newSplit of expenseData.splitData) {
+          if (newSplit.userId !== expenseData.paidBy) {
+            // Update group member balance
+            await this.updateGroupMemberBalance(expenseData.groupId, newSplit.userId, newSplit.amount);
+            await this.updateGroupMemberBalance(expenseData.groupId, expenseData.paidBy, -newSplit.amount);
+            
+            // Update friend balance if they are friends
+            try {
+              await this.updateFriendBalance(expenseData.paidBy, newSplit.userId, newSplit.amount);
+              console.log(`Updated friend balance between ${expenseData.paidBy} and ${newSplit.userId} by ${newSplit.amount}`);
+            } catch (error) {
+              console.log(`No friendship found, skipping friend balance update`);
+            }
+          }
+        }
+        
+        console.log('Balance recalculation completed');
+      }
+      
+      await batch.commit();
+      console.log('✅ Expense updated successfully:', expenseId);
+      
+    } catch (error) {
+      console.error('❌ Update expense error:', error);
+      throw error;
+    }
+  }
 
 }

@@ -25,17 +25,17 @@ export default function ExpensesScreen() {
 
   useEffect(() => {
     loadExpenses();
-  }, [user?.id]);
+  }, [user?.id]);  useEffect(() => {
+    const refreshService = ExpenseRefreshService.getInstance();
+    const unsubscribe = refreshService.addListener(() => {
+      console.log('Expenses screen received refresh notification');
+      loadExpenses();
+    });
 
-  useEffect(() => {
-  const refreshService = ExpenseRefreshService.getInstance();
-  const unsubscribe = refreshService.addListener(() => {
-    console.log('Expenses screen received refresh notification');
-    loadExpenses();
-  });
-
-  return unsubscribe;
-}, []);
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const loadExpenses = async () => {
     if (!user?.id) return;

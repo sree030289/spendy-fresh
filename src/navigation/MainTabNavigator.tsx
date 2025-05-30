@@ -24,19 +24,19 @@ export default function MainTabNavigator() {
 
           switch (route.name) {
             case 'Splitting':
-              iconName = focused ? 'people' : 'people-outline';
+              iconName = focused ? 'git-network' : 'git-network-outline';
               break;
             case 'Expenses':
-              iconName = focused ? 'receipt' : 'receipt-outline';
+              iconName = focused ? 'card' : 'card-outline';
               break;
             case 'Reminders':
-              iconName = focused ? 'notifications' : 'notifications-outline';
+              iconName = focused ? 'alarm' : 'alarm-outline';
               break;
             case 'Goals':
-              iconName = focused ? 'trophy' : 'trophy-outline';
+              iconName = focused ? 'trending-up' : 'trending-up-outline';
               break;
             case 'Profile':
-              iconName = focused ? 'person' : 'person-outline';
+              iconName = focused ? 'person-circle' : 'person-circle-outline';
               break;
             default:
               iconName = 'ellipse';
@@ -49,9 +49,9 @@ export default function MainTabNavigator() {
         tabBarStyle: {
           backgroundColor: theme.colors.background,
           borderTopColor: theme.colors.border,
-          paddingBottom: 8,
           paddingTop: 8,
-          height: 60,
+          height: 88, // Increased height for safe area
+          paddingBottom: 34, // Add bottom padding for home indicator
         },
         headerShown: false,
       })}

@@ -385,14 +385,14 @@ export default function AddFriendModal({ visible, onClose, onSubmit }: AddFriend
           title="Send SMS"
           onPress={handleSendSMS}
           loading={loading}
-          style={[styles.phoneButton, { backgroundColor: '#2563EB' }]}
+          style={StyleSheet.flatten([styles.phoneButton, { backgroundColor: '#2563EB' }])}
           disabled={!phoneNumber.trim() || (showContactNameInput && !contactName.trim())}
         />
         <Button
           title="Send WhatsApp"
           onPress={handleSendWhatsApp}
           loading={loading}
-          style={[styles.phoneButton, { backgroundColor: '#25D366' }]}
+          style={StyleSheet.flatten([styles.phoneButton, { backgroundColor: '#25D366' }])}
           disabled={!phoneNumber.trim() || (showContactNameInput && !contactName.trim())}
         />
       </View>

@@ -21,10 +21,9 @@ const initializeFirebase = async () => {
     
     // Dynamic imports to avoid loading Firebase at startup
     const { initializeApp, getApps } = await import('firebase/app');
-    const { getAuth, initializeAuth, getReactNativePersistence, onAuthStateChanged } = await import('firebase/auth');
+    const { getAuth, onAuthStateChanged } = await import('firebase/auth');
     const { getFirestore } = await import('firebase/firestore');
     const { getStorage } = await import('firebase/storage');
-    const AsyncStorage = await import('@react-native-async-storage/async-storage');
 
     // Firebase config
     const firebaseConfig = {
@@ -47,17 +46,14 @@ const initializeFirebase = async () => {
       app = getApps()[0];
     }
     
-    // Try initializeAuth with persistence first, fallback to getAuth
+    // Initialize auth
     try {
-      console.log('🔐 Initializing Auth with persistence...');
-      firebaseAuth = initializeAuth(app, {
-        persistence: getReactNativePersistence(AsyncStorage.default)
-      });
-      console.log('✅ Auth initialized with persistence!');
-    } catch (error) {
-      console.log('🔐 Falling back to standard auth...');
+      console.log('🔐 Initializing Auth...');
       firebaseAuth = getAuth(app);
-      console.log('✅ Auth initialized (no persistence)');
+      console.log('✅ Auth initialized!');
+    } catch (error) {
+      console.log('❌ Auth initialization failed:', error);
+      throw error;
     }
     
     // Initialize firestore
@@ -132,7 +128,7 @@ export class AuthService {
   }
 
   // Register with enhanced session management
-static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
+static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, password: string): Promise<User> {
   console.log('AuthService: Registration for', userData.email);
   
   // Clear any existing session data before registering new user
@@ -149,7 +145,7 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): P
     const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
     
     console.log('🔥 Attempting Firebase registration...');
-    const userCredential = await createUserWithEmailAndPassword(firebaseAuth, userData.email, userData.password || '');
+    const userCredential = await createUserWithEmailAndPassword(firebaseAuth, userData.email, password);
     
     // Store user data in Firestore
     const userDoc = {

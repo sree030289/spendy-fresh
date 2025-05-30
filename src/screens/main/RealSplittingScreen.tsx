@@ -160,7 +160,9 @@ export default function RealSplittingScreen() {
       loadFriends();
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // FIX: Add loadNotifications function
@@ -269,10 +271,15 @@ export default function RealSplittingScreen() {
 
   const markAllNotificationsRead = async () => {
     try {
-      // TODO: Implement mark notifications as read in SplittingService
+      if (!user?.id) return;
+      
+      await SplittingService.markAllNotificationsAsRead(user.id);
       setNotifications([]);
+      
+      Alert.alert('Success', 'All notifications marked as read');
     } catch (error) {
       console.error('Mark notifications read error:', error);
+      Alert.alert('Error', 'Failed to mark notifications as read');
     }
   };
 
@@ -556,22 +563,11 @@ export default function RealSplittingScreen() {
         description: groupData.description || '',
         avatar: groupData.avatar,
         createdBy: user.id,
+        members: [], // Initialize with empty array, members will be added separately
         currency: groupData.currency || user.currency || 'AUD',
         inviteCode, // Add the invite code
         totalExpenses: 0,
         isActive: true,
-        members: [{
-          userId: user.id,
-          userData: {
-            fullName: user.fullName,
-            email: user.email,
-            avatar: user.profilePicture || ''
-          },
-          role: 'admin' as const,
-          balance: 0,
-          joinedAt: new Date(),
-          isActive: true
-        }],
         settings: {
           allowMemberInvites: true,
           requireApproval: false,
@@ -579,12 +575,32 @@ export default function RealSplittingScreen() {
         }
       });
       
+      // Add selected friends to the group if any were selected
+      if (groupData.selectedFriends && groupData.selectedFriends.length > 0) {
+        console.log('Adding selected friends to group:', groupData.selectedFriends);
+        
+        for (const friendId of groupData.selectedFriends) {
+          try {
+            // Find the friend data to get their user ID
+            const friend = friends.find(f => f.id === friendId);
+            if (friend) {
+              console.log('Adding friend to group:', friend.friendData.fullName, friend.friendId);
+              await SplittingService.addGroupMember(groupId, friend.friendId, 'member');
+            }
+          } catch (error) {
+            console.error(`Failed to add friend ${friendId} to group:`, error);
+            // Continue with other friends even if one fails
+          }
+        }
+      }
+      
       await loadGroups(); // Refresh groups list
       
-      // Show success with invite code
+      // Show success with invite code and member count
+      const memberCount = 1 + (groupData.selectedFriends?.length || 0);
       Alert.alert(
         'Group Created! 🎉', 
-        `"${groupData.name}" has been created successfully!\n\nInvite Code: ${inviteCode}\n\nYou can now invite friends using this code, QR code, or direct invitations.`,
+        `"${groupData.name}" has been created successfully with ${memberCount} member${memberCount > 1 ? 's' : ''}!\n\nInvite Code: ${inviteCode}\n\nYou can share this code to invite more friends.`,
         [
           {
             text: 'Share Invite Code',
@@ -841,15 +857,15 @@ export default function RealSplittingScreen() {
               </View>
               <View style={styles.friendRight}>
                 {friend.balance === 0 ? (
-                  <Text style={[styles.friendBalance, { color: theme.colors.textSecondary }]}>
+                  <Text style={[styles.friendBalanceText, { color: theme.colors.textSecondary }]}>
                     Settled up
                   </Text>
                 ) : friend.balance > 0 ? (
-                  <Text style={[styles.friendBalance, { color: theme.colors.success }]}>
+                  <Text style={[styles.friendBalanceText, { color: theme.colors.success }]}>
                     +${Math.abs(friend.balance).toFixed(2)}
                   </Text>
                 ) : (
-                  <Text style={[styles.friendBalance, { color: theme.colors.error }]}>
+                  <Text style={[styles.friendBalanceText, { color: theme.colors.error }]}>
                     -${Math.abs(friend.balance).toFixed(2)}
                   </Text>
                 )}
@@ -1246,6 +1262,9 @@ export default function RealSplittingScreen() {
           setShowGroupDetails(false);
           setShowGroupChat(true);
         }}
+        onGroupLeft={loadGroups}
+        onRefresh={loadGroups}
+        friends={friends}
       />
       
       <QRCodeModal
@@ -1563,6 +1582,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   friendBalance: {
+    alignItems: 'flex-end',
+  },
+  friendBalanceText: {
     fontSize: 14,
     fontWeight: '600',
   },
