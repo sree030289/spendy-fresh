@@ -18,6 +18,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { User } from '@/types';
 
+
 // Import Firebase functions
 import { 
   addDoc, 
@@ -46,6 +47,7 @@ import GroupChatModal from '@/components/modals/GroupChatModal';
 import ReceiptScannerModal from '@/components/modals/ReceiptScannerModal';
 import GroupDetailsModal from '@/components/modals/GroupDetailsModal';
 import ExpenseRefreshService from '@/services/expenseRefreshService';
+import NotificationsModal from '@/components/modals/NotificationsModal';
 
 export default function RealSplittingScreen() {
   const navigation = useNavigation();
@@ -74,6 +76,7 @@ export default function RealSplittingScreen() {
   });
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [selectedGroupForExpense, setSelectedGroupForExpense] = useState<Group | null>(null);
+const [showNotifications, setShowNotifications] = useState(false);
 
   // Modal states
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -165,16 +168,25 @@ export default function RealSplittingScreen() {
     };
   }, []);
 
-  // FIX: Add loadNotifications function
   const loadNotifications = async () => {
-    try {
-      if (!user?.id) return;
-      const notificationsData = await SplittingService.getNotifications(user.id);
-      setNotifications(notificationsData);
-    } catch (error) {
-      console.error('Load notifications error:', error);
-    }
-  };
+  try {
+    if (!user?.id) return;
+    const notificationsData = await SplittingService.getNotifications(user.id);
+    
+    // Convert Firestore timestamps to proper Date objects
+    const processedNotifications = notificationsData.map(notification => ({
+      ...notification,
+      createdAt: notification.createdAt && typeof notification.createdAt.toDate === 'function' 
+        ? notification.createdAt.toDate() 
+        : new Date(notification.createdAt || Date.now())
+    }));
+    
+    setNotifications(processedNotifications);
+  } catch (error) {
+    console.error('Load notifications error:', error);
+  }
+};
+  
 
   // Load friends data - FIX: Properly calculate balances
   const loadFriends = async () => {
@@ -248,26 +260,8 @@ export default function RealSplittingScreen() {
 
   // FIX: Handle notifications properly
   const handleNotificationsPress = () => {
-    if (notifications.length === 0) {
-      Alert.alert('No Notifications', 'You have no new notifications.');
-      return;
-    }
-
-    // Show notifications in a simple alert for now
-    const notificationTitles = notifications.slice(0, 3).map(n => `• ${n.title}`).join('\n');
-    const message = notifications.length > 3 
-      ? `${notificationTitles}\n\n...and ${notifications.length - 3} more`
-      : notificationTitles;
-
-    Alert.alert(
-      `${notifications.length} Notification${notifications.length > 1 ? 's' : ''}`,
-      message,
-      [
-        { text: 'Dismiss', style: 'cancel' },
-        { text: 'Mark All Read', onPress: markAllNotificationsRead }
-      ]
-    );
-  };
+      setShowNotifications(true);
+    };
 
   const markAllNotificationsRead = async () => {
     try {
@@ -670,6 +664,131 @@ export default function RealSplittingScreen() {
       Alert.alert('Error', error.message || 'Failed to add expense');
     }
   };
+
+  const handleNotificationNavigation = async (notification: Notification) => {
+  try {
+    const { type, data } = notification;
+    
+    switch (type) {
+      case 'friend_request':
+        // Navigate to friends tab and show friend request
+        setActiveTab('friends');
+        if (data.friendRequestId) {
+          // Show friend request accept dialog
+          Alert.alert(
+            'Friend Request',
+            `Accept friend request from ${data.senderName || 'someone'}?`,
+            [
+              { text: 'Decline', style: 'cancel' },
+              {
+                text: 'Accept',
+                onPress: async () => {
+                  try {
+                    await SplittingService.acceptFriendRequest(data.friendRequestId);
+                    await loadFriends();
+                    Alert.alert('Success', 'Friend request accepted!');
+                  } catch (error: any) {
+                    Alert.alert('Error', error.message || 'Failed to accept friend request');
+                  }
+                }
+              }
+            ]
+          );
+        }
+        break;
+
+      case 'expense_added':
+        // Navigate to the group and show group details
+        if (data.groupId) {
+          const group = groups.find(g => g.id === data.groupId);
+          if (group) {
+            setSelectedGroup(group);
+            setShowGroupDetails(true);
+            // Optionally scroll to specific expense if expenseId is available
+          } else {
+            Alert.alert('Group Not Found', 'The group for this expense could not be found.');
+          }
+        }
+        break;
+
+      case 'group_invite':
+        // Navigate to groups tab and show join group option
+        setActiveTab('groups');
+        if (data.inviteCode) {
+          Alert.alert(
+            'Group Invitation',
+            `Join "${data.groupName || 'group'}"?`,
+            [
+              { text: 'Decline', style: 'cancel' },
+              {
+                text: 'Join',
+                onPress: async () => {
+                  try {
+                    if (!user?.id) return;
+                    await SplittingService.joinGroupByInviteCode(data.inviteCode, user.id);
+                    await loadGroups();
+                    Alert.alert('Success', `You've joined "${data.groupName}"!`);
+                  } catch (error: any) {
+                    Alert.alert('Error', error.message || 'Failed to join group');
+                  }
+                }
+              }
+            ]
+          );
+        }
+        break;
+
+      case 'group_message':
+        // Open the group chat
+        if (data.groupId) {
+          const group = groups.find(g => g.id === data.groupId);
+          if (group) {
+            setSelectedGroup(group);
+            setShowGroupChat(true);
+          } else {
+            Alert.alert('Group Not Found', 'The group for this message could not be found.');
+          }
+        }
+        break;
+
+      case 'payment_received':
+        // Navigate to friends tab and show the relevant friend
+        setActiveTab('friends');
+        if (data.fromUserId) {
+          const friend = friends.find(f => f.friendId === data.fromUserId);
+          if (friend) {
+            Alert.alert(
+              'Payment Received',
+              `You received a payment from ${friend.friendData.fullName}`,
+              [{ text: 'OK' }]
+            );
+          }
+        }
+        break;
+
+      case 'expense_settled':
+        // Navigate to expenses tab or group details
+        if (data.groupId) {
+          const group = groups.find(g => g.id === data.groupId);
+          if (group) {
+            setSelectedGroup(group);
+            setShowGroupDetails(true);
+          }
+        } else {
+          // Navigate to expenses tab
+          navigation.navigate('Expenses' as never);
+        }
+        break;
+
+      default:
+        console.log('Unknown notification type:', type);
+        break;
+    }
+  } catch (error) {
+    console.error('Navigation error:', error);
+    Alert.alert('Error', 'Failed to navigate to notification content');
+  }
+};
 
   // Handle payment
   const handlePayment = async (friendId: string, amount: number, method: string) => {
@@ -1288,6 +1407,11 @@ export default function RealSplittingScreen() {
         onClose={() => setShowGroupChat(false)}
         group={selectedGroup}
         currentUser={user}
+        onAddExpense={() => {
+          setShowGroupChat(false); // Close chat modal
+          setSelectedGroupForExpense(selectedGroup); // Set the group for expense
+          setShowAddExpense(true); // Open add expense modal
+        }}
       />
 
       <ReceiptScannerModal
@@ -1296,6 +1420,17 @@ export default function RealSplittingScreen() {
         onReceiptProcessed={(receiptData) => {
           console.log('Receipt processed:', receiptData);
         }}
+      />
+      <NotificationsModal
+        visible={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        notifications={notifications}
+        onMarkAsRead={async (notificationId) => {
+          await SplittingService.markNotificationAsRead(notificationId);
+          await loadNotifications();
+        }}
+        onMarkAllAsRead={markAllNotificationsRead}
+        onNavigateToNotification={handleNotificationNavigation}
       />
 
     </SafeAreaView>

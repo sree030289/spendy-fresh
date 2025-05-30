@@ -142,7 +142,7 @@ export interface FriendRequest {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'friend_request' | 'expense_added' | 'payment_received' | 'group_invite' | 'expense_settled';
+  type: 'friend_request' | 'expense_added' | 'payment_received' | 'group_invite' | 'expense_settled' | 'group_message';
   title: string;
   message: string;
   data: any;
@@ -929,26 +929,30 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     }
   }
   
-  static async getNotifications(userId: string): Promise<Notification[]> {
-    try {
-      const notificationsQuery = query(
-        collection(db, 'notifications'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        limit(50)
-      );
-      
-      const snapshot = await getDocs(notificationsQuery);
-      return snapshot.docs.map(doc => ({
+static async getNotifications(userId: string): Promise<Notification[]> {
+  try {
+    const notificationsQuery = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+    
+    const snapshot = await getDocs(notificationsQuery);
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
         id: doc.id,
-        ...doc.data()
-      })) as Notification[];
-      
-    } catch (error) {
-      console.error('Get notifications error:', error);
-      throw error;
-    }
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(), // Convert Firestore timestamp
+      };
+    }) as Notification[];
+    
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    return [];
   }
+}
   
   // Mark single notification as read
   static async markNotificationAsRead(notificationId: string): Promise<void> {
@@ -1066,10 +1070,15 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     );
     
     return onSnapshot(notificationsQuery, (snapshot) => {
-      const notifications = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Notification[];
+      const notifications = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Convert Firestore timestamp to Date object
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt || new Date())
+        };
+      }) as Notification[];
       callback(notifications);
     });
   }
@@ -1300,7 +1309,7 @@ static async sendGroupMessage(messageData: {
   try {
     const chatMessage = {
       ...messageData,
-      userAvatar: messageData.userAvatar || '', // Ensure no undefined values
+      userAvatar: messageData.userAvatar || '',
       timestamp: serverTimestamp()
     };
     
@@ -1310,11 +1319,62 @@ static async sendGroupMessage(messageData: {
     await updateDoc(doc(db, 'groups', messageData.groupId), {
       updatedAt: serverTimestamp()
     });
+
+    // Send notifications to group members (except sender)
+    if (messageData.type === 'message') {
+      await this.sendChatNotificationToGroupMembers(
+        messageData.groupId,
+        messageData.userId,
+        messageData.userName,
+        messageData.message
+      );
+    }
     
     return docRef.id;
   } catch (error) {
     console.error('Send group message error:', error);
     throw error;
+  }
+}
+
+static async sendChatNotificationToGroupMembers(
+  groupId: string,
+  senderUserId: string,
+  senderName: string,
+  message: string
+): Promise<void> {
+  try {
+    // Get group data to find all members
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) return;
+    
+    const groupData = groupDoc.data() as Group;
+    
+    // Send notification to all members except sender
+    const notificationPromises = groupData.members
+      .filter(member => member.userId !== senderUserId)
+      .map(member => 
+        this.createNotification({
+          userId: member.userId,
+          type: 'group_message',
+          title: `${senderName} in ${groupData.name}`,
+          message: message.length > 50 ? `${message.substring(0, 50)}...` : message,
+          data: { 
+            groupId,
+            groupName: groupData.name,
+            senderId: senderUserId,
+            senderName,
+            navigationType: 'groupChat'
+          },
+          isRead: false,
+          createdAt: new Date()
+        })
+      );
+    
+    await Promise.all(notificationPromises);
+    
+  } catch (error) {
+    console.error('Send chat notification error:', error);
   }
 }
 
@@ -1493,10 +1553,10 @@ static async updateGroupMemberBalance(groupId: string, userId: string, amount: n
       
       const batch = writeBatch(db);
       
-      // Update the expense document
+      // Update the expense document - remove id field completely
+      const { id, ...expenseDataWithoutId } = expenseData;
       const updatedExpense = {
-        ...expenseData,
-        id: undefined, // Remove id from the data to be saved
+        ...expenseDataWithoutId,
         updatedAt: new Date()
       };
       

@@ -118,53 +118,61 @@ export class QRCodeService {
   }
   
   // Convert QR data to string for encoding
-  static encodeQRData(qrData: QRData): string {
-    try {
-      const jsonString = JSON.stringify(qrData);
-      const encodedData = btoa(jsonString); // Base64 encode
-      return `spendy://qr?data=${encodedData}`;
-    } catch (error) {
-      console.error('QR encode error:', error);
-      throw new Error('Failed to encode QR data');
-    }
+static encodeQRData(qrData: QRData): string {
+  try {
+    // Clean the data to remove any undefined or problematic values
+    const cleanData = {
+      type: qrData.type,
+      version: qrData.version,
+      timestamp: qrData.timestamp,
+      ...(qrData.userId && { userId: qrData.userId }),
+      ...(qrData.groupId && { groupId: qrData.groupId }),
+      ...(qrData.inviteCode && { inviteCode: qrData.inviteCode }),
+      ...(qrData.userData && { userData: qrData.userData }),
+      ...(qrData.groupData && { groupData: qrData.groupData }),
+      ...(qrData.expiresAt && { expiresAt: qrData.expiresAt })
+    };
+    
+    const jsonString = JSON.stringify(cleanData);
+    
+    // Use a simpler encoding approach
+    const encodedData = encodeURIComponent(btoa(jsonString));
+    return `spendy://qr?data=${encodedData}`;
+  } catch (error) {
+    console.error('QR encode error:', error);
+    throw new Error('Failed to encode QR data');
   }
+}
   
   // Parse QR code string back to data
-  static decodeQRData(qrString: string): QRData {
-    try {
-      // Check if it's a Spendy QR code
-      if (!qrString.startsWith('spendy://qr?data=')) {
-        throw new Error('Invalid Spendy QR code');
-      }
-      
-      // Extract encoded data
-      const url = new URL(qrString);
-      const encodedData = url.searchParams.get('data');
-      
-      if (!encodedData) {
-        throw new Error('No data found in QR code');
-      }
-      
-      // Decode and parse
-      const jsonString = atob(encodedData); // Base64 decode
-      const qrData: QRData = JSON.parse(jsonString);
-      
-      // Validate QR code version
-      if (!qrData.version || qrData.version !== '1.0') {
-        throw new Error('Unsupported QR code version');
-      }
-      
-      // Check if expired
-      if (qrData.expiresAt && Date.now() > qrData.expiresAt) {
-        throw new Error('QR code has expired');
-      }
-      
-      return qrData;
-    } catch (error) {
-      console.error('QR decode error:', error);
-      throw new Error('Invalid or corrupted QR code');
+static decodeQRData(qrString: string): QRData {
+  try {
+    if (!qrString.startsWith('spendy://qr?data=')) {
+      throw new Error('Invalid Spendy QR code');
     }
+    
+    const encodedData = qrString.replace('spendy://qr?data=', '');
+    if (!encodedData) {
+      throw new Error('No data found in QR code');
+    }
+    
+    const jsonString = atob(decodeURIComponent(encodedData));
+    const qrData: QRData = JSON.parse(jsonString);
+    
+    if (!qrData.version || qrData.version !== '1.0') {
+      throw new Error('Unsupported QR code version');
+    }
+    
+    if (qrData.expiresAt && Date.now() > qrData.expiresAt) {
+      throw new Error('QR code has expired');
+    }
+    
+    return qrData;
+  } catch (error) {
+    console.error('QR decode error:', error);
+    throw new Error('Invalid or corrupted QR code');
   }
+}
   
   // Handle scanned QR code
   static async handleScannedQR(qrString: string, currentUserId: string): Promise<void> {

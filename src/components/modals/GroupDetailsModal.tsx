@@ -25,7 +25,7 @@ import * as Contacts from 'expo-contacts';
 import QRCodeModal from './QRCodeModal';
 import EditExpenseModal from './EditExpenseModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
-
+import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
 
 interface GroupDetailsModalProps {
@@ -185,23 +185,48 @@ export default function GroupDetailsModal({
     }
   };
 
-  const handleRemoveAdmin = async (userId: string) => {
-    if (!group || !currentUser || !isUserAdmin) return;
-    
-    try {
-      // Update the group using SplittingService
-      await SplittingService.updateMemberRole(group.id, userId, 'member');
-      
-      Alert.alert('Success', 'Admin privileges removed');
-      
-      // Refresh group data by calling parent refresh
-      onRefresh?.();
-      await loadGroupExpenses();
-    } catch (error: any) {
-      console.error('Remove admin error:', error);
-      Alert.alert('Error', error.message || 'Failed to remove admin privileges');
-    }
-  };
+  // In src/components/modals/GroupDetailsModal.tsx
+// Update handleRemoveAdmin function around line 220:
+
+const handleRemoveAdmin = async (userId: string) => {
+  if (!group || !currentUser || !isUserAdmin) return;
+  
+  const member = group.members.find(m => m.userId === userId);
+  if (!member) return;
+  
+  // Check if member has pending balances
+  if (member.balance !== 0) {
+    Alert.alert(
+      'Cannot Remove Admin',
+      `${member.userData.fullName} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(group.currency)}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  Alert.alert(
+    'Remove Admin Privileges',
+    `Remove admin privileges from ${member.userData.fullName}?`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove Admin',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await SplittingService.updateMemberRole(group.id, userId, 'member');
+            Alert.alert('Success', 'Admin privileges removed');
+            onRefresh?.();
+            await loadGroupExpenses();
+          } catch (error: any) {
+            console.error('Remove admin error:', error);
+            Alert.alert('Error', error.message || 'Failed to remove admin privileges');
+          }
+        }
+      }
+    ]
+  );
+};
 
   const handleRemoveMember = async (userId: string) => {
     if (!group || !currentUser || !isUserAdmin) return;
@@ -445,35 +470,35 @@ const renderExpensesList = () => (
 );
 
   const renderGroupStats = () => (
-    <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.colors.text }]}>
-          {group?.currency === 'USD' ? '$' : group?.currency === 'EUR' ? '€' : group?.currency === 'INR' ? '₹' : group?.currency || '$'}{group?.totalExpenses.toFixed(2)}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-          Total Spent
-        </Text>
-      </View>
-      <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.colors.text }]}>
-          {group?.currency === 'USD' ? '$' : group?.currency === 'EUR' ? '€' : group?.currency === 'INR' ? '₹' : group?.currency || '$'}{group ? (group.totalExpenses / group.members.length).toFixed(2) : '0.00'}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-          Per Person
-        </Text>
-      </View>
-      <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.colors.text }]}>
-          {groupExpenses.length}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-          Expenses
-        </Text>
-      </View>
+  <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
+    <View style={styles.statItem}>
+      <Text style={[styles.statValue, { color: theme.colors.text }]}>
+        {getCurrencySymbol(group?.currency || 'AUD')}{group?.totalExpenses.toFixed(2)}
+      </Text>
+      <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+        Total Spent
+      </Text>
     </View>
-  );
+    <View style={styles.statDivider} />
+    <View style={styles.statItem}>
+      <Text style={[styles.statValue, { color: theme.colors.text }]}>
+        {getCurrencySymbol(group?.currency || 'AUD')}{group ? (group.totalExpenses / group.members.length).toFixed(2) : '0.00'}
+      </Text>
+      <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+        Per Person
+      </Text>
+    </View>
+    <View style={styles.statDivider} />
+    <View style={styles.statItem}>
+      <Text style={[styles.statValue, { color: theme.colors.text }]}>
+        {groupExpenses.length}
+      </Text>
+      <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+        Expenses
+      </Text>
+    </View>
+  </View>
+);
 
   if (!group) return null;
 
@@ -632,67 +657,68 @@ const renderExpensesList = () => (
       </SafeAreaView>
       
       {/* Member Action Modal */}
-      {selectedMemberForAction && (
-        <Modal visible={true} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={[styles.actionModalContent, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.actionModalTitle, { color: theme.colors.text }]}>
-                Member Actions
-              </Text>
-              
-              {(() => {
-                const member = group?.members.find(m => m.userId === selectedMemberForAction);
-                return member ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.actionModalOption}
-                      onPress={() => {
-                        setSelectedMemberForAction(null);
-                        if (member.role === 'admin') {
-                          handleRemoveAdmin(selectedMemberForAction);
-                        } else {
-                          handleMakeAdmin(selectedMemberForAction);
-                        }
-                      }}
-                    >
-                      <Ionicons 
-                        name={member.role === 'admin' ? 'person-remove' : 'ribbon'} 
-                        size={20} 
-                        color={theme.colors.primary} 
-                      />
-                      <Text style={[styles.actionModalOptionText, { color: theme.colors.text }]}>
-                        {member.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
-                      </Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity
-                      style={styles.actionModalOption}
-                      onPress={() => {
-                        setSelectedMemberForAction(null);
-                        handleRemoveMember(selectedMemberForAction);
-                      }}
-                    >
-                      <Ionicons name="person-remove" size={20} color={theme.colors.error} />
-                      <Text style={[styles.actionModalOptionText, { color: theme.colors.error }]}>
-                        Remove from Group
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                ) : null;
-              })()}
-              
+
+{selectedMemberForAction && (
+  <Modal visible={true} transparent animationType="fade">
+    <View style={styles.modalOverlay}>
+      <View style={[styles.actionModalContent, { backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.actionModalTitle, { color: theme.colors.text }]}>
+          Member Actions
+        </Text>
+        
+        {(() => {
+          const member = group?.members.find(m => m.userId === selectedMemberForAction);
+          return member ? (
+            <>
               <TouchableOpacity
-                style={[styles.actionModalOption, styles.cancelOption]}
-                onPress={() => setSelectedMemberForAction(null)}
+                style={styles.actionModalOption}
+                onPress={() => {
+                  setSelectedMemberForAction(null);
+                  if (member.role === 'admin') {
+                    handleRemoveAdmin(selectedMemberForAction);
+                  } else {
+                    handleMakeAdmin(selectedMemberForAction);
+                  }
+                }}
               >
-                <Text style={[styles.actionModalOptionText, { color: theme.colors.textSecondary }]}>
-                  Cancel
+                <Ionicons 
+                  name={member.role === 'admin' ? 'person-remove' : 'ribbon'} 
+                  size={20} 
+                  color={theme.colors.primary} 
+                />
+                <Text style={[styles.actionModalOptionText, { color: theme.colors.text }]}>
+                  {member.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
                 </Text>
               </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      )}
+              
+              <TouchableOpacity
+                style={styles.actionModalOption}
+                onPress={() => {
+                  setSelectedMemberForAction(null);
+                  handleRemoveMember(selectedMemberForAction);
+                }}
+              >
+                <Ionicons name="person-remove" size={20} color={theme.colors.error} />
+                <Text style={[styles.actionModalOptionText, { color: theme.colors.error }]}>
+                  Remove from Group
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : null;
+        })()}
+        
+        <TouchableOpacity
+          style={[styles.actionModalOption, styles.cancelOption]}
+          onPress={() => setSelectedMemberForAction(null)}
+        >
+          <Text style={[styles.actionModalOptionText, { color: theme.colors.textSecondary }]}>
+            Cancel
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </Modal>
+)}
 
       {/* Add Member Modal */}
       {showAddMember && (
@@ -853,57 +879,38 @@ const styles = StyleSheet.create({
   groupMetaText: {
     fontSize: 14,
   },
-  statsCard: {
-    flexDirection: 'row',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 24,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 0, // Allow flex shrinking
-  },
-  statValue: {
-    fontSize: 18, // Reduced from 20
-    fontWeight: 'bold',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  statLabel: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 16,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14, // Increased padding
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    gap: 8,
-    minHeight: 48, // Ensure minimum height
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
-    textAlign: 'center', // Center the text
-  },
+statsCard: {
+  flexDirection: 'row',
+  padding: 16, // Reduced from 20
+  borderRadius: 16,
+  marginBottom: 24,
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+statItem: {
+  alignItems: 'center',
+  flex: 1,
+  minWidth: 0, // Allow flex shrinking
+  paddingHorizontal: 8, // Add horizontal padding
+},
+statValue: {
+  fontSize: 16, // Reduced from 18-20
+  fontWeight: 'bold',
+  marginBottom: 4,
+  textAlign: 'center',
+  //numberOfLines: 1, // Ensure single line
+},
+statLabel: {
+  fontSize: 11, // Reduced from 12
+  textAlign: 'center',
+  //numberOfLines: 1, // Ensure single line
+},
+statDivider: {
+  width: 1,
+  height: 32, // Reduced from 40
+  backgroundColor: '#E5E7EB',
+  marginHorizontal: 8, // Reduced from 16
+},
   inviteSection: {
     padding: 16,
     borderRadius: 12,

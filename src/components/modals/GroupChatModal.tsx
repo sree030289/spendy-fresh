@@ -41,9 +41,11 @@ interface GroupChatModalProps {
   onClose: () => void;
   group: Group | null;
   currentUser: User | null;
+  onAddExpense?: () => void; // Add this prop
+
 }
 
-export default function GroupChatModal({ visible, onClose, group, currentUser }: GroupChatModalProps) {
+export default function GroupChatModal({ visible, onClose, group, currentUser, onAddExpense }: GroupChatModalProps) {
   const { theme } = useTheme();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -127,19 +129,16 @@ export default function GroupChatModal({ visible, onClose, group, currentUser }:
     }
   };
 
-  const handleAddExpense = () => {
-    Alert.alert(
-      'Add Expense',
-      'This will open the Add Expense modal with this group pre-selected.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Add Expense', onPress: () => {
-          onClose();
-          // Navigate to add expense - implement this based on your navigation
-        }}
-      ]
-    );
-  };
+const handleAddExpense = () => {
+  // Don't close the chat modal, instead call a callback to open add expense
+  if (onAddExpense) {
+    onAddExpense();
+  } else {
+    // Fallback: close chat and indicate expense should be opened
+    onClose();
+    // You can pass additional data to indicate expense modal should open
+  }
+};
 
   const handleTakePhoto = () => {
     Alert.alert(

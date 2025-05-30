@@ -15,8 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { getCurrencySymbol } from '../../utils/currency';
-import { Expense, ExpenseSplit } from '../../services/firebase/splitting';
-
+import { Expense, ExpenseSplit, SplittingService } from '../../services/firebase/splitting';
+import ExpenseRefreshService from '../../services/expenseRefreshService';
 interface EditExpenseModalProps {
   visible: boolean;
   onClose: () => void;
@@ -73,49 +73,58 @@ export default function EditExpenseModal({
     setSelectedCategory(expenseCategories[0]);
   };
 
-  const handleSubmit = async () => {
-    if (!expense || !user?.id) return;
+const handleSubmit = async () => {
+  if (!expense || !user?.id) return;
 
-    if (!description.trim()) {
-      Alert.alert('Missing Information', 'Please enter a description');
-      return;
-    }
+  if (!description.trim()) {
+    Alert.alert('Missing Information', 'Please enter a description');
+    return;
+  }
 
-    if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount');
-      return;
-    }
+  if (!amount || parseFloat(amount) <= 0) {
+    Alert.alert('Invalid Amount', 'Please enter a valid amount');
+    return;
+  }
 
-    setLoading(true);
-    try {
-      const expenseData = {
-        id: expense.id,
-        description: description.trim(),
-        amount: parseFloat(amount),
-        currency: user?.currency || 'AUD',
-        category: selectedCategory.id,
-        categoryIcon: selectedCategory.icon,
-        groupId: expense.groupId,
-        paidBy: expense.paidBy,
-        splitType: expense.splitType,
-        splitData: splitData.map(split => ({
-          userId: split.userId,
-          amount: split.amount,
-          percentage: split.percentage,
-          isPaid: split.isPaid,
-        })),
-        notes: notes.trim(),
-        tags: expense.tags || [],
-      };
+  setLoading(true);
+  try {
+    const expenseData = {
+      id: expense.id,
+      description: description.trim(),
+      amount: parseFloat(amount),
+      currency: user?.currency || 'AUD',
+      category: selectedCategory.id,
+      categoryIcon: selectedCategory.icon,
+      groupId: expense.groupId,
+      paidBy: expense.paidBy,
+      splitType: expense.splitType,
+      splitData: splitData.map(split => ({
+        userId: split.userId,
+        amount: split.amount,
+        percentage: split.percentage,
+        isPaid: split.isPaid,
+      })),
+      notes: notes.trim(),
+      tags: expense.tags || [],
+    };
 
-      await onSubmit(expenseData);
-      resetForm();
-    } catch (error) {
-      // Error handled in parent component
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Use the SplittingService updateExpense method
+    await SplittingService.updateExpense(expenseData);
+    
+    Alert.alert('Success', 'Expense updated successfully!');
+    resetForm();
+    onClose(); // Close the modal
+    
+    // Notify expense refresh service
+    ExpenseRefreshService.getInstance().notifyExpenseAdded();
+    
+  } catch (error) {
+    console.error('Update expense error:', error);
+    Alert.alert('Error', 'Failed to update expense. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const updateSplitAmount = (userId: string, newAmount: number) => {
     setSplitData(prev => prev.map(split => 
