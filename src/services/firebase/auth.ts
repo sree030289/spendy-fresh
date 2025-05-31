@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@/types';
 import { SplittingService } from './splitting';
+import { RealNotificationService } from '../notifications/RealNotificationService';
 
 
 // Only import Firebase when we actually need it (lazy loading)
@@ -258,6 +259,12 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
       
       // Store session info for logged in user
       await this.storeUserSession(user);
+
+       try {
+    await RealNotificationService.registerTokenWithBackend(user.id);
+  } catch (error) {
+    console.log('Failed to register push token:', error);
+  }
       
       return user;
       

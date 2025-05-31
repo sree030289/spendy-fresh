@@ -1,4 +1,4 @@
-// src/components/reminders/NotificationSettingsModal.tsx
+// src/components/reminders/NotificationSettingsModal.tsx - Updated with real functionality
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
+import { DateTimePicker } from '@/components/common/DateTimePicker';
 import { NotificationService } from '@/services/notifications/NotificationService';
 
 interface NotificationSettingsModalProps {
@@ -29,6 +30,10 @@ interface NotificationSettings {
   pushEnabled: boolean;
   emailEnabled: boolean;
   smsEnabled: boolean;
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
 }
 
 const REMINDER_DAY_OPTIONS = [
@@ -44,6 +49,10 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
   const { user } = useAuth();
   
   const [loading, setLoading] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showQuietStartPicker, setShowQuietStartPicker] = useState(false);
+  const [showQuietEndPicker, setShowQuietEndPicker] = useState(false);
+  
   const [settings, setSettings] = useState<NotificationSettings>({
     enabled: true,
     reminderDays: [1, 3, 7],
@@ -51,6 +60,10 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
     pushEnabled: true,
     emailEnabled: false,
     smsEnabled: false,
+    soundEnabled: true,
+    vibrationEnabled: true,
+    quietHoursStart: '22:00',
+    quietHoursEnd: '08:00',
   });
 
   useEffect(() => {
@@ -65,19 +78,6 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
       if (userSettings) {
         setSettings(userSettings);
       }
-    } catch (error) {
-      console.error('Error loading notification settings:', error);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!user) return;
-
-    setLoading(true);
-    try {
-      await NotificationService.updateNotificationSettings(user.id, settings);
-      Alert.alert('Success', 'Notification settings updated successfully!');
-      onClose();
     } catch (error) {
       Alert.alert('Error', 'Failed to update notification settings');
     } finally {
@@ -101,6 +101,33 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
       : [...settings.reminderDays, day].sort((a, b) => a - b);
     
     setSettings({ ...settings, reminderDays: newReminderDays });
+  };
+
+  const formatTime = (time: string): string => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const handleTimeSelect = (date: Date, type: 'main' | 'quietStart' | 'quietEnd') => {
+    const timeString = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    
+    if (type === 'main') {
+      setSettings({ ...settings, timeOfDay: timeString });
+    } else if (type === 'quietStart') {
+      setSettings({ ...settings, quietHoursStart: timeString });
+    } else if (type === 'quietEnd') {
+      setSettings({ ...settings, quietHoursEnd: timeString });
+    }
+  };
+
+  const createTimeFromString = (timeString: string): Date => {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date;
   };
 
   const SettingRow = ({ 
@@ -225,6 +252,31 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
             />
           </View>
 
+          {/* Sound & Vibration */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Alert Settings
+            </Text>
+            
+            <SettingRow
+              icon="volume-high-outline"
+              title="Sound"
+              description="Play sound with notifications"
+              value={settings.soundEnabled}
+              onToggle={(value) => setSettings({ ...settings, soundEnabled: value })}
+              disabled={!settings.enabled}
+            />
+            
+            <SettingRow
+              icon="phone-portrait-outline"
+              title="Vibration"
+              description="Vibrate when receiving notifications"
+              value={settings.vibrationEnabled}
+              onToggle={(value) => setSettings({ ...settings, vibrationEnabled: value })}
+              disabled={!settings.enabled}
+            />
+          </View>
+
           {/* Reminder Timing */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
@@ -278,16 +330,70 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
               ]}
               onPress={() => {
                 if (!settings.enabled) return;
-                Alert.alert('Time Picker', 'Time picker integration coming soon!');
+                setShowTimePicker(true);
               }}
               disabled={!settings.enabled}
             >
               <Ionicons name="time-outline" size={20} color={theme.colors.primary} />
               <Text style={[styles.timeText, { color: theme.colors.text }]}>
-                {settings.timeOfDay} (9:00 AM)
+                {formatTime(settings.timeOfDay)}
               </Text>
               <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
             </TouchableOpacity>
+          </View>
+
+          {/* Quiet Hours */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Quiet Hours
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
+              Don't send notifications during these hours
+            </Text>
+            
+            <View style={styles.quietHoursContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.timeSelector,
+                  styles.quietTimeSelector,
+                  { backgroundColor: theme.colors.surface },
+                  !settings.enabled && { opacity: 0.5 }
+                ]}
+                onPress={() => {
+                  if (!settings.enabled) return;
+                  setShowQuietStartPicker(true);
+                }}
+                disabled={!settings.enabled}
+              >
+                <Text style={[styles.quietLabel, { color: theme.colors.textSecondary }]}>
+                  Start
+                </Text>
+                <Text style={[styles.timeText, { color: theme.colors.text }]}>
+                  {settings.quietHoursStart ? formatTime(settings.quietHoursStart) : 'Not set'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.timeSelector,
+                  styles.quietTimeSelector,
+                  { backgroundColor: theme.colors.surface },
+                  !settings.enabled && { opacity: 0.5 }
+                ]}
+                onPress={() => {
+                  if (!settings.enabled) return;
+                  setShowQuietEndPicker(true);
+                }}
+                disabled={!settings.enabled}
+              >
+                <Text style={[styles.quietLabel, { color: theme.colors.textSecondary }]}>
+                  End
+                </Text>
+                <Text style={[styles.timeText, { color: theme.colors.text }]}>
+                  {settings.quietHoursEnd ? formatTime(settings.quietHoursEnd) : 'Not set'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Test Notification */}
@@ -310,6 +416,34 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
             </Text>
           </View>
         </ScrollView>
+
+        {/* Time Pickers */}
+        <DateTimePicker
+          visible={showTimePicker}
+          onClose={() => setShowTimePicker(false)}
+          onDateSelect={(date) => handleTimeSelect(date, 'main')}
+          initialDate={createTimeFromString(settings.timeOfDay)}
+          mode="time"
+          title="Daily Notification Time"
+        />
+
+        <DateTimePicker
+          visible={showQuietStartPicker}
+          onClose={() => setShowQuietStartPicker(false)}
+          onDateSelect={(date) => handleTimeSelect(date, 'quietStart')}
+          initialDate={settings.quietHoursStart ? createTimeFromString(settings.quietHoursStart) : new Date()}
+          mode="time"
+          title="Quiet Hours Start"
+        />
+
+        <DateTimePicker
+          visible={showQuietEndPicker}
+          onClose={() => setShowQuietEndPicker(false)}
+          onDateSelect={(date) => handleTimeSelect(date, 'quietEnd')}
+          initialDate={settings.quietHoursEnd ? createTimeFromString(settings.quietHoursEnd) : new Date()}
+          mode="time"
+          title="Quiet Hours End"
+        />
       </SafeAreaView>
     </Modal>
   );
@@ -416,6 +550,22 @@ const styles = StyleSheet.create({
   timeText: {
     flex: 1,
     fontSize: 16,
+  },
+  quietHoursContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  quietTimeSelector: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  quietLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   testButton: {
     marginTop: 8,

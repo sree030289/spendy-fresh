@@ -1,5 +1,5 @@
-// src/components/reminders/AddReminderModal.tsx - Updated with real functionality
-import React, { useState } from 'react';
+// src/components/reminders/EditReminderModal.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,15 +18,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { DateTimePicker } from '@/components/common/DateTimePicker';
+import CustomDateTimePicker from '@/components/common/DateTimePicker';
 import { RemindersService } from '@/services/reminders/RemindersService';
-import { ReminderCategory, RecurringType } from '@/types/reminder';
+import { Reminder, ReminderCategory, RecurringType } from '@/types/reminder';
 import { formatCurrency } from '@/utils/currency';
 
-interface AddReminderModalProps {
+interface EditReminderModalProps {
   visible: boolean;
+  reminder: Reminder | null;
   onClose: () => void;
-  onReminderAdded: () => void;
+  onReminderUpdated: () => void;
 }
 
 const CATEGORIES: Array<{ id: ReminderCategory; label: string; icon: string; color: string }> = [
@@ -44,15 +45,28 @@ const CATEGORIES: Array<{ id: ReminderCategory; label: string; icon: string; col
   { id: 'other', label: 'Other', icon: 'ellipse-outline', color: '#6B7280' },
 ];
 
-const RECURRING_OPTIONS: Array<{ id: RecurringType; label: string; description: string }> = [
-  { id: 'weekly', label: 'Weekly', description: 'Every 7 days' },
-  { id: 'biweekly', label: 'Bi-weekly', description: 'Every 14 days' },
-  { id: 'monthly', label: 'Monthly', description: 'Every month' },
-  { id: 'quarterly', label: 'Quarterly', description: 'Every 3 months' },
-  { id: 'yearly', label: 'Yearly', description: 'Every year' },
+const RECURRING_OPTIONS: Array<{ id: RecurringType; label: string }> = [
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'biweekly', label: 'Bi-weekly' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'quarterly', label: 'Quarterly' },
+  { id: 'yearly', label: 'Yearly' },
 ];
 
-export default function AddReminderModal({ visible, onClose, onReminderAdded }: AddReminderModalProps) {
+const REMINDER_DAYS_OPTIONS = [
+  { value: 1, label: '1 day before' },
+  { value: 3, label: '3 days before' },
+  { value: 7, label: '1 week before' },
+  { value: 14, label: '2 weeks before' },
+  { value: 30, label: '1 month before' },
+];
+
+export default function EditReminderModal({ 
+  visible, 
+  reminder, 
+  onClose, 
+  onReminderUpdated 
+}: EditReminderModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   
@@ -65,7 +79,9 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
     dueDate: new Date(),
     isRecurring: false,
     recurringType: 'monthly' as RecurringType,
-    reminderDays: [1, 3], // Default to 1 and 3 days before
+    reminderDays: [1, 3],
+    notificationEnabled: true,
+    notes: '',
   });
   
   const [errors, setErrors] = useState({
@@ -77,26 +93,63 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showRecurringPicker, setShowRecurringPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showReminderDaysPicker, setShowReminderDaysPicker] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Initialize form data when reminder changes
+  useEffect(() => {
+    if (reminder) {
+      setFormData({
+        title: reminder.title,
+        description: reminder.description || '',
+        amount: reminder.amount.toString(),
+        category: reminder.category,
+        dueDate: new Date(reminder.dueDate),
+        isRecurring: reminder.isRecurring,
+        recurringType: reminder.recurringType || 'monthly',
+        reminderDays: reminder.reminderDays || [1, 3],
+        notificationEnabled: reminder.notificationEnabled ?? true,
+        notes: reminder.notes || '',
+      });
+      setHasChanges(false);
+    }
+  }, [reminder]);
+
+  // Track changes
+  useEffect(() => {
+    if (reminder) {
+      const hasFormChanges = 
+        formData.title !== reminder.title ||
+        formData.description !== (reminder.description || '') ||
+        formData.amount !== reminder.amount.toString() ||
+        formData.category !== reminder.category ||
+        formData.dueDate.getTime() !== new Date(reminder.dueDate).getTime() ||
+        formData.isRecurring !== reminder.isRecurring ||
+        formData.recurringType !== (reminder.recurringType || 'monthly') ||
+        JSON.stringify(formData.reminderDays) !== JSON.stringify(reminder.reminderDays || [1, 3]) ||
+        formData.notificationEnabled !== (reminder.notificationEnabled ?? true) ||
+        formData.notes !== (reminder.notes || '');
+      
+      setHasChanges(hasFormChanges);
+    }
+  }, [formData, reminder]);
 
   const validateForm = (): boolean => {
     const newErrors = { title: '', amount: '', dueDate: '' };
     let isValid = true;
 
-    // Validate title
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
       isValid = false;
     }
 
-    // Validate amount
     const amount = parseFloat(formData.amount);
     if (!formData.amount || isNaN(amount) || amount <= 0) {
       newErrors.amount = 'Please enter a valid amount';
       isValid = false;
     }
 
-    // Validate due date
-    if (formData.dueDate < new Date()) {
+    if (formData.dueDate < new Date() && reminder?.status !== 'paid') {
       newErrors.dueDate = 'Due date cannot be in the past';
       isValid = false;
     }
@@ -105,49 +158,66 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
     return isValid;
   };
 
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
+  const handleSave = async () => {
+    if (!reminder || !validateForm()) return;
+
+    if (!hasChanges) {
+      Alert.alert('No Changes', 'No changes were made to save.');
+      return;
+    }
 
     setLoading(true);
     try {
-      await RemindersService.createReminder(user?.id || '', {
+      const updates: Partial<Reminder> = {
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
         amount: parseFloat(formData.amount),
-        currency: user?.currency || 'USD',
         category: formData.category,
         dueDate: formData.dueDate,
-        status: 'upcoming',
         isRecurring: formData.isRecurring,
         recurringType: formData.isRecurring ? formData.recurringType : undefined,
         reminderDays: formData.reminderDays,
-        notificationEnabled: true,
-        autoDetected: false,
-      });
+        notificationEnabled: formData.notificationEnabled,
+        notes: formData.notes.trim() || undefined,
+      };
 
-      Alert.alert('Success', 'Reminder created successfully!');
-      onReminderAdded();
+      await RemindersService.updateReminder(reminder.id, updates);
+
+      Alert.alert('Success', 'Reminder updated successfully!');
+      onReminderUpdated();
       onClose();
-      resetForm();
     } catch (error) {
-      Alert.alert('Error', 'Failed to create reminder. Please try again.');
+      Alert.alert('Error', 'Failed to update reminder. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      amount: '',
-      category: 'utilities',
-      dueDate: new Date(),
-      isRecurring: false,
-      recurringType: 'monthly',
-      reminderDays: [1, 3],
-    });
-    setErrors({ title: '', amount: '', dueDate: '' });
+  const handleDiscard = () => {
+    if (hasChanges) {
+      Alert.alert(
+        'Discard Changes',
+        'You have unsaved changes. Are you sure you want to discard them?',
+        [
+          { text: 'Keep Editing', style: 'cancel' },
+          { 
+            text: 'Discard', 
+            style: 'destructive',
+            onPress: onClose
+          }
+        ]
+      );
+    } else {
+      onClose();
+    }
+  };
+
+  const toggleReminderDay = (day: number) => {
+    const newReminderDays = formData.reminderDays.includes(day)
+      ? formData.reminderDays.filter(d => d !== day)
+      : [...formData.reminderDays, day].sort((a, b) => a - b);
+    
+    setFormData({ ...formData, reminderDays: newReminderDays });
   };
 
   const formatDate = (date: Date): string => {
@@ -159,6 +229,8 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
   };
 
   const selectedCategory = CATEGORIES.find(cat => cat.id === formData.category) || CATEGORIES[0];
+
+  if (!reminder) return null;
 
   const CategoryPicker = () => (
     <Modal
@@ -232,17 +304,71 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
                 setShowRecurringPicker(false);
               }}
             >
-              <View style={styles.recurringContent}>
-                <Text style={[styles.pickerOptionText, { color: theme.colors.text }]}>
-                  {option.label}
-                </Text>
-                <Text style={[styles.pickerOptionDescription, { color: theme.colors.textSecondary }]}>
-                  {option.description}
-                </Text>
-              </View>
+              <Ionicons 
+                name="repeat-outline" 
+                size={20} 
+                color={theme.colors.textSecondary} 
+                style={{ marginRight: 12 }}
+              />
+              <Text style={[styles.pickerOptionText, { color: theme.colors.text }]}>
+                {option.label}
+              </Text>
               {formData.recurringType === option.id && (
                 <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
               )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+
+  const ReminderDaysPicker = () => (
+    <Modal
+      visible={showReminderDaysPicker}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowReminderDaysPicker(false)}
+    >
+      <SafeAreaView style={[styles.pickerContainer, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.pickerHeader}>
+          <TouchableOpacity onPress={() => setShowReminderDaysPicker(false)}>
+            <Ionicons name="close" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>
+            Reminder Schedule
+          </Text>
+          <TouchableOpacity onPress={() => setShowReminderDaysPicker(false)}>
+            <Text style={[styles.doneText, { color: theme.colors.primary }]}>Done</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <ScrollView style={styles.pickerOptions}>
+          <Text style={[styles.pickerSubtitle, { color: theme.colors.textSecondary }]}>
+            Select when you'd like to be reminded before the due date:
+          </Text>
+          
+          {REMINDER_DAYS_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[styles.reminderDayOption, { backgroundColor: theme.colors.surface }]}
+              onPress={() => toggleReminderDay(option.value)}
+            >
+              <Text style={[styles.reminderDayLabel, { color: theme.colors.text }]}>
+                {option.label}
+              </Text>
+              <View style={[
+                styles.checkbox,
+                { borderColor: theme.colors.border },
+                formData.reminderDays.includes(option.value) && { 
+                  backgroundColor: theme.colors.primary,
+                  borderColor: theme.colors.primary 
+                }
+              ]}>
+                {formData.reminderDays.includes(option.value) && (
+                  <Ionicons name="checkmark" size={16} color="white" />
+                )}
+              </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -255,7 +381,7 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={handleDiscard}
     >
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
@@ -264,28 +390,36 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
         >
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.headerButton}>
+            <TouchableOpacity onPress={handleDiscard} style={styles.headerButton}>
               <Text style={[styles.headerButtonText, { color: theme.colors.textSecondary }]}>
                 Cancel
               </Text>
             </TouchableOpacity>
             
             <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-              Add Reminder
+              Edit Reminder
             </Text>
             
             <TouchableOpacity 
-              onPress={handleSubmit} 
+              onPress={handleSave} 
               style={styles.headerButton}
-              disabled={loading}
+              disabled={loading || !hasChanges}
             >
               <Text style={[styles.headerButtonText, { 
-                color: loading ? theme.colors.textSecondary : theme.colors.primary 
+                color: loading || !hasChanges ? theme.colors.textSecondary : theme.colors.primary 
               }]}>
                 {loading ? 'Saving...' : 'Save'}
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Changes Indicator */}
+          {hasChanges && (
+            <View style={[styles.changesIndicator, { backgroundColor: theme.colors.primary }]}>
+              <Ionicons name="pencil" size={16} color="white" />
+              <Text style={styles.changesText}>You have unsaved changes</Text>
+            </View>
+          )}
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {/* Title */}
@@ -485,6 +619,95 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
               )}
             </View>
 
+            {/* Notification Settings */}
+            <View style={styles.inputGroup}>
+              <View style={styles.switchRow}>
+                <View style={styles.switchLabel}>
+                  <Text style={[styles.label, { color: theme.colors.text }]}>
+                    Notifications
+                  </Text>
+                  <Text style={[styles.sublabel, { color: theme.colors.textSecondary }]}>
+                    Get reminded before due date
+                  </Text>
+                </View>
+                <Switch
+                  value={formData.notificationEnabled}
+                  onValueChange={(value) => setFormData({ ...formData, notificationEnabled: value })}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={formData.notificationEnabled ? 'white' : theme.colors.textSecondary}
+                />
+              </View>
+
+              {formData.notificationEnabled && (
+                <TouchableOpacity
+                  style={[
+                    styles.selector,
+                    styles.recurringSelector,
+                    {
+                      backgroundColor: theme.colors.surface,
+                      borderColor: theme.colors.border,
+                    }
+                  ]}
+                  onPress={() => setShowReminderDaysPicker(true)}
+                >
+                  <Ionicons 
+                    name="notifications-outline" 
+                    size={20} 
+                    color={theme.colors.textSecondary} 
+                    style={{ marginRight: 12 }}
+                  />
+                  <Text style={[styles.selectorText, { color: theme.colors.text }]}>
+                    {formData.reminderDays.length > 0 
+                      ? `Remind ${formData.reminderDays.length} time${formData.reminderDays.length === 1 ? '' : 's'}`
+                      : 'Set reminder schedule'
+                    }
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Notes */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>
+                Notes
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.textArea,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                    color: theme.colors.text,
+                  }
+                ]}
+                placeholder="Add any additional notes (optional)"
+                placeholderTextColor={theme.colors.textSecondary}
+                value={formData.notes}
+                onChangeText={(text) => setFormData({ ...formData, notes: text })}
+                multiline
+                numberOfLines={3}
+                returnKeyType="done"
+              />
+            </View>
+
+            {/* Auto-detected Info */}
+            {reminder.autoDetected && (
+              <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
+                <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+                <View style={styles.infoTextContainer}>
+                  <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
+                    Auto-detected Bill
+                  </Text>
+                  <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
+                    This reminder was automatically created from your email
+                    {reminder.emailSource && ` from ${reminder.emailSource}`}.
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {/* Preview */}
             <View style={[styles.previewCard, { backgroundColor: theme.colors.surface }]}>
               <Text style={[styles.previewTitle, { color: theme.colors.text }]}>
@@ -504,34 +727,41 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
                   Due: {formatDate(formData.dueDate)}
                   {formData.isRecurring && ` • Repeats ${formData.recurringType}`}
                 </Text>
+                {formData.notificationEnabled && formData.reminderDays.length > 0 && (
+                  <Text style={[styles.previewNotifications, { color: theme.colors.textSecondary }]}>
+                    Reminders: {formData.reminderDays.map(d => `${d} day${d === 1 ? '' : 's'}`).join(', ')} before
+                  </Text>
+                )}
               </View>
             </View>
           </ScrollView>
 
-          {/* Submit Button */}
+          {/* Action Buttons */}
           <View style={styles.footer}>
             <Button
-              title="Create Reminder"
-              onPress={handleSubmit}
+              title={hasChanges ? "Save Changes" : "No Changes"}
+              onPress={handleSave}
               loading={loading}
+              disabled={!hasChanges}
               style={styles.submitButton}
             />
           </View>
         </KeyboardAvoidingView>
 
         {/* Date Picker */}
-        <DateTimePicker
+        <CustomDateTimePicker
           visible={showDatePicker}
-          onClose={() => setShowDatePicker(false)}
-          onDateSelect={(date) => setFormData({ ...formData, dueDate: date })}
-          initialDate={formData.dueDate}
+          value={formData.dueDate}
           mode="date"
-          minimumDate={new Date()}
+          minimumDate={reminder.status === 'paid' ? undefined : new Date()}
           title="Select Due Date"
+          onChange={(date) => setFormData({ ...formData, dueDate: date })}
+          onClose={() => setShowDatePicker(false)}
         />
 
         <CategoryPicker />
         <RecurringPicker />
+        <ReminderDaysPicker />
       </SafeAreaView>
     </Modal>
   );
@@ -564,6 +794,18 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  changesIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  changesText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
   },
   content: {
     flex: 1,
@@ -639,6 +881,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
   },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 24,
+    gap: 12,
+  },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
   previewCard: {
     marginTop: 32,
     padding: 16,
@@ -670,6 +932,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 32,
   },
+  previewNotifications: {
+    fontSize: 14,
+    marginLeft: 32,
+  },
   footer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -695,6 +961,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  doneText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  pickerSubtitle: {
+    fontSize: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    lineHeight: 20,
+  },
   pickerOptions: {
     flex: 1,
     paddingHorizontal: 20,
@@ -713,13 +989,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 12,
   },
-  recurringContent: {
-    flex: 1,
-    marginLeft: 12,
+  reminderDayOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 8,
   },
-  pickerOptionDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 2,
+  reminderDayLabel: {
+    fontSize: 16,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

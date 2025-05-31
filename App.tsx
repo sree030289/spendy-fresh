@@ -17,6 +17,7 @@ import MainTabNavigator from './src/navigation/MainTabNavigator';
 import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 import { QRCodeService } from '@/services/qr/QRCodeService';
+import { RealNotificationService } from './src/services/notifications/RealNotificationService';
 
 const Stack = createStackNavigator();
 
@@ -36,6 +37,10 @@ const AppNavigator = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    // Initialize notifications
+    RealNotificationService.initialize();
+  }, []);
   // Initialize QR deep links
 useEffect(() => {
   const cleanup = QRCodeService.initializeDeepLinkListener();

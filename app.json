@@ -28,7 +28,32 @@
           "data": [{ "scheme": "spendy" }],
           "category": ["BROWSABLE", "DEFAULT"]
         }
+      ],
+      "permissions": [
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ]
-    }
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#10B981",
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} new reminder(s)"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#10B981",
+          "defaultChannel": "default",
+          "sounds": [
+            "./assets/notification-sound.wav"
+          ]
+        }
+      ]
+    ]
   }
 }

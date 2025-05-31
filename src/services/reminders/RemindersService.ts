@@ -1,59 +1,18 @@
 // src/services/reminders/RemindersService.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Reminder, ReminderCategory, ReminderStatus, RecurringType } from '@/types/reminder';
+import { GmailService } from '@/services/gmail/GmailService';
+import { NotificationService } from '@/services/notifications/NotificationService';
+import { RealNotificationService } from '../notifications/RealNotificationService';
 
 // Storage keys
 const STORAGE_KEYS = {
   REMINDERS: '@spendy_reminders',
   EMAIL_CONNECTION: '@spendy_email_connection',
   NOTIFICATION_SETTINGS: '@spendy_notification_settings',
+  LAST_SYNC: '@spendy_last_sync',
+  AUTO_SYNC_ENABLED: '@spendy_auto_sync_enabled',
 };
-
-// Mock email patterns for demo
-const EMAIL_BILL_PATTERNS = [
-  {
-    sender: 'netflix.com',
-    title: 'Netflix Subscription',
-    category: 'entertainment' as ReminderCategory,
-    amount: 15.99,
-    pattern: /netflix.*(\$[\d.]+)/i
-  },
-  {
-    sender: 'spotify.com',
-    title: 'Spotify Premium',
-    category: 'entertainment' as ReminderCategory,
-    amount: 9.99,
-    pattern: /spotify.*premium.*(\$[\d.]+)/i
-  },
-  {
-    sender: 'electric@utility.com',
-    title: 'Electricity Bill',
-    category: 'utilities' as ReminderCategory,
-    amount: 127.45,
-    pattern: /electricity.*bill.*(\$[\d.]+)/i
-  },
-  {
-    sender: 'visa@bank.com',
-    title: 'Credit Card Payment',
-    category: 'finance' as ReminderCategory,
-    amount: 450.00,
-    pattern: /credit.*card.*payment.*(\$[\d.]+)/i
-  },
-  {
-    sender: 'internet@provider.com',
-    title: 'Internet Bill',
-    category: 'utilities' as ReminderCategory,
-    amount: 89.99,
-    pattern: /internet.*bill.*(\$[\d.]+)/i
-  },
-  {
-    sender: 'insurance@company.com',
-    title: 'Car Insurance',
-    category: 'insurance' as ReminderCategory,
-    amount: 156.78,
-    pattern: /insurance.*premium.*(\$[\d.]+)/i
-  }
-];
 
 let firebaseDb: any = null;
 
@@ -110,26 +69,82 @@ export class RemindersService {
         });
         
         // Update status based on due dates
-        const updatedReminders = reminders.map(reminder => ({
-          ...reminder,
-          status: this.calculateReminderStatus(reminder)
-        }));
-        
+        const updatedReminders = await this.updateReminderStatuses(reminders);
         return updatedReminders;
       }
     } catch (error) {
-      console.log('Firebase getReminders failed, using mock data:', error);
+      console.log('Firebase getReminders failed, using local storage:', error);
     }
     
-    // Fallback to mock data
-    return this.getMockReminders();
+    // Fallback to local storage
+    return this.getLocalReminders(userId);
+  }
+  
+  // Get reminders from local storage
+  private static async getLocalReminders(userId: string): Promise<Reminder[]> {
+    try {
+      const stored = await AsyncStorage.getItem(`${STORAGE_KEYS.REMINDERS}_${userId}`);
+      if (stored) {
+        const reminders = JSON.parse(stored);
+        // Convert date strings back to Date objects
+        return reminders.map((reminder: any) => ({
+          ...reminder,
+          dueDate: new Date(reminder.dueDate),
+          createdAt: new Date(reminder.createdAt),
+          updatedAt: new Date(reminder.updatedAt),
+          paidDate: reminder.paidDate ? new Date(reminder.paidDate) : undefined,
+          nextDueDate: reminder.nextDueDate ? new Date(reminder.nextDueDate) : undefined,
+        }));
+      }
+      
+      // Initialize with demo data for new users
+      const demoReminders = this.getDemoReminders(userId);
+      await this.storeLocalReminders(userId, demoReminders);
+      return demoReminders;
+    } catch (error) {
+      console.error('Failed to get local reminders:', error);
+      return this.getDemoReminders(userId);
+    }
+  }
+  
+  // Store reminders in local storage
+  private static async storeLocalReminders(userId: string, reminders: Reminder[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(`${STORAGE_KEYS.REMINDERS}_${userId}`, JSON.stringify(reminders));
+    } catch (error) {
+      console.error('Failed to store local reminders:', error);
+    }
+  }
+  
+  // Update reminder statuses based on due dates
+  private static async updateReminderStatuses(reminders: Reminder[]): Promise<Reminder[]> {
+    const now = new Date();
+    let hasChanges = false;
+    
+    const updatedReminders = reminders.map(reminder => {
+      const newStatus = this.calculateReminderStatus(reminder, now);
+      
+      if (newStatus !== reminder.status) {
+        hasChanges = true;
+        return { ...reminder, status: newStatus, updatedAt: new Date() };
+      }
+      
+      return reminder;
+    });
+    
+    // If statuses changed, save to storage
+    if (hasChanges && updatedReminders.length > 0) {
+      const userId = updatedReminders[0].userId;
+      await this.storeLocalReminders(userId, updatedReminders);
+    }
+    
+    return updatedReminders;
   }
   
   // Calculate reminder status based on due date
-  private static calculateReminderStatus(reminder: Reminder): ReminderStatus {
+  private static calculateReminderStatus(reminder: Reminder, now: Date = new Date()): ReminderStatus {
     if (reminder.status === 'paid') return 'paid';
     
-    const now = new Date();
     const dueDate = new Date(reminder.dueDate);
     
     if (dueDate < now) {
@@ -139,91 +154,101 @@ export class RemindersService {
     }
   }
   
-  // Get mock reminders for demo
-  private static getMockReminders(): Reminder[] {
+  // Get demo reminders for new users
+  private static getDemoReminders(userId: string): Reminder[] {
     const now = new Date();
     
     return [
       {
-        id: 'reminder-1',
-        userId: 'mock-123',
+        id: 'demo-1',
+        userId,
         title: 'Netflix Subscription',
         description: 'Monthly Netflix Premium subscription',
         amount: 15.99,
         currency: 'USD',
         category: 'entertainment',
-        dueDate: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000), // Due in 2 days
+        dueDate: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000),
         status: 'upcoming',
         isRecurring: true,
         recurringType: 'monthly',
+        reminderDays: [1, 3],
+        notificationEnabled: true,
         autoDetected: true,
         emailSource: 'netflix@netflix.com',
         createdAt: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
         updatedAt: now,
       },
       {
-        id: 'reminder-2',
-        userId: 'mock-123',
+        id: 'demo-2',
+        userId,
         title: 'Electricity Bill',
         description: 'Monthly electricity bill from City Power',
         amount: 127.45,
         currency: 'USD',
         category: 'utilities',
-        dueDate: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000), // Due in 5 days
+        dueDate: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000),
         status: 'upcoming',
         isRecurring: true,
         recurringType: 'monthly',
+        reminderDays: [3, 7],
+        notificationEnabled: true,
         autoDetected: true,
         emailSource: 'billing@citypower.com',
         createdAt: new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000),
         updatedAt: now,
       },
       {
-        id: 'reminder-3',
-        userId: 'mock-123',
+        id: 'demo-3',
+        userId,
         title: 'Credit Card Payment',
         description: 'Visa credit card minimum payment',
         amount: 450.00,
         currency: 'USD',
         category: 'finance',
-        dueDate: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000), // Overdue by 3 days
+        dueDate: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
         status: 'overdue',
         isRecurring: true,
         recurringType: 'monthly',
+        reminderDays: [1, 3, 7],
+        notificationEnabled: true,
         autoDetected: true,
         emailSource: 'statements@visa.com',
         createdAt: new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000),
         updatedAt: now,
       },
       {
-        id: 'reminder-4',
-        userId: 'mock-123',
+        id: 'demo-4',
+        userId,
         title: 'Internet Bill',
         description: 'Monthly internet service from TechCorp',
         amount: 89.99,
         currency: 'USD',
         category: 'utilities',
-        dueDate: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000), // Overdue by 1 day
+        dueDate: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
         status: 'overdue',
         isRecurring: true,
         recurringType: 'monthly',
+        reminderDays: [1, 3],
+        notificationEnabled: true,
         autoDetected: true,
         emailSource: 'billing@techcorp.com',
         createdAt: new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000),
         updatedAt: now,
       },
       {
-        id: 'reminder-5',
-        userId: 'mock-123',
+        id: 'demo-5',
+        userId,
         title: 'Spotify Premium',
         description: 'Monthly Spotify Premium subscription',
         amount: 9.99,
         currency: 'USD',
         category: 'entertainment',
-        dueDate: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000), // Paid 5 days ago
+        dueDate: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
         status: 'paid',
         isRecurring: true,
         recurringType: 'monthly',
+        reminderDays: [1, 3],
+        notificationEnabled: true,
         autoDetected: true,
         emailSource: 'noreply@spotify.com',
         paidDate: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
@@ -236,6 +261,17 @@ export class RemindersService {
   // Create a new reminder
   static async createReminder(userId: string, reminderData: Omit<Reminder, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
+      const now = new Date();
+      const newReminder: Reminder = {
+        id: this.generateId(),
+        userId,
+        ...reminderData,
+        status: this.calculateReminderStatus({ ...reminderData } as Reminder, now),
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      // Try Firebase first
       const db = await initializeFirebase();
       if (db && !userId.startsWith('mock-')) {
         const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
@@ -243,26 +279,45 @@ export class RemindersService {
         const docRef = await addDoc(collection(db, 'reminders'), {
           ...reminderData,
           userId,
-          status: this.calculateReminderStatus({ ...reminderData } as Reminder),
+          status: newReminder.status,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
         
-        return docRef.id;
+        newReminder.id = docRef.id;
       }
+
+      // Store locally as backup
+      const existingReminders = await this.getLocalReminders(userId);
+      const updatedReminders = [...existingReminders, newReminder];
+      await this.storeLocalReminders(userId, updatedReminders);
+
+      // Schedule notifications if enabled
+      if (newReminder.notificationEnabled && newReminder.status !== 'paid') {
+        await NotificationService.scheduleReminderNotifications(userId, newReminder);
+      }
+
+      console.log('✅ Created reminder:', newReminder.title);
+
+      const reminder = { id: newReminder.id, userId, ...reminderData };
+      await RealNotificationService.scheduleReminderNotification(reminder, userId);
+
+      return newReminder.id;
     } catch (error) {
-      console.log('Firebase createReminder failed:', error);
+      console.error('❌ Failed to create reminder:', error);
+      throw error;
     }
-    
-    // Mock creation
-    const mockId = 'reminder-' + Math.random().toString(36).substr(2, 9);
-    console.log('Created mock reminder:', mockId);
-    return mockId;
   }
   
   // Update a reminder
   static async updateReminder(reminderId: string, updates: Partial<Reminder>): Promise<void> {
     try {
+      const updatedData = {
+        ...updates,
+        updatedAt: new Date(),
+      };
+
+      // Try Firebase first
       const db = await initializeFirebase();
       if (db) {
         const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
@@ -271,21 +326,48 @@ export class RemindersService {
           ...updates,
           updatedAt: serverTimestamp(),
         });
-        
-        return;
       }
+
+      // Update locally
+      const userId = await this.getUserIdFromReminder(reminderId);
+      if (userId) {
+        const existingReminders = await this.getLocalReminders(userId);
+        const updatedReminders = existingReminders.map(reminder =>
+          reminder.id === reminderId
+            ? { ...reminder, ...updatedData }
+            : reminder
+        );
+        await this.storeLocalReminders(userId, updatedReminders);
+
+        // Update notifications if reminder settings changed
+        const updatedReminder = updatedReminders.find(r => r.id === reminderId);
+        if (updatedReminder && (updates.notificationEnabled !== undefined || updates.reminderDays)) {
+          await NotificationService.cancelReminderNotifications(reminderId);
+          
+          if (updatedReminder.notificationEnabled && updatedReminder.status !== 'paid') {
+            await NotificationService.scheduleReminderNotifications(userId, updatedReminder);
+          }
+        }
+      }
+
+      console.log('✅ Updated reminder:', reminderId);
     } catch (error) {
-      console.log('Firebase updateReminder failed:', error);
+      console.error('❌ Failed to update reminder:', error);
+      throw error;
     }
-    
-    console.log('Updated mock reminder:', reminderId);
   }
   
   // Mark reminder as paid
   static async markAsPaid(reminderId: string): Promise<void> {
     try {
       const now = new Date();
-      
+      const updates: Partial<Reminder> = {
+        status: 'paid',
+        paidDate: now,
+        updatedAt: now,
+      };
+
+      // Try Firebase first
       const db = await initializeFirebase();
       if (db) {
         const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
@@ -295,40 +377,80 @@ export class RemindersService {
           paidDate: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-        
-        return;
       }
+
+      // Update locally
+      const userId = await this.getUserIdFromReminder(reminderId);
+      if (userId) {
+        const existingReminders = await this.getLocalReminders(userId);
+        const reminderToUpdate = existingReminders.find(r => r.id === reminderId);
+        
+        if (reminderToUpdate) {
+          const updatedReminders = existingReminders.map(reminder =>
+            reminder.id === reminderId
+              ? { ...reminder, ...updates }
+              : reminder
+          );
+          await this.storeLocalReminders(userId, updatedReminders);
+
+          // Cancel pending notifications
+          await NotificationService.cancelReminderNotifications(reminderId);
+
+          // Send payment confirmation
+          await NotificationService.sendPaymentConfirmation(
+            { ...reminderToUpdate, ...updates },
+            reminderToUpdate.amount
+          );
+
+          // Create next recurring reminder if applicable
+          if (reminderToUpdate.isRecurring && reminderToUpdate.recurringType) {
+            await this.createNextRecurringReminder(userId, reminderToUpdate);
+          }
+        }
+      }
+
+      console.log('✅ Marked reminder as paid:', reminderId);
     } catch (error) {
-      console.log('Firebase markAsPaid failed:', error);
+      console.error('❌ Failed to mark reminder as paid:', error);
+      throw error;
     }
-    
-    console.log('Marked mock reminder as paid:', reminderId);
   }
   
   // Delete a reminder
   static async deleteReminder(reminderId: string): Promise<void> {
     try {
+      // Try Firebase first
       const db = await initializeFirebase();
       if (db) {
         const { doc, deleteDoc } = await import('firebase/firestore');
         
         await deleteDoc(doc(db, 'reminders', reminderId));
-        return;
       }
+
+      // Delete locally
+      const userId = await this.getUserIdFromReminder(reminderId);
+      if (userId) {
+        const existingReminders = await this.getLocalReminders(userId);
+        const updatedReminders = existingReminders.filter(reminder => reminder.id !== reminderId);
+        await this.storeLocalReminders(userId, updatedReminders);
+
+        // Cancel notifications
+        await NotificationService.cancelReminderNotifications(reminderId);
+      }
+
+      console.log('✅ Deleted reminder:', reminderId);
     } catch (error) {
-      console.log('Firebase deleteReminder failed:', error);
+      console.error('❌ Failed to delete reminder:', error);
+      throw error;
     }
-    
-    console.log('Deleted mock reminder:', reminderId);
   }
   
   // Check if email is connected
   static async isEmailConnected(userId: string): Promise<boolean> {
     try {
-      const stored = await AsyncStorage.getItem(`${STORAGE_KEYS.EMAIL_CONNECTION}_${userId}`);
-      return stored === 'true';
+      return await GmailService.isGmailConnected(userId);
     } catch (error) {
-      console.log('Error checking email connection:', error);
+      console.error('❌ Failed to check email connection:', error);
       return false;
     }
   }
@@ -336,13 +458,21 @@ export class RemindersService {
   // Connect email for auto-detection
   static async connectEmail(userId: string, provider: 'gmail' | 'outlook'): Promise<void> {
     try {
-      // In production, this would integrate with OAuth
-      await AsyncStorage.setItem(`${STORAGE_KEYS.EMAIL_CONNECTION}_${userId}`, 'true');
-      await AsyncStorage.setItem(`${STORAGE_KEYS.EMAIL_CONNECTION}_${userId}_provider`, provider);
+      if (provider === 'gmail') {
+        const success = await GmailService.connectGmail(userId);
+        if (!success) {
+          throw new Error('Failed to connect Gmail');
+        }
+      } else {
+        throw new Error('Only Gmail is currently supported');
+      }
+
+      // Enable auto-sync
+      await AsyncStorage.setItem(`${STORAGE_KEYS.AUTO_SYNC_ENABLED}_${userId}`, 'true');
       
-      console.log(`Connected ${provider} for user ${userId}`);
+      console.log(`✅ Connected ${provider} for user ${userId}`);
     } catch (error) {
-      console.log('Error connecting email:', error);
+      console.error('❌ Failed to connect email:', error);
       throw error;
     }
   }
@@ -350,71 +480,93 @@ export class RemindersService {
   // Disconnect email
   static async disconnectEmail(userId: string): Promise<void> {
     try {
-      await AsyncStorage.removeItem(`${STORAGE_KEYS.EMAIL_CONNECTION}_${userId}`);
-      await AsyncStorage.removeItem(`${STORAGE_KEYS.EMAIL_CONNECTION}_${userId}_provider`);
+      await GmailService.disconnectGmail(userId);
+      await AsyncStorage.removeItem(`${STORAGE_KEYS.AUTO_SYNC_ENABLED}_${userId}`);
       
-      console.log(`Disconnected email for user ${userId}`);
+      console.log(`✅ Disconnected email for user ${userId}`);
     } catch (error) {
-      console.log('Error disconnecting email:', error);
+      console.error('❌ Failed to disconnect email:', error);
       throw error;
     }
   }
   
-  // Sync bills from email (mock implementation)
+  // Sync bills from email
   static async syncEmailBills(userId: string): Promise<Reminder[]> {
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock finding new bills in email
-      const newBills: Array<Omit<Reminder, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> = [];
-      
-      // Randomly generate 0-3 new bills for demo
-      const numNewBills = Math.floor(Math.random() * 4);
-      
-      for (let i = 0; i < numNewBills; i++) {
-        const pattern = EMAIL_BILL_PATTERNS[Math.floor(Math.random() * EMAIL_BILL_PATTERNS.length)];
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + Math.floor(Math.random() * 30) + 1); // 1-30 days from now
-        
-        newBills.push({
-          title: pattern.title,
-          description: `Auto-detected from ${pattern.sender}`,
-          amount: pattern.amount + (Math.random() - 0.5) * 20, // Vary amount slightly
-          currency: 'USD',
-          category: pattern.category,
-          dueDate,
-          status: 'upcoming',
-          isRecurring: true,
-          recurringType: 'monthly',
-          autoDetected: true,
-          emailSource: pattern.sender,
-        });
+      console.log('📧 Starting email bill sync...');
+
+      const isConnected = await this.isEmailConnected(userId);
+      if (!isConnected) {
+        throw new Error('Email not connected');
       }
+
+      // Get bills from Gmail
+      let newBills = await GmailService.syncBillsFromGmail(userId);
       
+      // Set user ID for each bill
+      newBills = newBills.map(bill => ({ ...bill, userId }));
+
+      // Filter out duplicates based on title and amount
+      const existingReminders = await this.getReminders(userId);
+      const uniqueBills = newBills.filter(newBill => {
+        return !existingReminders.some(existing => 
+          existing.title.toLowerCase() === newBill.title.toLowerCase() &&
+          Math.abs(existing.amount - newBill.amount) < 0.01 &&
+          existing.emailSource === newBill.emailSource
+        );
+      });
+
       // Create the new reminders
       const createdReminders: Reminder[] = [];
-      for (const bill of newBills) {
-        const id = await this.createReminder(userId, bill);
-        createdReminders.push({
-          id,
-          userId,
-          ...bill,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+      for (const bill of uniqueBills) {
+        try {
+          const id = await this.createReminder(userId, bill);
+          createdReminders.push({
+            ...bill,
+            id,
+            userId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        } catch (createError) {
+          console.warn('Failed to create reminder from email:', createError);
+        }
       }
-      
+
+      // Update last sync time
+      await AsyncStorage.setItem(
+        `${STORAGE_KEYS.LAST_SYNC}_${userId}`,
+        new Date().toISOString()
+      );
+
+      console.log(`✅ Synced ${createdReminders.length} new bills from email`);
       return createdReminders;
       
     } catch (error) {
-      console.log('Error syncing email bills:', error);
+      console.error('❌ Email sync error:', error);
       throw error;
+    }
+  }
+  
+  // Auto-sync if enabled and needed
+  static async autoSyncIfNeeded(userId: string): Promise<void> {
+    try {
+      const autoSyncEnabled = await AsyncStorage.getItem(`${STORAGE_KEYS.AUTO_SYNC_ENABLED}_${userId}`);
+      if (autoSyncEnabled !== 'true') {
+        return;
+      }
+
+      const shouldSync = await GmailService.shouldSync(userId);
+      if (shouldSync) {
+        await this.syncEmailBills(userId);
+      }
+    } catch (error) {
+      console.log('Auto-sync failed (non-critical):', error);
     }
   }
   
   // Get reminders due soon (for notifications)
-  static async getRemindersDueSoon(userId: string, days: number = 3): Promise<Reminder[]> {
+  static async getRemindersDueSoon(userId: string, days: number = 7): Promise<Reminder[]> {
     try {
       const allReminders = await this.getReminders(userId);
       const now = new Date();
@@ -427,7 +579,7 @@ export class RemindersService {
         return dueDate >= now && dueDate <= futureDate;
       });
     } catch (error) {
-      console.log('Error getting reminders due soon:', error);
+      console.error('❌ Failed to get reminders due soon:', error);
       return [];
     }
   }
@@ -445,7 +597,7 @@ export class RemindersService {
         return dueDate < now;
       });
     } catch (error) {
-      console.log('Error getting overdue reminders:', error);
+      console.error('❌ Failed to get overdue reminders:', error);
       return [];
     }
   }
@@ -471,14 +623,51 @@ export class RemindersService {
         nextDate.setFullYear(nextDate.getFullYear() + 1);
         break;
       default:
-        // No recurring, return same date
         break;
     }
     
     return nextDate;
   }
   
-  // Process recurring reminders (called by background task)
+  // Create next recurring reminder
+  private static async createNextRecurringReminder(userId: string, paidReminder: Reminder): Promise<void> {
+    try {
+      if (!paidReminder.isRecurring || !paidReminder.recurringType) {
+        return;
+      }
+
+      const nextDueDate = this.calculateNextDueDate(paidReminder.dueDate, paidReminder.recurringType);
+      
+      // Only create if next due date is in the future
+      const now = new Date();
+      if (nextDueDate <= now) {
+        return;
+      }
+
+      const nextReminder: Omit<Reminder, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
+        title: paidReminder.title,
+        description: paidReminder.description,
+        amount: paidReminder.amount,
+        currency: paidReminder.currency,
+        category: paidReminder.category,
+        dueDate: nextDueDate,
+        status: 'upcoming',
+        isRecurring: paidReminder.isRecurring,
+        recurringType: paidReminder.recurringType,
+        reminderDays: paidReminder.reminderDays,
+        notificationEnabled: paidReminder.notificationEnabled,
+        autoDetected: false, // Mark as system-generated
+        notes: paidReminder.notes,
+      };
+
+      await this.createReminder(userId, nextReminder);
+      console.log(`✅ Created next recurring reminder for ${paidReminder.title}`);
+    } catch (error) {
+      console.error('❌ Failed to create next recurring reminder:', error);
+    }
+  }
+  
+  // Process all recurring reminders (called periodically)
   static async processRecurringReminders(userId: string): Promise<void> {
     try {
       const allReminders = await this.getReminders(userId);
@@ -486,22 +675,26 @@ export class RemindersService {
       
       for (const reminder of allReminders) {
         if (reminder.isRecurring && reminder.status === 'paid' && reminder.recurringType) {
+          // Check if we need to create the next occurrence
           const nextDueDate = this.calculateNextDueDate(reminder.dueDate, reminder.recurringType);
           
-          // If it's time for the next occurrence
-          if (nextDueDate <= now) {
-            await this.createReminder(userId, {
-              ...reminder,
-              dueDate: nextDueDate,
-              status: 'upcoming',
-              paidDate: undefined,
-              autoDetected: false, // Mark as system-generated recurring
-            });
+          // Create next reminder if it doesn't exist and is due within next 3 months
+          const threeMonthsFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+          if (nextDueDate <= threeMonthsFromNow) {
+            const existingNext = allReminders.find(r => 
+              r.title === reminder.title &&
+              r.status === 'upcoming' &&
+              Math.abs(new Date(r.dueDate).getTime() - nextDueDate.getTime()) < 24 * 60 * 60 * 1000
+            );
+
+            if (!existingNext) {
+              await this.createNextRecurringReminder(userId, reminder);
+            }
           }
         }
       }
     } catch (error) {
-      console.log('Error processing recurring reminders:', error);
+      console.error('❌ Failed to process recurring reminders:', error);
     }
   }
   
@@ -513,7 +706,9 @@ export class RemindersService {
     paid: number;
     totalAmount: number;
     overdueAmount: number;
+    avgAmount: number;
     categoryBreakdown: Array<{ category: ReminderCategory; count: number; amount: number }>;
+    monthlyTrend: Array<{ month: string; count: number; amount: number }>;
   }> {
     try {
       const allReminders = await this.getReminders(userId);
@@ -525,10 +720,13 @@ export class RemindersService {
         paid: 0,
         totalAmount: 0,
         overdueAmount: 0,
+        avgAmount: 0,
         categoryBreakdown: [] as Array<{ category: ReminderCategory; count: number; amount: number }>,
+        monthlyTrend: [] as Array<{ month: string; count: number; amount: number }>,
       };
       
       const categoryMap = new Map<ReminderCategory, { count: number; amount: number }>();
+      const monthlyMap = new Map<string, { count: number; amount: number }>();
       
       for (const reminder of allReminders) {
         // Count by status
@@ -550,17 +748,33 @@ export class RemindersService {
           count: existing.count + 1,
           amount: existing.amount + reminder.amount,
         });
+
+        // Monthly trend
+        const monthKey = new Date(reminder.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+        const monthlyExisting = monthlyMap.get(monthKey) || { count: 0, amount: 0 };
+        monthlyMap.set(monthKey, {
+          count: monthlyExisting.count + 1,
+          amount: monthlyExisting.amount + reminder.amount,
+        });
       }
       
-      // Convert category map to array
+      // Calculate average
+      stats.avgAmount = allReminders.length > 0 ? stats.totalAmount / allReminders.length : 0;
+      
+      // Convert maps to arrays
       stats.categoryBreakdown = Array.from(categoryMap.entries()).map(([category, data]) => ({
         category,
+        ...data,
+      }));
+
+      stats.monthlyTrend = Array.from(monthlyMap.entries()).map(([month, data]) => ({
+        month,
         ...data,
       }));
       
       return stats;
     } catch (error) {
-      console.log('Error getting reminder stats:', error);
+      console.error('❌ Failed to get reminder stats:', error);
       return {
         total: 0,
         upcoming: 0,
@@ -568,7 +782,9 @@ export class RemindersService {
         paid: 0,
         totalAmount: 0,
         overdueAmount: 0,
+        avgAmount: 0,
         categoryBreakdown: [],
+        monthlyTrend: [],
       };
     }
   }
@@ -582,10 +798,11 @@ export class RemindersService {
       return allReminders.filter(reminder =>
         reminder.title.toLowerCase().includes(lowercaseQuery) ||
         reminder.description?.toLowerCase().includes(lowercaseQuery) ||
-        reminder.category.toLowerCase().includes(lowercaseQuery)
+        reminder.category.toLowerCase().includes(lowercaseQuery) ||
+        reminder.notes?.toLowerCase().includes(lowercaseQuery)
       );
     } catch (error) {
-      console.log('Error searching reminders:', error);
+      console.error('❌ Failed to search reminders:', error);
       return [];
     }
   }
@@ -596,8 +813,7 @@ export class RemindersService {
       const reminders = await this.getReminders(userId);
       
       if (format === 'csv') {
-        // Convert to CSV format
-        const headers = ['Title', 'Amount', 'Currency', 'Category', 'Due Date', 'Status', 'Description'];
+        const headers = ['Title', 'Amount', 'Currency', 'Category', 'Due Date', 'Status', 'Description', 'Recurring', 'Created'];
         const csvRows = [
           headers.join(','),
           ...reminders.map(r => [
@@ -607,18 +823,180 @@ export class RemindersService {
             r.category,
             r.dueDate.toISOString().split('T')[0],
             r.status,
-            `"${r.description || ''}"`
+            `"${r.description || ''}"`,
+            r.isRecurring ? 'Yes' : 'No',
+            r.createdAt.toISOString().split('T')[0]
           ].join(','))
         ];
         
         return csvRows.join('\n');
       } else {
-        // Return as JSON
         return JSON.stringify(reminders, null, 2);
       }
     } catch (error) {
-      console.log('Error exporting reminders:', error);
+      console.error('❌ Failed to export reminders:', error);
       throw error;
+    }
+  }
+
+  // Import reminders data
+  static async importReminders(userId: string, data: string, format: 'json' | 'csv' = 'json'): Promise<{
+    imported: number;
+    skipped: number;
+    errors: number;
+  }> {
+    try {
+      let remindersToImport: any[] = [];
+      
+      if (format === 'json') {
+        remindersToImport = JSON.parse(data);
+      } else {
+        // Parse CSV
+        const lines = data.split('\n');
+        const headers = lines[0].split(',');
+        
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',');
+          const reminder: any = {};
+          
+          headers.forEach((header, index) => {
+            reminder[header.toLowerCase().replace(/[^a-z0-9]/g, '')] = values[index]?.replace(/"/g, '');
+          });
+          
+          remindersToImport.push(reminder);
+        }
+      }
+
+      let imported = 0;
+      let skipped = 0;
+      let errors = 0;
+
+      for (const reminderData of remindersToImport) {
+        try {
+          // Validate required fields
+          if (!reminderData.title || !reminderData.amount) {
+            errors++;
+            continue;
+          }
+
+          // Check for duplicates
+          const existing = await this.searchReminders(userId, reminderData.title);
+          if (existing.length > 0) {
+            skipped++;
+            continue;
+          }
+
+          // Create reminder
+          const newReminder: Omit<Reminder, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
+            title: reminderData.title,
+            description: reminderData.description || '',
+            amount: parseFloat(reminderData.amount),
+            currency: reminderData.currency || 'USD',
+            category: reminderData.category || 'other',
+            dueDate: new Date(reminderData.dueDate || Date.now()),
+            status: reminderData.status || 'upcoming',
+            isRecurring: reminderData.isRecurring === 'Yes' || reminderData.isRecurring === true,
+            recurringType: reminderData.recurringType || 'monthly',
+            reminderDays: [1, 3],
+            notificationEnabled: true,
+            autoDetected: false,
+          };
+
+          await this.createReminder(userId, newReminder);
+          imported++;
+        } catch (createError) {
+          console.warn('Failed to import reminder:', createError);
+          errors++;
+        }
+      }
+
+      return { imported, skipped, errors };
+    } catch (error) {
+      console.error('❌ Failed to import reminders:', error);
+      throw error;
+    }
+  }
+
+  // Utility methods
+  private static generateId(): string {
+    return 'reminder-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+  }
+
+  private static async getUserIdFromReminder(reminderId: string): Promise<string | null> {
+    try {
+      // First try to find in all user local storage (not ideal but works for demo)
+      // In production, you'd have a central index or use Firebase queries
+      
+      // For now, assume mock user
+      return 'mock-123';
+    } catch (error) {
+      console.error('❌ Failed to get user ID from reminder:', error);
+      return null;
+    }
+  }
+
+  // Background sync
+  static async backgroundSync(): Promise<void> {
+    try {
+      console.log('🔄 Running background sync...');
+      
+      // Get all users (in production, this would come from your user service)
+      const userIds = ['mock-123']; // Demo user
+      
+      for (const userId of userIds) {
+        try {
+          // Auto-sync emails if enabled
+          await this.autoSyncIfNeeded(userId);
+          
+          // Process recurring reminders
+          await this.processRecurringReminders(userId);
+          
+          // Update reminder statuses
+          const reminders = await this.getReminders(userId);
+          await this.updateReminderStatuses(reminders);
+          
+        } catch (userError) {
+          console.warn(`Background sync failed for user ${userId}:`, userError);
+        }
+      }
+      
+      console.log('✅ Background sync completed');
+    } catch (error) {
+      console.error('❌ Background sync failed:', error);
+    }
+  }
+
+  // Get sync status
+  static async getSyncStatus(userId: string): Promise<{
+    lastSync: Date | null;
+    autoSyncEnabled: boolean;
+    emailConnected: boolean;
+    pendingSync: boolean;
+  }> {
+    try {
+      const lastSyncStr = await AsyncStorage.getItem(`${STORAGE_KEYS.LAST_SYNC}_${userId}`);
+      const lastSync = lastSyncStr ? new Date(lastSyncStr) : null;
+      
+      const autoSyncEnabledStr = await AsyncStorage.getItem(`${STORAGE_KEYS.AUTO_SYNC_ENABLED}_${userId}`);
+      const autoSyncEnabled = autoSyncEnabledStr === 'true';
+      
+      const emailConnected = await this.isEmailConnected(userId);
+      const pendingSync = emailConnected && await GmailService.shouldSync(userId);
+
+      return {
+        lastSync,
+        autoSyncEnabled,
+        emailConnected,
+        pendingSync,
+      };
+    } catch (error) {
+      console.error('❌ Failed to get sync status:', error);
+      return {
+        lastSync: null,
+        autoSyncEnabled: false,
+        emailConnected: false,
+        pendingSync: false,
+      };
     }
   }
 }
