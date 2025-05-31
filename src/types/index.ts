@@ -39,3 +39,6 @@ export interface AppTheme {
     success: string;
   };
 }
+
+// Re-export reminder types
+export * from './reminder';

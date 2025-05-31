@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { getCurrencySymbol } from '../../utils/currency';
@@ -48,6 +49,8 @@ export default function EditExpenseModal({
   const [amount, setAmount] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(expenseCategories[0]);
   const [notes, setNotes] = useState('');
+  const [expenseDate, setExpenseDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [splitData, setSplitData] = useState<ExpenseSplit[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -57,6 +60,7 @@ export default function EditExpenseModal({
       setAmount(expense.amount.toString());
       setNotes(expense.notes || '');
       setSplitData(expense.splitData);
+      setExpenseDate(expense.expenseDate ? new Date(expense.expenseDate) : new Date(expense.createdAt));
       
       const category = expenseCategories.find(cat => cat.id === expense.category);
       if (category) {
@@ -71,6 +75,7 @@ export default function EditExpenseModal({
     setNotes('');
     setSplitData([]);
     setSelectedCategory(expenseCategories[0]);
+    setExpenseDate(new Date());
   };
 
 const handleSubmit = async () => {
@@ -106,6 +111,7 @@ const handleSubmit = async () => {
       })),
       notes: notes.trim(),
       tags: expense.tags || [],
+      expenseDate,
     };
 
     // Use the SplittingService updateExpense method
@@ -226,6 +232,43 @@ const handleSubmit = async () => {
                     keyboardType="decimal-pad"
                   />
                 </View>
+              </View>
+
+              {/* Date */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.text }]}>Date</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.background,
+                      borderColor: theme.colors.border,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }
+                  ]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={[styles.dateText, { color: theme.colors.text }]}>
+                    {expenseDate.toLocaleDateString()}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={expenseDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(Platform.OS === 'ios');
+                      if (selectedDate) {
+                        setExpenseDate(selectedDate);
+                      }
+                    }}
+                    maximumDate={new Date()}
+                  />
+                )}
               </View>
             </View>
 
@@ -373,6 +416,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
+    fontSize: 16,
+  },
+  dateText: {
     fontSize: 16,
   },
   amountContainer: {

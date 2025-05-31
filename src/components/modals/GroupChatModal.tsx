@@ -33,6 +33,7 @@ interface ChatMessage {
     description: string;
     amount: number;
     currency: string;
+    expenseDate?: Date;
   };
 }
 
@@ -196,6 +197,9 @@ const handleAddExpense = () => {
           </Text>
           <Text style={[styles.expenseMessageSubtext, { color: theme.colors.textSecondary }]}>
             Added by {message.userName}
+            {message.expenseData?.expenseDate && 
+              ` • Expense date: ${new Date(message.expenseData.expenseDate).toLocaleDateString()}`
+            }
           </Text>
           <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
             {formatMessageTime(message.timestamp)}

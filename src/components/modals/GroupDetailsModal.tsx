@@ -516,54 +516,8 @@ const renderExpensesList = () => (
           <View style={{ width: 24 }} />
         </View>
 
-        {/* Tab Navigation */}
-        <View style={[styles.tabContainer, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'expenses' && { borderBottomColor: theme.colors.primary }
-            ]}
-            onPress={() => setActiveTab('expenses')}
-          >
-            <Text style={[
-              styles.tabText,
-              { color: activeTab === 'expenses' ? theme.colors.primary : theme.colors.textSecondary }
-            ]}>
-              Expenses
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'members' && { borderBottomColor: theme.colors.primary }
-            ]}
-            onPress={() => setActiveTab('members')}
-          >
-            <Text style={[
-              styles.tabText,
-              { color: activeTab === 'members' ? theme.colors.primary : theme.colors.textSecondary }
-            ]}>
-              Members
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'settings' && { borderBottomColor: theme.colors.primary }
-            ]}
-            onPress={() => setActiveTab('settings')}
-          >
-            <Text style={[
-              styles.tabText,
-              { color: activeTab === 'settings' ? theme.colors.primary : theme.colors.textSecondary }
-            ]}>
-              Settings
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <ScrollView contentContainerStyle={styles.content}>
-          {/* Group Info */}
+          {/* Group Info - Fixed at top */}
           <View style={styles.groupInfo}>
             <Text style={styles.groupAvatar}>{group.avatar}</Text>
             <Text style={[styles.groupName, { color: theme.colors.text }]}>
@@ -584,8 +538,54 @@ const renderExpensesList = () => (
             </View>
           </View>
 
-          {/* Group Stats */}
+          {/* Group Stats - Fixed at top */}
           {renderGroupStats()}
+
+          {/* Tab Navigation - Now below stats */}
+          <View style={[styles.tabContainer, { borderBottomColor: theme.colors.border }]}>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'expenses' && { borderBottomColor: theme.colors.primary }
+              ]}
+              onPress={() => setActiveTab('expenses')}
+            >
+              <Text style={[
+                styles.tabText,
+                { color: activeTab === 'expenses' ? theme.colors.primary : theme.colors.textSecondary }
+              ]}>
+                Expenses
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'members' && { borderBottomColor: theme.colors.primary }
+              ]}
+              onPress={() => setActiveTab('members')}
+            >
+              <Text style={[
+                styles.tabText,
+                { color: activeTab === 'members' ? theme.colors.primary : theme.colors.textSecondary }
+              ]}>
+                Members
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'settings' && { borderBottomColor: theme.colors.primary }
+              ]}
+              onPress={() => setActiveTab('settings')}
+            >
+              <Text style={[
+                styles.tabText,
+                { color: activeTab === 'settings' ? theme.colors.primary : theme.colors.textSecondary }
+              ]}>
+                Settings
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Tab Content */}
           {activeTab === 'expenses' && (

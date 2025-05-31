@@ -9,15 +9,18 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { Friend, Group } from '@/services/firebase/splitting';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
+import ReceiptScannerModal from './ReceiptScannerModal';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -57,6 +60,9 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
   const [splitType, setSplitType] = useState<'equal' | 'custom' | 'percentage'>('equal');
   const [splitData, setSplitData] = useState<any[]>([]);
   const [notes, setNotes] = useState('');
+  const [expenseDate, setExpenseDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showReceiptScanner, setShowReceiptScanner] = useState(false);
   
   // Errors
   const [errors, setErrors] = useState<any>({});
@@ -90,6 +96,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
     setSplitType('equal');
     setSplitData([]);
     setNotes('');
+    setExpenseDate(new Date());
     setErrors({});
     setActiveStep('details');
   };
@@ -135,12 +142,21 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
       const totalAmount = parseFloat(amount);
       const splitTotal = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0);
       
-      if (Math.abs(splitTotal - totalAmount) > 0.01) {
-        newErrors.split = `Split amounts must equal ${totalAmount}`;
+      // Strict validation - no difference allowed
+      if (Math.abs(splitTotal - totalAmount) > 0.001) {
+        newErrors.split = `Split amounts must equal exactly ${getCurrencySymbol(user?.currency || 'USD')}${totalAmount.toFixed(2)}. Current total: ${getCurrencySymbol(user?.currency || 'USD')}${splitTotal.toFixed(2)}`;
       }
       
       if (splitData.filter(split => split.isIncluded).length === 0) {
         newErrors.split = 'At least one person must be included in the split';
+      }
+      
+      // Additional validation for percentage splits
+      if (splitType === 'percentage') {
+        const totalPercentage = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.percentage : 0), 0);
+        if (Math.abs(totalPercentage - 100) > 0.1) {
+          newErrors.split = `Percentages must total exactly 100%. Current total: ${totalPercentage.toFixed(1)}%`;
+        }
       }
     }
 
@@ -186,6 +202,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
         })),
         notes: notes.trim(),
         tags: [],
+        expenseDate,
       };
 
       await onSubmit(expenseData);
@@ -236,6 +253,32 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
         ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
         : split
     ));
+  };
+
+  const handleReceiptData = (receiptData: any) => {
+    // Auto-populate form with receipt data
+    if (receiptData.merchant) {
+      setDescription(receiptData.merchant);
+    }
+    if (receiptData.total) {
+      setAmount(receiptData.total.toString());
+    }
+    if (receiptData.date) {
+      setExpenseDate(new Date(receiptData.date));
+    }
+    // Set appropriate category based on merchant or items
+    if (receiptData.merchant) {
+      // Simple logic to categorize based on merchant name
+      const merchantLower = receiptData.merchant.toLowerCase();
+      if (merchantLower.includes('restaurant') || merchantLower.includes('cafe') || merchantLower.includes('food')) {
+        setSelectedCategory(EXPENSE_CATEGORIES.find(cat => cat.id === 'food') || EXPENSE_CATEGORIES[0]);
+      } else if (merchantLower.includes('gas') || merchantLower.includes('fuel') || merchantLower.includes('uber') || merchantLower.includes('taxi')) {
+        setSelectedCategory(EXPENSE_CATEGORIES.find(cat => cat.id === 'transport') || EXPENSE_CATEGORIES[0]);
+      } else if (merchantLower.includes('store') || merchantLower.includes('market') || merchantLower.includes('shop')) {
+        setSelectedCategory(EXPENSE_CATEGORIES.find(cat => cat.id === 'shopping') || EXPENSE_CATEGORIES[0]);
+      }
+    }
+    setShowReceiptScanner(false);
   };
 
   const renderStepIndicator = () => (
@@ -304,6 +347,26 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
 
   const renderDetailsStep = () => (
     <ScrollView contentContainerStyle={styles.stepContent}>
+      {/* Receipt Scanner */}
+      <TouchableOpacity
+        style={[styles.receiptScannerButton, { 
+          borderColor: theme.colors.primary, 
+          backgroundColor: theme.colors.primary + '10' 
+        }]}
+        onPress={() => setShowReceiptScanner(true)}
+      >
+        <Ionicons name="camera" size={24} color={theme.colors.primary} />
+        <View style={styles.receiptScannerTextContainer}>
+          <Text style={[styles.receiptScannerTitle, { color: theme.colors.primary }]}>
+            Scan Receipt
+          </Text>
+          <Text style={[styles.receiptScannerSubtitle, { color: theme.colors.textSecondary }]}>
+            Auto-fill expense details from receipt
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={theme.colors.primary} />
+      </TouchableOpacity>
+
       {/* Description */}
       <View style={styles.inputContainer}>
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>What was this expense for? *</Text>
@@ -397,6 +460,43 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
             ))}
           </View>
         </ScrollView>
+      </View>
+
+      {/* Date */}
+      <View style={styles.inputContainer}>
+        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Date</Text>
+        <TouchableOpacity
+          style={[
+            styles.input,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }
+          ]}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Text style={[styles.dateText, { color: theme.colors.text }]}>
+            {expenseDate.toLocaleDateString()}
+          </Text>
+          <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={expenseDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(Platform.OS === 'ios');
+              if (selectedDate) {
+                setExpenseDate(selectedDate);
+              }
+            }}
+            maximumDate={new Date()}
+          />
+        )}
       </View>
 
       {/* Group Selection */}
@@ -879,6 +979,13 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
           </View>
         </View>
       </SafeAreaView>
+
+      {/* Receipt Scanner Modal */}
+      <ReceiptScannerModal
+        visible={showReceiptScanner}
+        onClose={() => setShowReceiptScanner(false)}
+        onReceiptProcessed={handleReceiptData}
+      />
     </Modal>
   );
 }
@@ -945,6 +1052,30 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     fontSize: 16,
+  },
+  dateText: {
+    fontSize: 16,
+  },
+  receiptScannerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    marginBottom: 24,
+  },
+  receiptScannerTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  receiptScannerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  receiptScannerSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
   amountInputContainer: {
     flexDirection: 'row',

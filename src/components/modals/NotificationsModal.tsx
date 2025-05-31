@@ -89,11 +89,13 @@ export default function NotificationsModal({
       onMarkAsRead(notification.id);
     }
     
-    // Close the notifications modal
-    onClose();
-    
-    // Navigate to the appropriate screen
+    // Navigate to the appropriate screen first
     onNavigateToNotification(notification);
+    
+    // Close the notifications modal after a small delay to avoid refresh issues
+    setTimeout(() => {
+      onClose();
+    }, 100);
   };
 
   const renderNotification = (notification: Notification) => (
