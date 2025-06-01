@@ -5,11 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Modal,
   Alert,
   RefreshControl,
-  Animated,
-  Dimensions,
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,8 +19,8 @@ import { Reminder, ReminderCategory, ReminderStatus } from '@/types/reminder';
 import { formatCurrency } from '@/utils/currency';
 import AddReminderModal from '@/components/reminders/AddReminderModal';
 import ReminderDetailsModal from '@/components/reminders/ReminderDetailsModal';
-
-const { width } = Dimensions.get('window');
+import EditReminderModal from '@/components/reminders/EditReminderModal';
+import ReminderStatsModal from '@/components/reminders/ReminderStatsModal';
 
 interface TabInfo {
   key: ReminderStatus | 'all';
@@ -44,11 +41,10 @@ export default function RemindersScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
   const [emailConnected, setEmailConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  const scrollX = new Animated.Value(0);
 
   useEffect(() => {
     loadReminders();
@@ -84,12 +80,10 @@ export default function RemindersScreen() {
   const filterReminders = () => {
     let filtered = reminders;
 
-    // Filter by tab
     if (activeTab !== 'all') {
       filtered = filtered.filter(reminder => reminder.status === activeTab);
     }
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(reminder =>
@@ -158,6 +152,11 @@ export default function RemindersScreen() {
     } catch (error) {
       Alert.alert('Error', 'Failed to mark as paid');
     }
+  };
+
+  const handleEditReminder = (reminder: Reminder) => {
+    setSelectedReminder(reminder);
+    setShowEditModal(true);
   };
 
   const handleDeleteReminder = async (reminder: Reminder) => {
@@ -441,6 +440,12 @@ export default function RemindersScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, styles.secondaryButton, { borderColor: theme.colors.border }]}
+                onPress={() => handleEditReminder(reminder)}
+              >
+                <Ionicons name="create-outline" size={16} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.secondaryButton, { borderColor: theme.colors.border }]}
                 onPress={() => handleDeleteReminder(reminder)}
               >
                 <Ionicons name="trash-outline" size={16} color={theme.colors.textSecondary} />
@@ -552,6 +557,17 @@ export default function RemindersScreen() {
         onReminderAdded={loadReminders}
       />
 
+      {/* Edit Reminder Modal */}
+      <EditReminderModal
+        visible={showEditModal}
+        reminder={selectedReminder}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedReminder(null);
+        }}
+        onReminderUpdated={loadReminders}
+      />
+
       {/* Reminder Details Modal */}
       <ReminderDetailsModal
         visible={showDetailsModal}
@@ -563,29 +579,11 @@ export default function RemindersScreen() {
         onReminderUpdated={loadReminders}
       />
 
-      {/* Stats Modal Placeholder */}
-      <Modal
+      {/* Stats Modal */}
+      <ReminderStatsModal
         visible={showStatsModal}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowStatsModal(false)}
-      >
-        <View style={styles.statsModalOverlay}>
-          <View style={[styles.statsModalContent, { backgroundColor: theme.colors.background }]}>
-            <Text style={[styles.statsModalTitle, { color: theme.colors.text }]}>
-              Reminder Statistics
-            </Text>
-            <Text style={[styles.comingSoonText, { color: theme.colors.textSecondary }]}>
-              Detailed statistics coming soon!
-            </Text>
-            <Button
-              title="Close"
-              onPress={() => setShowStatsModal(false)}
-              style={styles.statsModalButton}
-            />
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowStatsModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -824,55 +822,5 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-  },
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  modalContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  comingSoonText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  statsModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 24,
-  },
-  statsModalContent: {
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 320,
-    alignItems: 'center',
-  },
-  statsModalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  statsModalButton: {
-    marginTop: 24,
-    width: '100%',
   },
 });

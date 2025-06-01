@@ -1,4 +1,4 @@
-// src/components/reminders/NotificationSettingsModal.tsx - Updated with real functionality
+// src/components/reminders/NotificationSettingsModal.tsx - Fixed with real functionality
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,8 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { DateTimePicker } from '@/components/common/DateTimePicker';
-import { NotificationService } from '@/services/notifications/NotificationService';
+import { CustomDateTimePicker } from '@/components/common/DateTimePicker';
+import { RealNotificationService } from '@/services/notifications/RealNotificationService';
 
 interface NotificationSettingsModalProps {
   visible: boolean;
@@ -74,10 +74,21 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
 
   const loadSettings = async () => {
     try {
-      const userSettings = await NotificationService.getNotificationSettings(user?.id || '');
+      const userSettings = await RealNotificationService.getNotificationSettings(user?.id || '');
       if (userSettings) {
         setSettings(userSettings);
       }
+    } catch (error) {
+      console.error('Failed to load notification settings:', error);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      await RealNotificationService.updateNotificationSettings(user?.id || '', settings);
+      Alert.alert('Success', 'Notification settings updated successfully!');
+      onClose();
     } catch (error) {
       Alert.alert('Error', 'Failed to update notification settings');
     } finally {
@@ -89,7 +100,7 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
     if (!user) return;
 
     try {
-      await NotificationService.sendTestNotification(user.id);
+      await RealNotificationService.sendTestNotification(user.id);
     } catch (error) {
       Alert.alert('Error', 'Failed to send test notification');
     }
@@ -418,29 +429,29 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
         </ScrollView>
 
         {/* Time Pickers */}
-        <DateTimePicker
+        <CustomDateTimePicker
           visible={showTimePicker}
           onClose={() => setShowTimePicker(false)}
-          onDateSelect={(date) => handleTimeSelect(date, 'main')}
-          initialDate={createTimeFromString(settings.timeOfDay)}
+          onChange={(date) => handleTimeSelect(date, 'main')}
+          value={createTimeFromString(settings.timeOfDay)}
           mode="time"
           title="Daily Notification Time"
         />
 
-        <DateTimePicker
+        <CustomDateTimePicker
           visible={showQuietStartPicker}
           onClose={() => setShowQuietStartPicker(false)}
-          onDateSelect={(date) => handleTimeSelect(date, 'quietStart')}
-          initialDate={settings.quietHoursStart ? createTimeFromString(settings.quietHoursStart) : new Date()}
+          onChange={(date) => handleTimeSelect(date, 'quietStart')}
+          value={settings.quietHoursStart ? createTimeFromString(settings.quietHoursStart) : new Date()}
           mode="time"
           title="Quiet Hours Start"
         />
 
-        <DateTimePicker
+        <CustomDateTimePicker
           visible={showQuietEndPicker}
           onClose={() => setShowQuietEndPicker(false)}
-          onDateSelect={(date) => handleTimeSelect(date, 'quietEnd')}
-          initialDate={settings.quietHoursEnd ? createTimeFromString(settings.quietHoursEnd) : new Date()}
+          onChange={(date) => handleTimeSelect(date, 'quietEnd')}
+          value={settings.quietHoursEnd ? createTimeFromString(settings.quietHoursEnd) : new Date()}
           mode="time"
           title="Quiet Hours End"
         />

@@ -1,4 +1,4 @@
-// src/components/reminders/ReminderStatsModal.tsx
+// src/components/reminders/ReminderStatsModal.tsx - Complete Implementation
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   Dimensions,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,7 +30,9 @@ interface StatsData {
   paid: number;
   totalAmount: number;
   overdueAmount: number;
+  avgAmount: number;
   categoryBreakdown: Array<{ category: ReminderCategory; count: number; amount: number }>;
+  monthlyTrend: Array<{ month: string; count: number; amount: number }>;
 }
 
 const { width } = Dimensions.get('window');
@@ -75,9 +78,10 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
     paid: 0,
     totalAmount: 0,
     overdueAmount: 0,
+    avgAmount: 0,
     categoryBreakdown: [],
+    monthlyTrend: [],
   });
-  const [selectedPeriod, setSelectedPeriod] = useState<'month' | 'quarter' | 'year'>('month');
 
   useEffect(() => {
     if (visible) {
@@ -109,6 +113,19 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
 
   const getCategoryPercentage = (amount: number): number => {
     return stats.totalAmount > 0 ? (amount / stats.totalAmount) * 100 : 0;
+  };
+
+  const handleExport = async (format: 'csv' | 'json') => {
+    try {
+      const exportData = await RemindersService.exportReminders(user?.id || '', format);
+      
+      await Share.share({
+        message: exportData,
+        title: `Reminders Export - ${format.toUpperCase()}`,
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
   };
 
   const renderOverviewCards = () => (
@@ -199,10 +216,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
             Average Bill
           </Text>
           <Text style={[styles.amountValue, { color: theme.colors.text }]}>
-            {formatCurrency(
-              stats.total > 0 ? stats.totalAmount / stats.total : 0, 
-              user?.currency || 'USD'
-            )}
+            {formatCurrency(stats.avgAmount, user?.currency || 'USD')}
           </Text>
         </View>
         
@@ -444,10 +458,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
       <View style={styles.exportContainer}>
         <TouchableOpacity 
           style={[styles.exportButton, { borderColor: theme.colors.border }]}
-          onPress={() => {
-            // Handle CSV export
-            console.log('Export as CSV');
-          }}
+          onPress={() => handleExport('csv')}
         >
           <Ionicons name="document-text-outline" size={24} color={theme.colors.primary} />
           <Text style={[styles.exportText, { color: theme.colors.text }]}>
@@ -457,14 +468,11 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
         
         <TouchableOpacity 
           style={[styles.exportButton, { borderColor: theme.colors.border }]}
-          onPress={() => {
-            // Handle PDF export
-            console.log('Export as PDF');
-          }}
+          onPress={() => handleExport('json')}
         >
           <Ionicons name="document-outline" size={24} color={theme.colors.primary} />
           <Text style={[styles.exportText, { color: theme.colors.text }]}>
-            Export as PDF
+            Export as JSON
           </Text>
         </TouchableOpacity>
       </View>

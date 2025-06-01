@@ -1,4 +1,4 @@
-// src/components/reminders/AddReminderModal.tsx - Updated with real functionality
+// src/components/reminders/AddReminderModal.tsx - Fixed with proper imports
 import React, { useState } from 'react';
 import {
   View,
@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { DateTimePicker } from '@/components/common/DateTimePicker';
+import { CustomDateTimePicker } from '@/components/common/DateTimePicker'; // Use named import
 import { RemindersService } from '@/services/reminders/RemindersService';
 import { ReminderCategory, RecurringType } from '@/types/reminder';
 import { formatCurrency } from '@/utils/currency';
@@ -65,7 +65,7 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
     dueDate: new Date(),
     isRecurring: false,
     recurringType: 'monthly' as RecurringType,
-    reminderDays: [1, 3], // Default to 1 and 3 days before
+    reminderDays: [1, 3],
   });
   
   const [errors, setErrors] = useState({
@@ -82,20 +82,17 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
     const newErrors = { title: '', amount: '', dueDate: '' };
     let isValid = true;
 
-    // Validate title
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
       isValid = false;
     }
 
-    // Validate amount
     const amount = parseFloat(formData.amount);
     if (!formData.amount || isNaN(amount) || amount <= 0) {
       newErrors.amount = 'Please enter a valid amount';
       isValid = false;
     }
 
-    // Validate due date
     if (formData.dueDate < new Date()) {
       newErrors.dueDate = 'Due date cannot be in the past';
       isValid = false;
@@ -366,7 +363,6 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
                   placeholderTextColor={theme.colors.textSecondary}
                   value={formData.amount}
                   onChangeText={(text) => {
-                    // Only allow numbers and decimal point
                     const numericText = text.replace(/[^0-9.]/g, '');
                     setFormData({ ...formData, amount: numericText });
                     if (errors.amount) setErrors({ ...errors, amount: '' });
@@ -520,11 +516,11 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
         </KeyboardAvoidingView>
 
         {/* Date Picker */}
-        <DateTimePicker
+        <CustomDateTimePicker
           visible={showDatePicker}
           onClose={() => setShowDatePicker(false)}
-          onDateSelect={(date) => setFormData({ ...formData, dueDate: date })}
-          initialDate={formData.dueDate}
+          onChange={(date) => setFormData({ ...formData, dueDate: date })}
+          value={formData.dueDate}
           mode="date"
           minimumDate={new Date()}
           title="Select Due Date"
