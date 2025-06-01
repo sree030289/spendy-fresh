@@ -32,7 +32,7 @@ export default function ReminderDetailsModal({
   visible, 
   reminder, 
   onClose, 
-  onReminderUpdated 
+  onReminderUpdated
 }: ReminderDetailsModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -207,10 +207,6 @@ export default function ReminderDetailsModal({
     } finally {
       setActionLoading(null);
     }
-  };
-
-  const handleEdit = () => {
-    Alert.alert('Edit Reminder', 'Edit functionality coming soon!');
   };
 
   const handleDelete = () => {
@@ -444,16 +440,6 @@ export default function ReminderDetailsModal({
 
           {/* More Options */}
           <View style={[styles.moreOptionsCard, { backgroundColor: theme.colors.surface }]}>
-            <TouchableOpacity style={styles.moreOption} onPress={handleEdit}>
-              <Ionicons name="create-outline" size={20} color={theme.colors.text} />
-              <Text style={[styles.moreOptionText, { color: theme.colors.text }]}>
-                Edit Reminder
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            
-            <View style={[styles.separator, { backgroundColor: theme.colors.border }]} />
-            
             <TouchableOpacity style={styles.moreOption} onPress={handleDelete}>
               <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
               <Text style={[styles.moreOptionText, { color: theme.colors.error }]}>

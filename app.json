@@ -25,7 +25,10 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [{ "scheme": "spendy" }],
+          "data": [
+            { "scheme": "spendy" },
+            { "scheme": "exp" }
+          ],
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ],

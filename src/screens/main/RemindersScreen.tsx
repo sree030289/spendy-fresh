@@ -21,6 +21,7 @@ import AddReminderModal from '@/components/reminders/AddReminderModal';
 import ReminderDetailsModal from '@/components/reminders/ReminderDetailsModal';
 import EditReminderModal from '@/components/reminders/EditReminderModal';
 import ReminderStatsModal from '@/components/reminders/ReminderStatsModal';
+import { RealGmailService } from '@/services/gmail/RealGmailService';
 
 interface TabInfo {
   key: ReminderStatus | 'all';
@@ -29,12 +30,15 @@ interface TabInfo {
   color: string;
 }
 
+type ViewMode = 'list' | 'calendar';
+
 export default function RemindersScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [filteredReminders, setFilteredReminders] = useState<Reminder[]>([]);
   const [activeTab, setActiveTab] = useState<ReminderStatus | 'all'>('upcoming');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,6 +49,7 @@ export default function RemindersScreen() {
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
   const [emailConnected, setEmailConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     loadReminders();
@@ -70,7 +75,7 @@ export default function RemindersScreen() {
 
   const checkEmailConnection = async () => {
     try {
-      const connected = await RemindersService.isEmailConnected(user?.id || '');
+      const connected = await RealGmailService.isGmailConnected(user?.id || '');
       setEmailConnected(connected);
     } catch (error) {
       console.error('Error checking email connection:', error);
@@ -104,19 +109,27 @@ export default function RemindersScreen() {
 
   const handleConnectEmail = async () => {
     try {
+      setIsSyncing(true);
+      
       Alert.alert(
-        'Connect Email',
-        'This will allow us to automatically detect bills and payment confirmations from your email.',
+        'Connect Gmail',
+        'You will be redirected to Google to sign in and authorize Spendy to read your emails for bill detection.',
         [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Connect Gmail',
             onPress: async () => {
-              setIsSyncing(true);
-              await RemindersService.connectEmail(user?.id || '', 'gmail');
-              setEmailConnected(true);
-              setIsSyncing(false);
-              Alert.alert('Success', 'Gmail connected successfully!');
+              try {
+                const success = await RealGmailService.connectGmail(user?.id || '');
+                if (success) {
+                  setEmailConnected(true);
+                  Alert.alert('Success', 'Gmail connected successfully!');
+                }
+              } catch (error) {
+                Alert.alert('Error', error.message);
+              } finally {
+                setIsSyncing(false);
+              }
             }
           }
         ]
@@ -130,9 +143,9 @@ export default function RemindersScreen() {
   const handleSyncEmail = async () => {
     try {
       setIsSyncing(true);
-      const newReminders = await RemindersService.syncEmailBills(user?.id || '');
-      if (newReminders.length > 0) {
-        Alert.alert('Sync Complete', `Found ${newReminders.length} new bills!`);
+      const bills = await RealGmailService.syncBillsFromGmail(user?.id || '');
+      if (bills.length > 0) {
+        Alert.alert('Sync Complete', `Found ${bills.length} new bills!`);
         await loadReminders();
       } else {
         Alert.alert('Sync Complete', 'No new bills found');
@@ -179,6 +192,16 @@ export default function RemindersScreen() {
         }
       ]
     );
+  };
+
+  // Handle tab change with automatic view mode switching
+  const handleTabChange = (tab: ReminderStatus | 'all') => {
+    setActiveTab(tab);
+    
+    // Auto-switch to list mode for overdue and paid tabs
+    if (tab === 'overdue' || tab === 'paid') {
+      setViewMode('list');
+    }
   };
 
   const getTabs = (): TabInfo[] => {
@@ -264,8 +287,142 @@ export default function RemindersScreen() {
     }
   };
 
+  const getCalendarDays = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    
+    const days = [];
+    const current = new Date(startDate);
+    
+    while (current <= lastDay || days.length < 42) {
+      days.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return days.slice(0, 42);
+  };
+
+  const getRemindersForDate = (date: Date) => {
+    return reminders.filter(reminder => {
+      const reminderDate = new Date(reminder.dueDate);
+      return reminderDate.toDateString() === date.toDateString();
+    });
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
   const stats = getStats();
   const tabs = getTabs();
+
+  const renderHeader = () => (
+    <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
+      <View style={styles.headerTop}>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+          Reminders
+        </Text>
+        <TouchableOpacity
+          style={[styles.syncButton, { backgroundColor: isSyncing ? theme.colors.textSecondary : theme.colors.primary }]}
+          onPress={emailConnected ? handleSyncEmail : handleConnectEmail}
+          disabled={isSyncing}
+        >
+          <Ionicons name="mail-outline" size={16} color={isSyncing ? theme.colors.text : 'white'} />
+          <Text style={[styles.syncButtonText, { color: isSyncing ? theme.colors.text : 'white' }]}>
+            {isSyncing ? 'Syncing...' : emailConnected ? 'Sync' : 'Connect'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Stats Cards */}
+      <View style={styles.statsContainer}>
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: theme.colors.background }]}
+          onPress={() => setShowStatsModal(true)}
+        >
+          <Text style={[styles.statValue, { color: theme.colors.primary }]}>
+            {stats.upcomingCount}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+            Upcoming
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: theme.colors.background }]}
+          onPress={() => setShowStatsModal(true)}
+        >
+          <Text style={[styles.statValue, { color: theme.colors.error }]}>
+            {stats.overdueCount}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+            Overdue
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: theme.colors.background }]}
+          onPress={() => setShowStatsModal(true)}
+        >
+          <Text style={[styles.statValue, { color: theme.colors.success }]} numberOfLines={1}>
+            {stats.totalDue}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+            Total Due
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* View Toggle */}
+      <View style={[styles.viewToggle, { backgroundColor: theme.colors.background }]}>
+        <TouchableOpacity
+          style={[
+            styles.viewButton,
+            viewMode === 'list' && [styles.activeViewButton, { backgroundColor: theme.colors.primary }]
+          ]}
+          onPress={() => setViewMode('list')}
+        >
+          <Ionicons 
+            name="list-outline" 
+            size={16} 
+            color={viewMode === 'list' ? 'white' : theme.colors.textSecondary} 
+          />
+          <Text style={[
+            styles.viewButtonText,
+            { color: viewMode === 'list' ? 'white' : theme.colors.textSecondary }
+          ]}>
+            List
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.viewButton,
+            viewMode === 'calendar' && [styles.activeViewButton, { backgroundColor: theme.colors.primary }]
+          ]}
+          onPress={() => setViewMode('calendar')}
+        >
+          <Ionicons 
+            name="calendar-outline" 
+            size={16} 
+            color={viewMode === 'calendar' ? 'white' : theme.colors.textSecondary} 
+          />
+          <Text style={[
+            styles.viewButtonText,
+            { color: viewMode === 'calendar' ? 'white' : theme.colors.textSecondary }
+          ]}>
+            Calendar
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const renderEmailBanner = () => (
     <View style={[
@@ -281,77 +438,36 @@ export default function RemindersScreen() {
       />
       <View style={styles.emailBannerText}>
         <Text style={styles.emailBannerTitle}>
-          {emailConnected ? 'Email Connected' : 'Connect Email'}
+          {emailConnected ? 'Gmail Connected' : 'Connect Gmail'}
         </Text>
         <Text style={styles.emailBannerSubtitle}>
           {emailConnected 
-            ? 'Auto-sync enabled • bills@example.com'
+            ? 'Auto-sync enabled • john@gmail.com'
             : 'Auto-detect recurring bills & payments'
           }
         </Text>
       </View>
-      <Button
-        title={emailConnected ? (isSyncing ? 'Syncing...' : 'Sync') : 'Connect'}
-        onPress={emailConnected ? handleSyncEmail : handleConnectEmail}
-        loading={isSyncing}
-        variant="outline"
-        style={styles.emailBannerButton}
-        textStyle={{ color: 'white', fontSize: 14 }}
-      />
-    </View>
-  );
-
-  const renderStatsCards = () => (
-    <View style={styles.statsContainer}>
       <TouchableOpacity
-        style={[styles.statCard, { backgroundColor: theme.colors.surface }]}
-        onPress={() => setShowStatsModal(true)}
+        style={styles.connectBtn}
+        onPress={() => setEmailConnected(!emailConnected)}
       >
-        <Text style={[styles.statValue, { color: theme.colors.primary }]}>
-          {stats.upcomingCount}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-          Upcoming
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.statCard, { backgroundColor: theme.colors.surface }]}
-        onPress={() => setShowStatsModal(true)}
-      >
-        <Text style={[styles.statValue, { color: theme.colors.error }]}>
-          {stats.overdueCount}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-          Overdue
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.statCard, { backgroundColor: theme.colors.surface }]}
-        onPress={() => setShowStatsModal(true)}
-      >
-        <Text style={[styles.statValue, { color: theme.colors.success }]} numberOfLines={1}>
-          {stats.totalDue}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-          Total Due
+        <Text style={styles.connectBtnText}>
+          {emailConnected ? 'Disconnect' : 'Connect'}
         </Text>
       </TouchableOpacity>
     </View>
   );
 
   const renderTabs = () => (
-    <View style={[styles.tabsContainer, { backgroundColor: theme.colors.surface }]}>
+    <View style={[styles.tabsContainer, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
       {tabs.map((tab) => (
         <TouchableOpacity
           key={tab.key}
           style={[
             styles.tab,
-            activeTab === tab.key && styles.activeTab,
-            { borderBottomColor: activeTab === tab.key ? tab.color : 'transparent' }
+            activeTab === tab.key && [styles.activeTab, { borderBottomColor: tab.color }]
           ]}
-          onPress={() => setActiveTab(tab.key)}
+          onPress={() => handleTabChange(tab.key)}
         >
           <Text style={[
             styles.tabText,
@@ -360,7 +476,7 @@ export default function RemindersScreen() {
             {tab.title}
           </Text>
           {tab.count > 0 && (
-            <View style={[styles.tabBadge, { backgroundColor: tab.color }]}>
+            <View style={[styles.tabBadge, { backgroundColor: theme.colors.error }]}>
               <Text style={styles.tabBadgeText}>{tab.count}</Text>
             </View>
           )}
@@ -396,7 +512,7 @@ export default function RemindersScreen() {
               <Text style={[styles.reminderTitle, { color: theme.colors.text }]}>
                 {reminder.title}
               </Text>
-              <Text style={[styles.reminderCategory, { color: theme.colors.textSecondary }]}>
+              <Text style={[styles.reminderCategory, { color: theme.colors.textSecondary, backgroundColor: theme.colors.background }]}>
                 {reminder.category}
               </Text>
             </View>
@@ -430,30 +546,133 @@ export default function RemindersScreen() {
             )}
           </View>
 
-          {reminder.status !== 'paid' && (
-            <View style={styles.reminderActions}>
+          <View style={styles.reminderActions}>
+            {reminder.status !== 'paid' && (
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
                 onPress={() => handleMarkAsPaid(reminder)}
               >
                 <Text style={styles.actionButtonText}>Mark Paid</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.secondaryButton, { borderColor: theme.colors.border }]}
-                onPress={() => handleEditReminder(reminder)}
-              >
-                <Ionicons name="create-outline" size={16} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.secondaryButton, { borderColor: theme.colors.border }]}
-                onPress={() => handleDeleteReminder(reminder)}
-              >
-                <Ionicons name="trash-outline" size={16} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          )}
+            )}
+            
+            <TouchableOpacity
+              style={[styles.actionButton, styles.secondaryButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+              onPress={() => handleEditReminder(reminder)}
+            >
+              <Ionicons name="create-outline" size={16} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.actionButton, styles.secondaryButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+              onPress={() => handleDeleteReminder(reminder)}
+            >
+              <Ionicons name="trash-outline" size={16} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
+    );
+  };
+
+  const renderCalendarView = () => {
+    const calendarDays = getCalendarDays();
+    const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    return (
+      <View style={styles.calendarContainer}>
+        {/* Calendar Header */}
+        <View style={styles.calendarHeader}>
+          <TouchableOpacity
+            style={styles.calendarNav}
+            onPress={() => {
+              const newMonth = new Date(currentMonth);
+              newMonth.setMonth(newMonth.getMonth() - 1);
+              setCurrentMonth(newMonth);
+            }}
+          >
+            <Ionicons name="chevron-back" size={24} color={theme.colors.primary} />
+          </TouchableOpacity>
+          
+          <Text style={[styles.calendarMonth, { color: theme.colors.text }]}>
+            {monthName}
+          </Text>
+          
+          <TouchableOpacity
+            style={styles.calendarNav}
+            onPress={() => {
+              const newMonth = new Date(currentMonth);
+              newMonth.setMonth(newMonth.getMonth() + 1);
+              setCurrentMonth(newMonth);
+            }}
+          >
+            <Ionicons name="chevron-forward" size={24} color={theme.colors.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Days of Week */}
+        <View style={styles.calendarGrid}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+            <View key={`day-header-${index}`} style={styles.calendarDayHeader}>
+              <Text style={[styles.calendarDayHeaderText, { color: theme.colors.textSecondary }]}>
+                {day.charAt(0)}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Calendar Days */}
+        <View style={styles.calendarGrid}>
+          {calendarDays.map((date, index) => {
+            const dayReminders = getRemindersForDate(date);
+            const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
+            const isTodayDate = isToday(date);
+
+            return (
+              <TouchableOpacity
+                key={`calendar-day-${index}-${date.getTime()}`}
+                style={[
+                  styles.calendarDay,
+                  isTodayDate && [styles.calendarDayToday, { backgroundColor: theme.colors.primary }],
+                  !isCurrentMonth && styles.calendarDayOtherMonth
+                ]}
+                onPress={() => {
+                  if (dayReminders.length > 0) {
+                    Alert.alert(
+                      `Reminders for ${date.toLocaleDateString()}`,
+                      dayReminders.map(r => `• ${r.title} - ${formatCurrency(r.amount, user?.currency || 'USD')}`).join('\n')
+                    );
+                  }
+                }}
+              >
+                <Text style={[
+                  styles.calendarDayText,
+                  { color: isTodayDate ? 'white' : isCurrentMonth ? theme.colors.text : theme.colors.textSecondary }
+                ]}>
+                  {date.getDate()}
+                </Text>
+                {dayReminders.length > 0 && (
+                  <View style={[styles.calendarDayIndicator, { backgroundColor: theme.colors.error }]} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Today's Reminders */}
+        <View style={[styles.todayReminders, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.todayRemindersTitle, { color: theme.colors.text }]}>
+            Today's Reminders
+          </Text>
+          {getRemindersForDate(new Date()).length === 0 ? (
+            <Text style={[styles.noRemindersText, { color: theme.colors.textSecondary }]}>
+              No reminders for today 🎉
+            </Text>
+          ) : (
+            getRemindersForDate(new Date()).map(renderReminderCard)
+          )}
+        </View>
+      </View>
     );
   };
 
@@ -482,17 +701,10 @@ export default function RemindersScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-          Reminders
-        </Text>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
-          onPress={() => setShowAddModal(true)}
-        >
-          <Ionicons name="add" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
+      {renderHeader()}
+
+      {/* Tabs */}
+      {renderTabs()}
 
       <ScrollView
         style={styles.content}
@@ -504,71 +716,67 @@ export default function RemindersScreen() {
         {/* Email Connection Banner */}
         {renderEmailBanner()}
 
-        {/* Stats Cards */}
-        {renderStatsCards()}
+        {/* Search - Only show in list view */}
+        {viewMode === 'list' && (
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={[
+                styles.searchInput,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                }
+              ]}
+              placeholder="Search reminders..."
+              placeholderTextColor={theme.colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            <Ionicons 
+              name="search-outline" 
+              size={20} 
+              color={theme.colors.textSecondary} 
+              style={styles.searchIcon}
+            />
+          </View>
+        )}
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={[
-              styles.searchInput,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                color: theme.colors.text,
-              }
-            ]}
-            placeholder="Search reminders..."
-            placeholderTextColor={theme.colors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          <Ionicons 
-            name="search-outline" 
-            size={20} 
-            color={theme.colors.textSecondary} 
-            style={styles.searchIcon}
-          />
-        </View>
-
-        {/* Tabs */}
-        {renderTabs()}
-
-        {/* Reminders List */}
-        <View style={styles.remindersContainer}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
-                Loading reminders...
-              </Text>
-            </View>
-          ) : filteredReminders.length === 0 ? (
-            renderEmptyState()
-          ) : (
-            filteredReminders.map(renderReminderCard)
-          )}
-        </View>
+        {/* Content based on view mode */}
+        {viewMode === 'calendar' ? (
+          renderCalendarView()
+        ) : (
+          <View style={styles.remindersContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+                  Loading reminders...
+                </Text>
+              </View>
+            ) : filteredReminders.length === 0 ? (
+              renderEmptyState()
+            ) : (
+              filteredReminders.map(renderReminderCard)
+            )}
+          </View>
+        )}
       </ScrollView>
 
-      {/* Add Reminder Modal */}
+      {/* FAB */}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        onPress={() => setShowAddModal(true)}
+      >
+        <Ionicons name="add" size={28} color="white" />
+      </TouchableOpacity>
+
+      {/* Modals */}
       <AddReminderModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
         onReminderAdded={loadReminders}
       />
 
-      {/* Edit Reminder Modal */}
-      <EditReminderModal
-        visible={showEditModal}
-        reminder={selectedReminder}
-        onClose={() => {
-          setShowEditModal(false);
-          setSelectedReminder(null);
-        }}
-        onReminderUpdated={loadReminders}
-      />
-
-      {/* Reminder Details Modal */}
       <ReminderDetailsModal
         visible={showDetailsModal}
         reminder={selectedReminder}
@@ -579,7 +787,20 @@ export default function RemindersScreen() {
         onReminderUpdated={loadReminders}
       />
 
-      {/* Stats Modal */}
+      <EditReminderModal
+        visible={showEditModal}
+        reminder={selectedReminder}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedReminder(null);
+        }}
+        onReminderUpdated={() => {
+          loadReminders();
+          setShowEditModal(false);
+          setSelectedReminder(null);
+        }}
+      />
+
       <ReminderStatsModal
         visible={showStatsModal}
         onClose={() => setShowStatsModal(false)}
@@ -588,38 +809,133 @@ export default function RemindersScreen() {
   );
 }
 
+// ...existing styles...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   header: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    marginBottom: 24,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+  syncButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  syncButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  statCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    padding: 4,
+    gap: 4,
+  },
+  viewButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    gap: 6,
+  },
+  activeViewButton: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  viewButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTab: {
+    borderBottomWidth: 3,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  tabBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   content: {
     flex: 1,
   },
   emailBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 24,
+    marginHorizontal: 20,
+    marginTop: 20,
     marginBottom: 20,
     padding: 16,
     borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   emailBannerText: {
@@ -635,20 +951,22 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 14,
   },
-  emailBannerButton: {
+  connectBtn: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 6,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    paddingVertical: 10,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    marginBottom: 20,
-    gap: 12,
+  connectBtnText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '700',
   },
   searchContainer: {
     position: 'relative',
-    marginHorizontal: 24,
+    marginHorizontal: 20,
     marginBottom: 20,
   },
   searchInput: {
@@ -663,64 +981,14 @@ const styles = StyleSheet.create({
     left: 16,
     top: 14,
   },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 24,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  tabBadge: {
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  tabBadgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
   remindersContainer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     paddingBottom: 100,
   },
   reminderCard: {
     borderRadius: 12,
-    padding: 16,
+    padding: 18,
     marginBottom: 12,
     borderLeftWidth: 4,
     borderWidth: 1,
@@ -729,7 +997,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   reminderTitleSection: {
     flexDirection: 'row',
@@ -750,15 +1018,19 @@ const styles = StyleSheet.create({
   reminderTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   reminderCategory: {
     fontSize: 12,
     textTransform: 'capitalize',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   reminderAmount: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
   reminderDetails: {
     flexDirection: 'row',
@@ -782,7 +1054,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderRadius: 6,
   },
   secondaryButton: {
@@ -792,25 +1064,103 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  calendarContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  calendarNav: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  calendarMonth: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calendarDayHeader: {
+    width: '14.28%',
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calendarDayHeaderText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  calendarDay: {
+    width: '14.28%',
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    marginBottom: 4,
+    position: 'relative',
+  },
+  calendarDayToday: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  calendarDayOtherMonth: {
+    opacity: 0.3,
+  },
+  calendarDayText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  calendarDayIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  todayReminders: {
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 12,
+  },
+  todayRemindersTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    marginBottom: 12,
+  },
+  noRemindersText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
+    paddingVertical: 40,
+    paddingHorizontal: 20,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     marginTop: 16,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 20,
     marginBottom: 24,
   },
   emptyButton: {
@@ -822,5 +1172,23 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 25,
+    elevation: 8,
   },
 });

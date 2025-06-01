@@ -109,14 +109,14 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
     try {
       await RemindersService.createReminder(user?.id || '', {
         title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
+        description: formData.description.trim() || '',
         amount: parseFloat(formData.amount),
         currency: user?.currency || 'USD',
         category: formData.category,
         dueDate: formData.dueDate,
         status: 'upcoming',
         isRecurring: formData.isRecurring,
-        recurringType: formData.isRecurring ? formData.recurringType : undefined,
+        ...(formData.isRecurring && { recurringType: formData.recurringType }), // Only include if recurring
         reminderDays: formData.reminderDays,
         notificationEnabled: true,
         autoDetected: false,

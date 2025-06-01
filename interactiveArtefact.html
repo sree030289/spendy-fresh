@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spendy Reminders - Interactive Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #111827;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .phone-container {
+            width: 375px;
+            height: 812px;
+            margin: 20px auto;
+            background: #111827;
+            border-radius: 40px;
+            border: 8px solid #374151;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .screen {
+            width: 100%;
+            height: 100%;
+            background: #111827;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #1F2937;
+            padding: 60px 24px 20px 24px;
+            border-bottom: 1px solid #374151;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .sync-btn {
+            background: #00C805;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            color: #000000;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(0, 200, 5, 0.2);
+        }
+
+        .sync-btn:hover {
+            background: #00E005;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 200, 5, 0.3);
+        }
+
+        .sync-btn.syncing {
+            background: #6B7280;
+            pointer-events: none;
+        }
+
+        .sync-btn.syncing::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 4px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: #374151;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 800;
+            color: #00C805;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #9CA3AF;
+            font-weight: 500;
+        }
+
+        .view-toggle {
+            display: flex;
+            background: #374151;
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .view-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            padding: 8px;
+            color: #9CA3AF;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-btn.active {
+            background: #00C805;
+            color: #000000;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(0, 200, 5, 0.25);
+        }
+
+        .tabs {
+            display: flex;
+            background: #1F2937;
+            border-bottom: 1px solid #374151;
+        }
+
+        .tab {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 16px;
+            color: #9CA3AF;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .tab.active {
+            color: #00C805;
+            border-bottom-color: #00C805;
+            font-weight: 700;
+        }
+
+        .tab-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #EF4444;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            background: #374151;
+            border: 1px solid #4B5563;
+            border-radius: 12px;
+            padding: 12px 16px 12px 40px;
+            color: white;
+            font-size: 16px;
+        }
+
+        .search-input::placeholder {
+            color: #9CA3AF;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9CA3AF;
+        }
+
+        .reminder-card {
+            background: #1F2937;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 12px;
+            border-left: 4px solid #00C805;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid #374151;
+        }
+
+        .reminder-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 200, 5, 0.15);
+            border-color: #00C805;
+        }
+
+        .reminder-card.overdue {
+            border-left-color: #EF4444;
+        }
+
+        .reminder-card.paid {
+            border-left-color: #6B7280;
+            opacity: 0.7;
+        }
+
+        .reminder-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .reminder-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .reminder-amount {
+            font-size: 18px;
+            font-weight: 800;
+            color: #00C805;
+        }
+
+        .reminder-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .reminder-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .reminder-date {
+            font-size: 14px;
+            color: #9CA3AF;
+        }
+
+        .reminder-category {
+            font-size: 12px;
+            color: #6B7280;
+            background: #374151;
+            padding: 2px 8px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+
+        .reminder-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            background: #00C805;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 14px;
+            color: #000000;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0, 200, 5, 0.2);
+        }
+
+        .action-btn:hover {
+            background: #00E005;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0, 200, 5, 0.3);
+        }
+
+        .action-btn.secondary {
+            background: #374151;
+            color: #9CA3AF;
+        }
+
+        .action-btn.secondary:hover {
+            background: #4B5563;
+        }
+
+        .fab {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            width: 60px;
+            height: 60px;
+            background: #00C805;
+            border: none;
+            border-radius: 50%;
+            color: #000000;
+            font-size: 28px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(0, 200, 5, 0.4);
+            transition: all 0.15s ease;
+        }
+
+        .fab:hover {
+            transform: scale(1.1);
+            background: #00E005;
+            box-shadow: 0 12px 35px rgba(0, 200, 5, 0.5);
+        }
+
+        .calendar-view {
+            display: none;
+        }
+
+        .calendar-view.active {
+            display: block;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-month {
+            font-size: 20px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .calendar-nav {
+            background: none;
+            border: none;
+            color: #00C805;
+            font-size: 24px;
+            font-weight: 700;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: all 0.15s ease;
+        }
+
+        .calendar-nav:hover {
+            background: rgba(0, 200, 5, 0.1);
+            color: #00E005;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .calendar-day:hover {
+            background: #374151;
+        }
+
+        .calendar-day.today {
+            background: #00C805;
+            color: #000000;
+            font-weight: 800;
+            box-shadow: 0 2px 8px rgba(0, 200, 5, 0.3);
+        }
+
+        .calendar-day.has-reminder::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 6px;
+            height: 6px;
+            background: #EF4444;
+            border-radius: 50%;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #00C805;
+            color: #000000;
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: 0 8px 25px rgba(0, 200, 5, 0.4);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .gmail-banner {
+            background: linear-gradient(135deg, #4285f4, #34a853);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .gmail-banner.connected {
+            background: linear-gradient(135deg, #00C805, #00A004);
+        }
+
+        .gmail-icon {
+            font-size: 24px;
+        }
+
+        .gmail-text {
+            flex: 1;
+        }
+
+        .gmail-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .gmail-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .connect-btn {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            padding: 10px 16px;
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .connect-btn:hover {
+            background: rgba(255,255,255,0.25);
+            transform: translateY(-1px);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            color: #6B7280;
+            margin-bottom: 16px;
+        }
+
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .empty-subtitle {
+            font-size: 14px;
+            color: #9CA3AF;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <div class="screen">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-top">
+                    <h1 class="header-title">Reminders</h1>
+                    <button class="sync-btn" onclick="syncGmail()">
+                        <span>📧</span>
+                        <span id="sync-text">Sync</span>
+                    </button>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-value" id="upcoming-count">5</div>
+                        <div class="stat-label">Upcoming</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="overdue-count">2</div>
+                        <div class="stat-label">Overdue</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-amount">$1,247</div>
+                        <div class="stat-label">Total Due</div>
+                    </div>
+                </div>
+
+                <!-- View Toggle -->
+                <div class="view-toggle">
+                    <button class="view-btn active" onclick="switchView('list')">📋 List</button>
+                    <button class="view-btn" onclick="switchView('calendar')">📅 Calendar</button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('upcoming')">
+                    Upcoming
+                    <span class="tab-badge">5</span>
+                </button>
+                <button class="tab" onclick="switchTab('overdue')">
+                    Overdue
+                    <span class="tab-badge">2</span>
+                </button>
+                <button class="tab" onclick="switchTab('paid')">Paid</button>
+            </div>
+
+            <!-- Content -->
+            <div class="content">
+                <!-- Gmail Banner -->
+                <div class="gmail-banner" id="gmail-banner">
+                    <div class="gmail-icon">📧</div>
+                    <div class="gmail-text">
+                        <div class="gmail-title">Connect Gmail</div>
+                        <div class="gmail-subtitle">Auto-detect recurring bills & payments</div>
+                    </div>
+                    <button class="connect-btn" onclick="connectGmail()">Connect</button>
+                </div>
+
+                <!-- Search -->
+                <div class="search-container">
+                    <input type="text" class="search-input" placeholder="Search reminders..." oninput="searchReminders(this.value)">
+                    <div class="search-icon">🔍</div>
+                </div>
+
+                <!-- List View -->
+                <div id="list-view">
+                    <!-- Upcoming Reminders -->
+                    <div id="upcoming-reminders">
+                        <div class="reminder-card" onclick="showReminderActions(this)">
+                            <div class="reminder-header">
+                                <div>
+                                    <div class="reminder-title">Netflix Subscription</div>
+                                    <div class="reminder-category">Entertainment</div>
+                                </div>
+                                <div class="reminder-amount">$15.99</div>
+                            </div>
+                            <div class="reminder-details">
+                                <div class="reminder-info">
+                                    <div class="reminder-date">Due: Dec 15, 2024</div>
+                                </div>
+                                <div class="reminder-actions">
+                                    <button class="action-btn" onclick="markAsPaid(this)">Mark Paid</button>
+                                    <button class="action-btn secondary" onclick="editReminder(this)">Edit</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="reminder-card" onclick="showReminderActions(this)">
+                            <div class="reminder-header">
+                                <div>
+                                    <div class="reminder-title">Electricity Bill</div>
+                                    <div class="reminder-category">Utilities</div>
+                                </div>
+                                <div class="reminder-amount">$127.45</div>
+                            </div>
+                            <div class="reminder-details">
+                                <div class="reminder-info">
+                                    <div class="reminder-date">Due: Dec 18, 2024</div>
+                                </div>
+                                <div class="reminder-actions">
+                                    <button class="action-btn" onclick="markAsPaid(this)">Mark Paid</button>
+                                    <button class="action-btn secondary" onclick="editReminder(this)">Edit</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="reminder-card overdue" onclick="showReminderActions(this)">
+                            <div class="reminder-header">
+                                <div>
+                                    <div class="reminder-title">Credit Card Payment</div>
+                                    <div class="reminder-category">Finance</div>
+                                </div>
+                                <div class="reminder-amount">$450.00</div>
+                            </div>
+                            <div class="reminder-details">
+                                <div class="reminder-info">
+                                    <div class="reminder-date" style="color: #EF4444;">Overdue: Dec 10, 2024</div>
+                                </div>
+                                <div class="reminder-actions">
+                                    <button class="action-btn" onclick="markAsPaid(this)">Mark Paid</button>
+                                    <button class="action-btn secondary" onclick="editReminder(this)">Edit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Overdue Reminders (hidden by default) -->
+                    <div id="overdue-reminders" style="display: none;">
+                        <div class="reminder-card overdue">
+                            <div class="reminder-header">
+                                <div>
+                                    <div class="reminder-title">Credit Card Payment</div>
+                                    <div class="reminder-category">Finance</div>
+                                </div>
+                                <div class="reminder-amount">$450.00</div>
+                            </div>
+                            <div class="reminder-details">
+                                <div class="reminder-info">
+                                    <div class="reminder-date" style="color: #EF4444;">Overdue: Dec 10, 2024</div>
+                                </div>
+                                <div class="reminder-actions">
+                                    <button class="action-btn" onclick="markAsPaid(this)">Mark Paid</button>
+                                    <button class="action-btn secondary" onclick="editReminder(this)">Edit</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="reminder-card overdue">
+                            <div class="reminder-header">
+                                <div>
+                                    <div class="reminder-title">Internet Bill</div>
+                                    <div class="reminder-category">Utilities</div>
+                                </div>
+                                <div class="reminder-amount">$89.99</div>
+                            </div>
+                            <div class="reminder-details">
+                                <div class="reminder-info">
+                                    <div class="reminder-date" style="color: #EF4444;">Overdue: Dec 12, 2024</div>
+                                </div>
+                                <div class="reminder-actions">
+                                    <button class="action-btn" onclick="markAsPaid(this)">Mark Paid</button>
+                                    <button class="action-btn secondary" onclick="editReminder(this)">Edit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Paid Reminders (hidden by default) -->
+                    <div id="paid-reminders" style="display: none;">
+                        <div class="reminder-card paid">
+                            <div class="reminder-header">
+                                <div>
+                                    <div class="reminder-title">Spotify Premium</div>
+                                    <div class="reminder-category">Entertainment</div>
+                                </div>
+                                <div class="reminder-amount">$9.99</div>
+                            </div>
+                            <div class="reminder-details">
+                                <div class="reminder-info">
+                                    <div class="reminder-date">Paid: Dec 8, 2024</div>
+                                </div>
+                                <div class="reminder-actions">
+                                    <button class="action-btn secondary" onclick="viewReceipt(this)">Receipt</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calendar View -->
+                <div id="calendar-view" class="calendar-view">
+                    <div class="calendar-header">
+                        <button class="calendar-nav" onclick="previousMonth()">‹</button>
+                        <div class="calendar-month">December 2024</div>
+                        <button class="calendar-nav" onclick="nextMonth()">›</button>
+                    </div>
+                    
+                    <div class="calendar-grid">
+                        <div class="calendar-day" style="color: #6B7280;">S</div>
+                        <div class="calendar-day" style="color: #6B7280;">M</div>
+                        <div class="calendar-day" style="color: #6B7280;">T</div>
+                        <div class="calendar-day" style="color: #6B7280;">W</div>
+                        <div class="calendar-day" style="color: #6B7280;">T</div>
+                        <div class="calendar-day" style="color: #6B7280;">F</div>
+                        <div class="calendar-day" style="color: #6B7280;">S</div>
+                        
+                        <div class="calendar-day">1</div>
+                        <div class="calendar-day">2</div>
+                        <div class="calendar-day">3</div>
+                        <div class="calendar-day">4</div>
+                        <div class="calendar-day">5</div>
+                        <div class="calendar-day">6</div>
+                        <div class="calendar-day">7</div>
+                        <div class="calendar-day">8</div>
+                        <div class="calendar-day">9</div>
+                        <div class="calendar-day has-reminder">10</div>
+                        <div class="calendar-day">11</div>
+                        <div class="calendar-day has-reminder">12</div>
+                        <div class="calendar-day today">13</div>
+                        <div class="calendar-day">14</div>
+                        <div class="calendar-day has-reminder">15</div>
+                        <div class="calendar-day">16</div>
+                        <div class="calendar-day">17</div>
+                        <div class="calendar-day has-reminder">18</div>
+                        <div class="calendar-day">19</div>
+                        <div class="calendar-day">20</div>
+                        <div class="calendar-day">21</div>
+                        <div class="calendar-day">22</div>
+                        <div class="calendar-day">23</div>
+                        <div class="calendar-day">24</div>
+                        <div class="calendar-day">25</div>
+                        <div class="calendar-day">26</div>
+                        <div class="calendar-day">27</div>
+                        <div class="calendar-day">28</div>
+                        <div class="calendar-day">29</div>
+                        <div class="calendar-day">30</div>
+                        <div class="calendar-day">31</div>
+                    </div>
+
+                    <div class="reminder-card">
+                        <div class="reminder-header">
+                            <div>
+                                <div class="reminder-title">Today's Reminders</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 12px;">
+                            <div style="font-size: 14px; color: #9CA3AF; margin-bottom: 8px;">No reminders for today 🎉</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FAB -->
+            <button class="fab" onclick="addReminder()">+</button>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification"></div>
+
+    <script>
+        let currentTab = 'upcoming';
+        let currentView = 'list';
+        let gmailConnected = false;
+
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Show/hide reminder sections
+            document.getElementById('upcoming-reminders').style.display = tab === 'upcoming' ? 'block' : 'none';
+            document.getElementById('overdue-reminders').style.display = tab === 'overdue' ? 'block' : 'none';
+            document.getElementById('paid-reminders').style.display = tab === 'paid' ? 'block' : 'none';
+        }
+
+        function switchView(view) {
+            currentView = view;
+            
+            // Update view buttons
+            document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Show/hide views
+            document.getElementById('list-view').style.display = view === 'list' ? 'block' : 'none';
+            document.getElementById('calendar-view').classList.toggle('active', view === 'calendar');
+        }
+
+        function connectGmail() {
+            const banner = document.getElementById('gmail-banner');
+            const syncBtn = document.querySelector('.sync-btn');
+            
+            banner.innerHTML = `
+                <div class="gmail-icon">📧</div>
+                <div class="gmail-text">
+                    <div class="gmail-title">Connecting...</div>
+                    <div class="gmail-subtitle">Please wait...</div>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                gmailConnected = true;
+                banner.classList.add('connected');
+                banner.innerHTML = `
+                    <div class="gmail-icon">✅</div>
+                    <div class="gmail-text">
+                        <div class="gmail-title">Gmail Connected</div>
+                        <div class="gmail-subtitle">Auto-sync enabled • john@gmail.com</div>
+                    </div>
+                    <button class="connect-btn" onclick="disconnectGmail()">Disconnect</button>
+                `;
+                
+                showNotification('Gmail connected successfully!');
+                
+                // Auto-sync after connection
+                setTimeout(() => syncGmail(), 1000);
+            }, 2000);
+        }
+
+        function disconnectGmail() {
+            gmailConnected = false;
+            const banner = document.getElementById('gmail-banner');
+            banner.classList.remove('connected');
+            banner.innerHTML = `
+                <div class="gmail-icon">📧</div>
+                <div class="gmail-text">
+                    <div class="gmail-title">Connect Gmail</div>
+                    <div class="gmail-subtitle">Auto-detect recurring bills & payments</div>
+                </div>
+                <button class="connect-btn" onclick="connectGmail()">Connect</button>
+            `;
+            showNotification('Gmail disconnected');
+        }
+
+        function syncGmail() {
+            if (!gmailConnected) {
+                showNotification('Please connect Gmail first');
+                return;
+            }
+
+            const syncBtn = document.querySelector('.sync-btn');
+            const syncText = document.getElementById('sync-text');
+            
+            syncBtn.classList.add('syncing');
+            syncText.textContent = 'Syncing...';
+            
+            setTimeout(() => {
+                syncBtn.classList.remove('syncing');
+                syncText.textContent = 'Sync';
+                
+                // Simulate finding new bills and payments
+                showNotification('Sync complete! Found 2 new bills, marked 1 as paid');
+                
+                // Update stats
+                document.getElementById('upcoming-count').textContent = '6';
+                document.getElementById('total-amount').textContent = '$1,347';
+            }, 3000);
+        }
+
+        function markAsPaid(element) {
+            const card = element.closest('.reminder-card');
+            card.classList.add('paid');
+            card.classList.remove('overdue');
+            
+            // Update the date
+            const dateElement = card.querySelector('.reminder-date');
+            dateElement.textContent = 'Paid: Dec 13, 2024';
+            dateElement.style.color = '#10B981';
+            
+            // Update actions
+            const actions = card.querySelector('.reminder-actions');
+            actions.innerHTML = '<button class="action-btn secondary" onclick="viewReceipt(this)">Receipt</button>';
+            
+            showNotification('Payment marked as paid!');
+            
+            // Update stats
+            const upcomingCount = parseInt(document.getElementById('upcoming-count').textContent);
+            document.getElementById('upcoming-count').textContent = (upcomingCount - 1).toString();
+            
+            const overdueCount = parseInt(document.getElementById('overdue-count').textContent);
+            if (card.classList.contains('overdue')) {
+                document.getElementById('overdue-count').textContent = Math.max(0, overdueCount - 1).toString();
+            }
+        }
+
+        function editReminder(element) {
+            showNotification('Edit reminder feature coming soon!');
+        }
+
+        function viewReceipt(element) {
+            showNotification('Receipt viewer coming soon!');
+        }
+
+        function addReminder() {
+            showNotification('Add reminder feature coming soon!');
+        }
+
+        function searchReminders(query) {
+            const cards = document.querySelectorAll('.reminder-card');
+            cards.forEach(card => {
+                const title = card.querySelector('.reminder-title').textContent.toLowerCase();
+                const category = card.querySelector('.reminder-category').textContent.toLowerCase();
+                const isVisible = title.includes(query.toLowerCase()) || category.includes(query.toLowerCase());
+                card.style.display = isVisible ? 'block' : 'none';
+            });
+        }
+
+        function showReminderActions(element) {
+            // Add visual feedback when clicking a reminder
+            element.style.transform = 'scale(0.98)';
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+            }, 150);
+        }
+
+        function previousMonth() {
+            document.querySelector('.calendar-month').textContent = 'November 2024';
+            showNotification('Switched to November 2024');
+        }
+
+        function nextMonth() {
+            document.querySelector('.calendar-month').textContent = 'January 2025';
+            showNotification('Switched to January 2025');
+        }
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Auto-demo functionality
+        function startDemo() {
+            setTimeout(() => {
+                showNotification('Welcome to Spendy Reminders! 🎉');
+            }, 1000);
+            
+            setTimeout(() => {
+                showNotification('Try connecting Gmail to auto-detect bills!');
+            }, 4000);
+            
+            setTimeout(() => {
+                showNotification('Click on any reminder to see actions');
+            }, 7000);
+        }
+
+        // Initialize demo
+        startDemo();
+
+        // Add hover effects for calendar days
+        document.querySelectorAll('.calendar-day').forEach(day => {
+            if (day.classList.contains('has-reminder')) {
+                day.addEventListener('click', () => {
+                    showNotification(`Reminder on ${day.textContent}: Netflix Subscription - $15.99`);
+                });
+            }
+        });
+
+        // Add click handler for today
+        document.querySelector('.calendar-day.today').addEventListener('click', () => {
+            showNotification('Today: No reminders scheduled 🎉');
+        });
+    </script>
+</body>
+</html>
