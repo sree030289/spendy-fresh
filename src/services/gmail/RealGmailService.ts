@@ -39,8 +39,8 @@ const STORAGE_KEYS = {
 
 // Gmail API Configuration
 const GMAIL_CONFIG: GmailConfig = {
-  clientId: '886487256037-ckipi085tqncafi7vql1tbao21h7aj3t.apps.googleusercontent.com',
-  clientSecret: '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',
+  clientId: '',//'886487256037-ckipi085tqncafi7vql1tbao21h7aj3t.apps.googleusercontent.com',
+  clientSecret: '',//'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',
   // This is the URI that MUST be registered in Google Cloud Console
   // and is the URI Google will redirect TO.
   redirectUri: 'https://auth.expo.io/@sree030289/spendy', 
