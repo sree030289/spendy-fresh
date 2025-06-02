@@ -30,6 +30,37 @@ interface EditReminderModalProps {
   onReminderUpdated: () => void;
 }
 
+const CATEGORIES: Array<{ id: ReminderCategory; label: string; icon: string; color: string }> = [
+  { id: 'utilities', label: 'Utilities', icon: 'flash-outline', color: '#F59E0B' },
+  { id: 'entertainment', label: 'Entertainment', icon: 'play-outline', color: '#8B5CF6' },
+  { id: 'finance', label: 'Finance', icon: 'card-outline', color: '#EF4444' },
+  { id: 'insurance', label: 'Insurance', icon: 'shield-outline', color: '#10B981' },
+  { id: 'subscription', label: 'Subscription', icon: 'repeat-outline', color: '#3B82F6' },
+  { id: 'rent', label: 'Rent', icon: 'home-outline', color: '#F97316' },
+  { id: 'food', label: 'Food', icon: 'restaurant-outline', color: '#EC4899' },
+  { id: 'transport', label: 'Transport', icon: 'car-outline', color: '#06B6D4' },
+  { id: 'health', label: 'Health', icon: 'medical-outline', color: '#84CC16' },
+  { id: 'education', label: 'Education', icon: 'school-outline', color: '#6366F1' },
+  { id: 'shopping', label: 'Shopping', icon: 'bag-outline', color: '#F472B6' },
+  { id: 'other', label: 'Other', icon: 'ellipse-outline', color: '#6B7280' },
+];
+
+const RECURRING_OPTIONS: Array<{ id: RecurringType; label: string }> = [
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'biweekly', label: 'Bi-weekly' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'quarterly', label: 'Quarterly' },
+  { id: 'yearly', label: 'Yearly' },
+];
+
+const REMINDER_DAYS_OPTIONS = [
+  { value: 1, label: '1 day before' },
+  { value: 3, label: '3 days before' },
+  { value: 7, label: '1 week before' },
+  { value: 14, label: '2 weeks before' },
+  { value: 30, label: '1 month before' },
+];
+
 export default function EditReminderModal({ 
   visible, 
   reminder, 
@@ -52,54 +83,59 @@ export default function EditReminderModal({
     notificationEnabled: true,
     notes: '',
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  const [errors, setErrors] = useState({
+    title: '',
+    amount: '',
+    dueDate: '',
+  });
+
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showRecurringPicker, setShowRecurringPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showReminderDaysPicker, setShowReminderDaysPicker] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Simplify the useEffect and add dependency array to prevent unnecessary re-renders
+  // Initialize form data when reminder changes
   useEffect(() => {
-    if (visible && reminder) {
-      console.log('EditReminderModal: Initializing form data for reminder:', reminder.id);
+    if (reminder) {
       setFormData({
-        title: reminder.title || '',
+        title: reminder.title,
         description: reminder.description || '',
-        amount: reminder.amount?.toString() || '',
-        category: reminder.category || 'utilities',
-        dueDate: reminder.dueDate ? new Date(reminder.dueDate) : new Date(),
-        isRecurring: reminder.isRecurring || false,
+        amount: reminder.amount.toString(),
+        category: reminder.category,
+        dueDate: new Date(reminder.dueDate),
+        isRecurring: reminder.isRecurring,
         recurringType: reminder.recurringType || 'monthly',
         reminderDays: reminder.reminderDays || [1, 3],
-        notificationEnabled: reminder.notificationEnabled !== false,
+        notificationEnabled: reminder.notificationEnabled ?? true,
         notes: reminder.notes || '',
       });
-      setErrors({});
       setHasChanges(false);
     }
-  }, [visible, reminder?.id]); // Only depend on visible and reminder.id to prevent excessive re-renders
+  }, [reminder]);
 
-  // Reset form when modal is closed
+  // Track changes
   useEffect(() => {
-    if (!visible) {
-      setErrors({});
-      setHasChanges(false);
-      setLoading(false);
+    if (reminder) {
+      const hasFormChanges = 
+        formData.title !== reminder.title ||
+        formData.description !== (reminder.description || '') ||
+        formData.amount !== reminder.amount.toString() ||
+        formData.category !== reminder.category ||
+        formData.dueDate.getTime() !== new Date(reminder.dueDate).getTime() ||
+        formData.isRecurring !== reminder.isRecurring ||
+        formData.recurringType !== (reminder.recurringType || 'monthly') ||
+        JSON.stringify(formData.reminderDays) !== JSON.stringify(reminder.reminderDays || [1, 3]) ||
+        formData.notificationEnabled !== (reminder.notificationEnabled ?? true) ||
+        formData.notes !== (reminder.notes || '');
+      
+      setHasChanges(hasFormChanges);
     }
-  }, [visible]);
-
-  // Early return with proper Modal structure to prevent React warning
-  if (!reminder) {
-    return (
-      <Modal
-        visible={false}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <View />
-      </Modal>
-    );
-  }
+  }, [formData, reminder]);
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+    const newErrors = { title: '', amount: '', dueDate: '' };
     let isValid = true;
 
     if (!formData.title.trim()) {
@@ -107,8 +143,9 @@ export default function EditReminderModal({
       isValid = false;
     }
 
-    if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      newErrors.amount = 'Valid amount is required';
+    const amount = parseFloat(formData.amount);
+    if (!formData.amount || isNaN(amount) || amount <= 0) {
+      newErrors.amount = 'Please enter a valid amount';
       isValid = false;
     }
 
@@ -133,442 +170,608 @@ export default function EditReminderModal({
     try {
       const updates: Partial<Reminder> = {
         title: formData.title.trim(),
-        description: formData.description.trim() || '',
+        description: formData.description.trim() || undefined,
         amount: parseFloat(formData.amount),
         category: formData.category,
         dueDate: formData.dueDate,
         isRecurring: formData.isRecurring,
-        ...(formData.isRecurring && { recurringType: formData.recurringType }),
+        recurringType: formData.isRecurring ? formData.recurringType : undefined,
         reminderDays: formData.reminderDays,
         notificationEnabled: formData.notificationEnabled,
-        notes: formData.notes.trim() || '',
+        notes: formData.notes.trim() || undefined,
       };
 
       await RemindersService.updateReminder(reminder.id, updates);
-      onReminderUpdated();
+
       Alert.alert('Success', 'Reminder updated successfully!');
+      onReminderUpdated();
+      onClose();
     } catch (error) {
-      console.error('Failed to update reminder:', error);
       Alert.alert('Error', 'Failed to update reminder. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Your form change handlers...
-  const handleFormChange = (field: string, value: any) => {
-    setFormData(prev => {
-      const newData = { ...prev, [field]: value };
-      
-      // Check if there are changes compared to original reminder
-      const hasChanged = 
-        newData.title !== (reminder?.title || '') ||
-        newData.description !== (reminder?.description || '') ||
-        parseFloat(newData.amount) !== (reminder?.amount || 0) ||
-        newData.category !== (reminder?.category || 'utilities') ||
-        newData.dueDate.getTime() !== new Date(reminder?.dueDate || new Date()).getTime() ||
-        newData.isRecurring !== (reminder?.isRecurring || false) ||
-        newData.recurringType !== (reminder?.recurringType || 'monthly') ||
-        JSON.stringify(newData.reminderDays) !== JSON.stringify(reminder?.reminderDays || [1, 3]) ||
-        newData.notificationEnabled !== (reminder?.notificationEnabled !== false) ||
-        newData.notes !== (reminder?.notes || '');
-      
-      setHasChanges(hasChanged);
-      
-      return newData;
-    });
-    
-    // Clear error for this field
-    if (errors[field]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
+  const handleDiscard = () => {
+    if (hasChanges) {
+      Alert.alert(
+        'Discard Changes',
+        'You have unsaved changes. Are you sure you want to discard them?',
+        [
+          { text: 'Keep Editing', style: 'cancel' },
+          { 
+            text: 'Discard', 
+            style: 'destructive',
+            onPress: onClose
+          }
+        ]
+      );
+    } else {
+      onClose();
     }
   };
+
+  const toggleReminderDay = (day: number) => {
+    const newReminderDays = formData.reminderDays.includes(day)
+      ? formData.reminderDays.filter(d => d !== day)
+      : [...formData.reminderDays, day].sort((a, b) => a - b);
+    
+    setFormData({ ...formData, reminderDays: newReminderDays });
+  };
+
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const selectedCategory = CATEGORIES.find(cat => cat.id === formData.category) || CATEGORIES[0];
+
+  if (!reminder) return null;
+
+  const CategoryPicker = () => (
+    <Modal
+      visible={showCategoryPicker}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowCategoryPicker(false)}
+    >
+      <SafeAreaView style={[styles.pickerContainer, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.pickerHeader}>
+          <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
+            <Ionicons name="close" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>
+            Select Category
+          </Text>
+          <View style={{ width: 24 }} />
+        </View>
+        
+        <ScrollView style={styles.pickerOptions}>
+          {CATEGORIES.map((category) => (
+            <TouchableOpacity
+              key={category.id}
+              style={[styles.pickerOption, { backgroundColor: theme.colors.surface }]}
+              onPress={() => {
+                setFormData({ ...formData, category: category.id });
+                setShowCategoryPicker(false);
+              }}
+            >
+              <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
+                <Ionicons name={category.icon as any} size={20} color="white" />
+              </View>
+              <Text style={[styles.pickerOptionText, { color: theme.colors.text }]}>
+                {category.label}
+              </Text>
+              {formData.category === category.id && (
+                <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+
+  const RecurringPicker = () => (
+    <Modal
+      visible={showRecurringPicker}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowRecurringPicker(false)}
+    >
+      <SafeAreaView style={[styles.pickerContainer, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.pickerHeader}>
+          <TouchableOpacity onPress={() => setShowRecurringPicker(false)}>
+            <Ionicons name="close" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>
+            Recurring Frequency
+          </Text>
+          <View style={{ width: 24 }} />
+        </View>
+        
+        <ScrollView style={styles.pickerOptions}>
+          {RECURRING_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.id}
+              style={[styles.pickerOption, { backgroundColor: theme.colors.surface }]}
+              onPress={() => {
+                setFormData({ ...formData, recurringType: option.id });
+                setShowRecurringPicker(false);
+              }}
+            >
+              <Ionicons 
+                name="repeat-outline" 
+                size={20} 
+                color={theme.colors.textSecondary} 
+                style={{ marginRight: 12 }}
+              />
+              <Text style={[styles.pickerOptionText, { color: theme.colors.text }]}>
+                {option.label}
+              </Text>
+              {formData.recurringType === option.id && (
+                <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+
+  const ReminderDaysPicker = () => (
+    <Modal
+      visible={showReminderDaysPicker}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowReminderDaysPicker(false)}
+    >
+      <SafeAreaView style={[styles.pickerContainer, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.pickerHeader}>
+          <TouchableOpacity onPress={() => setShowReminderDaysPicker(false)}>
+            <Ionicons name="close" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>
+            Reminder Schedule
+          </Text>
+          <TouchableOpacity onPress={() => setShowReminderDaysPicker(false)}>
+            <Text style={[styles.doneText, { color: theme.colors.primary }]}>Done</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <ScrollView style={styles.pickerOptions}>
+          <Text style={[styles.pickerSubtitle, { color: theme.colors.textSecondary }]}>
+            Select when you'd like to be reminded before the due date:
+          </Text>
+          
+          {REMINDER_DAYS_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[styles.reminderDayOption, { backgroundColor: theme.colors.surface }]}
+              onPress={() => toggleReminderDay(option.value)}
+            >
+              <Text style={[styles.reminderDayLabel, { color: theme.colors.text }]}>
+                {option.label}
+              </Text>
+              <View style={[
+                styles.checkbox,
+                { borderColor: theme.colors.border },
+                formData.reminderDays.includes(option.value) && { 
+                  backgroundColor: theme.colors.primary,
+                  borderColor: theme.colors.primary 
+                }
+              ]}>
+                {formData.reminderDays.includes(option.value) && (
+                  <Ionicons name="checkmark" size={16} color="white" />
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={handleDiscard}
     >
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Your existing modal content */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={[styles.cancelButton, { color: theme.colors.textSecondary }]}>
-              Cancel
-            </Text>
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Edit Reminder
-          </Text>
-          <TouchableOpacity 
-            onPress={handleSave}
-            disabled={loading || !hasChanges}
-          >
-            <Text style={[
-              styles.saveButton, 
-              { 
-                color: (loading || !hasChanges) ? theme.colors.textSecondary : theme.colors.primary 
-              }
-            ]}>
-              {loading ? 'Saving...' : 'Save'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Rest of your form content... */}
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Title */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Title *
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: errors.title ? theme.colors.error : theme.colors.border,
-                  color: theme.colors.text,
-                }
-              ]}
-              placeholder="Enter reminder title"
-              placeholderTextColor={theme.colors.textSecondary}
-              value={formData.title}
-              onChangeText={(text) => {
-                setFormData({ ...formData, title: text });
-                if (errors.title) setErrors({ ...errors, title: '' });
-              }}
-              returnKeyType="next"
-            />
-            {errors.title ? (
-              <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                {errors.title}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleDiscard} style={styles.headerButton}>
+              <Text style={[styles.headerButtonText, { color: theme.colors.textSecondary }]}>
+                Cancel
               </Text>
-            ) : null}
+            </TouchableOpacity>
+            
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+              Edit Reminder
+            </Text>
+            
+            <TouchableOpacity 
+              onPress={handleSave} 
+              style={styles.headerButton}
+              disabled={loading || !hasChanges}
+            >
+              <Text style={[styles.headerButtonText, { 
+                color: loading || !hasChanges ? theme.colors.textSecondary : theme.colors.primary 
+              }]}>
+                {loading ? 'Saving...' : 'Save'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Description */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Description
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                styles.textArea,
-                {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.border,
-                  color: theme.colors.text,
-                }
-              ]}
-              placeholder="Add a description (optional)"
-              placeholderTextColor={theme.colors.textSecondary}
-              value={formData.description}
-              onChangeText={(text) => setFormData({ ...formData, description: text })}
-              multiline
-              numberOfLines={3}
-              returnKeyType="next"
-            />
-          </View>
+          {/* Changes Indicator */}
+          {hasChanges && (
+            <View style={[styles.changesIndicator, { backgroundColor: theme.colors.primary }]}>
+              <Ionicons name="pencil" size={16} color="white" />
+              <Text style={styles.changesText}>You have unsaved changes</Text>
+            </View>
+          )}
 
-          {/* Amount */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Amount *
-            </Text>
-            <View style={styles.amountContainer}>
-              <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
-                {user?.currency || 'USD'}
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Title */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>
+                Title *
               </Text>
               <TextInput
                 style={[
                   styles.input,
-                  styles.amountInput,
                   {
                     backgroundColor: theme.colors.surface,
-                    borderColor: errors.amount ? theme.colors.error : theme.colors.border,
+                    borderColor: errors.title ? theme.colors.error : theme.colors.border,
                     color: theme.colors.text,
                   }
                 ]}
-                placeholder="0.00"
+                placeholder="Enter reminder title"
                 placeholderTextColor={theme.colors.textSecondary}
-                value={formData.amount}
+                value={formData.title}
                 onChangeText={(text) => {
-                  // Only allow numbers and decimal point
-                  const numericText = text.replace(/[^0-9.]/g, '');
-                  setFormData({ ...formData, amount: numericText });
-                  if (errors.amount) setErrors({ ...errors, amount: '' });
+                  setFormData({ ...formData, title: text });
+                  if (errors.title) setErrors({ ...errors, title: '' });
                 }}
-                keyboardType="decimal-pad"
+                returnKeyType="next"
+              />
+              {errors.title ? (
+                <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                  {errors.title}
+                </Text>
+              ) : null}
+            </View>
+
+            {/* Description */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>
+                Description
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.textArea,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                    color: theme.colors.text,
+                  }
+                ]}
+                placeholder="Add a description (optional)"
+                placeholderTextColor={theme.colors.textSecondary}
+                value={formData.description}
+                onChangeText={(text) => setFormData({ ...formData, description: text })}
+                multiline
+                numberOfLines={3}
                 returnKeyType="next"
               />
             </View>
-            {errors.amount ? (
-              <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                {errors.amount}
-              </Text>
-            ) : null}
-          </View>
 
-          {/* Category */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Category
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.selector,
-                {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.border,
-                }
-              ]}
-              onPress={() => setShowCategoryPicker(true)}
-            >
-              <View style={[styles.categoryIcon, { backgroundColor: selectedCategory.color }]}>
-                <Ionicons name={selectedCategory.icon as any} size={16} color="white" />
-              </View>
-              <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                {selectedCategory.label}
+            {/* Amount */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>
+                Amount *
               </Text>
-              <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Due Date */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Due Date *
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.selector,
-                {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: errors.dueDate ? theme.colors.error : theme.colors.border,
-                }
-              ]}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Ionicons 
-                name="calendar-outline" 
-                size={20} 
-                color={theme.colors.textSecondary} 
-                style={{ marginRight: 12 }}
-              />
-              <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                {formatDate(formData.dueDate)}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            {errors.dueDate ? (
-              <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                {errors.dueDate}
-              </Text>
-            ) : null}
-          </View>
-
-          {/* Recurring */}
-          <View style={styles.inputGroup}>
-            <View style={styles.switchRow}>
-              <View style={styles.switchLabel}>
-                <Text style={[styles.label, { color: theme.colors.text }]}>
-                  Recurring Bill
+              <View style={styles.amountContainer}>
+                <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
+                  {user?.currency || 'USD'}
                 </Text>
-                <Text style={[styles.sublabel, { color: theme.colors.textSecondary }]}>
-                  This bill repeats regularly
-                </Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.amountInput,
+                    {
+                      backgroundColor: theme.colors.surface,
+                      borderColor: errors.amount ? theme.colors.error : theme.colors.border,
+                      color: theme.colors.text,
+                    }
+                  ]}
+                  placeholder="0.00"
+                  placeholderTextColor={theme.colors.textSecondary}
+                  value={formData.amount}
+                  onChangeText={(text) => {
+                    // Only allow numbers and decimal point
+                    const numericText = text.replace(/[^0-9.]/g, '');
+                    setFormData({ ...formData, amount: numericText });
+                    if (errors.amount) setErrors({ ...errors, amount: '' });
+                  }}
+                  keyboardType="decimal-pad"
+                  returnKeyType="next"
+                />
               </View>
-              <Switch
-                value={formData.isRecurring}
-                onValueChange={(value) => setFormData({ ...formData, isRecurring: value })}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                thumbColor={formData.isRecurring ? 'white' : theme.colors.textSecondary}
-              />
+              {errors.amount ? (
+                <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                  {errors.amount}
+                </Text>
+              ) : null}
             </View>
-            
-            {formData.isRecurring && (
+
+            {/* Category */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>
+                Category
+              </Text>
               <TouchableOpacity
                 style={[
                   styles.selector,
-                  styles.recurringSelector,
                   {
                     backgroundColor: theme.colors.surface,
                     borderColor: theme.colors.border,
                   }
                 ]}
-                onPress={() => setShowRecurringPicker(true)}
+                onPress={() => setShowCategoryPicker(true)}
               >
-                <Ionicons 
-                  name="repeat-outline" 
-                  size={20} 
-                  color={theme.colors.textSecondary} 
-                  style={{ marginRight: 12 }}
-                />
+                <View style={[styles.categoryIcon, { backgroundColor: selectedCategory.color }]}>
+                  <Ionicons name={selectedCategory.icon as any} size={16} color="white" />
+                </View>
                 <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                  {RECURRING_OPTIONS.find(opt => opt.id === formData.recurringType)?.label || 'Monthly'}
+                  {selectedCategory.label}
                 </Text>
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Notification Settings */}
-          <View style={styles.inputGroup}>
-            <View style={styles.switchRow}>
-              <View style={styles.switchLabel}>
-                <Text style={[styles.label, { color: theme.colors.text }]}>
-                  Notifications
-                </Text>
-                <Text style={[styles.sublabel, { color: theme.colors.textSecondary }]}>
-                  Get reminded before due date
-                </Text>
-              </View>
-              <Switch
-                value={formData.notificationEnabled}
-                onValueChange={(value) => setFormData({ ...formData, notificationEnabled: value })}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                thumbColor={formData.notificationEnabled ? 'white' : theme.colors.textSecondary}
-              />
             </View>
 
-            {formData.notificationEnabled && (
+            {/* Due Date */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>
+                Due Date *
+              </Text>
               <TouchableOpacity
                 style={[
                   styles.selector,
-                  styles.recurringSelector,
                   {
                     backgroundColor: theme.colors.surface,
-                    borderColor: theme.colors.border,
+                    borderColor: errors.dueDate ? theme.colors.error : theme.colors.border,
                   }
                 ]}
-                onPress={() => setShowReminderDaysPicker(true)}
+                onPress={() => setShowDatePicker(true)}
               >
                 <Ionicons 
-                  name="notifications-outline" 
+                  name="calendar-outline" 
                   size={20} 
                   color={theme.colors.textSecondary} 
                   style={{ marginRight: 12 }}
                 />
                 <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                  {formData.reminderDays.length > 0 
-                    ? `Remind ${formData.reminderDays.length} time${formData.reminderDays.length === 1 ? '' : 's'}`
-                    : 'Set reminder schedule'
-                  }
+                  {formatDate(formData.dueDate)}
                 </Text>
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Notes */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Notes
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                styles.textArea,
-                {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.border,
-                  color: theme.colors.text,
-                }
-              ]}
-              placeholder="Add any additional notes (optional)"
-              placeholderTextColor={theme.colors.textSecondary}
-              value={formData.notes}
-              onChangeText={(text) => setFormData({ ...formData, notes: text })}
-              multiline
-              numberOfLines={3}
-              returnKeyType="done"
-            />
-          </View>
-
-          {/* Auto-detected Info */}
-          {reminder.autoDetected && (
-            <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
-              <View style={styles.infoTextContainer}>
-                <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
-                  Auto-detected Bill
+              {errors.dueDate ? (
+                <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                  {errors.dueDate}
                 </Text>
-                <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
-                  This reminder was automatically created from your email
-                  {reminder.emailSource && ` from ${reminder.emailSource}`}.
-                </Text>
-              </View>
+              ) : null}
             </View>
-          )}
 
-          {/* Preview */}
-          <View style={[styles.previewCard, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.previewTitle, { color: theme.colors.text }]}>
-              Preview
-            </Text>
-            <View style={styles.previewContent}>
-              <View style={styles.previewRow}>
-                <Ionicons name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
-                <Text style={[styles.previewText, { color: theme.colors.text }]}>
-                  {formData.title || 'Reminder Title'}
-                </Text>
-                <Text style={[styles.previewAmount, { color: theme.colors.primary }]}>
-                  {formData.amount ? formatCurrency(parseFloat(formData.amount) || 0, user?.currency || 'USD') : '$0.00'}
-                </Text>
+            {/* Recurring */}
+            <View style={styles.inputGroup}>
+              <View style={styles.switchRow}>
+                <View style={styles.switchLabel}>
+                  <Text style={[styles.label, { color: theme.colors.text }]}>
+                    Recurring Bill
+                  </Text>
+                  <Text style={[styles.sublabel, { color: theme.colors.textSecondary }]}>
+                    This bill repeats regularly
+                  </Text>
+                </View>
+                <Switch
+                  value={formData.isRecurring}
+                  onValueChange={(value) => setFormData({ ...formData, isRecurring: value })}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={formData.isRecurring ? 'white' : theme.colors.textSecondary}
+                />
               </View>
-              <Text style={[styles.previewDate, { color: theme.colors.textSecondary }]}>
-                Due: {formatDate(formData.dueDate)}
-                {formData.isRecurring && ` • Repeats ${formData.recurringType}`}
-              </Text>
-              {formData.notificationEnabled && formData.reminderDays.length > 0 && (
-                <Text style={[styles.previewNotifications, { color: theme.colors.textSecondary }]}>
-                  Reminders: {formData.reminderDays.map(d => `${d} day${d === 1 ? '' : 's'}`).join(', ')} before
-                </Text>
+              
+              {formData.isRecurring && (
+                <TouchableOpacity
+                  style={[
+                    styles.selector,
+                    styles.recurringSelector,
+                    {
+                      backgroundColor: theme.colors.surface,
+                      borderColor: theme.colors.border,
+                    }
+                  ]}
+                  onPress={() => setShowRecurringPicker(true)}
+                >
+                  <Ionicons 
+                    name="repeat-outline" 
+                    size={20} 
+                    color={theme.colors.textSecondary} 
+                    style={{ marginRight: 12 }}
+                  />
+                  <Text style={[styles.selectorText, { color: theme.colors.text }]}>
+                    {RECURRING_OPTIONS.find(opt => opt.id === formData.recurringType)?.label || 'Monthly'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
               )}
             </View>
+
+            {/* Notification Settings */}
+            <View style={styles.inputGroup}>
+              <View style={styles.switchRow}>
+                <View style={styles.switchLabel}>
+                  <Text style={[styles.label, { color: theme.colors.text }]}>
+                    Notifications
+                  </Text>
+                  <Text style={[styles.sublabel, { color: theme.colors.textSecondary }]}>
+                    Get reminded before due date
+                  </Text>
+                </View>
+                <Switch
+                  value={formData.notificationEnabled}
+                  onValueChange={(value) => setFormData({ ...formData, notificationEnabled: value })}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={formData.notificationEnabled ? 'white' : theme.colors.textSecondary}
+                />
+              </View>
+
+              {formData.notificationEnabled && (
+                <TouchableOpacity
+                  style={[
+                    styles.selector,
+                    styles.recurringSelector,
+                    {
+                      backgroundColor: theme.colors.surface,
+                      borderColor: theme.colors.border,
+                    }
+                  ]}
+                  onPress={() => setShowReminderDaysPicker(true)}
+                >
+                  <Ionicons 
+                    name="notifications-outline" 
+                    size={20} 
+                    color={theme.colors.textSecondary} 
+                    style={{ marginRight: 12 }}
+                  />
+                  <Text style={[styles.selectorText, { color: theme.colors.text }]}>
+                    {formData.reminderDays.length > 0 
+                      ? `Remind ${formData.reminderDays.length} time${formData.reminderDays.length === 1 ? '' : 's'}`
+                      : 'Set reminder schedule'
+                    }
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Notes */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>
+                Notes
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.textArea,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                    color: theme.colors.text,
+                  }
+                ]}
+                placeholder="Add any additional notes (optional)"
+                placeholderTextColor={theme.colors.textSecondary}
+                value={formData.notes}
+                onChangeText={(text) => setFormData({ ...formData, notes: text })}
+                multiline
+                numberOfLines={3}
+                returnKeyType="done"
+              />
+            </View>
+
+            {/* Auto-detected Info */}
+            {reminder.autoDetected && (
+              <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
+                <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+                <View style={styles.infoTextContainer}>
+                  <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
+                    Auto-detected Bill
+                  </Text>
+                  <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
+                    This reminder was automatically created from your email
+                    {reminder.emailSource && ` from ${reminder.emailSource}`}.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Preview */}
+            <View style={[styles.previewCard, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.previewTitle, { color: theme.colors.text }]}>
+                Preview
+              </Text>
+              <View style={styles.previewContent}>
+                <View style={styles.previewRow}>
+                  <Ionicons name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
+                  <Text style={[styles.previewText, { color: theme.colors.text }]}>
+                    {formData.title || 'Reminder Title'}
+                  </Text>
+                  <Text style={[styles.previewAmount, { color: theme.colors.primary }]}>
+                    {formData.amount ? formatCurrency(parseFloat(formData.amount) || 0, user?.currency || 'USD') : '$0.00'}
+                  </Text>
+                </View>
+                <Text style={[styles.previewDate, { color: theme.colors.textSecondary }]}>
+                  Due: {formatDate(formData.dueDate)}
+                  {formData.isRecurring && ` • Repeats ${formData.recurringType}`}
+                </Text>
+                {formData.notificationEnabled && formData.reminderDays.length > 0 && (
+                  <Text style={[styles.previewNotifications, { color: theme.colors.textSecondary }]}>
+                    Reminders: {formData.reminderDays.map(d => `${d} day${d === 1 ? '' : 's'}`).join(', ')} before
+                  </Text>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Action Buttons */}
+          <View style={styles.footer}>
+            <Button
+              title={hasChanges ? "Save Changes" : "No Changes"}
+              onPress={handleSave}
+              loading={loading}
+              disabled={!hasChanges}
+              style={styles.submitButton}
+            />
           </View>
-        </ScrollView>
+        </KeyboardAvoidingView>
 
-        {/* Action Buttons */}
-        <View style={styles.footer}>
-          <Button
-            title={hasChanges ? "Save Changes" : "No Changes"}
-            onPress={handleSave}
-            loading={loading}
-            disabled={!hasChanges}
-            style={styles.submitButton}
-          />
-        </View>
+        {/* Date Picker */}
+        <CustomDateTimePicker
+          visible={showDatePicker}
+          value={formData.dueDate}
+          mode="date"
+          minimumDate={reminder.status === 'paid' ? undefined : new Date()}
+          title="Select Due Date"
+          onChange={(date) => setFormData({ ...formData, dueDate: date })}
+          onClose={() => setShowDatePicker(false)}
+        />
+
+        <CategoryPicker />
+        <RecurringPicker />
+        <ReminderDaysPicker />
       </SafeAreaView>
-
-      {/* Date Picker */}
-      <CustomDateTimePicker
-        visible={showDatePicker}
-        value={formData.dueDate}
-        mode="date"
-        minimumDate={reminder.status === 'paid' ? undefined : new Date()}
-        title="Select Due Date"
-        onChange={(date) => setFormData({ ...formData, dueDate: date })}
-        onClose={() => setShowDatePicker(false)}
-      />
-
-      <CategoryPicker />
-      <RecurringPicker />
-      <ReminderDaysPicker />
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  keyboardView: {
     flex: 1,
   },
   header: {
@@ -580,16 +783,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  title: {
+  headerButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  headerButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    fontSize: 16,
-  },
-  saveButton: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   changesIndicator: {
     flexDirection: 'row',
