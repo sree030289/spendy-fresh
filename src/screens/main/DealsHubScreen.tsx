@@ -16,7 +16,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Share,
+  ImageBackground,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -62,7 +64,6 @@ const DealsHubScreen: React.FC = () => {
   const [showPostModal, setShowPostModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -84,21 +85,12 @@ const DealsHubScreen: React.FC = () => {
   });
 
   useEffect(() => {
-    checkFirstTime();
     loadDeals();
   }, []);
 
   useEffect(() => {
     filterDeals();
   }, [deals, selectedCategory, searchQuery]);
-
-  const checkFirstTime = async () => {
-    // Check if user is first time visitor
-    const isFirstTime = true; // This would be from AsyncStorage in real app
-    if (isFirstTime) {
-      setTimeout(() => setShowOnboarding(true), 1000);
-    }
-  };
 
   const loadDeals = async () => {
     setLoading(true);
@@ -113,7 +105,7 @@ const DealsHubScreen: React.FC = () => {
           originalPrice: 45.99,
           discountedPrice: 22.99,
           discount: 50,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           postedBy: 'StreamDeals',
           likes: 124,
           dislikes: 5,
@@ -130,7 +122,7 @@ const DealsHubScreen: React.FC = () => {
           originalPrice: 4.50,
           discountedPrice: 0,
           discount: 100,
-          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
           postedBy: 'FreebieHunter',
           likes: 89,
           dislikes: 2,
@@ -147,7 +139,7 @@ const DealsHubScreen: React.FC = () => {
           originalPrice: 249,
           discountedPrice: 180,
           discount: 28,
-          expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
+          expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
           postedBy: 'TechSaver',
           likes: 67,
           dislikes: 1,
@@ -166,7 +158,7 @@ const DealsHubScreen: React.FC = () => {
           originalPrice: 600,
           discountedPrice: 300,
           discount: 50,
-          expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000), // 10 days from now
+          expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
           postedBy: 'FitZone',
           likes: 43,
           dislikes: 0,
@@ -176,23 +168,6 @@ const DealsHubScreen: React.FC = () => {
           businessName: 'FitZone Gym',
           location: 'Downtown Melbourne',
         },
-        {
-          id: '5',
-          title: 'Uber Eats: 40% Off First Order',
-          description: 'Partner deal: Get 40% off your first order with code FRESH40. Max discount $15.',
-          category: 'Partners',
-          originalPrice: 35,
-          discountedPrice: 21,
-          discount: 40,
-          expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-          postedBy: 'SpendyPartner',
-          likes: 156,
-          dislikes: 3,
-          isGroupDeal: false,
-          chatEnabled: true,
-          isPartnership: true,
-          businessName: 'Uber Eats',
-        }
       ];
       
       setDeals(sampleDeals);
@@ -221,19 +196,6 @@ const DealsHubScreen: React.FC = () => {
     setFilteredDeals(filtered);
   };
 
-  const performAIModerationCheck = async (content: string): Promise<boolean> => {
-    // AI moderation simulation
-    const bannedWords = ['spam', 'fake', 'scam', 'illegal'];
-    const lowerContent = content.toLowerCase();
-    
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const isClean = !bannedWords.some(word => lowerContent.includes(word));
-        resolve(isClean);
-      }, 1000);
-    });
-  };
-
   const handlePostDeal = async () => {
     if (!postForm.title || !postForm.description || !postForm.originalPrice) {
       Alert.alert('Error', 'Please fill in all required fields');
@@ -243,16 +205,6 @@ const DealsHubScreen: React.FC = () => {
     setLoading(true);
     
     try {
-      // AI Moderation Check
-      const contentToCheck = `${postForm.title} ${postForm.description} ${postForm.businessName}`;
-      const isContentClean = await performAIModerationCheck(contentToCheck);
-      
-      if (!isContentClean) {
-        Alert.alert('Content Flagged', 'Your post contains inappropriate content and cannot be published.');
-        setLoading(false);
-        return;
-      }
-
       const originalPrice = parseFloat(postForm.originalPrice);
       const discountedPrice = parseFloat(postForm.discountedPrice);
       const discount = Math.round(((originalPrice - discountedPrice) / originalPrice) * 100);
@@ -344,7 +296,6 @@ const DealsHubScreen: React.FC = () => {
   const openChat = (deal: Deal) => {
     setSelectedDeal(deal);
     setShowChatModal(true);
-    // Load chat messages for this deal
     setChatMessages([]);
   };
 
@@ -360,34 +311,19 @@ ${deal.title}
 
 ${deal.description}
 
-${deal.businessName ? `🏪 ${deal.businessName}` : ''}
-${deal.location ? `📍 ${deal.location}` : ''}
+Found this deal on Spendy Deals Hub!`;
 
-Found this deal on Spendy Deals Hub! Download the app to discover more amazing deals.`;
-
-      const result = await Share.share({
+      await Share.share({
         message: shareMessage,
         title: `${deal.title} - ${deal.discount}% OFF`,
       });
-
-      if (result.action === Share.sharedAction) {
-        // Deal was shared successfully
-        Alert.alert('Success', 'Deal shared successfully!');
-      }
     } catch (error) {
       Alert.alert('Error', 'Failed to share deal. Please try again.');
-      console.error('Share error:', error);
     }
   };
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedDeal) return;
-
-    const isClean = await performAIModerationCheck(newMessage);
-    if (!isClean) {
-      Alert.alert('Message Flagged', 'Your message contains inappropriate content.');
-      return;
-    }
 
     const message: ChatMessage = {
       id: Date.now().toString(),
@@ -408,17 +344,173 @@ Found this deal on Spendy Deals Hub! Download the app to discover more amazing d
     setRefreshing(false);
   };
 
+  const getCategoryIcon = (category: string) => {
+    const icons = {
+      'OTT': 'tv',
+      'Freebies': 'gift',
+      'Group Buying': 'people',
+      'Local Deals': 'location',
+      'Partners': 'business',
+    };
+    return icons[category as keyof typeof icons] || 'pricetag';
+  };
+
+  const getCategoryColor = (category: string) => {
+    const colors = {
+      'OTT': ['#667eea', '#764ba2'],
+      'Freebies': ['#f093fb', '#f5576c'],
+      'Group Buying': ['#4facfe', '#00f2fe'],
+      'Local Deals': ['#43e97b', '#38f9d7'],
+      'Partners': ['#fa709a', '#fee140'],
+    };
+    return colors[category as keyof typeof colors] || ['#667eea', '#764ba2'];
+  };
+
+  const renderDealCard = ({ item: deal }: { item: Deal }) => {
+    const categoryColors = getCategoryColor(deal.category);
+    const isExpiringSoon = new Date(deal.expiresAt).getTime() - Date.now() < 24 * 60 * 60 * 1000;
+
+    return (
+      <View style={styles.dealCard}>
+        <LinearGradient
+          colors={categoryColors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.dealGradient}
+        >
+          <BlurView intensity={20} style={styles.dealContent}>
+            {/* Header */}
+            <View style={styles.dealHeader}>
+              <View style={styles.dealBadges}>
+                <View style={styles.categoryBadge}>
+                  <Ionicons 
+                    name={getCategoryIcon(deal.category) as any} 
+                    size={12} 
+                    color="white" 
+                  />
+                  <Text style={styles.categoryText}>{deal.category}</Text>
+                </View>
+                {isExpiringSoon && (
+                  <View style={styles.urgentBadge}>
+                    <Ionicons name="time" size={10} color="#FF6B6B" />
+                    <Text style={styles.urgentText}>Expiring Soon</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.discountBadge}>
+                <Text style={styles.discountText}>{deal.discount}%</Text>
+                <Text style={styles.offText}>OFF</Text>
+              </View>
+            </View>
+
+            {/* Title & Description */}
+            <Text style={styles.dealTitle} numberOfLines={2}>{deal.title}</Text>
+            <Text style={styles.dealDescription} numberOfLines={2}>{deal.description}</Text>
+
+            {/* Business Info */}
+            {deal.businessName && (
+              <View style={styles.businessInfo}>
+                <Ionicons name="business" size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.businessName}>{deal.businessName}</Text>
+              </View>
+            )}
+
+            {/* Location */}
+            {deal.location && (
+              <View style={styles.locationInfo}>
+                <Ionicons name="location" size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.locationText}>{deal.location}</Text>
+              </View>
+            )}
+
+            {/* Pricing */}
+            <View style={styles.pricingSection}>
+              <View style={styles.priceContainer}>
+                <Text style={styles.originalPrice}>${deal.originalPrice}</Text>
+                <Text style={styles.discountedPrice}>${deal.discountedPrice}</Text>
+              </View>
+              <Text style={styles.savedAmount}>Save ${(deal.originalPrice - deal.discountedPrice).toFixed(2)}</Text>
+            </View>
+
+            {/* Group Deal Progress */}
+            {deal.isGroupDeal && (
+              <View style={styles.groupSection}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.groupTitle}>Group Progress</Text>
+                  <Text style={styles.participantCount}>
+                    {deal.currentParticipants}/{deal.maxParticipants} joined
+                  </Text>
+                </View>
+                <View style={styles.progressBar}>
+                  <View 
+                    style={[styles.progressFill, { width: `${deal.groupProgress || 0}%` }]} 
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Actions */}
+            <View style={styles.actionsContainer}>
+              <View style={styles.leftActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, deal.userLiked && styles.activeAction]}
+                  onPress={() => handleLike(deal.id)}
+                >
+                  <Ionicons 
+                    name={deal.userLiked ? "heart" : "heart-outline"} 
+                    size={18} 
+                    color={deal.userLiked ? "#FF6B6B" : "rgba(255,255,255,0.8)"} 
+                  />
+                  <Text style={styles.actionText}>{deal.likes}</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => openChat(deal)}
+                >
+                  <Ionicons name="chatbubble-outline" size={18} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.actionText}>Chat</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleShareDeal(deal)}
+                >
+                  <Ionicons name="share-outline" size={18} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.actionText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={styles.claimButton}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
+                  style={styles.claimGradient}
+                >
+                  <Text style={styles.claimText}>Claim Deal</Text>
+                  <Ionicons name="arrow-forward" size={16} color="white" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            {/* Footer */}
+            <View style={styles.dealFooter}>
+              <Text style={styles.postedBy}>by {deal.postedBy}</Text>
+              <Text style={styles.timeRemaining}>
+                {Math.ceil((new Date(deal.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000))} days left
+              </Text>
+            </View>
+          </BlurView>
+        </LinearGradient>
+      </View>
+    );
+  };
+
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <LinearGradient
-        colors={['#8B5CF6', '#EC4899']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.emptyIconContainer}
-      >
-        <Ionicons name="pricetag" size={50} color="white" />
-      </LinearGradient>
-      <Text style={styles.emptyTitle}>No deals yet!</Text>
+      <View style={styles.emptyIconContainer}>
+        <Ionicons name="pricetag-outline" size={64} color="#CBD5E1" />
+      </View>
+      <Text style={styles.emptyTitle}>No deals found</Text>
       <Text style={styles.emptySubtitle}>
         Be the first to share an amazing deal with the community
       </Text>
@@ -427,9 +519,7 @@ Found this deal on Spendy Deals Hub! Download the app to discover more amazing d
         onPress={() => setShowPostModal(true)}
       >
         <LinearGradient
-          colors={['#8B5CF6', '#EC4899']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={['#667eea', '#764ba2']}
           style={styles.postFirstDealGradient}
         >
           <Text style={styles.postFirstDealText}>Post Your First Deal</Text>
@@ -438,153 +528,80 @@ Found this deal on Spendy Deals Hub! Download the app to discover more amazing d
     </View>
   );
 
-  const renderDealCard = ({ item: deal }: { item: Deal }) => (
-    <View style={styles.dealCard}>
-      <LinearGradient
-        colors={['#8B5CF6', '#EC4899']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.compactDealCardGradient}
-      >
-        <View style={styles.compactDealHeader}>
-          <View style={styles.compactDealCategory}>
-            <Text style={styles.compactDealCategoryText}>{deal.category}</Text>
-          </View>
-          <View style={styles.compactDealDiscount}>
-            <Text style={styles.compactDealDiscountText}>{deal.discount}% OFF</Text>
-          </View>
-        </View>
-        
-        <Text style={styles.compactDealTitle} numberOfLines={1}>{deal.title}</Text>
-        <Text style={styles.compactDealDescription} numberOfLines={2}>{deal.description}</Text>
-        
-        <View style={styles.compactDealInfoRow}>
-          <View style={styles.compactDealPricing}>
-            <Text style={styles.compactOriginalPrice}>${deal.originalPrice}</Text>
-            <Text style={styles.compactDiscountedPrice}>${deal.discountedPrice}</Text>
-          </View>
-          <Text style={styles.compactPostedBy} numberOfLines={1}>by {deal.postedBy}</Text>
-        </View>
-        
-        {deal.isGroupDeal && (
-          <View style={styles.compactGroupDealSection}>
-            <View style={styles.compactProgressBar}>
-              <View 
-                style={[
-                  styles.compactProgressFill, 
-                  { width: `${deal.groupProgress || 0}%` }
-                ]} 
-              />
-            </View>
-            <Text style={styles.compactGroupDealText}>
-              {deal.currentParticipants}/{deal.maxParticipants} joined
-            </Text>
-          </View>
-        )}
-        
-        <View style={styles.compactDealActions}>
-          <TouchableOpacity
-            style={[styles.compactActionButton, deal.userLiked && styles.compactActionButtonActive]}
-            onPress={() => handleLike(deal.id)}
-          >
-            <Ionicons 
-              name={deal.userLiked ? "heart" : "heart-outline"} 
-              size={8} 
-              color={deal.userLiked ? "#EC4899" : "#fff"} 
-            />
-            <Text style={styles.compactActionText}>{deal.likes}</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.compactActionButton, deal.userDisliked && styles.compactActionButtonActive]}
-            onPress={() => handleDislike(deal.id)}
-          >
-            <Ionicons 
-              name={deal.userDisliked ? "heart-dislike" : "heart-dislike-outline"} 
-              size={8} 
-              color={deal.userDisliked ? "#EC4899" : "#fff"} 
-            />
-            <Text style={styles.compactActionText}>{deal.dislikes}</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.compactActionButton}
-            onPress={() => openChat(deal)}
-          >
-            <Ionicons name="chatbubble-outline" size={8} color="#fff" />
-            <Text style={styles.compactActionText}>Chat</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.compactActionButton}
-            onPress={() => handleShareDeal(deal)}
-          >
-            <Ionicons name="share-outline" size={8} color="#fff" />
-            <Text style={styles.compactActionText}>Share</Text>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <LinearGradient
-        colors={['#8B5CF6', '#EC4899']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={['#667eea', '#764ba2']}
         style={styles.header}
       >
-        <Text style={styles.headerTitle}>Deals Hub</Text>
-        <TouchableOpacity
-          style={styles.postButton}
-          onPress={() => setShowPostModal(true)}
-        >
-          <Ionicons name="add" size={24} color="#8B5CF6" />
-        </TouchableOpacity>
+        <BlurView intensity={20} style={styles.headerContent}>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.headerTitle}>Deals Hub</Text>
+              <Text style={styles.headerSubtitle}>Discover amazing savings</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.postButton}
+              onPress={() => setShowPostModal(true)}
+            >
+              <Ionicons name="add" size={24} color="#667eea" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={20} color="#94A3B8" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search deals..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Categories */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoriesContainer}
+          >
+            {DEAL_CATEGORIES.map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryButton,
+                  selectedCategory === category && styles.categoryButtonActive
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    selectedCategory === category && styles.categoryButtonTextActive
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </BlurView>
       </LinearGradient>
 
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#666" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search deals..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoriesContainer}
-      >
-        {DEAL_CATEGORIES.map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.categoryButton,
-              selectedCategory === category && styles.categoryButtonActive
-            ]}
-            onPress={() => setSelectedCategory(category)}
-          >
-            <Text
-              style={[
-                styles.categoryButtonText,
-                selectedCategory === category && styles.categoryButtonTextActive
-              ]}
-            >
-              {category}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
+      {/* Deals List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
+          <ActivityIndicator size="large" color="#667eea" />
+          <Text style={styles.loadingText}>Loading deals...</Text>
         </View>
       ) : filteredDeals.length === 0 ? (
         <ScrollView
@@ -603,8 +620,22 @@ Found this deal on Spendy Deals Hub! Download the app to discover more amazing d
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           contentContainerStyle={styles.dealsContainer}
+          showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowPostModal(true)}
+      >
+        <LinearGradient
+          colors={['#667eea', '#764ba2']}
+          style={styles.fabGradient}
+        >
+          <Ionicons name="add" size={28} color="white" />
+        </LinearGradient>
+      </TouchableOpacity>
 
       {/* Post Deal Modal */}
       <Modal
@@ -615,13 +646,10 @@ Found this deal on Spendy Deals Hub! Download the app to discover more amazing d
         <KeyboardAvoidingView 
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
         >
           <SafeAreaView style={styles.modalContainer}>
             <LinearGradient
-              colors={['#8B5CF6', '#EC4899']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              colors={['#667eea', '#764ba2']}
               style={styles.modalHeader}
             >
               <TouchableOpacity
@@ -646,126 +674,125 @@ Found this deal on Spendy Deals Hub! Download the app to discover more amazing d
 
             <ScrollView 
               style={styles.modalContent}
-              keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 50 }}
             >
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Deal Title *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={postForm.title}
-                onChangeText={(text) => setPostForm(prev => ({ ...prev, title: text }))}
-                placeholder="Enter deal title"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Description *</Text>
-              <TextInput
-                style={[styles.formInput, styles.formTextArea]}
-                value={postForm.description}
-                onChangeText={(text) => setPostForm(prev => ({ ...prev, description: text }))}
-                placeholder="Describe the deal"
-                multiline
-                numberOfLines={4}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {['OTT', 'Freebies', 'Group Buying', 'Local Deals', 'Partners'].map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categorySelectButton,
-                      postForm.category === cat && styles.categorySelectButtonActive
-                    ]}
-                    onPress={() => setPostForm(prev => ({ ...prev, category: cat as Deal['category'] }))}
-                  >
-                    <Text
-                      style={[
-                        styles.categorySelectText,
-                        postForm.category === cat && styles.categorySelectTextActive
-                      ]}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            <View style={styles.formRow}>
-              <View style={styles.formHalf}>
-                <Text style={styles.formLabel}>Original Price *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={postForm.originalPrice}
-                  onChangeText={(text) => setPostForm(prev => ({ ...prev, originalPrice: text }))}
-                  placeholder="$0.00"
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={styles.formHalf}>
-                <Text style={styles.formLabel}>Discounted Price *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={postForm.discountedPrice}
-                  onChangeText={(text) => setPostForm(prev => ({ ...prev, discountedPrice: text }))}
-                  placeholder="$0.00"
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Business Name</Text>
-              <TextInput
-                style={styles.formInput}
-                value={postForm.businessName}
-                onChangeText={(text) => setPostForm(prev => ({ ...prev, businessName: text }))}
-                placeholder="Enter business name"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Location</Text>
-              <TextInput
-                style={styles.formInput}
-                value={postForm.location}
-                onChangeText={(text) => setPostForm(prev => ({ ...prev, location: text }))}
-                placeholder="Enter location"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <TouchableOpacity
-                style={styles.checkboxRow}
-                onPress={() => setPostForm(prev => ({ ...prev, isGroupDeal: !prev.isGroupDeal }))}
-              >
-                <Ionicons
-                  name={postForm.isGroupDeal ? "checkbox" : "checkbox-outline"}
-                  size={24}
-                  color="#8B5CF6"
-                />
-                <Text style={styles.checkboxLabel}>This is a group deal</Text>
-              </TouchableOpacity>
-            </View>
-
-            {postForm.isGroupDeal && (
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Max Participants</Text>
+                <Text style={styles.formLabel}>Deal Title *</Text>
                 <TextInput
                   style={styles.formInput}
-                  value={postForm.maxParticipants}
-                  onChangeText={(text) => setPostForm(prev => ({ ...prev, maxParticipants: text }))}
-                  placeholder="Enter max participants"
-                  keyboardType="numeric"
+                  value={postForm.title}
+                  onChangeText={(text) => setPostForm(prev => ({ ...prev, title: text }))}
+                  placeholder="Enter deal title"
                 />
               </View>
-            )}            </ScrollView>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Description *</Text>
+                <TextInput
+                  style={[styles.formInput, styles.formTextArea]}
+                  value={postForm.description}
+                  onChangeText={(text) => setPostForm(prev => ({ ...prev, description: text }))}
+                  placeholder="Describe the deal"
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Category</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {['OTT', 'Freebies', 'Group Buying', 'Local Deals', 'Partners'].map((cat) => (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        styles.categorySelectButton,
+                        postForm.category === cat && styles.categorySelectButtonActive
+                      ]}
+                      onPress={() => setPostForm(prev => ({ ...prev, category: cat as Deal['category'] }))}
+                    >
+                      <Text
+                        style={[
+                          styles.categorySelectText,
+                          postForm.category === cat && styles.categorySelectTextActive
+                        ]}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={styles.formHalf}>
+                  <Text style={styles.formLabel}>Original Price *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={postForm.originalPrice}
+                    onChangeText={(text) => setPostForm(prev => ({ ...prev, originalPrice: text }))}
+                    placeholder="$0.00"
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.formHalf}>
+                  <Text style={styles.formLabel}>Discounted Price *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={postForm.discountedPrice}
+                    onChangeText={(text) => setPostForm(prev => ({ ...prev, discountedPrice: text }))}
+                    placeholder="$0.00"
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Business Name</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={postForm.businessName}
+                  onChangeText={(text) => setPostForm(prev => ({ ...prev, businessName: text }))}
+                  placeholder="Enter business name"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Location</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={postForm.location}
+                  onChangeText={(text) => setPostForm(prev => ({ ...prev, location: text }))}
+                  placeholder="Enter location"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <TouchableOpacity
+                  style={styles.checkboxRow}
+                  onPress={() => setPostForm(prev => ({ ...prev, isGroupDeal: !prev.isGroupDeal }))}
+                >
+                  <Ionicons
+                    name={postForm.isGroupDeal ? "checkbox" : "checkbox-outline"}
+                    size={24}
+                    color="#667eea"
+                  />
+                  <Text style={styles.checkboxLabel}>This is a group deal</Text>
+                </TouchableOpacity>
+              </View>
+
+              {postForm.isGroupDeal && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Max Participants</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={postForm.maxParticipants}
+                    onChangeText={(text) => setPostForm(prev => ({ ...prev, maxParticipants: text }))}
+                    placeholder="Enter max participants"
+                    keyboardType="numeric"
+                  />
+                </View>
+              )}
+            </ScrollView>
           </SafeAreaView>
         </KeyboardAvoidingView>
       </Modal>
@@ -776,123 +803,60 @@ Found this deal on Spendy Deals Hub! Download the app to discover more amazing d
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <KeyboardAvoidingView 
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
-        >
-          <SafeAreaView style={styles.modalContainer}>
-            <LinearGradient
-              colors={['#8B5CF6', '#EC4899']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.modalHeader}
+        <SafeAreaView style={styles.modalContainer}>
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            style={styles.modalHeader}
+          >
+            <TouchableOpacity
+              onPress={() => setShowChatModal(false)}
+              style={styles.modalCloseButton}
             >
-              <TouchableOpacity
-                onPress={() => setShowChatModal(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Deal Chat</Text>
-              <View style={styles.modalSaveButton} />
-            </LinearGradient>
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Deal Chat</Text>
+            <View style={styles.modalSaveButton} />
+          </LinearGradient>
 
-            <View style={styles.chatContainer}>
-              <FlatList
-                data={chatMessages}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <View style={styles.chatMessage}>
-                    <Text style={styles.chatUserName}>{item.userName}</Text>
-                    <Text style={styles.chatMessageText}>{item.message}</Text>
-                    <Text style={styles.chatTimestamp}>
-                      {item.timestamp.toLocaleTimeString()}
-                    </Text>
-                  </View>
-                )}
-                style={styles.chatMessages}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+          <View style={styles.chatContainer}>
+            <FlatList
+              data={chatMessages}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.chatMessage}>
+                  <Text style={styles.chatUserName}>{item.userName}</Text>
+                  <Text style={styles.chatMessageText}>{item.message}</Text>
+                  <Text style={styles.chatTimestamp}>
+                    {item.timestamp.toLocaleTimeString()}
+                  </Text>
+                </View>
+              )}
+              style={styles.chatMessages}
+            />
+            
+            <View style={styles.chatInputContainer}>
+              <TextInput
+                style={styles.chatInput}
+                value={newMessage}
+                onChangeText={setNewMessage}
+                placeholder="Type your message..."
+                multiline
+                maxLength={200}
               />
-              
-              <View style={styles.chatInputContainer}>
-                <TextInput
-                  style={styles.chatInput}
-                  value={newMessage}
-                  onChangeText={setNewMessage}
-                  placeholder="Type your message..."
-                  multiline
-                  maxLength={200}
-                  blurOnSubmit={false}
-                />
-                <TouchableOpacity
-                  style={styles.chatSendButton}
-                  onPress={sendMessage}
-                >
-                  <LinearGradient
-                    colors={['#8B5CF6', '#EC4899']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.chatSendGradient}
-                  >
-                    <Ionicons name="send" size={20} color="white" />
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Onboarding Modal */}
-      <Modal
-        visible={showOnboarding}
-        animationType="fade"
-        transparent
-      >
-        <View style={styles.onboardingOverlay}>
-          <View style={styles.onboardingContainer}>
-            <LinearGradient
-              colors={['#8B5CF6', '#EC4899']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.onboardingGradient}
-            >
-              <Ionicons name="rocket" size={60} color="white" />
-              <Text style={styles.onboardingTitle}>Welcome to Deals Hub!</Text>
-              <Text style={styles.onboardingSubtitle}>
-                Discover amazing deals, share with friends, and save money together
-              </Text>
-              
-              <View style={styles.onboardingFeatures}>
-                <View style={styles.onboardingFeature}>
-                  <Ionicons name="pricetag" size={24} color="white" />
-                  <Text style={styles.onboardingFeatureText}>Share Real Deals</Text>
-                </View>
-                <View style={styles.onboardingFeature}>
-                  <Ionicons name="people" size={24} color="white" />
-                  <Text style={styles.onboardingFeatureText}>Group Buying</Text>
-                </View>
-                <View style={styles.onboardingFeature}>
-                  <Ionicons name="chatbubbles" size={24} color="white" />
-                  <Text style={styles.onboardingFeatureText}>Real-time Chat</Text>
-                </View>
-                <View style={styles.onboardingFeature}>
-                  <Ionicons name="shield-checkmark" size={24} color="white" />
-                  <Text style={styles.onboardingFeatureText}>AI Moderation</Text>
-                </View>
-              </View>
-              
               <TouchableOpacity
-                style={styles.onboardingButton}
-                onPress={() => setShowOnboarding(false)}
+                style={styles.chatSendButton}
+                onPress={sendMessage}
               >
-                <Text style={styles.onboardingButtonText}>Get Started</Text>
+                <LinearGradient
+                  colors={['#667eea', '#764ba2']}
+                  style={styles.chatSendGradient}
+                >
+                  <Ionicons name="send" size={20} color="white" />
+                </LinearGradient>
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -903,83 +867,101 @@ const { width } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8FAFC',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingTop: 8,
+  },
+  headerContent: {
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingBottom: 20,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '800',
     color: 'white',
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
   },
   postButton: {
     backgroundColor: 'white',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+    borderRadius: 16,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   searchContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    marginBottom: 20,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
     fontSize: 16,
+    color: '#1E293B',
   },
   categoriesContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    marginTop: 8,
   },
   categoryButton: {
-    backgroundColor: 'white',
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    marginRight: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    minWidth: 35,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   categoryButtonActive: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
+    backgroundColor: 'white',
+    borderColor: 'white',
   },
   categoryButtonText: {
-    color: '#666',
-    fontSize: 8,
-    fontWeight: '500',
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   categoryButtonTextActive: {
-    color: 'white',
+    color: '#667eea',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748B',
   },
   emptyContainer: {
     flex: 1,
@@ -989,165 +971,277 @@ const styles = StyleSheet.create({
     paddingVertical: 100,
   },
   emptyIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   emptyTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 12,
   },
   emptySubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#64748B',
     textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 22,
+    marginBottom: 32,
+    lineHeight: 24,
   },
   postFirstDealButton: {
-    borderRadius: 25,
+    borderRadius: 16,
     overflow: 'hidden',
   },
   postFirstDealGradient: {
-    paddingHorizontal: 30,
-    paddingVertical: 15,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
   },
   postFirstDealText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   dealsContainer: {
-    paddingHorizontal: 4,
-    paddingBottom: 4,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 100,
   },
   dealCard: {
-    marginBottom: 2,
-    borderRadius: 8,
+    marginBottom: 20,
+    borderRadius: 20,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  dealCardGradient: {
+  dealGradient: {
+    borderRadius: 20,
+  },
+  dealContent: {
     padding: 20,
+    borderRadius: 20,
   },
   dealHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  dealCategory: {
+  dealBadges: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
+    gap: 6,
   },
-  dealCategoryText: {
+  categoryText: {
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
   },
-  dealDiscount: {
+  urgentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,107,107,0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  urgentText: {
+    color: '#FF6B6B',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  discountBadge: {
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 8,
+    alignItems: 'center',
+    minWidth: 60,
   },
-  dealDiscountText: {
-    color: '#8B5CF6',
-    fontSize: 12,
-    fontWeight: 'bold',
+  discountText: {
+    color: '#667eea',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  offText: {
+    color: '#667eea',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: -2,
   },
   dealTitle: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+    lineHeight: 26,
   },
   dealDescription: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 14,
-    marginBottom: 10,
+    lineHeight: 20,
+    marginBottom: 16,
   },
-  dealBusiness: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  dealLocation: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  dealPricing: {
+  businessInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 8,
+    gap: 6,
+  },
+  businessName: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 6,
+  },
+  locationText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+  },
+  pricingSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   originalPrice: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 16,
     textDecorationLine: 'line-through',
-    marginRight: 10,
   },
   discountedPrice: {
     color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '800',
   },
-  groupDealSection: {
-    marginBottom: 15,
+  savedAmount: {
+    color: '#4ADE80',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  groupDealLabel: {
+  groupSection: {
+    marginBottom: 16,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  groupTitle: {
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 5,
+  },
+  participantCount: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
   },
   progressBar: {
     height: 6,
     backgroundColor: 'rgba(255,255,255,0.3)',
     borderRadius: 3,
-    marginBottom: 5,
   },
   progressFill: {
     height: '100%',
     backgroundColor: 'white',
     borderRadius: 3,
   },
-  groupDealText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 12,
-  },
-  dealActions: {
+  actionsContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
+  },
+  leftActions: {
+    flexDirection: 'row',
+    gap: 16,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 10,
+    gap: 6,
   },
-  actionButtonActive: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
+  activeAction: {
+    // Add styles for active state if needed
   },
   actionText: {
-    color: 'white',
+    color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
-    marginLeft: 5,
+    fontWeight: '500',
+  },
+  claimButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  claimGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  claimText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   dealFooter: {
-    color: 'rgba(255,255,255,0.7)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  postedBy: {
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
+  },
+  timeRemaining: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  fabGradient: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -1158,7 +1252,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 16,
   },
   modalCloseButton: {
     width: 40,
@@ -1168,7 +1262,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: 'white',
   },
   modalSaveButton: {
@@ -1187,22 +1281,23 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   formGroup: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   formLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#1E293B',
     marginBottom: 8,
   },
   formInput: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: 'white',
+    backgroundColor: '#F8FAFC',
+    color: '#1E293B',
   },
   formTextArea: {
     height: 100,
@@ -1210,24 +1305,27 @@ const styles = StyleSheet.create({
   },
   formRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    gap: 16,
+    marginBottom: 24,
   },
   formHalf: {
-    flex: 0.48,
+    flex: 1,
   },
   categorySelectButton: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    marginRight: 10,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   categorySelectButtonActive: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#667eea',
+    borderColor: '#667eea',
   },
   categorySelectText: {
-    color: '#666',
+    color: '#64748B',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -1237,11 +1335,12 @@ const styles = StyleSheet.create({
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   checkboxLabel: {
     fontSize: 16,
-    color: '#333',
-    marginLeft: 10,
+    color: '#1E293B',
+    fontWeight: '500',
   },
   chatContainer: {
     flex: 1,
@@ -1251,25 +1350,26 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   chatMessage: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
   },
   chatUserName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#8B5CF6',
-    marginBottom: 5,
+    color: '#667eea',
+    marginBottom: 6,
   },
   chatMessageText: {
     fontSize: 16,
-    color: '#333',
-    marginBottom: 5,
+    color: '#1E293B',
+    marginBottom: 6,
+    lineHeight: 22,
   },
   chatTimestamp: {
     fontSize: 12,
-    color: '#666',
+    color: '#64748B',
   },
   chatInputContainer: {
     flexDirection: 'row',
@@ -1277,17 +1377,19 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: 'white',
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#E2E8F0',
+    gap: 12,
   },
   chatInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#E2E8F0',
     borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     maxHeight: 100,
-    marginRight: 10,
+    fontSize: 16,
+    backgroundColor: '#F8FAFC',
   },
   chatSendButton: {
     borderRadius: 20,
@@ -1298,185 +1400,6 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  onboardingOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  onboardingContainer: {
-    width: width * 0.9,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  onboardingGradient: {
-    padding: 30,
-    alignItems: 'center',
-  },
-  onboardingTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  onboardingSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
-    textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 22,
-  },
-  onboardingFeatures: {
-    width: '100%',
-    marginBottom: 30,
-  },
-  onboardingFeature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  onboardingFeatureText: {
-    fontSize: 16,
-    color: 'white',
-    marginLeft: 15,
-    fontWeight: '500',
-  },
-  onboardingButton: {
-    backgroundColor: 'white',
-    borderRadius: 25,
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-  },
-  onboardingButtonText: {
-    color: '#8B5CF6',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  
-  // Compact Deal Card Styles
-  compactDealCardGradient: {
-    padding: 4,
-  },
-  compactDealHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  compactDealCategory: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 3,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
-    minWidth: 25,
-    height: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  compactDealCategoryText: {
-    color: 'white',
-    fontSize: 7,
-    fontWeight: '600',
-  },
-  compactDealDiscount: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 3,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
-    minWidth: 30,
-    height: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  compactDealDiscountText: {
-    color: '#8B5CF6',
-    fontSize: 7,
-    fontWeight: 'bold',
-  },
-  compactDealTitle: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginBottom: 1,
-  },
-  compactDealDescription: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 9,
-    marginBottom: 2,
-    lineHeight: 11,
-  },
-  compactDealInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  compactDealPricing: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  compactOriginalPrice: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 9,
-    textDecorationLine: 'line-through',
-    marginRight: 2,
-  },
-  compactDiscountedPrice: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  compactPostedBy: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 7,
-    fontStyle: 'italic',
-  },
-  compactGroupDealSection: {
-    marginBottom: 4,
-  },
-  compactProgressBar: {
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 1,
-    marginBottom: 1,
-  },
-  compactProgressFill: {
-    height: '100%',
-    backgroundColor: 'white',
-    borderRadius: 1,
-  },
-  compactGroupDealText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 8,
-  },
-  compactDealActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    flexWrap: 'wrap',
-  },
-  compactActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 3,
-    paddingHorizontal: 2,
-    paddingVertical: 1,
-    marginRight: 2,
-    marginBottom: 1,
-    minWidth: 25,
-    height: 14,
-  },
-  compactActionButtonActive: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  compactActionText: {
-    color: 'white',
-    fontSize: 6,
-    marginLeft: 1,
-    fontWeight: '500',
   },
 });
 
