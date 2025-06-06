@@ -24,6 +24,7 @@ import ExpenseRefreshService from '@/services/expenseRefreshService';
 import * as Contacts from 'expo-contacts';
 import QRCodeModal from './QRCodeModal';
 import EditExpenseModal from './EditExpenseModal';
+import ExpenseModal from './ExpenseModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
@@ -64,6 +65,7 @@ export default function GroupDetailsModal({
   const [showEditExpense, setShowEditExpense] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [selectedMemberForAction, setSelectedMemberForAction] = useState<string | null>(null);
+  const [showGroupExpenseModal, setShowGroupExpenseModal] = useState(false);
 
   const isUserAdmin = group?.members?.find(member => 
     member.userId === currentUser?.id
@@ -404,6 +406,13 @@ const renderExpensesList = () => (
         <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
           <Ionicons name="refresh" size={16} color={theme.colors.primary} />
         </TouchableOpacity>
+        {groupExpenses.length > 0 && (
+          <TouchableOpacity onPress={() => setShowGroupExpenseModal(true)}>
+            <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
+              View All
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={onAddExpense}>
           <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
             Add New
@@ -827,6 +836,15 @@ const renderExpensesList = () => (
           onClose={() => setShowEditExpense(false)}
           expense={selectedExpense}
           onSubmit={handleExpenseUpdated}
+        />
+      )}
+
+      {/* Group Expense Modal */}
+      {showGroupExpenseModal && (
+        <ExpenseModal
+          visible={showGroupExpenseModal}
+          onClose={() => setShowGroupExpenseModal(false)}
+          groupId={group?.id}
         />
       )}
     </Modal>

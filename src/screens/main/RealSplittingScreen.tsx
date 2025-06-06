@@ -76,7 +76,8 @@ export default function RealSplittingScreen() {
   });
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [selectedGroupForExpense, setSelectedGroupForExpense] = useState<Group | null>(null);
-const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
 
   // Modal states
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -176,8 +177,8 @@ const [showNotifications, setShowNotifications] = useState(false);
     // Convert Firestore timestamps to proper Date objects
     const processedNotifications = notificationsData.map(notification => ({
       ...notification,
-      createdAt: notification.createdAt && typeof notification.createdAt.toDate === 'function' 
-        ? notification.createdAt.toDate() 
+      createdAt: notification.createdAt && typeof (notification.createdAt as any).toDate === 'function' 
+        ? (notification.createdAt as any).toDate() 
         : new Date(notification.createdAt || Date.now())
     }));
     
@@ -831,10 +832,9 @@ const [showNotifications, setShowNotifications] = useState(false);
     }
   };
 
-  // FIX: Navigate to expenses screen properly
+  // Navigate to expenses modal instead of tab
   const navigateToExpenses = () => {
-    // Navigate to the Expenses tab in the main navigator
-    navigation.navigate('Expenses' as never);
+    setShowExpenseModal(true);
   };
 
   // Render overview tab
@@ -1432,6 +1432,7 @@ const [showNotifications, setShowNotifications] = useState(false);
         onMarkAllAsRead={markAllNotificationsRead}
         onNavigateToNotification={handleNotificationNavigation}
       />
+
 
     </SafeAreaView>
   );

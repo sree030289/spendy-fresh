@@ -131,7 +131,7 @@ export default function ReminderDetailsModal({
         onPress: () => initiatePayment(provider.id)
       }));
 
-      buttons.push({ text: 'Cancel', onPress: () => {} });
+      buttons.push({ text: 'Cancel', onPress: async () => {} });
 
       Alert.alert(
         'Choose Payment Method',

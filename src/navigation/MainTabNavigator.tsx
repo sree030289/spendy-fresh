@@ -7,7 +7,7 @@ import { useTheme } from '@/hooks/useTheme';
 import SplittingScreen from '@/screens/main/SplittingScreen';
 import ExpensesScreen from '@/screens/main/ExpensesScreen';
 import RemindersScreen from '@/screens/main/RemindersScreen';
-import GoalsScreen from '@/screens/main/GoalsScreen';
+import DealsHubScreen from '@/screens/main/DealsHubScreen';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 
@@ -24,19 +24,19 @@ export default function MainTabNavigator() {
 
           switch (route.name) {
             case 'Splitting':
-              iconName = focused ? 'git-network' : 'git-network-outline';
+              iconName = focused ? 'people' : 'people-outline';
               break;
             case 'Expenses':
-              iconName = focused ? 'card' : 'card-outline';
+              iconName = focused ? 'receipt' : 'receipt-outline';
               break;
             case 'Reminders':
-              iconName = focused ? 'alarm' : 'alarm-outline';
+              iconName = focused ? 'notifications' : 'notifications-outline';
               break;
-            case 'Goals':
-              iconName = focused ? 'trending-up' : 'trending-up-outline';
+            case 'Deals Hub':
+              iconName = focused ? 'storefront' : 'storefront-outline';
               break;
             case 'Profile':
-              iconName = focused ? 'person-circle' : 'person-circle-outline';
+              iconName = focused ? 'person' : 'person-outline';
               break;
             default:
               iconName = 'ellipse';
@@ -58,8 +58,8 @@ export default function MainTabNavigator() {
     >
       <Tab.Screen name="Splitting" component={RealSplittingScreen} />
       <Tab.Screen name="Expenses" component={ExpensesScreen} />
+      <Tab.Screen name="Deals Hub" component={DealsHubScreen} />
       <Tab.Screen name="Reminders" component={RemindersScreen} />
-      <Tab.Screen name="Goals" component={GoalsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

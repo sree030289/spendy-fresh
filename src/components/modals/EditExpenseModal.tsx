@@ -60,7 +60,7 @@ export default function EditExpenseModal({
       setAmount(expense.amount.toString());
       setNotes(expense.notes || '');
       setSplitData(expense.splitData);
-      setExpenseDate(expense.expenseDate ? new Date(expense.expenseDate) : new Date(expense.createdAt));
+      setExpenseDate(new Date(expense.createdAt));
       
       const category = expenseCategories.find(cat => cat.id === expense.category);
       if (category) {

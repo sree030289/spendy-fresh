@@ -126,7 +126,7 @@ export default function RemindersScreen() {
                   Alert.alert('Success', 'Gmail connected successfully!');
                 }
               } catch (error) {
-                Alert.alert('Error', error.message);
+                Alert.alert('Error', error instanceof Error ? error.message : 'An error occurred');
               } finally {
                 setIsSyncing(false);
               }
