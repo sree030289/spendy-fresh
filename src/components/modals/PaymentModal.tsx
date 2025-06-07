@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { PaymentService } from '@/services/payments/PaymentService';
-import { Friend } from '@/services/firebase/splitting';
+import { Friend, SplittingService } from '@/services/firebase/splitting';
 
 interface PaymentModalProps {
   visible: boolean;
@@ -110,15 +110,30 @@ export default function PaymentModal({
     }
   };
 
-  const handlePayment = async () => {
+ const handlePayment = async () => {
     if (!friend || !selectedMethod) return;
 
     setLoading(true);
     try {
-      await onPayment(friend.friendId, parseFloat(amount), selectedMethod);
+      // Create payment request with notification system
+      await SplittingService.createPaymentRequest({
+        fromUserId: user?.id || '',
+        toUserId: friend.friendId,
+        amount: parseFloat(amount),
+        currency: userCurrency,
+        message: note.trim() || undefined
+      });
+      
+      Alert.alert(
+        'Payment Request Sent! 📱', 
+        `${friend.friendData.fullName} will receive a notification and SMS with your payment request.`,
+        [{ text: 'OK' }]
+      );
+      
       onClose();
+      
     } catch (error: any) {
-      Alert.alert('Payment Error', error.message || 'Failed to process payment');
+      Alert.alert('Error', error.message || 'Failed to send payment request');
     } finally {
       setLoading(false);
     }

@@ -160,11 +160,13 @@ export interface Payment {
   groupId?: string;
   amount: number;
   currency: string;
-  method: 'bank' | 'paypal' | 'gpay' | 'phonepe' | 'paytm' | 'upi';
-  provider: string;
+  method: 'bank' | 'paypal' | 'gpay' | 'phonepe' | 'paytm' | 'upi' | 'manual_settlement';
+  provider?: string;
   transactionId?: string;
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
-  deepLinkUsed: boolean;
+  deepLinkUsed?: boolean;
+  description?: string;
+  settledAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -300,7 +302,7 @@ export interface ExpenseTemplate {
 export class SplittingService {
   
   // FRIENDS MANAGEMENT
-static async sendFriendRequest(fromUserId: string, toEmail: string, message?: string): Promise<void> {
+  static async sendFriendRequest(fromUserId: string, toEmail: string, message?: string): Promise<void> {
   try {
     // Get current user data first
     const fromUserDoc = await getDoc(doc(db, 'users', fromUserId));
@@ -2112,6 +2114,8 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
   splitWithMostFrequent: { userId: string; userName: string; count: number };
 }> {
   try {
+    console.log('Getting expense analytics for user:', userId, 'timeframe:', timeframe);
+    
     // Calculate date range based on timeframe
     const now = new Date();
     let startDate = new Date();
@@ -2131,19 +2135,77 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
         break;
     }
 
-    // Get user's expenses within timeframe
-    const expensesQuery = query(
-      collection(db, 'expenses'),
-      where('participants', 'array-contains', userId),
-      where('date', '>=', startDate),
-      orderBy('date', 'desc')
+    console.log('Date range:', startDate, 'to', now);
+
+    // First get user's groups to find relevant expenses
+    const userGroups = await this.getUserGroups(userId);
+    const groupIds = userGroups.map(group => group.id);
+    
+    console.log('User groups found:', groupIds.length);
+    
+    if (groupIds.length === 0) {
+      console.log('No groups found for user, returning empty analytics');
+      return {
+        totalSpent: 0,
+        totalOwed: 0,
+        totalOwing: 0,
+        averageExpense: 0,
+        expenseCount: 0,
+        monthlySpending: [],
+        categoryBreakdown: [],
+        groupAnalytics: [],
+        splitWithMostFrequent: { userId: '', userName: '', count: 0 }
+      };
+    }
+
+    // Get user's expenses within timeframe from their groups
+    // Since we need to handle the 'in' limitation and date filtering, we'll do this in batches
+    let allExpenses: Expense[] = [];
+    
+    // Process groups in batches of 10 (Firestore 'in' limitation)
+    for (let i = 0; i < groupIds.length; i += 10) {
+      const batchGroupIds = groupIds.slice(i, i + 10);
+      
+      try {
+        const expensesQuery = query(
+          collection(db, 'expenses'),
+          where('groupId', 'in', batchGroupIds),
+          orderBy('createdAt', 'desc'),
+          limit(1000) // Limit per batch to avoid too much data
+        );
+        
+        const expensesSnapshot = await getDocs(expensesQuery);
+        const batchExpenses = expensesSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            date: data.date?.toDate() || data.createdAt?.toDate() || new Date(),
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate() || new Date(),
+          };
+        }) as Expense[];
+        
+        // Filter by date range (since we can't use both 'in' and 'where' with orderBy on different fields)
+        const filteredBatchExpenses = batchExpenses.filter(expense => 
+          expense.date >= startDate && expense.date <= now
+        );
+        
+        allExpenses = [...allExpenses, ...filteredBatchExpenses];
+        
+      } catch (error) {
+        console.error(`Error fetching expenses for batch ${i}:`, error);
+        // Continue with other batches
+      }
+    }
+    
+    // Filter expenses where user is involved (paidBy or in splitData)
+    const expenses = allExpenses.filter(expense => 
+      expense.paidBy === userId || 
+      expense.splitData?.some((split: ExpenseSplit) => split.userId === userId)
     );
-    const expensesSnapshot = await getDocs(expensesQuery);
-    const expenses = expensesSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      date: doc.data().date?.toDate() || new Date()
-    })) as Expense[];
+
+    console.log('Total relevant expenses found:', expenses.length);
 
     // Calculate totals with proper fallbacks
     let totalSpent = 0;
@@ -2159,8 +2221,11 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
       const userSplit = expense.splitData?.find((split: ExpenseSplit) => split.userId === userId);
       if (userSplit) {
         if (expense.paidBy === userId) {
-          totalOwed += (expense.amount - userSplit.amount) || 0;
-        } else if (!expense.isSettled) {
+          // User paid, so others owe them
+          const othersOwe = (expense.amount || 0) - (userSplit.amount || 0);
+          totalOwed += othersOwe;
+        } else if (!userSplit.isPaid) {
+          // User owes money and hasn't paid yet
           totalOwing += userSplit.amount || 0;
         }
       }
@@ -2177,16 +2242,19 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
       });
     });
 
-    // Calculate average expense
-    const expenseCount = expenses.filter(exp => exp.paidBy === userId).length;
+    // Calculate average expense (only for expenses user paid)
+    const userPaidExpenses = expenses.filter(exp => exp.paidBy === userId);
+    const expenseCount = userPaidExpenses.length;
     const averageExpense = expenseCount > 0 ? totalSpent / expenseCount : 0;
+
+    console.log('Calculated totals:', { totalSpent, totalOwed, totalOwing, expenseCount, averageExpense });
 
     // Monthly spending analysis
     const monthlyData: { [key: string]: number } = {};
     expenses.forEach(expense => {
       if (expense.paidBy === userId) {
         const monthKey = expense.date.toISOString().substring(0, 7); // YYYY-MM
-        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + expense.amount;
+        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + (expense.amount || 0);
       }
     });
 
@@ -2200,7 +2268,7 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
     expenses.forEach(expense => {
       if (expense.paidBy === userId) {
         const category = expense.category || 'Other';
-        categoryData[category] = (categoryData[category] || 0) + expense.amount;
+        categoryData[category] = (categoryData[category] || 0) + (expense.amount || 0);
       }
     });
 
@@ -2214,18 +2282,11 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
       .sort((a, b) => b.amount - a.amount);
 
     // Group analytics
-    const groupsQuery = query(
-      collection(db, 'groups'),
-      where('members', 'array-contains', { userId, role: 'member' })
-    );
-    const groupsSnapshot = await getDocs(groupsQuery);
-    const groups = groupsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Group[];
-
-    const groupAnalytics = groups.map(group => {
+    const groupAnalytics = userGroups.map(group => {
       const groupExpenses = expenses.filter(exp => exp.groupId === group.id);
       const groupSpent = groupExpenses
         .filter(exp => exp.paidBy === userId)
-        .reduce((sum, exp) => sum + exp.amount, 0);
+        .reduce((sum, exp) => sum + (exp.amount || 0), 0);
       
       return {
         groupName: group.name,
@@ -2234,10 +2295,47 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
       };
     }).sort((a, b) => b.totalSpent - a.totalSpent);
 
-    // Most frequent split partner
-    const splitWithMostFrequent = Object.values(splitCounts).length > 0
-      ? Object.values(splitCounts).reduce((max, current) => current.count > max.count ? current : max)
-      : { userId: '', userName: '', count: 0 };
+    // Most frequent split partner - get name from group members or friends
+    let splitWithMostFrequent = { userId: '', userName: '', count: 0 };
+    
+    if (Object.values(splitCounts).length > 0) {
+      const mostFrequentSplit = Object.values(splitCounts).reduce((max, current) => 
+        current.count > max.count ? current : max
+      );
+      
+      // Try to get the actual user name
+      let userName = 'Unknown';
+      
+      // Check in group members
+      for (const group of userGroups) {
+        const member = group.members.find(m => m.userId === mostFrequentSplit.userId);
+        if (member) {
+          userName = member.userData.fullName;
+          break;
+        }
+      }
+      
+      // If not found in groups, try friends
+      if (userName === 'Unknown') {
+        try {
+          const friends = await this.getFriends(userId);
+          const friend = friends.find(f => f.friendId === mostFrequentSplit.userId);
+          if (friend) {
+            userName = friend.friendData.fullName;
+          }
+        } catch (error) {
+          console.log('Could not fetch friends for split partner name');
+        }
+      }
+      
+      splitWithMostFrequent = {
+        userId: mostFrequentSplit.userId,
+        userName,
+        count: mostFrequentSplit.count
+      };
+    }
+
+    console.log('Analytics calculation completed successfully');
 
     return {
       totalSpent: totalSpent || 0,
@@ -2267,6 +2365,496 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
       splitWithMostFrequent: { userId: '', userName: '', count: 0 }
     };
   }
+  }
+  // MANUAL SETTLEMENT METHODS
+  static async markPaymentAsPaid(
+    payerId: string,
+    payeeId: string,
+    amount: number,
+    groupId?: string,
+    description?: string
+  ): Promise<string> {
+    try {
+      console.log(`Marking payment as paid: ${payerId} -> ${payeeId}, amount: ${amount}`);
+      
+      const batch = writeBatch(db);
+      
+      // Create payment record
+      const paymentData: Omit<Payment, 'id' | 'createdAt' | 'updatedAt'> = {
+        fromUserId: payerId,
+        toUserId: payeeId,
+        amount: amount,
+        currency: 'USD', // Default currency, should be passed as parameter in real implementation
+        status: 'completed',
+        method: 'manual_settlement',
+        description: description || 'Manual settlement',
+        groupId: groupId,
+        settledAt: new Date()
+      };
+      
+      const paymentRef = doc(collection(db, 'payments'));
+      batch.set(paymentRef, {
+        ...paymentData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      
+      // Update friend balances
+      await this.updateFriendBalance(payerId, payeeId, -amount);
+      await this.updateFriendBalance(payeeId, payerId, amount);
+      
+      // Update group member balances if in a group
+      if (groupId) {
+        await this.updateGroupMemberBalance(groupId, payerId, -amount);
+        await this.updateGroupMemberBalance(groupId, payeeId, amount);
+        
+        // Add settlement message to group chat
+        const payerData = await this.getUser(payerId);
+        const payeeData = await this.getUser(payeeId);
+        
+        const settlementMessage = {
+          groupId: groupId,
+          userId: 'system',
+          userName: 'System',
+          message: `${payerData?.fullName || 'Someone'} marked payment of $${amount} to ${payeeData?.fullName || 'someone'} as paid`,
+          timestamp: serverTimestamp(),
+          type: 'system' as const
+        };
+        
+        batch.set(doc(collection(db, 'groupMessages')), settlementMessage);
+      }
+      
+      // Create notifications
+      const payeeNotification = {
+        userId: payeeId,
+        type: 'payment_received' as const,
+        title: 'Payment Received',
+        message: `You received $${amount} from a friend`,
+        data: { 
+          paymentId: paymentRef.id,
+          amount: amount,
+          payerId: payerId,
+          groupId: groupId
+        },
+        isRead: false,
+        createdAt: new Date()
+      };
+      
+      batch.set(doc(collection(db, 'notifications')), payeeNotification);
+      
+      await batch.commit();
+      console.log('✅ Payment marked as paid successfully');
+      
+      return paymentRef.id;
+      
+    } catch (error) {
+      console.error('❌ Mark payment as paid error:', error);
+      throw error;
+    }
+  }
+
+  static async settleAllBalancesBetweenFriends(
+    userId: string,
+    friendId: string,
+    groupId?: string
+  ): Promise<void> {
+    try {
+      console.log(`Settling all balances between ${userId} and ${friendId}`);
+      
+      // Get current friend relationship to check balance
+      const friendship = await this.getFriendship(userId, friendId);
+      if (!friendship) {
+        throw new Error('Friendship not found');
+      }
+      
+      const balance = friendship.balance;
+      if (balance === 0) {
+        throw new Error('No outstanding balance to settle');
+      }
+      
+      // Determine who owes whom
+      const amount = Math.abs(balance);
+      const payerId = balance > 0 ? friendId : userId; // If balance > 0, friend owes user
+      const payeeId = balance > 0 ? userId : friendId;
+      
+      await this.markPaymentAsPaid(
+        payerId,
+        payeeId,
+        amount,
+        groupId,
+        'Settlement of all balances'
+      );
+      
+      console.log('✅ All balances settled successfully');
+      
+    } catch (error) {
+      console.error('❌ Settle all balances error:', error);
+      throw error;
+    }
+  }
+
+  static async getSettlementSuggestions(userId: string): Promise<Array<{
+    friendId: string;
+    friendName: string;
+    friendAvatar?: string;
+    amount: number;
+    type: 'owes_you' | 'you_owe';
+    groupId?: string;
+    groupName?: string;
+  }>> {
+    try {
+      const friends = await this.getFriends(userId);
+      const suggestions = [];
+      
+      for (const friend of friends) {
+        if (friend.balance !== 0) {
+          const amount = Math.abs(friend.balance);
+          const type: 'owes_you' | 'you_owe' = friend.balance > 0 ? 'owes_you' : 'you_owe';
+          
+          suggestions.push({
+            friendId: friend.friendId,
+            friendName: friend.friendData.fullName,
+            friendAvatar: friend.friendData.avatar,
+            amount: amount,
+            type: type
+          });
+        }
+      }
+      
+      // Sort by amount descending
+      return suggestions.sort((a, b) => b.amount - a.amount);
+      
+    } catch (error) {
+      console.error('Get settlement suggestions error:', error);
+      return [];
+    }
+  }
+
+  static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
+    fromUserId: string;
+    fromUserName: string;
+    fromUserAvatar?: string;
+    toUserId: string;
+    toUserName: string;
+    toUserAvatar?: string;
+    amount: number;
+  }>> {
+    try {
+      const group = await this.getGroup(groupId);
+      if (!group) {
+        throw new Error('Group not found');
+      }
+      
+      const suggestions = [];
+      
+      // Find all members who owe money (negative balance) and who are owed money (positive balance)
+      const debtors = group.members.filter(m => m.balance < 0);
+      const creditors = group.members.filter(m => m.balance > 0);
+      
+      // Simple settlement suggestions - pair highest debtor with highest creditor
+      for (const debtor of debtors) {
+        for (const creditor of creditors) {
+          if (debtor.userId !== creditor.userId) {
+            const settleAmount = Math.min(Math.abs(debtor.balance), creditor.balance);
+            
+            if (settleAmount > 0) {
+              suggestions.push({
+                fromUserId: debtor.userId,
+                fromUserName: debtor.userData.fullName,
+                fromUserAvatar: debtor.userData.avatar,
+                toUserId: creditor.userId,
+                toUserName: creditor.userData.fullName,
+                toUserAvatar: creditor.userData.avatar,
+                amount: settleAmount
+              });
+            }
+          }
+        }
+      }
+      
+      // Sort by amount descending
+      return suggestions.sort((a, b) => b.amount - a.amount).slice(0, 5); // Top 5 suggestions
+      
+    } catch (error) {
+      console.error('Get group settlement suggestions error:', error);
+      return [];
+    }
+  }
+
+  // Helper method to get user data
+  static async getUser(userId: string): Promise<any> {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        return { id: userDoc.id, ...userDoc.data() };
+      }
+      return null;
+    } catch (error) {
+      console.error('Get user error:', error);
+      return null;
+    }
+  }
+
+  // Helper method to get friendship data
+  static async getFriendship(userId: string, friendId: string): Promise<Friend | null> {
+    try {
+      const friends = await this.getFriends(userId);
+      return friends.find(f => f.friendId === friendId) || null;
+    } catch (error) {
+      console.error('Get friendship error:', error);
+      return null;
+    }
+  }
+
+  // Add these methods to your SplittingService class
+
+// PAYMENT REQUEST METHODS
+static async createPaymentRequest(data: {
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  currency: string;
+  expenseId?: string;
+  groupId?: string;
+  message?: string;
+}): Promise<string> {
+  try {
+    // Get user data for notifications
+    const fromUserDoc = await getDoc(doc(db, 'users', data.fromUserId));
+    const toUserDoc = await getDoc(doc(db, 'users', data.toUserId));
+    
+    if (!fromUserDoc.exists() || !toUserDoc.exists()) {
+      throw new Error('User not found');
+    }
+    
+    const fromUserData = fromUserDoc.data();
+    const toUserData = toUserDoc.data();
+    
+    // Create payment request
+    const paymentRequest = {
+      fromUserId: data.fromUserId,
+      fromUserData: {
+        fullName: fromUserData.fullName,
+        email: fromUserData.email,
+        avatar: fromUserData.profilePicture || ''
+      },
+      toUserId: data.toUserId,
+      toUserData: {
+        fullName: toUserData.fullName,
+        email: toUserData.email,
+        avatar: toUserData.profilePicture || ''
+      },
+      amount: data.amount,
+      currency: data.currency,
+      expenseId: data.expenseId || null,
+      groupId: data.groupId || null,
+      message: data.message || '',
+      status: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await addDoc(collection(db, 'paymentRequests'), paymentRequest);
+    
+    // Create in-app notification
+    await this.createNotification({
+      userId: data.toUserId,
+      type: 'payment_received',
+      title: 'Payment Request',
+      message: `${fromUserData.fullName} is requesting ${getCurrencySymbol(data.currency)}${data.amount.toFixed(2)}${data.message ? ` for ${data.message}` : ''}`,
+      data: {
+        paymentRequestId: docRef.id,
+        fromUserId: data.fromUserId,
+        fromUserName: fromUserData.fullName,
+        amount: data.amount,
+        currency: data.currency,
+        expenseId: data.expenseId,
+        groupId: data.groupId
+      },
+      isRead: false,
+      createdAt: new Date()
+    });
+    
+    // Send SMS notification if user has phone number
+    if (toUserData.mobile) {
+      await this.sendSMSPaymentRequest(
+        toUserData.mobile,
+        fromUserData.fullName,
+        data.amount,
+        data.currency,
+        docRef.id
+      );
+    }
+    
+    // Add to group chat if it's a group expense
+    if (data.groupId) {
+      await this.sendGroupMessage({
+        groupId: data.groupId,
+        userId: data.fromUserId,
+        userName: fromUserData.fullName,
+        message: `💰 Requested ${getCurrencySymbol(data.currency)}${data.amount.toFixed(2)} from ${toUserData.fullName}`,
+        type: 'system'
+      });
+    }
+    
+    return docRef.id;
+    
+  } catch (error) {
+    console.error('Create payment request error:', error);
+    throw error;
+  }
 }
 
-} // End of SplittingService class
+static async sendSMSPaymentRequest(
+  phoneNumber: string, 
+  fromUserName: string, 
+  amount: number, 
+  currency: string, 
+  requestId: string
+): Promise<void> {
+  try {
+    const message = `💰 Payment Request: ${fromUserName} is requesting ${getCurrencySymbol(currency)}${amount.toFixed(2)}. Open Spendy to pay: https://spendy.app/pay/${requestId}`;
+    
+    // Here you would integrate with your SMS service (Twilio, AWS SNS, etc.)
+    // For now, we'll just log it
+    console.log('SMS Payment Request:', { phoneNumber, message });
+    
+    // TODO: Implement actual SMS sending
+    // await twilioClient.messages.create({
+    //   body: message,
+    //   from: '+1234567890',
+    //   to: phoneNumber
+    // });
+    
+  } catch (error) {
+    console.error('Send SMS payment request error:', error);
+    // Don't throw - SMS is optional
+  }
+}
+
+static async sendPaymentReminder(paymentRequestId: string): Promise<void> {
+  try {
+    // Get payment request
+    const requestDoc = await getDoc(doc(db, 'paymentRequests', paymentRequestId));
+    if (!requestDoc.exists()) {
+      throw new Error('Payment request not found');
+    }
+    
+    const requestData = requestDoc.data();
+    
+    // Send reminder notification
+    await this.createNotification({
+      userId: requestData.toUserId,
+      type: 'payment_received',
+      title: 'Payment Reminder',
+      message: `Reminder: ${requestData.fromUserData.fullName} is still waiting for ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)}`,
+      data: {
+        paymentRequestId,
+        fromUserId: requestData.fromUserId,
+        fromUserName: requestData.fromUserData.fullName,
+        amount: requestData.amount,
+        currency: requestData.currency,
+        isReminder: true
+      },
+      isRead: false,
+      createdAt: new Date()
+    });
+    
+    // Send SMS reminder if user has phone number
+    const toUserDoc = await getDoc(doc(db, 'users', requestData.toUserId));
+    if (toUserDoc.exists()) {
+      const toUserData = toUserDoc.data();
+      if (toUserData.mobile) {
+        const message = `🔔 Reminder: ${requestData.fromUserData.fullName} is waiting for your payment of ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)}. Open Spendy: https://spendy.app/pay/${paymentRequestId}`;
+        
+        console.log('SMS Reminder:', { phoneNumber: toUserData.mobile, message });
+        // TODO: Send actual SMS
+      }
+    }
+    
+    // Add fun meme message to group chat if it's a group expense
+    if (requestData.groupId) {
+      const memeMessages = [
+        `🕒 Still waiting for that ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)} from ${requestData.toUserData.fullName}... ⏰`,
+        `📱 ${requestData.toUserData.fullName}, your wallet is calling! 💸`,
+        `🎵 Money money money... must be funny... ${requestData.toUserData.fullName}? 🎶`,
+        `🚨 Payment Alert: ${requestData.toUserData.fullName} still owes ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)} 🚨`,
+        `💰 Breaking News: ${requestData.toUserData.fullName}'s payment is still missing! 📰`
+      ];
+      
+      const randomMeme = memeMessages[Math.floor(Math.random() * memeMessages.length)];
+      
+      await this.sendGroupMessage({
+        groupId: requestData.groupId,
+        userId: 'system',
+        userName: 'Spendy Bot',
+        message: randomMeme,
+        type: 'system'
+      });
+    }
+    
+  } catch (error) {
+    console.error('Send payment reminder error:', error);
+    throw error;
+  }
+}
+
+static async markPaymentRequestPaid(paymentRequestId: string, paidBy: string): Promise<void> {
+  try {
+    // Update payment request status
+    await updateDoc(doc(db, 'paymentRequests', paymentRequestId), {
+      status: 'paid',
+      paidAt: new Date(),
+      paidBy,
+      updatedAt: new Date()
+    });
+    
+    // Get payment request data
+    const requestDoc = await getDoc(doc(db, 'paymentRequests', paymentRequestId));
+    if (!requestDoc.exists()) return;
+    
+    const requestData = requestDoc.data();
+    
+    // Notify the requester that payment was received
+    await this.createNotification({
+      userId: requestData.fromUserId,
+      type: 'payment_received',
+      title: 'Payment Received!',
+      message: `${requestData.toUserData.fullName} paid ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)}`,
+      data: {
+        paymentRequestId,
+        fromUserId: requestData.toUserId,
+        fromUserName: requestData.toUserData.fullName,
+        amount: requestData.amount,
+        currency: requestData.currency
+      },
+      isRead: false,
+      createdAt: new Date()
+    });
+    
+    // Add celebration to group chat
+    if (requestData.groupId) {
+      const celebrationMessages = [
+        `🎉 Payment received! ${requestData.toUserData.fullName} just paid ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)} 🎉`,
+        `💸 Cha-ching! ${requestData.toUserData.fullName} settled up! 💰`,
+        `✅ Payment complete: ${requestData.toUserData.fullName} → ${requestData.fromUserData.fullName} ✅`,
+        `🏆 ${requestData.toUserData.fullName} wins "Fastest Payer" award! 🏆`
+      ];
+      
+      const randomCelebration = celebrationMessages[Math.floor(Math.random() * celebrationMessages.length)];
+      
+      await this.sendGroupMessage({
+        groupId: requestData.groupId,
+        userId: 'system',
+        userName: 'Spendy Bot',
+        message: randomCelebration,
+        type: 'system'
+      });
+    }
+    
+  } catch (error) {
+    console.error('Mark payment request paid error:', error);
+    throw error;
+  }
+}
+}

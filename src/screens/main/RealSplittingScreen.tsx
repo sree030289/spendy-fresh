@@ -27,7 +27,8 @@ import {
   where, 
   getDocs, 
   updateDoc, 
-  doc 
+  doc,
+  orderBy
 } from 'firebase/firestore';
 import { db } from '@/services/firebase/config';
 
@@ -52,6 +53,8 @@ import RecurringExpenseModal from '@/components/modals/RecurringExpenseModal';
 import AnalyticsModal from '@/components/modals/AnalyticsModal';
 import ExpenseDeletionModal from '@/components/modals/ExpenseDeletionModal';
 import ExpenseSettlementModal from '@/components/modals/ExpenseSettlementModal';
+import ManualSettlementModal from '@/components/modals/ManualSettlementModal';
+import GroupSettlementModal from '@/components/modals/GroupSettlementModal';
 import { getCurrencySymbol } from '@/utils/currency';
 
 export default function RealSplittingScreen() {
@@ -102,6 +105,8 @@ export default function RealSplittingScreen() {
   const [showExpenseSettlement, setShowExpenseSettlement] = useState(false);
   const [showExpenseDeletion, setShowExpenseDeletion] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showManualSettlement, setShowManualSettlement] = useState(false);
+  const [showGroupSettlement, setShowGroupSettlement] = useState(false);
   const [selectedExpenseForAction, setSelectedExpenseForAction] = useState<Expense | null>(null);
 
   // Reset to overview tab when the screen gains focus (when bottom tab is pressed)
@@ -131,13 +136,22 @@ export default function RealSplittingScreen() {
           console.warn('Push notification initialization failed:', pushError);
           // Continue without push notifications
         }
+
+        // Process recurring expenses on app startup
+      try {
+        await SplittingService.processRecurringExpenses();
+        console.log('Recurring expenses processed');
+      } catch (recurringError) {
+        console.warn('Recurring expenses processing failed:', recurringError);
+      }
         
         // Load initial data
         await Promise.all([
           loadFriends(),
           loadGroups(),
           loadRecentExpenses(),
-          loadNotifications() // FIX: Add this to load notifications
+          loadNotifications(), // FIX: Add this to load notifications
+          loadRecurringExpenses()
         ]);
         
         // Set up real-time listeners
@@ -207,6 +221,38 @@ export default function RealSplittingScreen() {
     setNotifications(processedNotifications);
   } catch (error) {
     console.error('Load notifications error:', error);
+  }
+};
+const loadRecurringExpenses = async () => {
+  try {
+    if (!user?.id) return;
+    
+    // Get user's recurring expenses
+    const recurringQuery = query(
+      collection(db, 'recurringExpenses'),
+      where('createdBy', '==', user.id),
+      where('isActive', '==', true),
+      orderBy('nextDueDate', 'asc')
+    );
+    
+    const snapshot = await getDocs(recurringQuery);
+    const recurringExpenses = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      startDate: doc.data().startDate?.toDate() || new Date(),
+      endDate: doc.data().endDate?.toDate() || null,
+      nextDueDate: doc.data().nextDueDate?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    }));
+    
+    console.log('Loaded recurring expenses:', recurringExpenses.length);
+    
+    // You can add state to store these and display them in UI
+    // setRecurringExpenses(recurringExpenses);
+    
+  } catch (error) {
+    console.error('Load recurring expenses error:', error);
   }
 };
   
@@ -526,6 +572,17 @@ const handleExportData = async () => {
         style: 'cancel'
       }
     ];
+
+    // Add manual settlement action if there's a balance
+    if (friend.balance !== 0 && friend.status === 'accepted') {
+      actions.unshift({
+        text: 'Mark as Paid',
+        onPress: () => {
+          setSelectedFriend(friend);
+          setShowManualSettlement(true);
+        }
+      });
+    }
 
     // Add payment action if there's a balance
     if (friend.balance !== 0 && friend.status === 'accepted') {
@@ -925,8 +982,6 @@ const showExpenseActionsMenu = (expense: Expense) => {
     actions
   );
 };
-
-
   // Handle payment
   const handlePayment = async (friendId: string, amount: number, method: string) => {
     try {
@@ -953,7 +1008,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
         recipientEmail: friend.friendData.email,
         description: `Payment via Spendy`
       };
-      
+
       // Initiate payment
       await PaymentService.initiatePayment(
         method,
@@ -965,6 +1020,35 @@ const showExpenseActionsMenu = (expense: Expense) => {
       setShowPayment(false);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to initiate payment');
+    }
+  };
+
+  // Handle manual settlement
+  const handleManualSettlement = async (friendId: string, amount: number, description?: string) => {
+    try {
+      if (!user?.id) return;
+
+      await SplittingService.markPaymentAsPaid(
+        user.id,
+        friendId,
+        amount,
+        description || 'Manual settlement'
+      );
+
+      // Refresh data
+      await Promise.all([
+        loadFriends(),
+        loadRecentExpenses(),
+        loadNotifications()
+      ]);
+
+      setShowManualSettlement(false);
+      setSelectedFriend(null);
+
+      Alert.alert('Success', 'Payment marked as paid successfully!');
+    } catch (error: any) {
+      console.error('Manual settlement error:', error);
+      Alert.alert('Error', error.message || 'Failed to mark payment as paid');
     }
   };
 
@@ -1258,6 +1342,17 @@ const showExpenseActionsMenu = (expense: Expense) => {
                 >
                   <Ionicons name="chatbubble" size={16} color={theme.colors.primary} />
                   <Text style={[styles.chatButtonText, { color: theme.colors.primary }]}>Chat</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedGroup(group);
+                    setShowGroupSettlement(true);
+                  }}
+                  style={[styles.settlementButton, { backgroundColor: theme.colors.success + '20' }]}
+                >
+                  <Ionicons name="card" size={16} color={theme.colors.success} />
+                  <Text style={[styles.settlementButtonText, { color: theme.colors.success }]}>Settle</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={(e) => {
@@ -1644,6 +1739,29 @@ const showExpenseActionsMenu = (expense: Expense) => {
       currentUser={user}
     />
 
+    <ManualSettlementModal
+      visible={showManualSettlement}
+      onClose={() => {
+        setShowManualSettlement(false);
+        setSelectedFriend(null);
+      }}
+      friend={selectedFriend}
+      userCurrency={user?.currency || 'USD'}
+      onSettlement={handleManualSettlement}
+    />
+
+    <GroupSettlementModal
+      visible={showGroupSettlement}
+      onClose={() => {
+        setShowGroupSettlement(false);
+        setSelectedGroup(null);
+      }}
+      groupId={selectedGroup?.id || null}
+      userCurrency={user?.currency || 'USD'}
+      currentUserId={user?.id || ''}
+      onRefresh={loadRecentExpenses}
+    />
+
     </SafeAreaView>
   );
 }
@@ -1823,90 +1941,57 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
   },
-  expenseItem: {
+expenseItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
+    paddingHorizontal: 4, // Add horizontal padding
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    minHeight: 60, // Ensure consistent height
   },
   expenseLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0, // Allow flex shrinking
   },
   expenseIcon: {
     fontSize: 20,
     marginRight: 12,
+    width: 24, // Fixed width for icon alignment
+    textAlign: 'center',
   },
   expenseTitle: {
     fontSize: 16,
     fontWeight: '500',
+    flexShrink: 1, // Allow text to shrink if needed
   },
   expenseSubtitle: {
     fontSize: 12,
     marginTop: 2,
+    flexShrink: 1, // Allow text to shrink if needed
   },
   expenseRight: {
     alignItems: 'flex-end',
+    minWidth: 80, // Ensure minimum width for amounts
+    marginLeft: 8,
   },
-  expenseAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  expenseStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  expenseStatusText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  groupCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  groupHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  groupLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  groupAvatar: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  groupName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  groupMembers: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  groupActions: {
-    flexDirection: 'row',
-  },
-  groupActionButton: {
-    marginLeft: 12,
-  },
+
   friendItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
+    paddingHorizontal: 4, // Add horizontal padding
+    minHeight: 60, // Ensure consistent height
   },
   friendLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    minWidth: 0, // Allow flex shrinking
   },
   friendAvatar: {
     width: 40,
@@ -1915,22 +2000,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-  },
-  friendAvatarText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    backgroundColor: '#4F46E5', // Consistent background
   },
   friendName: {
     fontSize: 16,
     fontWeight: '500',
+    flexShrink: 1, // Allow text to shrink if needed
   },
   friendEmail: {
     fontSize: 12,
     marginTop: 2,
+    flexShrink: 1, // Allow text to shrink if needed
   },
   friendRight: {
     alignItems: 'flex-end',
+    minWidth: 80, // Ensure minimum width for balance
+    marginLeft: 8,
   },
   friendBalance: {
     alignItems: 'flex-end',
@@ -2051,6 +2136,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  settlementButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  settlementButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   friendStatus: {
     fontSize: 11,
     fontWeight: '500',
@@ -2105,5 +2202,71 @@ const styles = StyleSheet.create({
   emptyExpensesText: {
     fontSize: 14,
     fontStyle: 'italic',
+  },
+  // Missing styles added
+  expenseAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  expenseStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  expenseStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  friendAvatarText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  groupCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  groupLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  groupAvatar: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  groupName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  groupMembers: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  groupActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  groupActionButton: {
+    padding: 8,
+    marginLeft: 8,
   },
 });
