@@ -325,7 +325,7 @@ export default function ExpensesScreen() {
               <View style={styles.expenseHeader}>
                 <View style={styles.expenseLeft}>
                   <LinearGradient
-                    colors={categoryConfig.gradient}
+                    colors={categoryConfig.gradient as [string, string, ...string[]]}
                     style={styles.categoryIconContainer}
                   >
                     <Ionicons 
@@ -551,7 +551,7 @@ export default function ExpensesScreen() {
                       <View key={category} style={styles.categoryItem}>
                         <View style={styles.categoryItemLeft}>
                           <LinearGradient
-                            colors={config.gradient}
+                            colors={config.gradient as [string, string, ...string[]]}
                             style={styles.categoryItemIcon}
                           >
                             <Ionicons name={config.icon as any} size={16} color="white" />

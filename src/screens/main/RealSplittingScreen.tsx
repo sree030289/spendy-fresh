@@ -1,5 +1,5 @@
 // src/screens/main/RealSplittingScreen.tsx - FIXED VERSION
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -48,6 +48,11 @@ import ReceiptScannerModal from '@/components/modals/ReceiptScannerModal';
 import GroupDetailsModal from '@/components/modals/GroupDetailsModal';
 import ExpenseRefreshService from '@/services/expenseRefreshService';
 import NotificationsModal from '@/components/modals/NotificationsModal';
+import RecurringExpenseModal from '@/components/modals/RecurringExpenseModal';
+import AnalyticsModal from '@/components/modals/AnalyticsModal';
+import ExpenseDeletionModal from '@/components/modals/ExpenseDeletionModal';
+import ExpenseSettlementModal from '@/components/modals/ExpenseSettlementModal';
+import { getCurrencySymbol } from '@/utils/currency';
 
 export default function RealSplittingScreen() {
   const navigation = useNavigation();
@@ -78,6 +83,7 @@ export default function RealSplittingScreen() {
   const [selectedGroupForExpense, setSelectedGroupForExpense] = useState<Group | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showRecurringExpense, setShowRecurringExpense] = useState(false);
 
   // Modal states
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -88,6 +94,22 @@ export default function RealSplittingScreen() {
   const [showGroupChat, setShowGroupChat] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  
+  // Additional modal states
+  const [showEditExpense, setShowEditExpense] = useState(false);
+  const [showExpenseApproval, setShowExpenseApproval] = useState(false);
+  const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
+  const [showExpenseSettlement, setShowExpenseSettlement] = useState(false);
+  const [showExpenseDeletion, setShowExpenseDeletion] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [selectedExpenseForAction, setSelectedExpenseForAction] = useState<Expense | null>(null);
+
+  // Reset to overview tab when the screen gains focus (when bottom tab is pressed)
+  useFocusEffect(
+    useCallback(() => {
+      setActiveTab('overview');
+    }, [])
+  );
 
   // Real-time listeners
   useEffect(() => {
@@ -219,6 +241,30 @@ export default function RealSplittingScreen() {
       setFriends([]);
     }
   };
+  // Recurring expense handler
+
+
+// Process recurring expenses (call this on app startup)
+const processRecurringExpenses = async () => {
+  try {
+    await SplittingService.processRecurringExpenses();
+  } catch (error) {
+    console.error('Process recurring expenses error:', error);
+  }
+};
+
+// Export data handler
+const handleExportData = async () => {
+  try {
+    if (!user?.id) return;
+    const exportData = await SplittingService.exportUserData(user.id);
+    
+    // In a real app, you'd save this to device or share it
+    Alert.alert('Data Exported', 'Your expense data has been exported successfully!');
+  } catch (error: any) {
+    Alert.alert('Error', error.message || 'Failed to export data');
+  }
+};
 
   // Load groups data
   const loadGroups = async () => {
@@ -399,6 +445,8 @@ export default function RealSplittingScreen() {
       // Don't throw error as the SMS/WhatsApp was already sent successfully
     }
   };
+
+  
 
   const handleRemoveFriend = (friend: Friend) => {
     Alert.alert(
@@ -666,6 +714,15 @@ export default function RealSplittingScreen() {
     }
   };
 
+  const handleCreateRecurring = async (recurringData: any) => {
+  try {
+    await SplittingService.createRecurringExpense(recurringData);
+    Alert.alert('Success', 'Recurring expense created!');
+    setShowRecurringExpense(false);
+  } catch (error: any) {
+    Alert.alert('Error', error.message);
+  }
+};
   const handleNotificationNavigation = async (notification: Notification) => {
   try {
     const { type, data } = notification;
@@ -781,6 +838,28 @@ export default function RealSplittingScreen() {
         }
         break;
 
+      case 'expense_approval_required':
+        // Open expense approval modal
+        if (data.approvalId) {
+          setSelectedApprovalId(data.approvalId);
+          setShowExpenseApproval(true);
+        }
+        break;
+        
+      case 'expense_approved':
+      case 'expense_rejected':
+        // Show approval result
+        Alert.alert(
+          type === 'expense_approved' ? 'Expense Approved' : 'Expense Rejected',
+          notification.message,
+          [{ text: 'OK' }]
+        );
+        break;
+        
+      case 'recurring_expense_created':
+        // Navigate to recurring expenses view
+        Alert.alert('Recurring Expense', notification.message);
+        break;
       default:
         console.log('Unknown notification type:', type);
         break;
@@ -790,6 +869,63 @@ export default function RealSplittingScreen() {
     Alert.alert('Error', 'Failed to navigate to notification content');
   }
 };
+
+
+const showExpenseActionsMenu = (expense: Expense) => {
+  // Check if current user is admin of the group this expense belongs to
+  const isUserAdmin = groups.find(g => g.id === expense.groupId)
+    ?.members.find(m => m.userId === user?.id)?.role === 'admin';
+    
+  const actions: Array<{
+    text: string;
+    style?: 'cancel' | 'destructive' | 'default';
+    onPress?: () => void;
+  }> = [
+    {
+      text: 'Cancel',
+      style: 'cancel'
+    }
+  ];
+
+  // Add settlement action if not settled
+  if (!expense.isSettled) {
+    actions.unshift({
+      text: 'Settle Expense',
+      onPress: () => {
+        setSelectedExpenseForAction(expense);
+        setShowExpenseSettlement(true);
+      }
+    });
+  }
+
+  // Add edit action
+  actions.unshift({
+    text: 'Edit Expense',
+    onPress: () => {
+      setSelectedExpenseForAction(expense);
+      setShowEditExpense(true);
+    }
+  });
+
+  // Add delete action (only for expense creator or admin)
+  if (expense.paidBy === user?.id || isUserAdmin) {
+    actions.unshift({
+      text: 'Delete Expense',
+      style: 'destructive',
+      onPress: () => {
+        setSelectedExpenseForAction(expense);
+        setShowExpenseDeletion(true);
+      }
+    });
+  }
+
+  Alert.alert(
+    expense.description,
+    `${getCurrencySymbol(expense.currency)}${expense.amount.toFixed(2)} • ${expense.date.toLocaleDateString()}`,
+    actions
+  );
+};
+
 
   // Handle payment
   const handlePayment = async (friendId: string, amount: number, method: string) => {
@@ -889,7 +1025,29 @@ export default function RealSplittingScreen() {
             Start a new expense group
           </Text>
         </TouchableOpacity>
-      </View>
+
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => setShowRecurringExpense(true)}
+        >
+          <Ionicons name="repeat" size={24} color="#4F46E5" />
+          <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Recurring</Text>
+          <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
+            Set up recurring expenses
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => setShowAnalytics(true)}
+        >
+          <Ionicons name="analytics" size={24} color="#10B981" />
+          <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Analytics</Text>
+          <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
+            View spending insights
+          </Text>
+        </TouchableOpacity>
+      </View> 
 
       {/* Recent Expenses - FIXED navigation */}
       <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
@@ -1283,6 +1441,18 @@ export default function RealSplittingScreen() {
           >
             <Ionicons name="qr-code" size={24} color={theme.colors.text} />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerAction}
+            onPress={() => setShowRecurringExpense(true)}
+          >
+            <Ionicons name="repeat" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerAction}
+            onPress={() => setShowAnalytics(true)}
+          >
+            <Ionicons name="analytics" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerAction}
             onPress={handleNotificationsPress}
@@ -1433,6 +1603,46 @@ export default function RealSplittingScreen() {
         onNavigateToNotification={handleNotificationNavigation}
       />
 
+      <ExpenseSettlementModal
+      visible={showExpenseSettlement}
+      onClose={() => setShowExpenseSettlement(false)}
+      expense={selectedExpenseForAction}
+      currentUser={user}
+      onSettlementComplete={() => {
+        loadRecentExpenses();
+        loadGroups();
+        loadFriends();
+      }}
+    />
+
+    <ExpenseDeletionModal
+      visible={showExpenseDeletion}
+      onClose={() => setShowExpenseDeletion(false)}
+      expense={selectedExpenseForAction}
+      currentUser={user}
+      onDeletionComplete={() => {
+        loadRecentExpenses();
+        loadGroups();
+        loadFriends();
+      }}
+      isUserAdmin={groups.find(g => g.id === selectedExpenseForAction?.groupId)
+        ?.members.find(m => m.userId === user?.id)?.role === 'admin'}
+    />
+
+    {/* NEW IMPORTANT FLOW MODALS */}
+    <RecurringExpenseModal
+      visible={showRecurringExpense}
+      onClose={() => setShowRecurringExpense(false)}
+      onSubmit={handleCreateRecurring}
+      groups={groups}
+      currentUser={user}
+    />
+
+    <AnalyticsModal
+      visible={showAnalytics}
+      onClose={() => setShowAnalytics(false)}
+      currentUser={user}
+    />
 
     </SafeAreaView>
   );
@@ -1554,25 +1764,30 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: 20,
     gap: 12,
   },
   actionCard: {
-    flex: 1,
+    width: '48%',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
+    minHeight: 100,
+    justifyContent: 'center',
   },
   actionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     marginTop: 8,
+    textAlign: 'center',
   },
   actionSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
     marginTop: 4,
+    lineHeight: 16,
   },
   section: {
     borderRadius: 12,

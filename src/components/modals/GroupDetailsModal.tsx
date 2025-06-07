@@ -28,6 +28,7 @@ import ExpenseModal from './ExpenseModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
+import ExpenseSettlementModal from './ExpenseSettlementModal';
 
 interface GroupDetailsModalProps {
   visible: boolean;
@@ -66,7 +67,7 @@ export default function GroupDetailsModal({
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [selectedMemberForAction, setSelectedMemberForAction] = useState<string | null>(null);
   const [showGroupExpenseModal, setShowGroupExpenseModal] = useState(false);
-
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
   const isUserAdmin = group?.members?.find(member => 
     member.userId === currentUser?.id
   )?.role === 'admin';
@@ -477,6 +478,20 @@ const renderExpensesList = () => (
     )}
   </View>
 );
+const renderExpenseCard = (expense: Expense) => (
+  <TouchableOpacity style={styles.expenseCard}>
+    {/* existing expense info */}
+    {!expense.isSettled && (
+      <Button
+        title="Settle"
+        onPress={() => {
+          setSelectedExpense(expense);
+          setShowSettlementModal(true);
+        }}
+      />
+    )}
+  </TouchableOpacity>
+);
 
   const renderGroupStats = () => (
   <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
@@ -847,6 +862,13 @@ const renderExpensesList = () => (
           groupId={group?.id}
         />
       )}
+      <ExpenseSettlementModal
+        visible={showSettlementModal}
+        onClose={() => setShowSettlementModal(false)}
+        expense={selectedExpense}
+        currentUser={currentUser}
+        onSettlementComplete={loadGroupExpenses}
+      />
     </Modal>
   );
 }
@@ -1011,6 +1033,14 @@ statDivider: {
   balanceText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  expenseCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
   },
   expenseItem: {
     flexDirection: 'row',

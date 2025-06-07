@@ -28,7 +28,7 @@ export class GoogleOAuthService {
       const codeChallenge = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
         Math.random().toString(),
-        { encoding: Crypto.CryptoEncoding.BASE64URL }
+        { encoding: Crypto.CryptoEncoding.BASE64 }
       );
 
       const request = new AuthSession.AuthRequest({
@@ -38,7 +38,7 @@ export class GoogleOAuthService {
         responseType: AuthSession.ResponseType.Code,
         codeChallenge,
         codeChallengeMethod: AuthSession.CodeChallengeMethod.S256,
-        additionalParameters: {
+        extraParams: {
           access_type: 'offline',
           prompt: 'consent',
         },

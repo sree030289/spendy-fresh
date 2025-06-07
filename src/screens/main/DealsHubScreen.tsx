@@ -373,7 +373,7 @@ Found this deal on Spendy Deals Hub!`;
     return (
       <View style={styles.dealCard}>
         <LinearGradient
-          colors={categoryColors}
+          colors={categoryColors as [string, string, ...string[]]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.dealGradient}

@@ -12,6 +12,17 @@ const STORAGE_KEYS = {
   AUTO_SYNC_ENABLED: '@spendy_auto_sync_enabled',
 };
 
+// Utility function to safely extract error messages
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  return String(error);
+};
+
 let firebaseDb: any = null;
 
 const initializeFirebase = async () => {
@@ -300,7 +311,7 @@ export class RemindersService {
           console.warn('⚠️ Failed to schedule notifications for reminder (non-critical):', {
             reminderId: newReminder.id,
             title: newReminder.title,
-            error: notificationError.message
+            error: notificationError instanceof Error ? notificationError.message : String(notificationError)
           });
           // Don't throw - notification failure shouldn't prevent reminder creation
         }
@@ -325,9 +336,9 @@ export class RemindersService {
       console.error('❌ Failed to create reminder:', {
         userId,
         title: reminderData.title,
-        error: error.message
+        error: getErrorMessage(error)
       });
-      throw new Error(`Failed to create reminder: ${error.message}`);
+      throw new Error(`Failed to create reminder: ${getErrorMessage(error)}`);
     }
   }
   
@@ -382,7 +393,7 @@ export class RemindersService {
             console.warn('⚠️ Failed to update notifications for reminder (non-critical):', {
               reminderId,
               title: updatedReminder.title,
-              error: notificationError.message
+              error: getErrorMessage(notificationError)
             });
             // Don't throw - notification failure shouldn't prevent reminder update
           }
@@ -398,9 +409,9 @@ export class RemindersService {
       console.error('❌ Failed to update reminder:', {
         reminderId,
         updates: Object.keys(updates),
-        error: error.message
+        error: getErrorMessage(error)
       });
-      throw new Error(`Failed to update reminder: ${error.message}`);
+      throw new Error(`Failed to update reminder: ${getErrorMessage(error)}`);
     }
   }
   
@@ -449,7 +460,7 @@ export class RemindersService {
             console.warn('⚠️ Failed to cancel notifications for paid reminder (non-critical):', {
               reminderId,
               title: reminderToUpdate.title,
-              error: notificationError.message
+              error: getErrorMessage(notificationError)
             });
           }
 
@@ -473,7 +484,7 @@ export class RemindersService {
             console.warn('⚠️ Failed to send payment confirmation notification (non-critical):', {
               reminderId,
               title: reminderToUpdate.title,
-              error: notificationError.message
+              error: getErrorMessage(notificationError)
             });
           }
 
@@ -487,7 +498,7 @@ export class RemindersService {
               console.warn('⚠️ Failed to create next recurring reminder (non-critical):', {
                 reminderId,
                 title: reminderToUpdate.title,
-                error: recurringError.message
+                error: getErrorMessage(recurringError)
               });
             }
           }
@@ -501,9 +512,9 @@ export class RemindersService {
     } catch (error) {
       console.error('❌ Failed to mark reminder as paid:', {
         reminderId,
-        error: error.message
+        error: getErrorMessage(error)
       });
-      throw new Error(`Failed to mark reminder as paid: ${error.message}`);
+      throw new Error(`Failed to mark reminder as paid: ${getErrorMessage(error)}`);
     }
   }
   
@@ -535,7 +546,7 @@ export class RemindersService {
           console.warn('⚠️ Failed to cancel notifications for deleted reminder (non-critical):', {
             reminderId,
             title: reminderToDelete?.title,
-            error: notificationError.message
+            error: getErrorMessage(notificationError)
           });
         }
       }
@@ -547,9 +558,9 @@ export class RemindersService {
     } catch (error) {
       console.error('❌ Failed to delete reminder:', {
         reminderId,
-        error: error.message
+        error: getErrorMessage(error)
       });
-      throw new Error(`Failed to delete reminder: ${error.message}`);
+      throw new Error(`Failed to delete reminder: ${getErrorMessage(error)}`);
     }
   }
   
@@ -706,7 +717,7 @@ export class RemindersService {
           console.log(`✅ Successfully imported bill: ${bill.title} (${bill.currency} ${bill.amount})`);
         } catch (createError) {
           failureCount++;
-          console.warn(`⚠️ Failed to create reminder from email for ${bill.title}:`, createError.message);
+          console.warn(`⚠️ Failed to create reminder from email for ${bill.title}:`, getErrorMessage(createError));
         }
       }
 
@@ -729,10 +740,10 @@ export class RemindersService {
     } catch (error) {
       console.error('❌ Email sync failed:', {
         userId,
-        error: error.message,
+        error: getErrorMessage(error),
         timestamp: new Date().toISOString()
       });
-      throw new Error(`Email sync failed: ${error.message}`);
+      throw new Error(`Email sync failed: ${getErrorMessage(error)}`);
     }
   }
   

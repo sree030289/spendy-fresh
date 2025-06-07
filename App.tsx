@@ -18,6 +18,7 @@ import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { RealNotificationService } from './src/services/notifications/RealNotificationService';
+import { SplittingService } from '@/services/firebase/splitting';
 
 const Stack = createStackNavigator();
 
@@ -46,6 +47,22 @@ useEffect(() => {
   const cleanup = QRCodeService.initializeDeepLinkListener();
   return cleanup;
 }, []);
+
+useEffect(() => {
+  const processRecurring = async () => {
+    if (user?.id) {
+      await SplittingService.processRecurringExpenses();
+    }
+  };
+
+  // Process on app startup
+  processRecurring();
+
+  // Set up daily processing
+  const interval = setInterval(processRecurring, 24 * 60 * 60 * 1000); // 24 hours
+  
+  return () => clearInterval(interval);
+}, [user?.id]);
   if (isLoading || initializing) {
     return (
       <View style={styles.loadingContainer}>

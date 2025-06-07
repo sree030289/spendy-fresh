@@ -1,5 +1,6 @@
 // src/services/notifications/NotificationService.ts
 import * as Notifications from 'expo-notifications';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,6 +13,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -123,7 +126,7 @@ export class NotificationService {
           'To receive bill reminders, please enable notifications in your device settings.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Notifications.openSettings?.() },
+            { text: 'OK', style: 'default' },
           ]
         );
         return false;
@@ -337,6 +340,7 @@ export class NotificationService {
             badge: 1,
           },
           trigger: {
+            type: SchedulableTriggerInputTypes.DATE,
             date: notificationDate,
           },
         });
@@ -640,7 +644,7 @@ export class NotificationService {
       const reminders = await RemindersService.getReminders(userId);
       
       const now = new Date();
-      const dueCount = reminders.filter(reminder => {
+      const dueCount = reminders.filter((reminder: Reminder) => {
         if (reminder.status === 'paid') return false;
         return new Date(reminder.dueDate) <= now;
       }).length;
@@ -724,7 +728,7 @@ export class NotificationService {
       const now = new Date();
       const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       
-      const upcomingThisWeek = reminders.filter(reminder => {
+      const upcomingThisWeek = reminders.filter((reminder: Reminder) => {
         if (reminder.status === 'paid') return false;
         const dueDate = new Date(reminder.dueDate);
         return dueDate >= now && dueDate <= nextWeek;
@@ -734,7 +738,7 @@ export class NotificationService {
         return;
       }
 
-      const totalAmount = upcomingThisWeek.reduce((sum, r) => sum + r.amount, 0);
+      const totalAmount = upcomingThisWeek.reduce((sum: number, r: Reminder) => sum + r.amount, 0);
       
       const title = '📊 Weekly Bills Summary';
       const body = `You have ${upcomingThisWeek.length} bills due this week (Total: ${totalAmount.toFixed(2)})`;

@@ -124,7 +124,7 @@ export class RealGmailService {
       if (__DEV__) {
         // For Expo development client, use HTTPS proxy URL required for sensitive scopes
         redirectUri = makeRedirectUri({
-          useProxy: true,
+          preferLocalhost: true,
         });
       } else {
         // For production builds

@@ -18,11 +18,14 @@ import { useAuth } from '../../hooks/useAuth';
 import { getCurrencySymbol } from '../../utils/currency';
 import { Expense, ExpenseSplit, SplittingService } from '../../services/firebase/splitting';
 import ExpenseRefreshService from '../../services/expenseRefreshService';
+import ExpenseDeletionModal from './ExpenseDeletionModal';
 interface EditExpenseModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (expenseData: any) => Promise<void>;
   expense: Expense | null;
+  onExpenseDeleted?: () => void;
+  isUserAdmin?: boolean;
 }
 
 const expenseCategories = [
@@ -40,7 +43,9 @@ export default function EditExpenseModal({
   visible, 
   onClose, 
   onSubmit, 
-  expense 
+  expense,
+  onExpenseDeleted,
+  isUserAdmin = false
 }: EditExpenseModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -53,7 +58,8 @@ export default function EditExpenseModal({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [splitData, setSplitData] = useState<ExpenseSplit[]>([]);
   const [loading, setLoading] = useState(false);
-
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+ 
   useEffect(() => {
     if (expense && visible) {
       setDescription(expense.description);
@@ -188,6 +194,12 @@ const handleSubmit = async () => {
               <Text style={styles.saveButtonText}>
                 {loading ? 'Saving...' : 'Save'}
               </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setShowDeleteModal(true)}
+              style={styles.deleteButton}
+            >
+              <Ionicons name="trash" size={20} color={theme.colors.error} />
             </TouchableOpacity>
           </View>
 
@@ -358,6 +370,17 @@ const handleSubmit = async () => {
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
+      <ExpenseDeletionModal
+  visible={showDeleteModal}
+  onClose={() => setShowDeleteModal(false)}
+  expense={expense}
+  currentUser={user}
+  onDeletionComplete={() => {
+    onClose(); // Close edit modal
+    onExpenseDeleted?.(); // Refresh parent
+  }}
+  isUserAdmin={isUserAdmin}
+/>
     </Modal>
   );
 }
@@ -389,6 +412,12 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,

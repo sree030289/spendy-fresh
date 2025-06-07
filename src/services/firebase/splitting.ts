@@ -21,6 +21,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from './config';
 import { User } from '@/types';
+import { getCurrencySymbol } from '@/utils/currency';
 
 // Types for Splitting Features
 export interface Friend {
@@ -59,6 +60,7 @@ export interface Group {
     allowMemberInvites: boolean;
     requireApproval: boolean;
     currency: string;
+    approvalThreshold?: number; // Amount that requires approval
   };
   createdAt: Date;
   updatedAt: Date;
@@ -142,7 +144,7 @@ export interface FriendRequest {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'friend_request' | 'expense_added' | 'payment_received' | 'group_invite' | 'expense_settled' | 'group_message';
+  type: 'friend_request' | 'expense_added' | 'payment_received' | 'group_invite' | 'expense_settled' | 'group_message'|'expense_approval_required'|'expense_approved'|'expense_rejected'|'recurring_expense_created';
   title: string;
   message: string;
   data: any;
@@ -183,6 +185,117 @@ export interface ChatMessage {
     currency: string;
   };
 }
+// RECURRING EXPENSE METHODS
+export interface RecurringExpense {
+  id: string;
+  templateName: string;
+  description: string;
+  amount: number;
+  currency: string;
+  category: string;
+  categoryIcon: string;
+  groupId: string;
+  paidBy: string;
+  paidByData: {
+    fullName: string;
+    email: string;
+  };
+  splitType: 'equal' | 'custom' | 'percentage';
+  splitData: ExpenseSplit[];
+  frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  startDate: Date;
+  endDate?: Date;
+  nextDueDate: Date;
+  isActive: boolean;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lastProcessedDate?: Date;
+  processedCount: number;
+  maxOccurrences?: number;
+}
+
+// ANALYTICS AND INSIGHTS
+export interface ExpenseAnalytics {
+  totalSpent: number;
+  totalOwed: number;
+  totalOwing: number;
+  averageExpense: number;
+  expenseCount: number;
+  monthlySpending: Array<{ month: string; amount: number }>;
+  categoryBreakdown: Array<{ category: string; amount: number; percentage: number }>;
+  groupAnalytics: Array<{ groupName: string; totalSpent: number; memberCount: number }>;
+  splitWithMostFrequent: { userId: string; userName: string; count: number };
+}
+
+// EXPORT/IMPORT DATA
+export interface ExportData {
+  expenses: Expense[];
+  groups: Group[];
+  friends: Friend[];
+  exportDate: Date;
+  exportedBy: string;
+  version: string;
+}
+
+// OFFLINE SYNC SUPPORT
+export interface OfflineExpense {
+  id: string;
+  tempId: string;
+  expenseData: any;
+  status: 'pending' | 'synced' | 'failed';
+  createdAt: Date;
+  lastSyncAttempt?: Date;
+  errorMessage?: string;
+  retryCount: number;
+}
+
+// EXPENSE APPROVAL SYSTEM
+export interface ExpenseApproval {
+  id: string;
+  expenseId: string;
+  groupId: string;
+  requestedBy: string;
+  requestedByData: {
+    fullName: string;
+    email: string;
+  };
+  approvalThreshold: number; // Amount that requires approval
+  status: 'pending' | 'approved' | 'rejected';
+  approvers: Array<{
+    userId: string;
+    userName: string;
+    decision: 'approved' | 'rejected';
+    reason?: string;
+    timestamp: Date;
+  }>;
+  requiredApprovals: number;
+  receivedApprovals: number;
+  createdAt: Date;
+  updatedAt: Date;
+  expiresAt?: Date;
+}
+
+// EXPENSE TEMPLATES
+export interface ExpenseTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  categoryIcon: string;
+  defaultAmount?: number;
+  splitType: 'equal' | 'custom' | 'percentage';
+  defaultSplitData?: ExpenseSplit[];
+  tags: string[];
+  createdBy: string;
+  groupId?: string; // Optional - can be group-specific or personal
+  isPublic: boolean; // Can other group members use this template
+  useCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
 // Splitting Service Class
 export class SplittingService {
   
@@ -1646,4 +1759,514 @@ static async updateGroupMemberBalance(groupId: string, userId: string, amount: n
     }
   }
 
+
+// EXPENSE SETTLEMENT METHODS
+static async updateExpenseSettlement(expenseId: string, settlementData: {
+  splitData: ExpenseSplit[];
+  isSettled: boolean;
+  lastSettlementDate: Date;
+}): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    
+    // Update the expense document
+    batch.update(doc(db, 'expenses', expenseId), {
+      splitData: settlementData.splitData,
+      isSettled: settlementData.isSettled,
+      lastSettlementDate: settlementData.lastSettlementDate,
+      updatedAt: new Date()
+    });
+    
+    await batch.commit();
+    console.log('Expense settlement updated successfully');
+    
+  } catch (error) {
+    console.error('Update expense settlement error:', error);
+    throw error;
+  }
 }
+
+// EXPENSE DELETION METHODS
+static async deleteExpense(expenseId: string, deletedBy: string): Promise<void> {
+  try {
+    console.log('Deleting expense:', expenseId);
+    
+    // Get the expense first to reverse balances
+    const expenseDoc = await getDoc(doc(db, 'expenses', expenseId));
+    if (!expenseDoc.exists()) {
+      throw new Error('Expense not found');
+    }
+    
+    const expense = {
+      id: expenseDoc.id,
+      ...expenseDoc.data(),
+      date: expenseDoc.data()?.date?.toDate() || new Date(),
+      createdAt: expenseDoc.data()?.createdAt?.toDate() || new Date(),
+      updatedAt: expenseDoc.data()?.updatedAt?.toDate() || new Date(),
+    } as Expense;
+    
+    const batch = writeBatch(db);
+    
+    // 1. Delete the expense document
+    batch.delete(doc(db, 'expenses', expenseId));
+    
+    // 2. Reverse group total expenses
+    batch.update(doc(db, 'groups', expense.groupId), {
+      totalExpenses: increment(-expense.amount),
+      updatedAt: serverTimestamp()
+    });
+    
+    // 3. Reverse all balance calculations
+    for (const split of expense.splitData) {
+      if (split.userId !== expense.paidBy) {
+        // Reverse group member balances
+        await this.updateGroupMemberBalance(expense.groupId, split.userId, -split.amount);
+        await this.updateGroupMemberBalance(expense.groupId, expense.paidBy, split.amount);
+        
+        // Reverse friend balances if they are friends
+        try {
+          await this.updateFriendBalance(expense.paidBy, split.userId, -split.amount);
+          console.log(`Reversed friend balance between ${expense.paidBy} and ${split.userId}`);
+        } catch (error) {
+          console.log(`No friendship found, skipping friend balance reversal`);
+        }
+      }
+    }
+    
+    // 4. Add deletion message to group chat
+    const deletionMessage = {
+      groupId: expense.groupId,
+      userId: deletedBy,
+      userName: 'System',
+      message: `Expense "${expense.description}" was deleted and balances have been reversed`,
+      timestamp: serverTimestamp(),
+      type: 'system' as const
+    };
+    
+    batch.set(doc(collection(db, 'groupMessages')), deletionMessage);
+    
+    await batch.commit();
+    console.log('✅ Expense deleted successfully and balances reversed');
+    
+  } catch (error) {
+    console.error('❌ Delete expense error:', error);
+    throw error;
+  }
+}
+
+
+
+static async createRecurringExpense(recurringData: Omit<RecurringExpense, 'id' | 'createdAt' | 'updatedAt' | 'processedCount'>): Promise<string> {
+  try {
+    // Ensure all undefined fields are properly handled for Firebase
+    const sanitizedData = {
+      ...recurringData,
+      endDate: recurringData.endDate || null, // Convert undefined to null for Firebase
+      maxOccurrences: recurringData.maxOccurrences || null, // Convert undefined to null for Firebase
+      processedCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await addDoc(collection(db, 'recurringExpenses'), sanitizedData);
+    console.log('Recurring expense created:', docRef.id);
+    return docRef.id;
+    
+  } catch (error) {
+    console.error('Create recurring expense error:', error);
+    throw error;
+  }
+}
+
+static async processRecurringExpenses(): Promise<void> {
+  try {
+    const today = new Date();
+    
+    // Get all active recurring expenses that are due
+    const recurringQuery = query(
+      collection(db, 'recurringExpenses'),
+      where('isActive', '==', true),
+      where('nextDueDate', '<=', today)
+    );
+    
+    const snapshot = await getDocs(recurringQuery);
+    
+    for (const docSnapshot of snapshot.docs) {
+      const recurring = { id: docSnapshot.id, ...docSnapshot.data() } as RecurringExpense;
+      
+      // Check if we've reached max occurrences (only if maxOccurrences is set)
+      if (recurring.maxOccurrences && recurring.processedCount >= recurring.maxOccurrences) {
+        await updateDoc(doc(db, 'recurringExpenses', recurring.id), {
+          isActive: false,
+          updatedAt: new Date()
+        });
+        continue;
+      }
+      
+      // Create the expense
+      await this.addExpense({
+        description: recurring.description,
+        amount: recurring.amount,
+        currency: recurring.currency,
+        category: recurring.category,
+        categoryIcon: recurring.categoryIcon,
+        groupId: recurring.groupId,
+        paidBy: recurring.paidBy,
+        paidByData: recurring.paidByData,
+        splitType: recurring.splitType,
+        splitData: recurring.splitData,
+        notes: `Recurring: ${recurring.templateName}`,
+        tags: ['recurring'],
+        date: new Date(),
+        isSettled: false
+      });
+      
+      // Calculate next due date
+      const nextDue = new Date(recurring.nextDueDate);
+      switch (recurring.frequency) {
+        case 'weekly':
+          nextDue.setDate(nextDue.getDate() + 7);
+          break;
+        case 'monthly':
+          nextDue.setMonth(nextDue.getMonth() + 1);
+          break;
+        case 'quarterly':
+          nextDue.setMonth(nextDue.getMonth() + 3);
+          break;
+        case 'yearly':
+          nextDue.setFullYear(nextDue.getFullYear() + 1);
+          break;
+      }
+      
+      // Update recurring expense
+      await updateDoc(doc(db, 'recurringExpenses', recurring.id), {
+        nextDueDate: nextDue,
+        lastProcessedDate: new Date(),
+        processedCount: recurring.processedCount + 1,
+        updatedAt: new Date()
+      });
+    } // End of for loop
+    
+  } catch (error) {
+    console.error('Process recurring expenses error:', error);
+  }
+}
+
+
+
+static async createExpenseTemplate(templateData: Omit<ExpenseTemplate, 'id' | 'createdAt' | 'updatedAt' | 'useCount'>): Promise<string> {
+  try {
+    const newTemplate: Omit<ExpenseTemplate, 'id'> = {
+      ...templateData,
+      useCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await addDoc(collection(db, 'expenseTemplates'), newTemplate);
+    return docRef.id;
+    
+  } catch (error) {
+    console.error('Create expense template error:', error);
+    throw error;
+  }
+}
+
+static async getExpenseTemplates(userId: string, groupId?: string): Promise<ExpenseTemplate[]> {
+  try {
+    let templatesQuery = query(
+      collection(db, 'expenseTemplates'),
+      where('createdBy', '==', userId),
+      orderBy('useCount', 'desc')
+    );
+    
+    const snapshot = await getDocs(templatesQuery);
+    const userTemplates = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as ExpenseTemplate[];
+    
+    // If groupId provided, also get public group templates
+    if (groupId) {
+      const groupTemplatesQuery = query(
+        collection(db, 'expenseTemplates'),
+        where('groupId', '==', groupId),
+        where('isPublic', '==', true),
+        where('createdBy', '!=', userId),
+        orderBy('useCount', 'desc')
+      );
+      
+      const groupSnapshot = await getDocs(groupTemplatesQuery);
+      const groupTemplates = groupSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+      })) as ExpenseTemplate[];
+      
+      return [...userTemplates, ...groupTemplates];
+    }
+    
+    return userTemplates;
+    
+  } catch (error) {
+    console.error('Get expense templates error:', error);
+    return [];
+  }
+}
+
+static async useExpenseTemplate(templateId: string): Promise<void> {
+  try {
+    await updateDoc(doc(db, 'expenseTemplates', templateId), {
+      useCount: increment(1),
+      updatedAt: new Date()
+    });
+  } catch (error) {
+    console.error('Use expense template error:', error);
+  }
+}
+
+
+static async requestExpenseApproval(expenseData: any): Promise<string> {
+  try {
+    // Check if expense amount requires approval
+    const group = await this.getGroup(expenseData.groupId);
+    if (!group) throw new Error('Group not found');
+    
+    const approvalThreshold = group.settings.approvalThreshold || 100; // Default $100
+    
+    if (expenseData.amount < approvalThreshold) {
+      // No approval needed, create expense directly
+      return await this.addExpense(expenseData);
+    }
+    
+    // Create approval request
+    const approvalData: Omit<ExpenseApproval, 'id'> = {
+      expenseId: 'pending',
+      groupId: expenseData.groupId,
+      requestedBy: expenseData.paidBy,
+      requestedByData: expenseData.paidByData,
+      approvalThreshold,
+      status: 'pending',
+      approvers: [],
+      requiredApprovals: Math.ceil(group.members.filter(m => m.role === 'admin').length / 2), // Majority of admins
+      receivedApprovals: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    };
+
+    const docRef = await addDoc(collection(db, 'expenseApprovals'), approvalData);
+    return docRef.id;
+
+  } catch (error) {
+    console.error('Request expense approval error:', error);
+    throw error;
+  }
+}
+
+// EXPORT USER DATA METHOD
+static async exportUserData(userId: string): Promise<ExportData> {
+  try {
+    console.log('Exporting user data for user:', userId);
+    
+    // Get user's expenses from all groups
+    const userExpenses = await this.getUserExpenses(userId, 1000); // Get up to 1000 expenses
+    
+    // Get user's groups
+    const userGroups = await this.getUserGroups(userId);
+    
+    // Get user's friends
+    const userFriends = await this.getFriends(userId);
+    
+    // Create export data object
+    const exportData: ExportData = {
+      expenses: userExpenses,
+      groups: userGroups,
+      friends: userFriends,
+      exportDate: new Date(),
+      exportedBy: userId,
+      version: '1.0'
+    };
+    
+    console.log('User data export completed successfully');
+    return exportData;
+    
+  } catch (error) {
+    console.error('Export user data error:', error);
+    throw new Error('Failed to export user data. Please try again.');
+  }
+}
+
+static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | 'quarter' | 'year' = 'month'): Promise<{
+  totalSpent: number;
+  totalOwed: number;
+  totalOwing: number;
+  averageExpense: number;
+  expenseCount: number;
+  monthlySpending: Array<{ month: string; amount: number }>;
+  categoryBreakdown: Array<{ category: string; amount: number; percentage: number }>;
+  groupAnalytics: Array<{ groupName: string; totalSpent: number; memberCount: number }>;
+  splitWithMostFrequent: { userId: string; userName: string; count: number };
+}> {
+  try {
+    // Calculate date range based on timeframe
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch (timeframe) {
+      case 'week':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'quarter':
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case 'year':
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+    }
+
+    // Get user's expenses within timeframe
+    const expensesQuery = query(
+      collection(db, 'expenses'),
+      where('participants', 'array-contains', userId),
+      where('date', '>=', startDate),
+      orderBy('date', 'desc')
+    );
+    const expensesSnapshot = await getDocs(expensesQuery);
+    const expenses = expensesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      date: doc.data().date?.toDate() || new Date()
+    })) as Expense[];
+
+    // Calculate totals with proper fallbacks
+    let totalSpent = 0;
+    let totalOwed = 0;
+    let totalOwing = 0;
+    const splitCounts: { [key: string]: { userId: string; userName: string; count: number } } = {};
+
+    expenses.forEach(expense => {
+      if (expense.paidBy === userId) {
+        totalSpent += expense.amount || 0;
+      }
+      
+      const userSplit = expense.splitData?.find((split: ExpenseSplit) => split.userId === userId);
+      if (userSplit) {
+        if (expense.paidBy === userId) {
+          totalOwed += (expense.amount - userSplit.amount) || 0;
+        } else if (!expense.isSettled) {
+          totalOwing += userSplit.amount || 0;
+        }
+      }
+
+      // Track split frequency
+      expense.splitData?.forEach((split: ExpenseSplit) => {
+        if (split.userId !== userId) {
+          const key = split.userId;
+          if (!splitCounts[key]) {
+            splitCounts[key] = { userId: split.userId, userName: 'Unknown', count: 0 };
+          }
+          splitCounts[key].count++;
+        }
+      });
+    });
+
+    // Calculate average expense
+    const expenseCount = expenses.filter(exp => exp.paidBy === userId).length;
+    const averageExpense = expenseCount > 0 ? totalSpent / expenseCount : 0;
+
+    // Monthly spending analysis
+    const monthlyData: { [key: string]: number } = {};
+    expenses.forEach(expense => {
+      if (expense.paidBy === userId) {
+        const monthKey = expense.date.toISOString().substring(0, 7); // YYYY-MM
+        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + expense.amount;
+      }
+    });
+
+    const monthlySpending = Object.entries(monthlyData)
+      .map(([month, amount]) => ({ month, amount }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-12); // Last 12 months
+
+    // Category breakdown
+    const categoryData: { [key: string]: number } = {};
+    expenses.forEach(expense => {
+      if (expense.paidBy === userId) {
+        const category = expense.category || 'Other';
+        categoryData[category] = (categoryData[category] || 0) + expense.amount;
+      }
+    });
+
+    const totalCategorySpent = Object.values(categoryData).reduce((sum, amount) => sum + amount, 0);
+    const categoryBreakdown = Object.entries(categoryData)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: totalCategorySpent > 0 ? (amount / totalCategorySpent) * 100 : 0
+      }))
+      .sort((a, b) => b.amount - a.amount);
+
+    // Group analytics
+    const groupsQuery = query(
+      collection(db, 'groups'),
+      where('members', 'array-contains', { userId, role: 'member' })
+    );
+    const groupsSnapshot = await getDocs(groupsQuery);
+    const groups = groupsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Group[];
+
+    const groupAnalytics = groups.map(group => {
+      const groupExpenses = expenses.filter(exp => exp.groupId === group.id);
+      const groupSpent = groupExpenses
+        .filter(exp => exp.paidBy === userId)
+        .reduce((sum, exp) => sum + exp.amount, 0);
+      
+      return {
+        groupName: group.name,
+        totalSpent: groupSpent,
+        memberCount: group.members.length
+      };
+    }).sort((a, b) => b.totalSpent - a.totalSpent);
+
+    // Most frequent split partner
+    const splitWithMostFrequent = Object.values(splitCounts).length > 0
+      ? Object.values(splitCounts).reduce((max, current) => current.count > max.count ? current : max)
+      : { userId: '', userName: '', count: 0 };
+
+    return {
+      totalSpent: totalSpent || 0,
+      totalOwed: totalOwed || 0,
+      totalOwing: totalOwing || 0,
+      averageExpense: averageExpense || 0,
+      expenseCount: expenseCount || 0,
+      monthlySpending,
+      categoryBreakdown,
+      groupAnalytics,
+      splitWithMostFrequent
+    };
+
+  } catch (error) {
+    console.error('Get expense analytics error:', error);
+    
+    // Return safe defaults to prevent toFixed() errors
+    return {
+      totalSpent: 0,
+      totalOwed: 0,
+      totalOwing: 0,
+      averageExpense: 0,
+      expenseCount: 0,
+      monthlySpending: [],
+      categoryBreakdown: [],
+      groupAnalytics: [],
+      splitWithMostFrequent: { userId: '', userName: '', count: 0 }
+    };
+  }
+}
+
+} // End of SplittingService class

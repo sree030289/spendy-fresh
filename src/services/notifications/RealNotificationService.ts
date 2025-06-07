@@ -2,6 +2,7 @@
 import { Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Reminder } from '@/types/reminder';
@@ -43,6 +44,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -182,7 +185,10 @@ export class RealNotificationService {
               categoryIdentifier: 'bill_reminder',
               badge: 1,
             },
-            trigger: { date: notificationDate },
+            trigger: { 
+              type: SchedulableTriggerInputTypes.DATE,
+              date: notificationDate 
+            },
           });
           
           console.log(`🔔 Scheduled notification for ${reminder.title} - ${days} days before`);
@@ -292,6 +298,12 @@ export class RealNotificationService {
     const { data } = notification.request.content;
     
     console.log('Notification response:', { actionIdentifier, data });
+    
+    // Type guard to ensure data has the expected structure
+    if (!data || typeof data.reminderId !== 'string') {
+      console.error('Invalid notification data:', data);
+      return;
+    }
     
     switch (actionIdentifier) {
       case 'mark_paid':

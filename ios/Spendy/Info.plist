@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>spendy</string>
-          <string>host.expo.exponent</string>
+          <string>com.svaag.spendy</string>
         </array>
       </dict>
     </array>
@@ -45,28 +45,6 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
-    <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your calendars</string>
-    <key>NSCalendarsUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your calendars</string>
-    <key>NSCameraUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your camera</string>
-    <key>NSContactsUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your contacts</string>
-    <key>NSFaceIDUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to use Face ID</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your photos</string>
-    <key>NSRemindersFullAccessUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your reminders</string>
-    <key>NSRemindersUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your reminders</string>
-    <key>UIBackgroundModes</key>
-    <array>
-      <string>fetch</string>
-    </array>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>

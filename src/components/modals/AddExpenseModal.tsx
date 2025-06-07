@@ -63,7 +63,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showReceiptScanner, setShowReceiptScanner] = useState(false);
-  
+
   // Errors
   const [errors, setErrors] = useState<any>({});
 
@@ -986,6 +986,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
         onClose={() => setShowReceiptScanner(false)}
         onReceiptProcessed={handleReceiptData}
       />
+
     </Modal>
   );
 }

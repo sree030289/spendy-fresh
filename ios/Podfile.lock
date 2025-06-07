@@ -8,7 +8,7 @@ PODS:
   - EXImageLoader (5.1.0):
     - ExpoModulesCore
     - React-Core
-  - EXNotifications (0.31.2):
+  - EXNotifications (0.31.3):
     - ExpoModulesCore
   - Expo (53.0.9):
     - DoubleConversion
@@ -41,6 +41,8 @@ PODS:
     - ExpoModulesCore
   - ExpoBackgroundFetch (13.1.5):
     - ExpoModulesCore
+  - ExpoBlur (14.1.5):
+    - ExpoModulesCore
   - ExpoCalendar (14.1.4):
     - ExpoModulesCore
   - ExpoCamera (16.1.6):
@@ -66,6 +68,8 @@ PODS:
   - ExpoLinking (7.1.5):
     - ExpoModulesCore
   - ExpoLocalAuthentication (16.0.4):
+    - ExpoModulesCore
+  - ExpoLocation (18.1.5):
     - ExpoModulesCore
   - ExpoModulesCore (2.3.13):
     - DoubleConversion
@@ -2050,6 +2054,7 @@ DEPENDENCIES:
   - Expo (from `../node_modules/expo`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
   - ExpoBackgroundFetch (from `../node_modules/expo-background-fetch/ios`)
+  - ExpoBlur (from `../node_modules/expo-blur/ios`)
   - ExpoCalendar (from `../node_modules/expo-calendar/ios`)
   - ExpoCamera (from `../node_modules/expo-camera/ios`)
   - ExpoContacts (from `../node_modules/expo-contacts/ios`)
@@ -2062,6 +2067,7 @@ DEPENDENCIES:
   - ExpoLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
   - ExpoLinking (from `../node_modules/expo-linking/ios`)
   - ExpoLocalAuthentication (from `../node_modules/expo-local-authentication/ios`)
+  - ExpoLocation (from `../node_modules/expo-location/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoWebBrowser (from `../node_modules/expo-web-browser/ios`)
   - EXTaskManager (from `../node_modules/expo-task-manager/ios`)
@@ -2170,6 +2176,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-asset/ios"
   ExpoBackgroundFetch:
     :path: "../node_modules/expo-background-fetch/ios"
+  ExpoBlur:
+    :path: "../node_modules/expo-blur/ios"
   ExpoCalendar:
     :path: "../node_modules/expo-calendar/ios"
   ExpoCamera:
@@ -2194,6 +2202,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-linking/ios"
   ExpoLocalAuthentication:
     :path: "../node_modules/expo-local-authentication/ios"
+  ExpoLocation:
+    :path: "../node_modules/expo-location/ios"
   ExpoModulesCore:
     :path: "../node_modules/expo-modules-core"
   ExpoWebBrowser:
@@ -2364,10 +2374,11 @@ SPEC CHECKSUMS:
   EXApplication: 63b87ca5204304007fac6b1be432f8afa3731c17
   EXConstants: 9f310f44bfedba09087042756802040e464323c0
   EXImageLoader: 4d3d3284141f1a45006cc4d0844061c182daf7ee
-  EXNotifications: f0c7597a22645faf9ce9e74f1b1078c16fb7575f
+  EXNotifications: 1afe5275cf399920480fc5a9008676749a767d19
   Expo: a9fc723f6c8f673f0e7e036c9021772d3a1a0707
   ExpoAsset: 3bc9adb7dbbf27ae82c18ca97eb988a3ae7e73b1
   ExpoBackgroundFetch: 6ea99684804a3a264b08f18cbb3b45a0ecd410ed
+  ExpoBlur: 3c8885b9bf9eef4309041ec87adec48b5f1986a9
   ExpoCalendar: f5f94ea8dcd957b1434beb4e1c0da1af063322e6
   ExpoCamera: 316809537daad6a5bd2c04b98e0589304beb5551
   ExpoContacts: 3dd51c3c53017b4ca05f18e786d1eb1ace729ef3
@@ -2380,6 +2391,7 @@ SPEC CHECKSUMS:
   ExpoLinearGradient: a3126d055dd021c1eb38a2cf28052ccbd1a2b3e2
   ExpoLinking: b85ff4eafeae6fc638c6cace60007ae521af0ef4
   ExpoLocalAuthentication: 490fac71e8b2ad9f1252ee7c7b391f85db1fae33
+  ExpoLocation: a319a1b2c00b82c29e8a24227e0f00d1e19662c5
   ExpoModulesCore: 5d37821c36f3781dcd0ea9a393800c90eaa6259d
   ExpoWebBrowser: 06fb5f767f53ad53944b068cdd207984cb998712
   EXTaskManager: a7a2d34c0fa6a459dcd9f50844ecbec886bd2da8
