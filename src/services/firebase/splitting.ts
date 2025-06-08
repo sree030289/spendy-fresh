@@ -20,8 +20,8 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from './config';
-import { User } from '@/types';
-import { getCurrencySymbol } from '@/utils/currency';
+import { User } from '../../types';
+import { getCurrencySymbol } from '../../utils/currency';
 
 // Types for Splitting Features
 export interface Friend {
@@ -91,6 +91,7 @@ export interface Expense {
   paidByData: {
     fullName: string;
     email: string;
+    avatar?: string;
   };
   splitType: 'equal' | 'custom' | 'percentage';
   splitData: ExpenseSplit[];
@@ -298,11 +299,44 @@ export interface ExpenseTemplate {
 }
 
 
+// SETTLEMENT TRANSACTION INTERFACES
+export interface SettlementTransaction {
+  id: string;
+  fromUserId: string;
+  fromUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  toUserId: string;
+  toUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  amount: number;
+  currency: string;
+  description: string;
+  groupId?: string;
+  groupData?: {
+    name: string;
+    description?: string;
+  };
+  expenseId?: string; // Reference to the original expense being settled
+  method: 'cash' | 'bank' | 'venmo' | 'paypal' | 'upi' | 'manual_settlement';
+  status: 'pending' | 'completed' | 'failed';
+  notes?: string;
+  settlementDate: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
 // Splitting Service Class
 export class SplittingService {
   
   // FRIENDS MANAGEMENT
-  static async sendFriendRequest(fromUserId: string, toEmail: string, message?: string): Promise<void> {
+  static async sendFriendRequest(fromUserId: string, toEmail: string, message?: string): Promise<{ success: boolean; isNewUser?: boolean; message?: string }> {
   try {
     // Get current user data first
     const fromUserDoc = await getDoc(doc(db, 'users', fromUserId));
@@ -351,8 +385,12 @@ export class SplittingService {
     
     if (userSnapshot.empty) {
       // User not found - create invitation for when they join
-      await this.createEmailInvitation(fromUserId, fromUserData, toEmail, message);
-      return;
+      const invitationResult = await this.createEmailInvitation(fromUserId, fromUserData, toEmail, message);
+      return {
+        success: true,
+        isNewUser: invitationResult.isNewUser,
+        message: invitationResult.message
+      };
     }
     
     const toUser = userSnapshot.docs[0];
@@ -382,7 +420,7 @@ export class SplittingService {
     };
     
     const docRef = await addDoc(collection(db, 'friendRequests'), friendRequest);
-    console.log('Friend request created:', docRef.id);
+    console.log('✅ Friend request created:', docRef.id);
     
     // Create notification for the recipient
     await this.createNotification({
@@ -393,14 +431,23 @@ export class SplittingService {
       data: { 
         friendRequestId: docRef.id,
         fromUserId,
-        fromUserName: fromUserData?.fullName || 'Unknown User'
+        senderName: fromUserData?.fullName || 'Unknown User',
+        senderEmail: fromUserData?.email || '',
+        senderAvatar: fromUserData?.profilePicture || '',
+        message: message || `${fromUserData?.fullName || 'Someone'} wants to be your friend`
       },
       isRead: false,
       createdAt: new Date()
     });
+
+    return {
+      success: true,
+      isNewUser: false,
+      message: `Friend request sent to ${toUserData?.fullName || toEmail}!`
+    };
     
   } catch (error) {
-    console.error('Send friend request error:', error);
+    console.error('❌ Send friend request error:', error);
     throw error;
   }
 }
@@ -431,7 +478,7 @@ static async blockFriend(userId: string, friendId: string): Promise<void> {
     console.log('Friend blocked successfully');
     
   } catch (error) {
-    console.error('Block friend error:', error);
+    console.error('❌ Block friend error:', error);
     throw new Error('Failed to block friend. Please try again.');
   }
 }
@@ -466,7 +513,7 @@ static async unblockFriend(userId: string, friendId: string): Promise<void> {
   }
 }
 
-static async createEmailInvitation(fromUserId: string, fromUserData: any, toEmail: string, message?: string): Promise<void> {
+static async createEmailInvitation(fromUserId: string, fromUserData: any, toEmail: string, message?: string): Promise<{ isNewUser: boolean; message: string }> {
   try {
     // Create an email invitation record
     const emailInvitation = {
@@ -486,12 +533,17 @@ static async createEmailInvitation(fromUserId: string, fromUserData: any, toEmai
     
     await addDoc(collection(db, 'emailInvitations'), emailInvitation);
     
+    console.log(`📧 Email invitation saved for ${toEmail} - will auto-send friend request when they join`);
+    
     // TODO: Send actual email invitation via Firebase Functions
-    // For now, we'll just throw a helpful error
-    throw new Error(`${toEmail} is not on Spendy yet. We've saved your invitation and will automatically send them a friend request when they join!`);
+    // Return success info instead of throwing error
+    return {
+      isNewUser: true,
+      message: `${toEmail} is not on Spendy yet. We've saved your invitation and will automatically send them a friend request when they join!`
+    };
     
   } catch (error) {
-    console.error('Create email invitation error:', error);
+    console.error('❌ Create email invitation error:', error);
     throw error;
   }
 }
@@ -510,11 +562,13 @@ static async processEmailInvitations(newUserEmail: string, newUserId: string): P
       const invitation = invitationDoc.data();
       
       // Create friend request
-      await this.sendFriendRequest(
+      const result = await this.sendFriendRequest(
         invitation.fromUserId,
         newUserEmail,
         `Welcome to Spendy! ${invitation.fromUserData.fullName} invited you to connect.`
       );
+      
+      console.log('✅ Processed email invitation:', result.message);
       
       // Mark invitation as processed
       await updateDoc(invitationDoc.ref, {
@@ -525,7 +579,7 @@ static async processEmailInvitations(newUserEmail: string, newUserId: string): P
     }
     
   } catch (error) {
-    console.error('Process email invitations error:', error);
+    console.error('❌ Process email invitations error:', error);
     // Don't throw - this is a background process
   }
 }
@@ -608,7 +662,42 @@ static async acceptFriendRequest(requestId: string): Promise<void> {
     });
     
   } catch (error) {
-    console.error('Accept friend request error:', error);
+    console.error('❌ Accept friend request error:', error);
+    throw error;
+  }
+}
+
+static async declineFriendRequest(requestId: string): Promise<void> {
+  try {
+    // Get friend request
+    const requestDoc = await getDoc(doc(db, 'friendRequests', requestId));
+    if (!requestDoc.exists()) {
+      throw new Error('Friend request not found');
+    }
+
+    const requestData = requestDoc.data() as FriendRequest;
+
+    // Update request status to declined
+    await updateDoc(doc(db, 'friendRequests', requestId), {
+      status: 'declined',
+      updatedAt: new Date()
+    });
+
+    // Send notification to requester
+    await this.createNotification({
+      userId: requestData.fromUserId,
+      type: 'friend_request',
+      title: 'Friend Request Declined',
+      message: `Someone declined your friend request`,
+      data: { friendRequestId: requestId },
+      isRead: false,
+      createdAt: new Date()
+    });
+
+    console.log('✅ Friend request declined successfully');
+    
+  } catch (error) {
+    console.error('❌ Decline friend request error:', error);
     throw error;
   }
 }
@@ -675,7 +764,7 @@ static async getFriends(userId: string): Promise<Friend[]> {
     return [...acceptedFriends, ...pendingInvitations];
     
   } catch (error) {
-    console.error('Get friends error:', error);
+    console.error('❌ Get friends error:', error);
     return [];
   }
 }
@@ -847,6 +936,43 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
       
       console.log('Member added successfully to group');
       
+      // Send group invitation notification to the new member (if not creating group)
+      try {
+        // Only send invitation notification if the user is being added by someone else
+        // (i.e., not when creating the group as admin)
+        if (role === 'member') {
+          // Get the group creator or admin who might be adding this member
+          const groupAdmin = groupData.members?.find(member => member.role === 'admin');
+          
+          if (groupAdmin) {
+            // Create notification for the new member
+            await this.createNotification({
+              userId: userId,
+              type: 'group_invite',
+              title: 'Group Invitation',
+              message: `${groupAdmin.userData.fullName} invited you to join "${groupData.name}"`,
+              data: {
+                groupId: groupId,
+                groupName: groupData.name,
+                inviteCode: groupData.inviteCode,
+                senderName: groupAdmin.userData.fullName,
+                senderAvatar: groupAdmin.userData.avatar || '',
+                groupDescription: groupData.description || '',
+                // Navigation data
+                navigationType: 'groupDetails'
+              },
+              isRead: false,
+              createdAt: new Date()
+            });
+            
+            console.log(`✅ Sent group invitation notification to ${userData?.fullName || userId}`);
+          }
+        }
+      } catch (notificationError) {
+        console.error('❌ Error sending group invitation notification:', notificationError);
+        // Don't throw - member was already added successfully
+      }
+      
     } catch (error) {
       console.error('Add group member error:', error);
       throw error;
@@ -948,6 +1074,46 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     
     await batch.commit();
     console.log('✅ Expense added successfully:', expenseRef.id);
+    
+    // Send notifications to all group members (except the person who added the expense)
+    try {
+      // Get group data to get member list and group name
+      const groupDoc = await getDoc(doc(db, 'groups', expenseData.groupId));
+      if (groupDoc.exists()) {
+        const groupData = groupDoc.data() as Group;
+        
+        // Send notification to each member (except the one who added the expense)
+        const membersToNotify = groupData.members.filter(member => 
+          member.userId !== expenseData.paidBy && member.isActive
+        );
+        
+        for (const member of membersToNotify) {
+          await this.createNotification({
+            userId: member.userId,
+            type: 'expense_added',
+            title: 'New Expense Added',
+            message: `${expenseData.paidByData.fullName} added "${expenseData.description}" for ${expenseData.currency} ${expenseData.amount} in ${groupData.name}`,
+            data: {
+              expenseId: expenseRef.id,
+              groupId: expenseData.groupId,
+              groupName: groupData.name,
+              senderName: expenseData.paidByData.fullName,
+              senderAvatar: '', // Will be filled from user data if available
+              amount: expenseData.amount,
+              currency: expenseData.currency,
+              description: expenseData.description
+            },
+            isRead: false,
+            createdAt: new Date()
+          });
+        }
+        
+        console.log(`✅ Sent expense notifications to ${membersToNotify.length} group members`);
+      }
+    } catch (error) {
+      console.error('❌ Error sending expense notifications:', error);
+      // Don't throw - expense was already added successfully
+    }
     
     return expenseRef.id;
     
@@ -2348,7 +2514,6 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
       groupAnalytics,
       splitWithMostFrequent
     };
-
   } catch (error) {
     console.error('Get expense analytics error:', error);
     
@@ -2365,496 +2530,532 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
       splitWithMostFrequent: { userId: '', userName: '', count: 0 }
     };
   }
-  }
-  // MANUAL SETTLEMENT METHODS
-  static async markPaymentAsPaid(
-    payerId: string,
-    payeeId: string,
-    amount: number,
-    groupId?: string,
-    description?: string
-  ): Promise<string> {
-    try {
-      console.log(`Marking payment as paid: ${payerId} -> ${payeeId}, amount: ${amount}`);
-      
-      const batch = writeBatch(db);
-      
-      // Create payment record
-      const paymentData: Omit<Payment, 'id' | 'createdAt' | 'updatedAt'> = {
-        fromUserId: payerId,
-        toUserId: payeeId,
-        amount: amount,
-        currency: 'USD', // Default currency, should be passed as parameter in real implementation
-        status: 'completed',
-        method: 'manual_settlement',
-        description: description || 'Manual settlement',
-        groupId: groupId,
-        settledAt: new Date()
-      };
-      
-      const paymentRef = doc(collection(db, 'payments'));
-      batch.set(paymentRef, {
-        ...paymentData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-      
-      // Update friend balances
-      await this.updateFriendBalance(payerId, payeeId, -amount);
-      await this.updateFriendBalance(payeeId, payerId, amount);
-      
-      // Update group member balances if in a group
-      if (groupId) {
-        await this.updateGroupMemberBalance(groupId, payerId, -amount);
-        await this.updateGroupMemberBalance(groupId, payeeId, amount);
-        
-        // Add settlement message to group chat
-        const payerData = await this.getUser(payerId);
-        const payeeData = await this.getUser(payeeId);
-        
-        const settlementMessage = {
-          groupId: groupId,
-          userId: 'system',
-          userName: 'System',
-          message: `${payerData?.fullName || 'Someone'} marked payment of $${amount} to ${payeeData?.fullName || 'someone'} as paid`,
-          timestamp: serverTimestamp(),
-          type: 'system' as const
-        };
-        
-        batch.set(doc(collection(db, 'groupMessages')), settlementMessage);
-      }
-      
-      // Create notifications
-      const payeeNotification = {
-        userId: payeeId,
-        type: 'payment_received' as const,
-        title: 'Payment Received',
-        message: `You received $${amount} from a friend`,
-        data: { 
-          paymentId: paymentRef.id,
-          amount: amount,
-          payerId: payerId,
-          groupId: groupId
-        },
-        isRead: false,
-        createdAt: new Date()
-      };
-      
-      batch.set(doc(collection(db, 'notifications')), payeeNotification);
-      
-      await batch.commit();
-      console.log('✅ Payment marked as paid successfully');
-      
-      return paymentRef.id;
-      
-    } catch (error) {
-      console.error('❌ Mark payment as paid error:', error);
-      throw error;
-    }
-  }
+}
 
-  static async settleAllBalancesBetweenFriends(
-    userId: string,
-    friendId: string,
-    groupId?: string
-  ): Promise<void> {
-    try {
-      console.log(`Settling all balances between ${userId} and ${friendId}`);
-      
-      // Get current friend relationship to check balance
-      const friendship = await this.getFriendship(userId, friendId);
-      if (!friendship) {
-        throw new Error('Friendship not found');
-      }
-      
-      const balance = friendship.balance;
-      if (balance === 0) {
-        throw new Error('No outstanding balance to settle');
-      }
-      
-      // Determine who owes whom
-      const amount = Math.abs(balance);
-      const payerId = balance > 0 ? friendId : userId; // If balance > 0, friend owes user
-      const payeeId = balance > 0 ? userId : friendId;
-      
-      await this.markPaymentAsPaid(
-        payerId,
-        payeeId,
-        amount,
-        groupId,
-        'Settlement of all balances'
-      );
-      
-      console.log('✅ All balances settled successfully');
-      
-    } catch (error) {
-      console.error('❌ Settle all balances error:', error);
-      throw error;
-    }
-  }
-
-  static async getSettlementSuggestions(userId: string): Promise<Array<{
-    friendId: string;
-    friendName: string;
-    friendAvatar?: string;
-    amount: number;
-    type: 'owes_you' | 'you_owe';
-    groupId?: string;
-    groupName?: string;
-  }>> {
-    try {
-      const friends = await this.getFriends(userId);
-      const suggestions = [];
-      
-      for (const friend of friends) {
-        if (friend.balance !== 0) {
-          const amount = Math.abs(friend.balance);
-          const type: 'owes_you' | 'you_owe' = friend.balance > 0 ? 'owes_you' : 'you_owe';
-          
-          suggestions.push({
-            friendId: friend.friendId,
-            friendName: friend.friendData.fullName,
-            friendAvatar: friend.friendData.avatar,
-            amount: amount,
-            type: type
-          });
-        }
-      }
-      
-      // Sort by amount descending
-      return suggestions.sort((a, b) => b.amount - a.amount);
-      
-    } catch (error) {
-      console.error('Get settlement suggestions error:', error);
-      return [];
-    }
-  }
-
-  static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
-    fromUserId: string;
-    fromUserName: string;
-    fromUserAvatar?: string;
-    toUserId: string;
-    toUserName: string;
-    toUserAvatar?: string;
-    amount: number;
-  }>> {
-    try {
-      const group = await this.getGroup(groupId);
-      if (!group) {
-        throw new Error('Group not found');
-      }
-      
-      const suggestions = [];
-      
-      // Find all members who owe money (negative balance) and who are owed money (positive balance)
-      const debtors = group.members.filter(m => m.balance < 0);
-      const creditors = group.members.filter(m => m.balance > 0);
-      
-      // Simple settlement suggestions - pair highest debtor with highest creditor
-      for (const debtor of debtors) {
-        for (const creditor of creditors) {
-          if (debtor.userId !== creditor.userId) {
-            const settleAmount = Math.min(Math.abs(debtor.balance), creditor.balance);
-            
-            if (settleAmount > 0) {
-              suggestions.push({
-                fromUserId: debtor.userId,
-                fromUserName: debtor.userData.fullName,
-                fromUserAvatar: debtor.userData.avatar,
-                toUserId: creditor.userId,
-                toUserName: creditor.userData.fullName,
-                toUserAvatar: creditor.userData.avatar,
-                amount: settleAmount
-              });
-            }
-          }
-        }
-      }
-      
-      // Sort by amount descending
-      return suggestions.sort((a, b) => b.amount - a.amount).slice(0, 5); // Top 5 suggestions
-      
-    } catch (error) {
-      console.error('Get group settlement suggestions error:', error);
-      return [];
-    }
-  }
-
-  // Helper method to get user data
-  static async getUser(userId: string): Promise<any> {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      if (userDoc.exists()) {
-        return { id: userDoc.id, ...userDoc.data() };
-      }
-      return null;
-    } catch (error) {
-      console.error('Get user error:', error);
-      return null;
-    }
-  }
-
-  // Helper method to get friendship data
-  static async getFriendship(userId: string, friendId: string): Promise<Friend | null> {
-    try {
-      const friends = await this.getFriends(userId);
-      return friends.find(f => f.friendId === friendId) || null;
-    } catch (error) {
-      console.error('Get friendship error:', error);
-      return null;
-    }
-  }
-
-  // Add these methods to your SplittingService class
-
-// PAYMENT REQUEST METHODS
-static async createPaymentRequest(data: {
+// SETTLEMENT TRANSACTION METHODS
+static async createSettlementTransaction(settlementData: {
   fromUserId: string;
   toUserId: string;
   amount: number;
   currency: string;
-  expenseId?: string;
+  description: string;
   groupId?: string;
-  message?: string;
+  expenseId?: string;
+  method: 'cash' | 'bank' | 'venmo' | 'paypal' | 'upi' | 'manual_settlement';
+  notes?: string;
 }): Promise<string> {
   try {
-    // Get user data for notifications
-    const fromUserDoc = await getDoc(doc(db, 'users', data.fromUserId));
-    const toUserDoc = await getDoc(doc(db, 'users', data.toUserId));
+    console.log('Creating settlement transaction:', settlementData);
+    
+    // Get user data for both users
+    const [fromUserDoc, toUserDoc] = await Promise.all([
+      getDoc(doc(db, 'users', settlementData.fromUserId)),
+      getDoc(doc(db, 'users', settlementData.toUserId))
+    ]);
     
     if (!fromUserDoc.exists() || !toUserDoc.exists()) {
-      throw new Error('User not found');
+      throw new Error('User data not found');
     }
     
     const fromUserData = fromUserDoc.data();
     const toUserData = toUserDoc.data();
     
-    // Create payment request
-    const paymentRequest = {
-      fromUserId: data.fromUserId,
+    // Get group data if groupId is provided
+    let groupData = undefined;
+    if (settlementData.groupId && settlementData.groupId !== 'personal') {
+      try {
+        const groupDoc = await getDoc(doc(db, 'groups', settlementData.groupId));
+        if (groupDoc.exists()) {
+          const group = groupDoc.data() as Group;
+          groupData = {
+            name: group.name || 'Unknown Group',
+            description: group.description
+          };
+        }
+      } catch (error) {
+        console.log('Failed to fetch group data:', error);
+      }
+    }
+    
+    const batch = writeBatch(db);
+    
+    // 1. Create the settlement transaction record
+    const settlementTransaction: Omit<SettlementTransaction, 'id'> = {
+      fromUserId: settlementData.fromUserId,
       fromUserData: {
-        fullName: fromUserData.fullName,
-        email: fromUserData.email,
-        avatar: fromUserData.profilePicture || ''
+        fullName: fromUserData?.fullName || 'Unknown User',
+        email: fromUserData?.email || '',
+        avatar: fromUserData?.profilePicture || ''
       },
-      toUserId: data.toUserId,
+      toUserId: settlementData.toUserId,
       toUserData: {
-        fullName: toUserData.fullName,
-        email: toUserData.email,
-        avatar: toUserData.profilePicture || ''
+        fullName: toUserData?.fullName || 'Unknown User',
+        email: toUserData?.email || '',
+        avatar: toUserData?.profilePicture || ''
       },
-      amount: data.amount,
-      currency: data.currency,
-      expenseId: data.expenseId || null,
-      groupId: data.groupId || null,
-      message: data.message || '',
-      status: 'pending',
+      amount: settlementData.amount,
+      currency: settlementData.currency,
+      description: settlementData.description || `Settlement payment to ${toUserData?.fullName}`,
+      groupId: settlementData.groupId,
+      groupData,
+      expenseId: settlementData.expenseId,
+      method: settlementData.method,
+      status: 'completed',
+      notes: settlementData.notes || '',
+      settlementDate: new Date(),
       createdAt: new Date(),
       updatedAt: new Date()
     };
     
-    const docRef = await addDoc(collection(db, 'paymentRequests'), paymentRequest);
+    const settlementRef = doc(collection(db, 'settlementTransactions'));
+    batch.set(settlementRef, settlementTransaction);
     
-    // Create in-app notification
-    await this.createNotification({
-      userId: data.toUserId,
-      type: 'payment_received',
-      title: 'Payment Request',
-      message: `${fromUserData.fullName} is requesting ${getCurrencySymbol(data.currency)}${data.amount.toFixed(2)}${data.message ? ` for ${data.message}` : ''}`,
-      data: {
-        paymentRequestId: docRef.id,
-        fromUserId: data.fromUserId,
-        fromUserName: fromUserData.fullName,
-        amount: data.amount,
-        currency: data.currency,
-        expenseId: data.expenseId,
-        groupId: data.groupId
+    // 2. Create a special settlement expense record for tracking
+    const settlementExpense: Omit<Expense, 'id'> = {
+      description: `Settlement: ${settlementData.description || 'Payment'}`,
+      amount: settlementData.amount,
+      currency: settlementData.currency,
+      category: 'settlement',
+      categoryIcon: '💸',
+      groupId: settlementData.groupId || 'personal',
+      paidBy: settlementData.fromUserId,
+      paidByData: {
+        fullName: fromUserData?.fullName || 'Unknown User',
+        email: fromUserData?.email || '',
+        avatar: fromUserData?.profilePicture || ''
       },
-      isRead: false,
-      createdAt: new Date()
-    });
+      splitType: 'equal',
+      splitData: [{
+        userId: settlementData.toUserId,
+        amount: settlementData.amount,
+        percentage: 100,
+        isPaid: true,
+        paidAt: new Date()
+      }],
+      notes: `Settlement payment via ${settlementData.method}${settlementData.notes ? '. ' + settlementData.notes : ''}`,
+      tags: ['settlement', 'payment'],
+      date: new Date(),
+      isSettled: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
     
-    // Send SMS notification if user has phone number
-    if (toUserData.mobile) {
-      await this.sendSMSPaymentRequest(
-        toUserData.mobile,
-        fromUserData.fullName,
-        data.amount,
-        data.currency,
-        docRef.id
-      );
+    const expenseRef = doc(collection(db, 'expenses'));
+    batch.set(expenseRef, settlementExpense);
+    
+    // 3. Update friend balances if they are friends
+    try {
+      await this.updateFriendBalance(settlementData.toUserId, settlementData.fromUserId, -settlementData.amount);
+      console.log(`Updated friend balance after settlement: ${settlementData.fromUserId} paid ${settlementData.toUserId} ${settlementData.amount}`);
+    } catch (error) {
+      console.log('No friendship found, skipping friend balance update');
     }
     
-    // Add to group chat if it's a group expense
-    if (data.groupId) {
+    // 4. Update group member balances if in a group
+    if (settlementData.groupId && settlementData.groupId !== 'personal') {
+      await this.updateGroupMemberBalance(settlementData.groupId, settlementData.fromUserId, -settlementData.amount);
+      await this.updateGroupMemberBalance(settlementData.groupId, settlementData.toUserId, settlementData.amount);
+      
+      // Add settlement message to group chat
       await this.sendGroupMessage({
-        groupId: data.groupId,
-        userId: data.fromUserId,
-        userName: fromUserData.fullName,
-        message: `💰 Requested ${getCurrencySymbol(data.currency)}${data.amount.toFixed(2)} from ${toUserData.fullName}`,
+        groupId: settlementData.groupId,
+        userId: settlementData.fromUserId,
+        userName: fromUserData?.fullName || 'Unknown User',
+        message: `💸 Settled ${settlementData.currency} ${settlementData.amount} with ${toUserData?.fullName}`,
         type: 'system'
       });
     }
     
-    return docRef.id;
+    await batch.commit();
+    
+    // 5. Send notifications
+    await this.sendSettlementNotifications(settlementRef.id, settlementTransaction);
+    
+    console.log('✅ Settlement transaction created successfully:', settlementRef.id);
+    return settlementRef.id;
     
   } catch (error) {
-    console.error('Create payment request error:', error);
+    console.error('❌ Create settlement transaction error:', error);
     throw error;
   }
 }
 
-static async sendSMSPaymentRequest(
-  phoneNumber: string, 
-  fromUserName: string, 
-  amount: number, 
-  currency: string, 
-  requestId: string
-): Promise<void> {
+static async sendSettlementNotifications(settlementId: string, settlement: Omit<SettlementTransaction, 'id'>): Promise<void> {
   try {
-    const message = `💰 Payment Request: ${fromUserName} is requesting ${getCurrencySymbol(currency)}${amount.toFixed(2)}. Open Spendy to pay: https://spendy.app/pay/${requestId}`;
-    
-    // Here you would integrate with your SMS service (Twilio, AWS SNS, etc.)
-    // For now, we'll just log it
-    console.log('SMS Payment Request:', { phoneNumber, message });
-    
-    // TODO: Implement actual SMS sending
-    // await twilioClient.messages.create({
-    //   body: message,
-    //   from: '+1234567890',
-    //   to: phoneNumber
-    // });
-    
-  } catch (error) {
-    console.error('Send SMS payment request error:', error);
-    // Don't throw - SMS is optional
-  }
-}
-
-static async sendPaymentReminder(paymentRequestId: string): Promise<void> {
-  try {
-    // Get payment request
-    const requestDoc = await getDoc(doc(db, 'paymentRequests', paymentRequestId));
-    if (!requestDoc.exists()) {
-      throw new Error('Payment request not found');
-    }
-    
-    const requestData = requestDoc.data();
-    
-    // Send reminder notification
+    // Notification to the receiver
     await this.createNotification({
-      userId: requestData.toUserId,
+      userId: settlement.toUserId,
       type: 'payment_received',
-      title: 'Payment Reminder',
-      message: `Reminder: ${requestData.fromUserData.fullName} is still waiting for ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)}`,
+      title: 'Payment Received',
+      message: `${settlement.fromUserData.fullName} sent you ${settlement.currency} ${settlement.amount}`,
       data: {
-        paymentRequestId,
-        fromUserId: requestData.fromUserId,
-        fromUserName: requestData.fromUserData.fullName,
-        amount: requestData.amount,
-        currency: requestData.currency,
-        isReminder: true
+        settlementId,
+        fromUserId: settlement.fromUserId,
+        amount: settlement.amount,
+        currency: settlement.currency,
+        method: settlement.method,
+        groupId: settlement.groupId,
+        navigationType: 'settlementDetails'
       },
       isRead: false,
       createdAt: new Date()
     });
     
-    // Send SMS reminder if user has phone number
-    const toUserDoc = await getDoc(doc(db, 'users', requestData.toUserId));
-    if (toUserDoc.exists()) {
-      const toUserData = toUserDoc.data();
-      if (toUserData.mobile) {
-        const message = `🔔 Reminder: ${requestData.fromUserData.fullName} is waiting for your payment of ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)}. Open Spendy: https://spendy.app/pay/${paymentRequestId}`;
-        
-        console.log('SMS Reminder:', { phoneNumber: toUserData.mobile, message });
-        // TODO: Send actual SMS
+    // Notification to the sender (confirmation)
+    await this.createNotification({
+      userId: settlement.fromUserId,
+      type: 'expense_settled',
+      title: 'Payment Sent',
+      message: `Your payment of ${settlement.currency} ${settlement.amount} to ${settlement.toUserData.fullName} has been recorded`,
+      data: {
+        settlementId,
+        toUserId: settlement.toUserId,
+        amount: settlement.amount,
+        currency: settlement.currency,
+        method: settlement.method,
+        groupId: settlement.groupId,
+        navigationType: 'settlementDetails'
+      },
+      isRead: false,
+      createdAt: new Date()
+    });
+
+    // Send push notifications using the PushNotificationService
+    const { PushNotificationService } = await import('../notifications/PushNotificationService');
+    
+    // Push notification to receiver
+    const receiverNotification = PushNotificationService.createExpenseSettledNotification(
+      settlement.fromUserData.fullName,
+      settlement.amount,
+      settlement.currency,
+      `Settlement for ${settlement.method} payment`,
+      settlementId,
+      settlement.groupId,
+      settlement.groupData?.name,
+      settlement.fromUserData.avatar
+    );
+    
+    await PushNotificationService.sendNotificationToUser(settlement.toUserId, receiverNotification);
+    
+    // Push notification to sender (confirmation)
+    const senderNotification = PushNotificationService.createExpenseSettledNotification(
+      'System',
+      settlement.amount,
+      settlement.currency,
+      `Payment confirmation`,
+      settlementId,
+      settlement.groupId,
+      settlement.groupData?.name
+    );
+    senderNotification.title = 'Payment Confirmed';
+    senderNotification.body = `Your payment of ${settlement.currency} ${settlement.amount} to ${settlement.toUserData.fullName} has been confirmed`;
+    
+    await PushNotificationService.sendNotificationToUser(settlement.fromUserId, senderNotification);
+    
+    console.log('✅ Settlement notifications sent');
+    
+  } catch (error) {
+    console.error('❌ Send settlement notifications error:', error);
+  }
+}
+
+static async getSettlementTransactions(userId: string, limitCount: number = 20): Promise<SettlementTransaction[]> {
+  try {
+    // Get settlements where user is either sender or receiver
+    const sentQuery = query(
+      collection(db, 'settlementTransactions'),
+      where('fromUserId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount / 2)
+    );
+    
+    const receivedQuery = query(
+      collection(db, 'settlementTransactions'),
+      where('toUserId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount / 2)
+    );
+    
+    const [sentSnapshot, receivedSnapshot] = await Promise.all([
+      getDocs(sentQuery),
+      getDocs(receivedQuery)
+    ]);
+    
+    const sentSettlements = sentSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      settlementDate: doc.data().settlementDate?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as SettlementTransaction[];
+    
+    const receivedSettlements = receivedSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      settlementDate: doc.data().settlementDate?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as SettlementTransaction[];
+    
+    // Combine and sort by creation date
+    const allSettlements = [...sentSettlements, ...receivedSettlements];
+    allSettlements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    
+    return allSettlements.slice(0, limitCount);
+    
+  } catch (error) {
+    console.error('❌ Get settlement transactions error:', error);
+    return [];
+  }
+}
+
+static async getGroupSettlementTransactions(groupId: string): Promise<SettlementTransaction[]> {
+  try {
+    const settlementsQuery = query(
+      collection(db, 'settlementTransactions'),
+      where('groupId', '==', groupId),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+    
+    const snapshot = await getDocs(settlementsQuery);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      settlementDate: doc.data().settlementDate?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as SettlementTransaction[];
+    
+  } catch (error) {
+    console.error('❌ Get group settlement transactions error:', error);
+    return [];
+  }
+}
+
+// GROUP SETTLEMENT SUGGESTIONS - Calculate optimal settlement suggestions for all group members
+static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
+  fromUserId: string;
+  fromUserName: string;
+  fromUserAvatar?: string;
+  toUserId: string;
+  toUserName: string;
+  toUserAvatar?: string;
+  amount: number;
+}>> {
+  try {
+    console.log('🔄 Calculating settlement suggestions for group:', groupId);
+    
+    // Get group data
+    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) {
+      throw new Error('Group not found');
+    }
+    
+    const groupData = groupDoc.data() as Group;
+    const activeMembers = groupData.members.filter(member => member.isActive);
+    
+    // Filter out members with zero balances and create debt matrix
+    const membersWithBalances = activeMembers.filter(member => Math.abs(member.balance) > 0.01);
+    
+    if (membersWithBalances.length === 0) {
+      return [];
+    }
+    
+    // Separate creditors (positive balance) and debtors (negative balance)
+    const creditors = membersWithBalances
+      .filter(member => member.balance > 0.01)
+      .map(member => ({
+        userId: member.userId,
+        userName: member.userData.fullName,
+        userAvatar: member.userData.avatar,
+        amount: member.balance
+      }))
+      .sort((a, b) => b.amount - a.amount); // Largest creditor first
+    
+    const debtors = membersWithBalances
+      .filter(member => member.balance < -0.01)
+      .map(member => ({
+        userId: member.userId,
+        userName: member.userData.fullName,
+        userAvatar: member.userData.avatar,
+        amount: Math.abs(member.balance)
+      }))
+      .sort((a, b) => b.amount - a.amount); // Largest debtor first
+    
+    console.log('Creditors:', creditors.length, 'Debtors:', debtors.length);
+    
+    // Generate optimal settlement suggestions using debt minimization algorithm
+    const settlements: Array<{
+      fromUserId: string;
+      fromUserName: string;
+      fromUserAvatar?: string;
+      toUserId: string;
+      toUserName: string;
+      toUserAvatar?: string;
+      amount: number;
+    }> = [];
+    
+    // Create working copies
+    const workingCreditors = [...creditors];
+    const workingDebtors = [...debtors];
+    
+    // Settlement algorithm: match largest debtor with largest creditor
+    while (workingCreditors.length > 0 && workingDebtors.length > 0) {
+      const creditor = workingCreditors[0];
+      const debtor = workingDebtors[0];
+      
+      // Calculate settlement amount (minimum of what creditor is owed and what debtor owes)
+      const settlementAmount = Math.min(creditor.amount, debtor.amount);
+      
+      if (settlementAmount > 0.01) { // Only create settlements for amounts > 1 cent
+        settlements.push({
+          fromUserId: debtor.userId,
+          fromUserName: debtor.userName,
+          fromUserAvatar: debtor.userAvatar,
+          toUserId: creditor.userId,
+          toUserName: creditor.userName,
+          toUserAvatar: creditor.userAvatar,
+          amount: parseFloat(settlementAmount.toFixed(2))
+        });
+      }
+      
+      // Update balances
+      creditor.amount -= settlementAmount;
+      debtor.amount -= settlementAmount;
+      
+      // Remove settled parties
+      if (creditor.amount <= 0.01) {
+        workingCreditors.shift();
+      }
+      if (debtor.amount <= 0.01) {
+        workingDebtors.shift();
       }
     }
     
-    // Add fun meme message to group chat if it's a group expense
-    if (requestData.groupId) {
-      const memeMessages = [
-        `🕒 Still waiting for that ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)} from ${requestData.toUserData.fullName}... ⏰`,
-        `📱 ${requestData.toUserData.fullName}, your wallet is calling! 💸`,
-        `🎵 Money money money... must be funny... ${requestData.toUserData.fullName}? 🎶`,
-        `🚨 Payment Alert: ${requestData.toUserData.fullName} still owes ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)} 🚨`,
-        `💰 Breaking News: ${requestData.toUserData.fullName}'s payment is still missing! 📰`
-      ];
-      
-      const randomMeme = memeMessages[Math.floor(Math.random() * memeMessages.length)];
-      
-      await this.sendGroupMessage({
-        groupId: requestData.groupId,
-        userId: 'system',
-        userName: 'Spendy Bot',
-        message: randomMeme,
-        type: 'system'
-      });
-    }
+    console.log(`✅ Generated ${settlements.length} settlement suggestions`);
+    return settlements;
     
   } catch (error) {
-    console.error('Send payment reminder error:', error);
+    console.error('❌ Get group settlement suggestions error:', error);
     throw error;
   }
 }
 
-static async markPaymentRequestPaid(paymentRequestId: string, paidBy: string): Promise<void> {
+// MARK PAYMENT AS PAID - Process settlement payment for groups or friends
+static async markPaymentAsPaid(
+  fromUserId: string,
+  toUserId: string,
+  amount: number,
+  groupId?: string,
+  description?: string
+): Promise<void> {
   try {
-    // Update payment request status
-    await updateDoc(doc(db, 'paymentRequests', paymentRequestId), {
-      status: 'paid',
-      paidAt: new Date(),
-      paidBy,
-      updatedAt: new Date()
-    });
+    console.log('🔄 Marking payment as paid:', { fromUserId, toUserId, amount, groupId, description });
     
-    // Get payment request data
-    const requestDoc = await getDoc(doc(db, 'paymentRequests', paymentRequestId));
-    if (!requestDoc.exists()) return;
+    // Get user data for both parties
+    const [fromUserDoc, toUserDoc] = await Promise.all([
+      getDoc(doc(db, 'users', fromUserId)),
+      getDoc(doc(db, 'users', toUserId))
+    ]);
     
-    const requestData = requestDoc.data();
+    if (!fromUserDoc.exists() || !toUserDoc.exists()) {
+      throw new Error('One or both users not found');
+    }
     
-    // Notify the requester that payment was received
+    const fromUserData = fromUserDoc.data();
+    const toUserData = toUserDoc.data();
+    
+    // Determine currency - use group currency if available, otherwise default
+    let currency = 'USD';
+    let groupData = undefined;
+    
+    if (groupId && groupId !== 'personal') {
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (groupDoc.exists()) {
+        const group = groupDoc.data() as Group;
+        currency = group.currency || 'USD';
+        groupData = {
+          name: group.name || 'Unknown Group',
+          description: group.description
+        };
+      }
+    }
+    
+    // Create settlement transaction
+    const settlementData = {
+      fromUserId,
+      toUserId,
+      amount,
+      currency,
+      description: description || 'Manual settlement',
+      groupId,
+      method: 'manual_settlement' as const,
+      notes: 'Marked as paid via settlement modal'
+    };
+    
+    const settlementId = await this.createSettlementTransaction(settlementData);
+    
+    console.log('✅ Settlement transaction created:', settlementId);
+    
+    // Send confirmation notifications
     await this.createNotification({
-      userId: requestData.fromUserId,
+      userId: toUserId,
       type: 'payment_received',
-      title: 'Payment Received!',
-      message: `${requestData.toUserData.fullName} paid ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)}`,
+      title: 'Payment Received',
+      message: `${fromUserData.fullName} marked a payment of ${currency} ${amount} as paid`,
       data: {
-        paymentRequestId,
-        fromUserId: requestData.toUserId,
-        fromUserName: requestData.toUserData.fullName,
-        amount: requestData.amount,
-        currency: requestData.currency
+        settlementId,
+        fromUserId,
+        amount,
+        currency,
+        method: 'manual_settlement',
+        groupId,
+        navigationType: 'settlementDetails'
       },
       isRead: false,
       createdAt: new Date()
     });
     
-    // Add celebration to group chat
-    if (requestData.groupId) {
-      const celebrationMessages = [
-        `🎉 Payment received! ${requestData.toUserData.fullName} just paid ${getCurrencySymbol(requestData.currency)}${requestData.amount.toFixed(2)} 🎉`,
-        `💸 Cha-ching! ${requestData.toUserData.fullName} settled up! 💰`,
-        `✅ Payment complete: ${requestData.toUserData.fullName} → ${requestData.fromUserData.fullName} ✅`,
-        `🏆 ${requestData.toUserData.fullName} wins "Fastest Payer" award! 🏆`
-      ];
-      
-      const randomCelebration = celebrationMessages[Math.floor(Math.random() * celebrationMessages.length)];
-      
+    await this.createNotification({
+      userId: fromUserId,
+      type: 'expense_settled',
+      title: 'Payment Confirmed',
+      message: `Your payment of ${currency} ${amount} to ${toUserData.fullName} has been recorded`,
+      data: {
+        settlementId,
+        toUserId,
+        amount,
+        currency,
+        method: 'manual_settlement',
+        groupId,
+        navigationType: 'settlementDetails'
+      },
+      isRead: false,
+      createdAt: new Date()
+    });
+    
+    // Add settlement message to group chat if in a group
+    if (groupId && groupId !== 'personal' && groupData) {
       await this.sendGroupMessage({
-        groupId: requestData.groupId,
-        userId: 'system',
-        userName: 'Spendy Bot',
-        message: randomCelebration,
+        groupId,
+        userId: fromUserId,
+        userName: fromUserData.fullName,
+        message: `💰 Settled ${currency} ${amount} with ${toUserData.fullName}`,
         type: 'system'
       });
     }
     
+    console.log('✅ Payment marked as paid successfully');
+    
   } catch (error) {
-    console.error('Mark payment request paid error:', error);
+    console.error('❌ Mark payment as paid error:', error);
     throw error;
   }
 }
 }
+
+// Export individual functions for testing
+export const getGroupSettlementSuggestions = (groupId: string) => SplittingService.getGroupSettlementSuggestions(groupId);
+export const markPaymentAsPaid = (fromUserId: string, toUserId: string, amount: number, groupId?: string, description?: string) => 
+  SplittingService.markPaymentAsPaid(fromUserId, toUserId, amount, groupId, description);

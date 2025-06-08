@@ -18,6 +18,7 @@ import { QRCodeService } from '@/services/qr/QRCodeService';
 import { InviteService } from '@/services/payments/PaymentService';
 import { User } from '@/types';
 import { Group } from '@/services/firebase/splitting';
+import QRCodeScanner from '@/components/QRCodeScanner';
 
 interface QRCodeModalProps {
   visible: boolean;
@@ -34,6 +35,8 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
   const [qrData, setQrData] = useState<any>(null);
   const [qrString, setQrString] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+
 
   useEffect(() => {
     if (visible && user) {
@@ -155,25 +158,22 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
     );
   };
 
-  const handleScanQR = () => {
-    setMode('scanner');
-    // In a real implementation, this would open the camera for QR scanning
-    Alert.alert(
-      'QR Scanner',
-      'Camera would open here to scan QR codes from friends or groups.',
-      [
-        { text: 'Cancel', onPress: () => setMode('friend') },
-        { 
-          text: 'Demo Scan', 
-          onPress: () => {
-            // Simulate scanning a QR code
-            Alert.alert('Demo', 'Scanned friend invitation QR code!');
-            setMode('friend');
-          }
-        }
-      ]
-    );
-  };
+const handleScanQR = () => {
+  setMode('scanner');
+  setShowScanner(true);
+};
+
+const handleQRCodeScanned = async (qrData: string) => {
+  try {
+    setShowScanner(false);
+    setMode('friend');
+    
+    await QRCodeService.handleScannedQR(qrData, user?.id || '');
+    Alert.alert('Success', 'QR code processed successfully!');
+  } catch (error: any) {
+    Alert.alert('Invalid QR Code', error.message || 'This QR code is not valid');
+  }
+};
 
   const renderModeSelector = () => (
     <View style={styles.modeSelector}>
@@ -345,8 +345,20 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
 
         {/* Content */}
         <View style={styles.content}>
-          {mode !== 'scanner' && renderQRCode()}
-          {mode !== 'scanner' && renderShareOptions()}
+          {mode === 'scanner' ? (
+            <QRCodeScanner
+              onQRCodeScanned={handleQRCodeScanned}
+              onClose={() => {
+                setShowScanner(false);
+                setMode('friend');
+              }}
+            />
+          ) : (
+            <>
+              {renderQRCode()}
+              {renderShareOptions()}
+            </>
+          )}
         </View>
 
         {/* Footer Info */}

@@ -135,8 +135,12 @@ static encodeQRData(qrData: QRData): string {
     
     const jsonString = JSON.stringify(cleanData);
     
-    // Use a simpler encoding approach
-    const encodedData = encodeURIComponent(btoa(jsonString));
+    // Handle non-ASCII characters properly by encoding to UTF-8 first
+    // Convert string to UTF-8 bytes, then to base64
+    const utf8Bytes = encodeURIComponent(jsonString).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+      return String.fromCharCode(parseInt(p1, 16));
+    });
+    const encodedData = encodeURIComponent(btoa(utf8Bytes));
     return `spendy://qr?data=${encodedData}`;
   } catch (error) {
     console.error('QR encode error:', error);
@@ -156,7 +160,12 @@ static decodeQRData(qrString: string): QRData {
       throw new Error('No data found in QR code');
     }
     
-    const jsonString = atob(decodeURIComponent(encodedData));
+    // Decode from base64 first, then convert UTF-8 bytes back to string
+    const base64Decoded = atob(decodeURIComponent(encodedData));
+    const jsonString = decodeURIComponent(base64Decoded.split('').map(c => {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    
     const qrData: QRData = JSON.parse(jsonString);
     
     if (!qrData.version || qrData.version !== '1.0') {
@@ -205,6 +214,46 @@ static decodeQRData(qrString: string): QRData {
       Alert.alert('QR Code Error', errorMessage);
     }
   }
+
+  static async handleScannedQRWithNavigation(
+  qrString: string, 
+  currentUserId: string,
+  navigation: any // Navigation object
+): Promise<void> {
+  try {
+    const qrData = this.decodeQRData(qrString);
+    
+    switch (qrData.type) {
+      case 'friend_invite':
+        await this.handleFriendInviteQR(qrData, currentUserId);
+        break;
+        
+      case 'group_invite':
+        const groupId = await this.handleGroupInviteQR(qrData, currentUserId);
+        if (groupId) {
+          // Navigate to group details
+          navigation.navigate('GroupDetails', { groupId });
+        }
+        break;
+        
+      case 'expense_share':
+        await this.handleExpenseShareQR(qrData, currentUserId);
+        break;
+        
+      case 'payment_request':
+        await this.handlePaymentRequestQR(qrData, currentUserId);
+        break;
+        
+      default:
+        throw new Error('Unknown QR code type');
+    }
+  } catch (error) {
+    console.error('Handle QR error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Invalid QR code';
+    Alert.alert('QR Code Error', errorMessage);
+    throw error; // Re-throw so caller can handle
+  }
+}
   
   // Handle friend invite QR code
   private static async handleFriendInviteQR(qrData: QRData, currentUserId: string): Promise<void> {
@@ -229,12 +278,17 @@ static decodeQRData(qrString: string): QRData {
           text: 'Add Friend',
           onPress: async () => {
             try {
-              await SplittingService.sendFriendRequest(
+              const result = await SplittingService.sendFriendRequest(
                 currentUserId,
                 qrData.userData!.email,
                 'Added via QR code'
               );
-              Alert.alert('Success', 'Friend request sent!');
+              
+              if (result.isNewUser) {
+                Alert.alert('Invitation Saved!', result.message || 'Invitation saved for when they join Spendy!');
+              } else {
+                Alert.alert('Success', result.message || 'Friend request sent!');
+              }
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to send friend request');
             }
@@ -245,18 +299,20 @@ static decodeQRData(qrString: string): QRData {
   }
   
   // Handle group invite QR code
-  private static async handleGroupInviteQR(qrData: QRData, currentUserId: string): Promise<void> {
-    if (!qrData.inviteCode || !qrData.groupData) {
-      throw new Error('Invalid group invite QR code');
-    }
-    
+private static async handleGroupInviteQR(qrData: QRData, currentUserId: string): Promise<string | null> {
+  if (!qrData.inviteCode || !qrData.groupData) {
+    throw new Error('Invalid group invite QR code');
+  }
+  
+  return new Promise((resolve) => {
     Alert.alert(
       'Group Invitation',
       `Join "${qrData.groupData.name}" group with ${qrData.groupData.memberCount} members?`,
       [
         {
           text: 'Cancel',
-          style: 'cancel'
+          style: 'cancel',
+          onPress: () => resolve(null)
         },
         {
           text: 'Join Group',
@@ -267,15 +323,17 @@ static decodeQRData(qrString: string): QRData {
                 currentUserId
               );
               Alert.alert('Success', `You've joined "${qrData.groupData!.name}"!`);
-              // Navigate to group screen
+              resolve(groupId);
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to join group');
+              resolve(null);
             }
           }
         }
       ]
     );
-  }
+  });
+}
   
   // Handle expense share QR code
   private static async handleExpenseShareQR(qrData: QRData, currentUserId: string): Promise<void> {
@@ -538,6 +596,8 @@ static decodeQRData(qrString: string): QRData {
       }
     });
   }
+
+  
   
   // Analytics tracking for QR code usage
   static trackQRCodeGenerated(type: string, userId: string): void {

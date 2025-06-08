@@ -34,7 +34,8 @@ const getCategoryIcon = (category: string): string => {
     'Bills': '💡',
     'Gas': '⛽',
     'Healthcare': '🏥',
-    'Other': '💳'
+    'Other': '💳',
+    'settlement': '💸'
   };
   return iconMap[category] || '💳';
 };
@@ -51,7 +52,8 @@ const getCategoryColor = (category: string): string => {
     'Bills': '#f97316',
     'Gas': '#64748b',
     'Healthcare': '#06b6d4',
-    'Other': '#6b7280'
+    'Other': '#6b7280',
+    'settlement': '#10b981'
   };
   return colorMap[category] || '#6b7280';
 };
@@ -228,24 +230,35 @@ export default function ExpenseModal({
     const iconText = getCategoryIcon(category);
     const colorBg = getCategoryColor(category);
     const canSplit = expense.amount > (category === 'Coffee' ? 10 : 30);
+    const isSettlement = category === 'settlement';
     
     return (
       <TouchableOpacity
         key={expense.id}
-        style={[styles.expenseCard, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.border }]}
+        style={[
+          styles.expenseCard, 
+          { backgroundColor: theme.colors.surface, shadowColor: theme.colors.border },
+          isSettlement && {
+            borderWidth: 2,
+            borderColor: '#10b981',
+            backgroundColor: '#10b981' + '10'
+          }
+        ]}
         onPress={() => handleExpensePress(expense)}
       >
         <View style={styles.expenseCardContent}>
           <View style={styles.expenseLeft}>
-            <View style={[styles.expenseIcon, { backgroundColor: colorBg }]}>
+            <View style={[styles.expenseIcon, { 
+              backgroundColor: isSettlement ? '#10b981' : colorBg 
+            }]}>
               <Text style={styles.expenseIconText}>{iconText}</Text>
             </View>
             <View style={styles.expenseInfo}>
               <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
-                ${expense.amount.toFixed(2)}
+                {isSettlement ? '' : '$'}{expense.amount.toFixed(2)}
               </Text>
               <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
-                {expense.description}
+                {isSettlement ? `💸 ${expense.description}` : expense.description}
               </Text>
               <View style={styles.expenseMetaRow}>
                 <Ionicons name="location-outline" size={12} color={theme.colors.textSecondary} />
@@ -262,10 +275,15 @@ export default function ExpenseModal({
           <View style={styles.expenseRight}>
             <View style={[
               styles.categoryBadge,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }
+              { 
+                backgroundColor: isSettlement ? '#10b981' + '20' : theme.colors.surface, 
+                borderColor: isSettlement ? '#10b981' : theme.colors.border 
+              }
             ]}>
-              <Text style={[styles.categoryText, { color: theme.colors.textSecondary }]}>
-                {category}
+              <Text style={[styles.categoryText, { 
+                color: isSettlement ? '#10b981' : theme.colors.textSecondary 
+              }]}>
+                {isSettlement ? 'Settlement' : category}
               </Text>
             </View>
             <View style={styles.expenseActions}>
@@ -274,7 +292,7 @@ export default function ExpenseModal({
                   styles.statusIndicator,
                   { backgroundColor: expense.isSettled ? '#10b981' : '#f59e0b' }
                 ]} />
-                {canSplit && !expense.isSettled && (
+                {canSplit && !expense.isSettled && !isSettlement && (
                   <TouchableOpacity 
                     style={[styles.splitButton, { backgroundColor: theme.colors.primary + '20' }]}
                     onPress={() => handleExpensePress(expense)}
@@ -283,6 +301,12 @@ export default function ExpenseModal({
                       Split
                     </Text>
                   </TouchableOpacity>
+                )}
+                {isSettlement && (
+                  <View style={[styles.settlementBadge, { backgroundColor: '#10b981' }]}>
+                    <Ionicons name="checkmark" size={14} color="white" />
+                    <Text style={styles.settlementBadgeText}>Settled</Text>
+                  </View>
                 )}
               </View>
             </View>
@@ -655,6 +679,20 @@ const styles = StyleSheet.create({
   splitButtonText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  settlementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10b981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  settlementBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
   },
   splitInfo: {
     marginTop: 12,

@@ -281,8 +281,10 @@ const handleRemoveAdmin = async (userId: string) => {
       await SplittingService.addGroupMember(group.id, friendId);
       Alert.alert('Success', 'Friend has been added to the group');
       setShowAddMember(false);
-      // Refresh group data
-      loadGroupExpenses();
+      // Refresh group data by calling parent refresh
+      onRefresh?.();
+      // Also refresh expenses
+      await loadGroupExpenses();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to add friend to group');
     }

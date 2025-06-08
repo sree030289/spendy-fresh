@@ -267,6 +267,111 @@ export class RealNotificationService {
           },
         },
       ]);
+
+      // **NEW** Friend request notification category
+      await Notifications.setNotificationCategoryAsync('friend_request', [
+        {
+          identifier: 'accept_friend',
+          buttonTitle: 'Accept',
+          options: {
+            isDestructive: false,
+            isAuthenticationRequired: false,
+            opensAppToForeground: true,
+          },
+        },
+        {
+          identifier: 'decline_friend',
+          buttonTitle: 'Decline',
+          options: {
+            isDestructive: true,
+            isAuthenticationRequired: false,
+          },
+        },
+        {
+          identifier: 'view_request',
+          buttonTitle: 'View',
+          options: {
+            isDestructive: false,
+            isAuthenticationRequired: false,
+            opensAppToForeground: true,
+          },
+        },
+      ]);
+
+      // **NEW** Group invitation notification category
+      await Notifications.setNotificationCategoryAsync('group_invitation', [
+        {
+          identifier: 'join_group',
+          buttonTitle: 'Join',
+          options: {
+            isDestructive: false,
+            isAuthenticationRequired: false,
+            opensAppToForeground: true,
+          },
+        },
+        {
+          identifier: 'decline_invite',
+          buttonTitle: 'Decline',
+          options: {
+            isDestructive: true,
+            isAuthenticationRequired: false,
+          },
+        },
+        {
+          identifier: 'view_group',
+          buttonTitle: 'View',
+          options: {
+            isDestructive: false,
+            isAuthenticationRequired: false,
+            opensAppToForeground: true,
+          },
+        },
+      ]);
+
+      // **NEW** Expense notification category
+      await Notifications.setNotificationCategoryAsync('expense_notification', [
+        {
+          identifier: 'view_expense',
+          buttonTitle: 'View',
+          options: {
+            isDestructive: false,
+            isAuthenticationRequired: false,
+            opensAppToForeground: true,
+          },
+        },
+        {
+          identifier: 'split_expense',
+          buttonTitle: 'Split',
+          options: {
+            isDestructive: false,
+            isAuthenticationRequired: false,
+            opensAppToForeground: true,
+          },
+        },
+      ]);
+
+      // **NEW** General notification category for other app notifications
+      await Notifications.setNotificationCategoryAsync('app_notification', [
+        {
+          identifier: 'view_notification',
+          buttonTitle: 'View',
+          options: {
+            isDestructive: false,
+            isAuthenticationRequired: false,
+            opensAppToForeground: true,
+          },
+        },
+        {
+          identifier: 'dismiss',
+          buttonTitle: 'Dismiss',
+          options: {
+            isDestructive: false,
+            isAuthenticationRequired: false,
+          },
+        },
+      ]);
+
+      console.log('✅ Notification categories set up successfully');
     } catch (error) {
       console.error('Failed to setup notification categories:', error);
     }
@@ -299,25 +404,102 @@ export class RealNotificationService {
     
     console.log('Notification response:', { actionIdentifier, data });
     
-    // Type guard to ensure data has the expected structure
-    if (!data || typeof data.reminderId !== 'string') {
-      console.error('Invalid notification data:', data);
-      return;
-    }
-    
+    // Handle different types of notification actions
     switch (actionIdentifier) {
+      // **EXISTING** Bill reminder actions
       case 'mark_paid':
-        this.handleMarkAsPaid(data.reminderId);
+        if (data && typeof data.reminderId === 'string') {
+          this.handleMarkAsPaid(data.reminderId);
+        }
         break;
       case 'snooze':
-        this.handleSnoozeReminder(data.reminderId);
+        if (data && typeof data.reminderId === 'string') {
+          this.handleSnoozeReminder(data.reminderId);
+        }
         break;
       case 'pay_now':
       case 'view':
-        this.handleViewReminder(data.reminderId);
+        if (data && typeof data.reminderId === 'string') {
+          this.handleViewReminder(data.reminderId);
+        }
         break;
+
+      // **NEW** Friend request actions
+      case 'accept_friend':
+        if (data && typeof data.friendRequestId === 'string') {
+          this.handleAcceptFriendRequest(
+            data.friendRequestId, 
+            typeof data.senderName === 'string' ? data.senderName : undefined
+          );
+        }
+        break;
+      case 'decline_friend':
+        if (data && typeof data.friendRequestId === 'string') {
+          this.handleDeclineFriendRequest(
+            data.friendRequestId, 
+            typeof data.senderName === 'string' ? data.senderName : undefined
+          );
+        }
+        break;
+      case 'view_request':
+        if (data && typeof data.friendRequestId === 'string') {
+          this.handleViewFriendRequest(data.friendRequestId);
+        }
+        break;
+
+      // **NEW** Group invitation actions
+      case 'join_group':
+        if (data && typeof data.inviteCode === 'string') {
+          this.handleJoinGroup(
+            data.inviteCode,
+            typeof data.groupName === 'string' ? data.groupName : undefined,
+            typeof data.senderName === 'string' ? data.senderName : undefined
+          );
+        }
+        break;
+      case 'decline_invite':
+        if (data) {
+          this.handleDeclineGroupInvite(
+            typeof data.groupName === 'string' ? data.groupName : undefined,
+            typeof data.senderName === 'string' ? data.senderName : undefined
+          );
+        }
+        break;
+      case 'view_group':
+        if (data && typeof data.groupId === 'string') {
+          this.handleViewGroup(data.groupId);
+        }
+        break;
+
+      // **NEW** Expense notification actions
+      case 'view_expense':
+        if (data && typeof data.expenseId === 'string') {
+          this.handleViewExpense(
+            data.expenseId,
+            typeof data.groupId === 'string' ? data.groupId : undefined
+          );
+        }
+        break;
+      case 'split_expense':
+        if (data && typeof data.expenseId === 'string') {
+          this.handleSplitExpense(
+            data.expenseId,
+            typeof data.groupId === 'string' ? data.groupId : undefined
+          );
+        }
+        break;
+
+      // **NEW** General app notification actions
+      case 'view_notification':
+        this.handleViewNotification(data);
+        break;
+      case 'dismiss':
+        console.log('Notification dismissed');
+        break;
+
+      // Default case - typically means user tapped the notification itself
       default:
-        this.handleViewReminder(data.reminderId);
+        this.handleDefaultNotificationTap(data);
         break;
     }
   }
@@ -365,167 +547,258 @@ export class RealNotificationService {
     console.log('Navigate to reminder:', reminderId);
   }
 
-  // Get notification settings for a user
-  static async getNotificationSettings(userId: string): Promise<NotificationSettings | null> {
+  // **NEW** Group invitation notification handlers
+  private static async handleJoinGroup(inviteCode: string, groupName?: string, senderName?: string): Promise<void> {
     try {
-      const stored = await AsyncStorage.getItem(`${STORAGE_KEYS.NOTIFICATION_SETTINGS}_${userId}`);
-      if (stored) {
-        return JSON.parse(stored);
+      console.log('Joining group with invite code:', inviteCode);
+      
+      // Get current user to pass as parameter
+      const { AuthService } = await import('@/services/firebase/auth');
+      const currentUser = await AuthService.getCurrentUser();
+      
+      if (!currentUser) {
+        console.error('No current user found');
+        Alert.alert('Error', 'Please log in to join the group.');
+        return;
       }
       
-      return {
-        enabled: true,
-        reminderDays: [1, 3, 7],
-        timeOfDay: '09:00',
-        pushEnabled: true,
-        emailEnabled: false,
-        smsEnabled: false,
-        soundEnabled: true,
-        vibrationEnabled: true,
-      };
+      // Import and use SplittingService to join the group
+      const { SplittingService } = await import('@/services/firebase/splitting');
+      await SplittingService.joinGroupByInviteCode(inviteCode, currentUser.id);
+      
+      // Show success notification
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Successfully Joined Group! 🎉',
+          body: groupName ? `Welcome to ${groupName}!` : 'You have successfully joined the group!',
+          sound: 'default',
+        },
+        trigger: null,
+      });
+      
+      // Trigger app navigation to the group
+      this.triggerAppNavigation({ 
+        type: 'group_joined', 
+        inviteCode,
+        groupName,
+        senderName
+      });
+      
     } catch (error) {
-      console.error('Error getting notification settings:', error);
+      console.error('Failed to join group:', error);
+      Alert.alert('Error', 'Failed to join group. Please try again.');
+    }
+  }
+
+  private static async handleDeclineGroupInvite(groupName?: string, senderName?: string): Promise<void> {
+    try {
+      console.log('Declining group invitation');
+      
+      // Show confirmation notification
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Group Invitation Declined',
+          body: groupName ? `Declined invitation to ${groupName}` : 'Group invitation declined',
+          sound: 'default',
+        },
+        trigger: null,
+      });
+      
+    } catch (error) {
+      console.error('Failed to decline group invitation:', error);
+    }
+  }
+
+  private static handleViewGroup(groupId: string): void {
+    console.log('Viewing group:', groupId);
+    
+    // Trigger app navigation to show group details
+    this.triggerAppNavigation({ 
+      type: 'group_details', 
+      groupId,
+      action: 'view'
+    });
+  }
+
+  // **NEW** Expense notification handlers
+  private static handleViewExpense(expenseId: string, groupId?: string): void {
+    console.log('Viewing expense:', expenseId);
+    
+    // Trigger app navigation to show expense details
+    this.triggerAppNavigation({ 
+      type: 'expense_details', 
+      expenseId,
+      groupId,
+      action: 'view'
+    });
+  }
+
+  private static handleSplitExpense(expenseId: string, groupId?: string): void {
+    console.log('Splitting expense:', expenseId);
+    
+    // Trigger app navigation to split expense
+    this.triggerAppNavigation({ 
+      type: 'split_expense', 
+      expenseId,
+      groupId,
+      action: 'split'
+    });
+  }
+
+  // **NEW** Friend request notification handlers
+  private static async handleAcceptFriendRequest(friendRequestId: string, senderName?: string): Promise<void> {
+    try {
+      console.log('Accepting friend request:', friendRequestId);
+      
+      // Import and use SplittingService to accept the friend request
+      const { SplittingService } = await import('@/services/firebase/splitting');
+      await SplittingService.acceptFriendRequest(friendRequestId);
+      
+      // Show success notification
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Friend Request Accepted! 🎉',
+          body: senderName ? `You are now friends with ${senderName}` : 'Friend request accepted successfully!',
+          sound: 'default',
+        },
+        trigger: null,
+      });
+      
+      // Trigger app navigation to friends screen
+      this.triggerAppNavigation({ type: 'friend_request_accepted', friendRequestId });
+      
+    } catch (error) {
+      console.error('Failed to accept friend request:', error);
+      Alert.alert('Error', 'Failed to accept friend request');
+    }
+  }
+
+  private static async handleDeclineFriendRequest(friendRequestId: string, senderName?: string): Promise<void> {
+    try {
+      console.log('Declining friend request:', friendRequestId);
+      
+      // Import and use SplittingService to decline the friend request
+      const { SplittingService } = await import('@/services/firebase/splitting');
+      await SplittingService.declineFriendRequest(friendRequestId);
+      
+      // Show confirmation notification
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Friend Request Declined',
+          body: senderName ? `Declined friend request from ${senderName}` : 'Friend request declined',
+          sound: 'default',
+        },
+        trigger: null,
+      });
+      
+    } catch (error) {
+      console.error('Failed to decline friend request:', error);
+      Alert.alert('Error', 'Failed to decline friend request');
+    }
+  }
+
+  private static handleViewFriendRequest(friendRequestId: string): void {
+    console.log('Viewing friend request:', friendRequestId);
+    
+    // Trigger app navigation to show friend request modal
+    this.triggerAppNavigation({ 
+      type: 'friend_request', 
+      friendRequestId,
+      action: 'view'
+    });
+  }
+
+  // **NEW** General notification handlers
+  private static handleViewNotification(data: any): void {
+    console.log('Viewing notification:', data);
+    
+    // Navigate based on notification type
+    if (data?.type) {
+      this.triggerAppNavigation(data);
+    }
+  }
+
+  private static handleDefaultNotificationTap(data: any): void {
+    console.log('Default notification tap:', data);
+    
+    // Handle notification tap based on data type
+    if (data?.friendRequestId) {
+      this.handleViewFriendRequest(data.friendRequestId);
+    } else if (data?.reminderId) {
+      this.handleViewReminder(data.reminderId);
+    } else {
+      this.triggerAppNavigation(data);
+    }
+  }
+
+  // **NEW** App navigation trigger (for deep linking from notifications)
+  private static triggerAppNavigation(data: any): void {
+    console.log('Triggering app navigation:', data);
+    
+    // In a real implementation, this would use a navigation service or event emitter
+    // to communicate with the app's navigation system
+    
+    // For now, we'll store the navigation intent and let the app pick it up
+    this.setNavigationIntent(data);
+  }
+
+  // **NEW** Store navigation intent for app to pick up
+  private static async setNavigationIntent(data: any): Promise<void> {
+    try {
+      await AsyncStorage.setItem('@notification_navigation_intent', JSON.stringify(data));
+      console.log('Navigation intent stored:', data);
+    } catch (error) {
+      console.error('Failed to store navigation intent:', error);
+    }
+  }
+
+  // **NEW** Get and clear navigation intent
+  static async getAndClearNavigationIntent(): Promise<any | null> {
+    try {
+      const intent = await AsyncStorage.getItem('@notification_navigation_intent');
+      if (intent) {
+        await AsyncStorage.removeItem('@notification_navigation_intent');
+        return JSON.parse(intent);
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to get navigation intent:', error);
       return null;
     }
   }
 
-  // Update notification settings
-  static async updateNotificationSettings(userId: string, settings: NotificationSettings): Promise<void> {
-    try {
-      await AsyncStorage.setItem(
-        `${STORAGE_KEYS.NOTIFICATION_SETTINGS}_${userId}`,
-        JSON.stringify(settings)
-      );
-      
-      await this.scheduleReminderNotifications(userId);
-    } catch (error) {
-      console.error('Error updating notification settings:', error);
-      throw error;
-    }
-  }
-
-  // Schedule notifications for all user reminders
-  static async scheduleReminderNotifications(userId: string): Promise<void> {
-    try {
-      const settings = await this.getNotificationSettings(userId);
-      if (!settings || !settings.enabled || !settings.pushEnabled) {
-        return;
-      }
-      
-      await this.clearScheduledNotifications(userId);
-      
-      // In a real app, you'd get reminders from RemindersService
-      // For now, just log that we would schedule them
-      console.log(`📅 Would schedule notifications for user ${userId}`);
-      
-    } catch (error) {
-      console.error('Error scheduling reminder notifications:', error);
-    }
-  }
-
-  // Clear all scheduled notifications for a user
-  static async clearScheduledNotifications(userId: string): Promise<void> {
-    try {
-      const stored = await AsyncStorage.getItem(`${STORAGE_KEYS.SCHEDULED_NOTIFICATIONS}_${userId}`);
-      if (stored) {
-        const notifications: ScheduledNotification[] = JSON.parse(stored);
-        
-        for (const notification of notifications) {
-          if (notification.notificationId) {
-            await Notifications.cancelScheduledNotificationAsync(notification.notificationId);
-          }
-        }
-      }
-      
-      await AsyncStorage.removeItem(`${STORAGE_KEYS.SCHEDULED_NOTIFICATIONS}_${userId}`);
-      console.log('🧹 Cleared all scheduled notifications');
-    } catch (error) {
-      console.error('Error clearing scheduled notifications:', error);
-    }
-  }
-
-  // Generate notification title
-  private static getNotificationTitle(reminder: Reminder, daysUntilDue: number): string {
-    if (daysUntilDue === 0) {
-      return 'Bill Due Today! 📅';
-    } else if (daysUntilDue === 1) {
-      return 'Bill Due Tomorrow 📅';
-    } else {
-      return `Bill Due in ${daysUntilDue} Days 📅`;
-    }
-  }
-
-  // Generate notification body
-  private static getNotificationBody(reminder: Reminder, daysUntilDue: number): string {
-    const amount = `${reminder.currency} ${reminder.amount.toFixed(2)}`;
-    
-    if (daysUntilDue === 0) {
-      return `${reminder.title} (${amount}) is due today. Don't forget to pay!`;
-    } else if (daysUntilDue === 1) {
-      return `${reminder.title} (${amount}) is due tomorrow. Get ready to pay.`;
-    } else {
-      return `${reminder.title} (${amount}) is due in ${daysUntilDue} days.`;
-    }
-  }
-
-  // Send immediate notification
-  static async sendImmediateNotification(
-    title: string,
-    body: string,
-    data?: any
+  // **NEW** Send friend request notification
+  static async sendFriendRequestNotification(
+    targetUserId: string,
+    senderName: string,
+    senderUserId: string,
+    friendRequestId: string
   ): Promise<void> {
     try {
+      console.log('Sending friend request notification to:', targetUserId);
+      
+      // In production, this would send a push notification via your backend
+      // For demo purposes, we'll schedule a local notification
       await Notifications.scheduleNotificationAsync({
         content: {
-          title,
-          body,
-          data,
+          title: 'New Friend Request',
+          body: `${senderName} wants to be your friend on Spendy`,
+          data: {
+            type: 'friend_request',
+            friendRequestId,
+            senderUserId,
+            senderName,
+          },
           sound: 'default',
+          categoryIdentifier: 'friend_request',
           badge: 1,
         },
-        trigger: null,
+        trigger: null, // Immediate notification
       });
-    } catch (error) {
-      console.error('Failed to send immediate notification:', error);
-    }
-  }
-
-  // Send test notification
-  static async sendTestNotification(userId: string): Promise<void> {
-    try {
-      const settings = await this.getNotificationSettings(userId);
       
-      if (!settings || !settings.enabled || !settings.pushEnabled) {
-        Alert.alert(
-          'Notifications Disabled', 
-          'Please enable notifications in your settings first.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      await this.sendImmediateNotification(
-        'Test Notification 🎉',
-        'Great! Your notifications are working perfectly. You\'ll receive reminders for your bills.',
-        { type: 'test', timestamp: new Date().toISOString() }
-      );
-
-      // Show success message after a short delay to let the notification appear first
-      setTimeout(() => {
-        Alert.alert(
-          'Test Successful! ✅', 
-          'Test notification sent successfully! Check your notification bar.',
-          [{ text: 'Awesome!' }]
-        );
-      }, 500);
-
+      console.log('✅ Friend request notification sent');
     } catch (error) {
-      console.error('Failed to send test notification:', error);
-      Alert.alert(
-        'Test Failed ❌', 
-        'Failed to send test notification. This might be because you\'re running on a simulator or notifications aren\'t properly configured.',
-        [{ text: 'OK' }]
-      );
+      console.error('Failed to send friend request notification:', error);
     }
   }
 
@@ -588,5 +861,64 @@ export class RealNotificationService {
     } catch (error) {
       console.error('Failed to cleanup notification service:', error);
     }
+  }
+
+  // **NEW** Helper methods for notification content
+  private static async getNotificationSettings(userId: string): Promise<NotificationSettings> {
+    try {
+      const settings = await AsyncStorage.getItem(`notification_settings_${userId}`);
+      if (settings) {
+        return JSON.parse(settings);
+      }
+      
+      // Return default settings
+      return {
+        enabled: true,
+        reminderDays: [1, 3, 7],
+        timeOfDay: '09:00',
+        pushEnabled: true,
+        emailEnabled: false,
+        smsEnabled: false,
+        soundEnabled: true,
+        vibrationEnabled: true,
+        quietHoursStart: '22:00',
+        quietHoursEnd: '08:00'
+      };
+    } catch (error) {
+      console.error('Error getting notification settings:', error);
+      return {
+        enabled: true,
+        reminderDays: [1, 3, 7],
+        timeOfDay: '09:00',
+        pushEnabled: true,
+        emailEnabled: false,
+        smsEnabled: false,
+        soundEnabled: true,
+        vibrationEnabled: true
+      };
+    }
+  }
+
+  private static getNotificationTitle(reminder: Reminder, days: number): string {
+    if (days <= 0) {
+      return `📋 ${reminder.title} - Due Today!`;
+    } else if (days === 1) {
+      return `📋 ${reminder.title} - Due Tomorrow`;
+    } else {
+      return `📋 ${reminder.title} - Due in ${days} days`;
+    }
+  }
+
+  private static getNotificationBody(reminder: Reminder, days: number): string {
+    let urgencyText = '';
+    if (days <= 0) {
+      urgencyText = 'This reminder is due today! ';
+    } else if (days === 1) {
+      urgencyText = 'This reminder is due tomorrow. ';
+    } else {
+      urgencyText = `This reminder is due in ${days} days. `;
+    }
+    
+    return `${urgencyText}${reminder.description || 'Tap to view details.'}`;
   }
 }

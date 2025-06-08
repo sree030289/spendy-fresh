@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -20,3 +20,9 @@ export const auth = getAuth(app);
 
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Optional: Reduce Firestore connection warnings in development
+if (__DEV__) {
+  // Configure Firestore settings to reduce connection warnings
+  console.log('🔧 Firebase initialized in development mode');
+}

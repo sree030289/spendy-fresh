@@ -117,6 +117,12 @@ const getCategoryConfig = (category: string) => {
       bgColor: 'rgba(59, 130, 246, 0.1)',
       iconColor: '#3B82F6'
     },
+    settlement: { 
+      icon: 'checkmark-circle',
+      gradient: ['#10b981', '#059669'],
+      bgColor: 'rgba(16, 185, 129, 0.1)',
+      iconColor: '#10b981'
+    },
   };
   return configs[category as keyof typeof configs] || { 
     icon: 'card',
@@ -296,11 +302,17 @@ export default function ExpensesScreen() {
   const renderExpenseCard = ({ item, index }: { item: SmartExpense; index: number }) => {
     const categoryConfig = getCategoryConfig(item.category);
     const detectionConfig = getDetectionConfig(item.detectionMethod);
+    const isSettlement = item.category === 'settlement';
     
     return (
       <Animated.View
         style={[
           styles.expenseCard,
+          isSettlement && {
+            borderWidth: 2,
+            borderColor: '#10b981',
+            backgroundColor: '#10b981' + '10'
+          },
           {
             transform: [{
               translateY: scrollY.interpolate({
@@ -336,15 +348,25 @@ export default function ExpensesScreen() {
                   </LinearGradient>
                   <View style={styles.expenseInfo}>
                     <View style={styles.amountRow}>
-                      <Text style={styles.expenseAmount}>${item.amount.toFixed(2)}</Text>
+                      <Text style={styles.expenseAmount}>
+                        {isSettlement ? '' : '$'}{item.amount.toFixed(2)}
+                      </Text>
                       {!item.isConfirmed && (
                         <View style={styles.pendingBadge}>
                           <View style={styles.pendingDot} />
                           <Text style={styles.pendingText}>Pending</Text>
                         </View>
                       )}
+                      {isSettlement && (
+                        <View style={styles.settlementBadge}>
+                          <Ionicons name="checkmark" size={14} color="white" />
+                          <Text style={styles.settlementBadgeText}>Settled</Text>
+                        </View>
+                      )}
                     </View>
-                    <Text style={styles.expenseDescription}>{item.description}</Text>
+                    <Text style={styles.expenseDescription}>
+                      {isSettlement ? '💸 ' : ''}{item.description}
+                    </Text>
                     <Text style={styles.merchantName}>{item.merchant}</Text>
                   </View>
                 </View>
@@ -377,7 +399,7 @@ export default function ExpensesScreen() {
 
               {/* Actions */}
               <View style={styles.expenseActions}>
-                {item.canSplit && (
+                {item.canSplit && !isSettlement && (
                   <TouchableOpacity style={styles.splitButton}>
                     <LinearGradient
                       colors={['#667eea', '#764ba2']}
@@ -1395,6 +1417,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     marginTop: 2,
+  },
+  settlementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10b981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  settlementBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
   },
 });
 

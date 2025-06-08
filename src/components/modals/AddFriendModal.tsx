@@ -20,11 +20,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { InviteService } from '@/services/payments/PaymentService';
+import { requestCameraPermissionsAsync } from 'expo-image-picker';
+
 
 interface AddFriendModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData) => void;
+  onOpenQRScanner?: () => void; // Add callback for QR scanner
 }
 
 interface ContactData {
@@ -32,7 +35,7 @@ interface ContactData {
   phoneNumber: string;
 }
 
-export default function AddFriendModal({ visible, onClose, onSubmit }: AddFriendModalProps) {
+export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRScanner }: AddFriendModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [activeMethod, setActiveMethod] = useState<'email' | 'phone' | 'qr'>('email');
@@ -228,6 +231,11 @@ export default function AddFriendModal({ visible, onClose, onSubmit }: AddFriend
     }
   };
 
+  // Handle QR code scanning by delegating to parent
+  const handleQRCodeScanned = async (qrData: string) => {
+    // This function is no longer needed since QR scanning is handled by parent
+  };
+
   const resetPhoneForm = () => {
     setPhoneNumber('');
     setContactName('');
@@ -239,23 +247,29 @@ export default function AddFriendModal({ visible, onClose, onSubmit }: AddFriend
     onClose();
   };
 
-  const handleScanQR = async () => {
-    try {
+const handleScanQR = async () => {
+  try {
+    // Check camera permissions first
+    const { status } = await requestCameraPermissionsAsync();
+    if (status !== 'granted') {
       Alert.alert(
-        'QR Scanner',
-        'Open camera to scan friend\'s QR code',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Camera', onPress: () => {
-            // Navigate to QR scanner screen
-            console.log('Open QR scanner');
-          }}
-        ]
+        'Camera Permission Required',
+        'Please allow camera access to scan QR codes',
+        [{ text: 'OK' }]
       );
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to open QR scanner');
+      return;
     }
-  };
+
+    // Close this modal and open QR scanner in parent
+    onClose();
+    if (onOpenQRScanner) {
+      onOpenQRScanner();
+    }
+  } catch (error: any) {
+    Alert.alert('Error', error.message || 'Failed to open QR scanner');
+  }
+};
+
 
   const renderEmailMethod = () => (
     <View style={styles.methodContent}>

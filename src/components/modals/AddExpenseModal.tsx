@@ -33,6 +33,7 @@ interface AddExpenseModalProps {
 }
 
 const EXPENSE_CATEGORIES = [
+  { id: 'settlement', name: 'Settlement', icon: '💸', isSpecial: true },
   { id: 'food', name: 'Food & Dining', icon: '🍽️' },
   { id: 'transport', name: 'Transportation', icon: '🚗' },
   { id: 'entertainment', name: 'Entertainment', icon: '🎬' },

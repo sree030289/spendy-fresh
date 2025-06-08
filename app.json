@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.svaag.spendy"
+      "bundleIdentifier": "com.svaag.spendy",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to camera for QR code scanning to quickly add expenses and split bills."
+      }
     },
     "android": {
       "adaptiveIcon": {

@@ -8,9 +8,24 @@ export interface PushNotificationData {
   data: {
     userId?: string;
     groupId?: string;
+    groupName?: string;
     expenseId?: string;
     friendRequestId?: string;
     paymentId?: string;
+    senderName?: string;
+    senderEmail?: string;
+    senderAvatar?: string;
+    message?: string;
+    inviteCode?: string;
+    groupDescription?: string;
+    amount?: number;
+    currency?: string;
+    description?: string;
+    actions?: Array<{
+      id: string;
+      title: string;
+      destructive: boolean;
+    }>;
     [key: string]: any;
   };
 }
@@ -112,12 +127,42 @@ export class PushNotificationService {
   }
 
   // Predefined notification templates
-  static createFriendRequestNotification(senderName: string, friendRequestId: string): PushNotificationData {
+  static createFriendRequestNotification(
+    senderName: string, 
+    senderEmail: string,
+    friendRequestId: string,
+    senderAvatar?: string,
+    message?: string
+  ): PushNotificationData {
     return {
       type: 'friend_request',
       title: 'New Friend Request',
       body: `${senderName} wants to be your friend on Spendy`,
-      data: { friendRequestId }
+      data: { 
+        friendRequestId,
+        senderName,
+        senderEmail,
+        senderAvatar,
+        message: message || `${senderName} wants to be your friend`,
+        // Action buttons for interactive notifications
+        actions: [
+          {
+            id: 'accept_friend',
+            title: 'Accept',
+            destructive: false
+          },
+          {
+            id: 'decline_friend', 
+            title: 'Decline',
+            destructive: true
+          },
+          {
+            id: 'view_request',
+            title: 'View',
+            destructive: false
+          }
+        ]
+      }
     };
   }
 
@@ -127,13 +172,37 @@ export class PushNotificationService {
     currency: string, 
     description: string,
     expenseId: string,
-    groupId: string
+    groupId: string,
+    groupName: string,
+    senderAvatar?: string
   ): PushNotificationData {
     return {
       type: 'expense_added',
       title: 'New Expense Added',
-      body: `${senderName} added "${description}" for ${currency} ${amount}`,
-      data: { expenseId, groupId }
+      body: `${senderName} added "${description}" for ${currency} ${amount} in ${groupName}`,
+      data: { 
+        expenseId, 
+        groupId,
+        groupName,
+        senderName,
+        senderAvatar,
+        amount,
+        currency,
+        description,
+        // Action buttons for interactive notifications
+        actions: [
+          {
+            id: 'view_expense',
+            title: 'View',
+            destructive: false
+          },
+          {
+            id: 'split_expense',
+            title: 'Split',
+            destructive: false
+          }
+        ]
+      }
     };
   }
 
@@ -154,13 +223,41 @@ export class PushNotificationService {
   static createGroupInviteNotification(
     senderName: string, 
     groupName: string, 
-    groupId: string
+    groupId: string,
+    inviteCode: string,
+    senderAvatar?: string,
+    groupDescription?: string
   ): PushNotificationData {
     return {
       type: 'group_invite',
       title: 'Group Invitation',
       body: `${senderName} invited you to join "${groupName}"`,
-      data: { groupId }
+      data: { 
+        groupId,
+        groupName,
+        inviteCode,
+        senderName,
+        senderAvatar,
+        groupDescription,
+        // Action buttons for interactive notifications
+        actions: [
+          {
+            id: 'join_group',
+            title: 'Join',
+            destructive: false
+          },
+          {
+            id: 'decline_invite',
+            title: 'Decline',
+            destructive: true
+          },
+          {
+            id: 'view_group',
+            title: 'View Details',
+            destructive: false
+          }
+        ]
+      }
     };
   }
 
@@ -175,6 +272,50 @@ export class PushNotificationService {
       title: 'Payment Reminder',
       body: `Don't forget to pay ${currency} ${amount} to ${friendName}`,
       data: { paymentId }
+    };
+  }
+
+  static createExpenseSettledNotification(
+    senderName: string, 
+    amount: number, 
+    currency: string, 
+    description: string,
+    expenseId: string,
+    groupId?: string,
+    groupName?: string,
+    senderAvatar?: string
+  ): PushNotificationData {
+    const bodyText = groupName 
+      ? `${senderName} settled ${currency} ${amount} for "${description}" in ${groupName}`
+      : `${senderName} settled ${currency} ${amount} for "${description}"`;
+      
+    return {
+      type: 'expense_settled',
+      title: 'Payment Settled',
+      body: bodyText,
+      data: { 
+        expenseId, 
+        groupId,
+        groupName,
+        senderName,
+        senderAvatar,
+        amount,
+        currency,
+        description,
+        // Action buttons for interactive notifications
+        actions: [
+          {
+            id: 'view_settlement',
+            title: 'View',
+            destructive: false
+          },
+          {
+            id: 'thank_sender',
+            title: 'Thank',
+            destructive: false
+          }
+        ]
+      }
     };
   }
 

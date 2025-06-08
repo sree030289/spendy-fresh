@@ -55,7 +55,9 @@ import ExpenseDeletionModal from '@/components/modals/ExpenseDeletionModal';
 import ExpenseSettlementModal from '@/components/modals/ExpenseSettlementModal';
 import ManualSettlementModal from '@/components/modals/ManualSettlementModal';
 import GroupSettlementModal from '@/components/modals/GroupSettlementModal';
+import FriendRequestModal from '@/components/modals/FriendRequestModal';
 import { getCurrencySymbol } from '@/utils/currency';
+import QRCodeScanner from '@/components/QRCodeScanner';
 
 export default function RealSplittingScreen() {
   const navigation = useNavigation();
@@ -93,6 +95,7 @@ export default function RealSplittingScreen() {
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showGroupChat, setShowGroupChat] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -108,6 +111,10 @@ export default function RealSplittingScreen() {
   const [showManualSettlement, setShowManualSettlement] = useState(false);
   const [showGroupSettlement, setShowGroupSettlement] = useState(false);
   const [selectedExpenseForAction, setSelectedExpenseForAction] = useState<Expense | null>(null);
+  
+  // Friend request modal state
+  const [showFriendRequest, setShowFriendRequest] = useState(false);
+  const [selectedFriendRequest, setSelectedFriendRequest] = useState<any>(null);
 
   // Reset to overview tab when the screen gains focus (when bottom tab is pressed)
   useFocusEffect(
@@ -115,6 +122,28 @@ export default function RealSplittingScreen() {
       setActiveTab('overview');
     }, [])
   );
+
+  // Handle tab switching with proper data refresh
+  const handleTabSwitch = useCallback((tabId: string) => {
+    setActiveTab(tabId);
+    
+    // Refresh friends list when friends tab is selected
+    if (tabId === 'friends') {
+      loadFriends();
+    }
+    // Refresh groups when groups tab is selected  
+    else if (tabId === 'groups') {
+      loadGroups();
+    }
+    // Refresh overview data when overview tab is selected
+    else if (tabId === 'overview') {
+      Promise.all([
+        loadFriends(),
+        loadGroups(), 
+        loadRecentExpenses()
+      ]);
+    }
+  }, []);
 
   // Real-time listeners
   useEffect(() => {
@@ -370,30 +399,41 @@ const handleExportData = async () => {
     }
   };
 
-  // Show friend request alert
+  // Show friend request modal instead of alert
   const showFriendRequestAlert = (request: any) => {
-    Alert.alert(
-      'Friend Request',
-      `${request.fromUserData.fullName} wants to be your friend`,
-      [
-        {
-          text: 'Decline',
-          style: 'cancel'
-        },
-        {
-          text: 'Accept',
-          onPress: async () => {
-            try {
-              await SplittingService.acceptFriendRequest(request.id);
-              await loadFriends(); // Refresh friends list
-              Alert.alert('Success', 'Friend request accepted!');
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to accept friend request');
-            }
-          }
-        }
-      ]
-    );
+    setSelectedFriendRequest(request);
+    setShowFriendRequest(true);
+  };
+
+  // Handle friend request accept
+  const handleAcceptFriendRequest = async (requestId: string) => {
+    try {
+      await SplittingService.acceptFriendRequest(requestId);
+      await loadFriends(); // Refresh friends list
+      setShowFriendRequest(false);
+      setSelectedFriendRequest(null);
+      
+      // Show success feedback
+      Alert.alert('Success', 'Friend request accepted!');
+    } catch (error: any) {
+      console.error('Error accepting friend request:', error);
+      Alert.alert('Error', error.message || 'Failed to accept friend request');
+    }
+  };
+
+  // Handle friend request decline
+  const handleDeclineFriendRequest = async (requestId: string) => {
+    try {
+      await SplittingService.declineFriendRequest(requestId);
+      setShowFriendRequest(false);
+      setSelectedFriendRequest(null);
+      
+      // Show success feedback
+      Alert.alert('Success', 'Friend request declined');
+    } catch (error: any) {
+      console.error('Error declining friend request:', error);
+      Alert.alert('Error', error.message || 'Failed to decline friend request');
+    }
   };
 
   // Handle add friend
@@ -430,8 +470,15 @@ const handleExportData = async () => {
           }
         }
         
-        await SplittingService.sendFriendRequest(user.id, email);
-        Alert.alert('Success', 'Friend request sent!');
+        const result = await SplittingService.sendFriendRequest(user.id, email);
+        
+        if (result.isNewUser) {
+          // User not on platform yet - show invitation saved message
+          Alert.alert('Invitation Saved!', result.message, [{ text: 'OK' }]);
+        } else {
+          // User found and friend request sent
+          Alert.alert('Success', result.message || 'Friend request sent!');
+        }
       } else if (method === 'sms' || method === 'whatsapp') {
         // For SMS/WhatsApp invitations with contact data
         if (contactData) {
@@ -631,11 +678,13 @@ const handleExportData = async () => {
         const invitationData = docSnap.data();
         
         // Create friend request from the original inviter to the new user
-        await SplittingService.sendFriendRequest(
+        const friendRequestResult = await SplittingService.sendFriendRequest(
           invitationData.fromUserId,
           newUser.email,
           `Connected via phone invitation to ${invitationData.toUserData.fullName}`
         );
+        
+        console.log('✅ Auto-connected phone invitation:', friendRequestResult.message);
         
         // Update pending invitation status
         await updateDoc(doc(db, 'pendingInvitations', docSnap.id), {
@@ -781,45 +830,48 @@ const handleExportData = async () => {
   }
 };
   const handleNotificationNavigation = async (notification: Notification) => {
-  try {
-    const { type, data } = notification;
-    
-    switch (type) {
-      case 'friend_request':
-        // Navigate to friends tab and show friend request
-        setActiveTab('friends');
-        if (data.friendRequestId) {
-          // Show friend request accept dialog
-          Alert.alert(
-            'Friend Request',
-            `Accept friend request from ${data.senderName || 'someone'}?`,
-            [
-              { text: 'Decline', style: 'cancel' },
-              {
-                text: 'Accept',
-                onPress: async () => {
-                  try {
-                    await SplittingService.acceptFriendRequest(data.friendRequestId);
-                    await loadFriends();
-                    Alert.alert('Success', 'Friend request accepted!');
-                  } catch (error: any) {
-                    Alert.alert('Error', error.message || 'Failed to accept friend request');
-                  }
-                }
-              }
-            ]
-          );
-        }
-        break;
+    try {
+      const { type, data } = notification;
+      
+      switch (type) {
+        case 'friend_request':
+          // Navigate to friends tab and show friend request modal
+          setActiveTab('friends');
+          if (data.friendRequestId && data.senderName) {
+            // Create a minimal friend request object from notification data
+            const friendRequestData = {
+              id: data.friendRequestId,
+              fromUserData: {
+                fullName: data.senderName,
+                email: data.senderEmail || '',
+                avatar: data.senderAvatar
+              },
+              message: data.message || `${data.senderName} wants to be your friend`,
+              status: 'pending' as const
+            };
+            
+            setSelectedFriendRequest(friendRequestData);
+            setShowFriendRequest(true);
+          }
+          break;
 
       case 'expense_added':
-        // Navigate to the group and show group details
+        // Navigate to the group and show group details with expenses tab
         if (data.groupId) {
           const group = groups.find(g => g.id === data.groupId);
           if (group) {
             setSelectedGroup(group);
             setShowGroupDetails(true);
-            // Optionally scroll to specific expense if expenseId is available
+            // Show a brief info about the new expense
+            if (data.description && data.amount && data.senderName) {
+              setTimeout(() => {
+                Alert.alert(
+                  'New Expense Added',
+                  `${data.senderName} added "${data.description}" for ${data.currency || '$'}${data.amount} in ${data.groupName}`,
+                  [{ text: 'OK' }]
+                );
+              }, 500);
+            }
           } else {
             Alert.alert('Group Not Found', 'The group for this expense could not be found.');
           }
@@ -827,22 +879,27 @@ const handleExportData = async () => {
         break;
 
       case 'group_invite':
-        // Navigate to groups tab and show join group option
+        // Navigate to groups tab and show join group option with enhanced UI
         setActiveTab('groups');
-        if (data.inviteCode) {
+        if (data.inviteCode && data.groupName) {
           Alert.alert(
-            'Group Invitation',
-            `Join "${data.groupName || 'group'}"?`,
+            'Group Invitation 🎉',
+            `${data.senderName || 'Someone'} invited you to join "${data.groupName}"${data.groupDescription ? `\n\n${data.groupDescription}` : ''}`,
             [
               { text: 'Decline', style: 'cancel' },
               {
-                text: 'Join',
+                text: 'Join Group',
+                style: 'default',
                 onPress: async () => {
                   try {
                     if (!user?.id) return;
                     await SplittingService.joinGroupByInviteCode(data.inviteCode, user.id);
                     await loadGroups();
-                    Alert.alert('Success', `You've joined "${data.groupName}"!`);
+                    Alert.alert(
+                      'Welcome! 🎊', 
+                      `You've successfully joined "${data.groupName}"! Start splitting expenses with your group.`,
+                      [{ text: 'Awesome!' }]
+                    );
                   } catch (error: any) {
                     Alert.alert('Error', error.message || 'Failed to join group');
                   }
@@ -1532,7 +1589,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerAction}
-            onPress={() => setShowQRCode(true)}
+            onPress={() => setShowQRScanner(true)} // Change this line
           >
             <Ionicons name="qr-code" size={24} color={theme.colors.text} />
           </TouchableOpacity>
@@ -1576,7 +1633,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
                 index === 0 && styles.firstSegment,
                 index === tabs.length - 1 && styles.lastSegment,
               ]}
-              onPress={() => setActiveTab(tab.id)}
+              onPress={() => handleTabSwitch(tab.id)}
             >
               <Ionicons
                 name={tab.icon as any}
@@ -1623,6 +1680,10 @@ const showExpenseActionsMenu = (expense: Expense) => {
         visible={showAddFriend}
         onClose={() => setShowAddFriend(false)}
         onSubmit={handleAddFriend}
+        onOpenQRScanner={() => {
+          setShowAddFriend(false);
+          setShowQRScanner(true);
+        }}
       />
       
       <CreateGroupModal
@@ -1698,6 +1759,17 @@ const showExpenseActionsMenu = (expense: Expense) => {
         onNavigateToNotification={handleNotificationNavigation}
       />
 
+      <FriendRequestModal
+        visible={showFriendRequest}
+        onClose={() => {
+          setShowFriendRequest(false);
+          setSelectedFriendRequest(null);
+        }}
+        friendRequest={selectedFriendRequest}
+        onAccept={() => selectedFriendRequest && handleAcceptFriendRequest(selectedFriendRequest.id)}
+        onDecline={() => selectedFriendRequest && handleDeclineFriendRequest(selectedFriendRequest.id)}
+      />
+
       <ExpenseSettlementModal
       visible={showExpenseSettlement}
       onClose={() => setShowExpenseSettlement(false)}
@@ -1761,6 +1833,25 @@ const showExpenseActionsMenu = (expense: Expense) => {
       currentUserId={user?.id || ''}
       onRefresh={loadRecentExpenses}
     />
+
+    <QRCodeScanner
+  visible={showQRScanner}
+  onClose={() => setShowQRScanner(false)}
+  onQRCodeScanned={async (qrData) => {
+    try {
+      setShowQRScanner(false);
+      await QRCodeService.handleScannedQR(qrData, user?.id || '');
+      // Refresh data after QR scan
+      await Promise.all([
+        loadFriends(),
+        loadGroups(),
+        loadRecentExpenses()
+      ]);
+    } catch (error: any) {
+      Alert.alert('QR Code Error', error.message || 'Invalid QR code');
+    }
+  }}
+/>
 
     </SafeAreaView>
   );
