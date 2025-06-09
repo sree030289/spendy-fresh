@@ -36,7 +36,9 @@ import { db } from '@/services/firebase/config';
 import { SplittingService, Friend, Group, Expense, Notification } from '@/services/firebase/splitting';
 import { PaymentService } from '@/services/payments/PaymentService';
 import { PushNotificationService } from '@/services/notifications/PushNotificationService';
+import { RealNotificationService } from '@/services/notifications/RealNotificationService';
 import { QRCodeService } from '@/services/qr/QRCodeService';
+import { friendsManager } from '@/services/FriendsManager';
 
 // Import modals
 import AddExpenseModal from '@/components/modals/AddExpenseModal';
@@ -58,6 +60,7 @@ import GroupSettlementModal from '@/components/modals/GroupSettlementModal';
 import FriendRequestModal from '@/components/modals/FriendRequestModal';
 import { getCurrencySymbol } from '@/utils/currency';
 import QRCodeScanner from '@/components/QRCodeScanner';
+import QRScannerManager from '@/services/qr/QRScannerManager';
 
 export default function RealSplittingScreen() {
   const navigation = useNavigation();
@@ -96,6 +99,7 @@ export default function RealSplittingScreen() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [qrScanSource, setQrScanSource] = useState<'direct' | 'addFriend' | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [showGroupChat, setShowGroupChat] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -127,9 +131,9 @@ export default function RealSplittingScreen() {
   const handleTabSwitch = useCallback((tabId: string) => {
     setActiveTab(tabId);
     
-    // Refresh friends list when friends tab is selected
+    // Refresh friends list when friends tab is selected using FriendsManager
     if (tabId === 'friends') {
-      loadFriends();
+      friendsManager.refreshFriends();
     }
     // Refresh groups when groups tab is selected  
     else if (tabId === 'groups') {
@@ -138,7 +142,7 @@ export default function RealSplittingScreen() {
     // Refresh overview data when overview tab is selected
     else if (tabId === 'overview') {
       Promise.all([
-        loadFriends(),
+        friendsManager.refreshFriends(),
         loadGroups(), 
         loadRecentExpenses()
       ]);
@@ -174,9 +178,29 @@ export default function RealSplittingScreen() {
         console.warn('Recurring expenses processing failed:', recurringError);
       }
         
+        // Initialize FriendsManager with user ID
+        await friendsManager.initialize(user.id);
+        
+        // Get initial friends state from FriendsManager
+        const friendsState = friendsManager.getState();
+        setFriends(friendsState.friends);
+        setBalances({
+          totalOwed: friendsState.balances.totalOwed,
+          totalOwing: friendsState.balances.totalOwing,
+          netBalance: friendsState.balances.netBalance
+        });
+        
+        // Get initial state from FriendsManager
+        const initialFriendsState = friendsManager.getState();
+        setFriends(initialFriendsState.friends);
+        setBalances({
+          totalOwed: initialFriendsState.balances.totalOwed,
+          totalOwing: initialFriendsState.balances.totalOwing,
+          netBalance: initialFriendsState.balances.netBalance
+        });
+        
         // Load initial data
         await Promise.all([
-          loadFriends(),
           loadGroups(),
           loadRecentExpenses(),
           loadNotifications(), // FIX: Add this to load notifications
@@ -200,6 +224,19 @@ export default function RealSplittingScreen() {
             }
           }
         );
+
+        // Use FriendsManager for friends updates instead of direct SplittingService
+        unsubscribeFriends = friendsManager.addListener((friendsData) => {
+          console.log('✅ Friends updated via FriendsManager:', friendsData.friends.length);
+          setFriends(friendsData.friends);
+          
+          // Update balances from FriendsManager state
+          setBalances({
+            totalOwed: friendsData.balances.totalOwed,
+            totalOwing: friendsData.balances.totalOwing,
+            netBalance: friendsData.balances.netBalance
+          });
+        });
         
       } catch (error) {
         console.error('Initialize splitting screen error:', error);
@@ -216,6 +253,9 @@ export default function RealSplittingScreen() {
       unsubscribeFriends?.();
       unsubscribeNotifications?.();
       unsubscribeFriendRequests?.();
+      
+      // Cleanup FriendsManager when component unmounts
+      friendsManager.cleanup();
     };
   }, [user?.id]);
 
@@ -226,13 +266,36 @@ export default function RealSplittingScreen() {
       // Refresh all data when an expense is added
       loadRecentExpenses();
       loadGroups();
-      loadFriends();
+      friendsManager.notifyBalanceUpdated();
     });
 
     return () => {
       unsubscribe();
     };
   }, []);
+
+  // Handle deep linking from notifications
+  useEffect(() => {
+    const checkNavigationIntent = async () => {
+      try {
+        const intent = await RealNotificationService.getAndClearNavigationIntent();
+        if (intent && user?.id) {
+          console.log('Processing navigation intent:', intent);
+          await handleNavigationIntent(intent);
+        }
+      } catch (error) {
+        console.error('Error processing navigation intent:', error);
+      }
+    };
+
+    // Check on component mount and when coming back to foreground
+    checkNavigationIntent();
+
+    // Set up interval to check for navigation intents
+    const interval = setInterval(checkNavigationIntent, 1000);
+
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const loadNotifications = async () => {
   try {
@@ -286,31 +349,24 @@ const loadRecurringExpenses = async () => {
 };
   
 
-  // Load friends data - FIX: Properly calculate balances
+  // Load friends data using FriendsManager
   const loadFriends = async () => {
     try {
       if (!user?.id) return;
       
-      console.log('Loading friends for user:', user.id);
-      const friendsData = await SplittingService.getFriends(user.id);
-      setFriends(friendsData);
+      console.log('Loading friends via FriendsManager for user:', user.id);
+      await friendsManager.refreshFriends();
       
-      // FIX: Calculate balances properly from accepted friends
-      const acceptedFriends = friendsData.filter(friend => friend.status === 'accepted');
-      const totalOwed = acceptedFriends.reduce((sum, friend) => 
-        sum + Math.max(0, friend.balance || 0), 0
-      );
-      const totalOwing = acceptedFriends.reduce((sum, friend) => 
-        sum + Math.max(0, -(friend.balance || 0)), 0
-      );
-      
+      // Get current state from FriendsManager
+      const currentState = friendsManager.getState();
+      setFriends(currentState.friends);
       setBalances({
-        totalOwed,
-        totalOwing,
-        netBalance: totalOwed - totalOwing
+        totalOwed: currentState.balances.totalOwed,
+        totalOwing: currentState.balances.totalOwing,
+        netBalance: currentState.balances.netBalance
       });
       
-      console.log('Calculated balances:', { totalOwed, totalOwing, netBalance: totalOwed - totalOwing });
+      console.log('Friends loaded via FriendsManager:', currentState.friends.length);
     } catch (error) {
       console.error('Load friends error:', error);
       setFriends([]);
@@ -368,7 +424,7 @@ const handleExportData = async () => {
     setRefreshing(true);
     try {
       await Promise.all([
-        loadFriends(),
+        friendsManager.forceRefresh(),
         loadGroups(),
         loadRecentExpenses(),
         loadNotifications() // FIX: Include notifications in refresh
@@ -401,15 +457,28 @@ const handleExportData = async () => {
 
   // Show friend request modal instead of alert
   const showFriendRequestAlert = (request: any) => {
-    setSelectedFriendRequest(request);
-    setShowFriendRequest(true);
+    // If the QRCodeModal (for sharing QR) is currently visible
+    if (showQRCode) {
+      setShowQRCode(false); // Close it first
+
+      // Use setTimeout to allow the UI to update (close QRCodeModal)
+      // before showing the FriendRequestModal. This helps prevent modal conflicts.
+      setTimeout(() => {
+        setSelectedFriendRequest(request);
+        setShowFriendRequest(true);
+      }, 100); // Using a 100ms delay, can be adjusted if needed
+    } else {
+      // If QRCodeModal wasn't open, show the friend request modal directly
+      setSelectedFriendRequest(request);
+      setShowFriendRequest(true);
+    }
   };
 
   // Handle friend request accept
   const handleAcceptFriendRequest = async (requestId: string) => {
     try {
       await SplittingService.acceptFriendRequest(requestId);
-      await loadFriends(); // Refresh friends list
+      await friendsManager.notifyFriendAdded(); // Notify FriendsManager to refresh
       setShowFriendRequest(false);
       setSelectedFriendRequest(null);
       
@@ -497,7 +566,7 @@ const handleExportData = async () => {
       }
       
       setShowAddFriend(false);
-      await loadFriends(); // Refresh friends list
+      await friendsManager.notifyFriendAdded(); // Notify FriendsManager to refresh
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to add friend');
     }
@@ -563,8 +632,8 @@ const handleExportData = async () => {
                 [{ text: 'OK' }]
               );
               
-              // Refresh friends list
-              await loadFriends();
+              // Refresh friends list via FriendsManager
+              await friendsManager.notifyFriendRemoved();
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to remove friend');
             }
@@ -597,8 +666,8 @@ const handleExportData = async () => {
                 [{ text: 'OK' }]
               );
               
-              // Refresh friends list
-              await loadFriends();
+              // Refresh friends list via FriendsManager
+              await friendsManager.notifyFriendRemoved();
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to block friend');
             }
@@ -799,7 +868,7 @@ const handleExportData = async () => {
       await Promise.all([
         loadGroups(),
         loadRecentExpenses(),
-        loadFriends()
+        friendsManager.notifyBalanceUpdated() // Notify FriendsManager about balance changes
       ]);
       
       Alert.alert('Success', 'Expense added successfully!');
@@ -829,6 +898,91 @@ const handleExportData = async () => {
     Alert.alert('Error', error.message);
   }
 };
+
+// Handle deep linking navigation from notifications
+const handleNavigationIntent = async (intent: any) => {
+  try {
+    const { type, action } = intent;
+    
+    switch (type) {
+      case 'group_joined':
+        // User successfully joined a group via notification
+        if (intent.groupName) {
+          setActiveTab('groups');
+          await loadGroups(); // Refresh groups to show new group
+          Alert.alert(
+            'Welcome to the Group! 🎉',
+            `You have successfully joined "${intent.groupName}"${intent.senderName ? ` invited by ${intent.senderName}` : ''}`,
+            [{ text: 'OK' }]
+          );
+        }
+        break;
+
+      case 'group_details':
+        // Navigate to specific group details
+        if (intent.groupId) {
+          const group = groups.find(g => g.id === intent.groupId) || 
+                      (await SplittingService.getGroup(intent.groupId));
+          if (group) {
+            setSelectedGroup(group);
+            setShowGroupDetails(true);
+            setActiveTab('groups');
+          }
+        }
+        break;
+
+      case 'expense_details':
+        // Navigate to expense details (within group context)
+        if (intent.expenseId && intent.groupId) {
+          const group = groups.find(g => g.id === intent.groupId) || 
+                      (await SplittingService.getGroup(intent.groupId));
+          if (group) {
+            setSelectedGroup(group);
+            setShowGroupDetails(true);
+            setActiveTab('groups');
+          }
+        }
+        break;
+
+      case 'split_expense':
+        // Navigate to split expense interface
+        if (intent.groupId) {
+          const group = groups.find(g => g.id === intent.groupId);
+          if (group) {
+            setSelectedGroupForExpense(group);
+            setShowAddExpense(true);
+          }
+        }
+        break;
+
+      case 'friend_request':
+        // Navigate to friend request
+        setActiveTab('friends');
+        if (intent.friendRequestId) {
+          // The friend request modal will be handled by existing flow
+          await loadFriends(); // Refresh to get pending requests
+        }
+        break;
+
+      case 'friend_request_accepted':
+        // Friend request was accepted
+        setActiveTab('friends');
+        await loadFriends(); // Refresh friends list
+        if (intent.friendRequestId) {
+          Alert.alert('Friend Added! 🎉', 'You are now connected and can split expenses together.');
+        }
+        break;
+
+      default:
+        console.log('Unknown navigation intent type:', type);
+        break;
+    }
+  } catch (error) {
+    console.error('Error handling navigation intent:', error);
+    Alert.alert('Navigation Error', 'Failed to navigate to the requested content');
+  }
+};
+
   const handleNotificationNavigation = async (notification: Notification) => {
     try {
       const { type, data } = notification;
@@ -1094,7 +1248,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
 
       // Refresh data
       await Promise.all([
-        loadFriends(),
+        friendsManager.notifyBalanceUpdated(),
         loadRecentExpenses(),
         loadNotifications()
       ]);
@@ -1589,7 +1743,10 @@ const showExpenseActionsMenu = (expense: Expense) => {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerAction}
-            onPress={() => setShowQRScanner(true)} // Change this line
+            onPress={() => {
+              setQrScanSource('direct');
+              setShowQRScanner(true);
+            }}
           >
             <Ionicons name="qr-code" size={24} color={theme.colors.text} />
           </TouchableOpacity>
@@ -1682,6 +1839,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
         onSubmit={handleAddFriend}
         onOpenQRScanner={() => {
           setShowAddFriend(false);
+          setQrScanSource('addFriend');
           setShowQRScanner(true);
         }}
       />
@@ -1778,7 +1936,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
       onSettlementComplete={() => {
         loadRecentExpenses();
         loadGroups();
-        loadFriends();
+        friendsManager.notifyBalanceUpdated();
       }}
     />
 
@@ -1790,7 +1948,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
       onDeletionComplete={() => {
         loadRecentExpenses();
         loadGroups();
-        loadFriends();
+        friendsManager.notifyBalanceUpdated();
       }}
       isUserAdmin={groups.find(g => g.id === selectedExpenseForAction?.groupId)
         ?.members.find(m => m.userId === user?.id)?.role === 'admin'}
@@ -1832,26 +1990,146 @@ const showExpenseActionsMenu = (expense: Expense) => {
       userCurrency={user?.currency || 'USD'}
       currentUserId={user?.id || ''}
       onRefresh={loadRecentExpenses}
-    />
+    />      <QRCodeScanner
+        visible={showQRScanner}
+        onClose={() => {
+          setShowQRScanner(false);
+          setQrScanSource(null);
+          // Reset scanner state
+          const scannerManager = QRScannerManager.getInstance();
+          scannerManager.stopScanning();
+        }}
+        onQRCodeScanned={async (qrData) => {
+          const scannerManager = QRScannerManager.getInstance();
+          
+          if (!user) {
+            Alert.alert('Error', 'User not authenticated');
+            setShowQRScanner(false);
+            setQrScanSource(null);
+            return;
+          }
 
-    <QRCodeScanner
-  visible={showQRScanner}
-  onClose={() => setShowQRScanner(false)}
-  onQRCodeScanned={async (qrData) => {
-    try {
-      setShowQRScanner(false);
-      await QRCodeService.handleScannedQR(qrData, user?.id || '');
-      // Refresh data after QR scan
-      await Promise.all([
-        loadFriends(),
-        loadGroups(),
-        loadRecentExpenses()
-      ]);
-    } catch (error: any) {
-      Alert.alert('QR Code Error', error.message || 'Invalid QR code');
-    }
-  }}
-/>
+          // Handle special error cases from QRCodeScanner
+          if (qrData === 'INVALID_QR_FORMAT') {
+            Alert.alert(
+              'Invalid QR Code',
+              'This is not a valid Spendy QR code. Please scan a QR code generated by Spendy.',
+              [
+                {
+                  text: 'Try Again',
+                  onPress: () => {
+                    // Keep scanner open for retry
+                  }
+                },
+                {
+                  text: 'Cancel',
+                  onPress: () => {
+                    setShowQRScanner(false);
+                    setQrScanSource(null);
+                  }
+                }
+              ]
+            );
+            return;
+          }
+
+          if (qrData === 'SCAN_ERROR') {
+            Alert.alert(
+              'Scan Error',
+              'An error occurred while scanning. Please try again.',
+              [
+                {
+                  text: 'Try Again',
+                  onPress: () => {
+                    // Keep scanner open for retry
+                  }
+                },
+                {
+                  text: 'Cancel',
+                  onPress: () => {
+                    setShowQRScanner(false);
+                    setQrScanSource(null);
+                  }
+                }
+              ]
+            );
+            return;
+          }
+
+          try {
+            const result = await scannerManager.processQRCode(qrData, user.id, {
+              closeOnSuccess: true,
+              navigation: navigation
+            });
+
+            if (result.success) {
+              // Close scanner immediately
+              setShowQRScanner(false);
+              setQrScanSource(null);
+              
+              // Show success message with slight delay
+              setTimeout(() => {
+                Alert.alert(
+                  'Success',
+                  'QR code processed successfully!',
+                  [{
+                    text: 'OK',
+                    onPress: async () => {
+                      // Refresh data after successful scan
+                      await Promise.all([
+                        friendsManager.notifyFriendAdded(),
+                        loadGroups(),
+                        loadRecentExpenses()
+                      ]);
+                    }
+                  }]
+                );
+              }, 100);
+            } else {
+              Alert.alert(
+                'QR Code Error',
+                result.error || 'Failed to process QR code',
+                [
+                  {
+                    text: 'Cancel',
+                    style: 'cancel',
+                    onPress: () => {
+                      setShowQRScanner(false);
+                      setQrScanSource(null);
+                    }
+                  },
+                  {
+                    text: 'Try Again',
+                    onPress: () => {
+                      // Keep scanner open for retry
+                    }
+                  }
+                ]
+              );
+            }
+          } catch (error: any) {
+            Alert.alert(
+              'Error',
+              error.message || 'Unexpected error occurred',
+              [
+                {
+                  text: 'Cancel',
+                  onPress: () => {
+                    setShowQRScanner(false);
+                    setQrScanSource(null);
+                  }
+                },
+                {
+                  text: 'Try Again',
+                  onPress: () => {
+                    // Keep scanner open for retry
+                  }
+                }
+              ]
+            );
+          }
+        }}
+      />
 
     </SafeAreaView>
   );

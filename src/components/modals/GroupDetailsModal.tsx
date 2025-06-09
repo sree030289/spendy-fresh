@@ -68,17 +68,21 @@ export default function GroupDetailsModal({
   const [selectedMemberForAction, setSelectedMemberForAction] = useState<string | null>(null);
   const [showGroupExpenseModal, setShowGroupExpenseModal] = useState(false);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
-  const isUserAdmin = group?.members?.find(member => 
+  
+  // Local state for group data to enable real-time updates
+  const [localGroupData, setLocalGroupData] = useState<Group | null>(null);
+  
+  const isUserAdmin = localGroupData?.members?.find(member => 
     member.userId === currentUser?.id
   )?.role === 'admin';
 
   const loadGroupExpenses = useCallback(async () => {
-    if (!group) return;
+    if (!localGroupData) return;
     
     setLoading(true);
     try {
-      console.log('Loading expenses for group:', group.id);
-      const expenses = await SplittingService.getGroupExpenses(group.id);
+      console.log('Loading expenses for group:', localGroupData.id);
+      const expenses = await SplittingService.getGroupExpenses(localGroupData.id);
       console.log('Loaded expenses:', expenses.length);
       setGroupExpenses(expenses);
     } catch (error) {
@@ -87,10 +91,42 @@ export default function GroupDetailsModal({
     } finally {
       setLoading(false);
     }
+  }, [localGroupData]);
+
+  // Function to refresh group data
+  const loadGroupData = useCallback(async () => {
+    if (!group?.id) return;
+    
+    try {
+      console.log('Loading fresh group data for:', group.id);
+      const freshGroupData = await SplittingService.getGroup(group.id);
+      if (freshGroupData) {
+        setLocalGroupData(freshGroupData);
+        console.log('Updated local group data with', freshGroupData.members.length, 'members');
+      }
+    } catch (error) {
+      console.error('Load group data error:', error);
+      // Fallback to prop data if API call fails
+      setLocalGroupData(group);
+    }
   }, [group]);
 
+  // Sync local group data with prop changes
   useEffect(() => {
-    if (!visible || !group) {
+    if (group) {
+      setLocalGroupData(group);
+    }
+  }, [group]);
+
+  // Load fresh group data when modal becomes visible
+  useEffect(() => {
+    if (visible && group) {
+      loadGroupData();
+    }
+  }, [visible, loadGroupData]);
+
+  useEffect(() => {
+    if (!visible || !localGroupData) {
       return undefined;
     }
     
@@ -99,7 +135,7 @@ export default function GroupDetailsModal({
     
     // Set up a refresh interval to catch new expenses
     const refreshInterval = setInterval(() => {
-      if (visible && group) {
+      if (visible && localGroupData) {
         loadGroupExpenses();
       }
     }, 5000); // Refresh every 5 seconds when modal is open
@@ -107,7 +143,7 @@ export default function GroupDetailsModal({
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [visible, group?.id, loadGroupExpenses]);
+  }, [visible, localGroupData?.id, loadGroupExpenses]);
 
   useEffect(() => {
     if (!visible) {
@@ -117,7 +153,7 @@ export default function GroupDetailsModal({
     const refreshService = ExpenseRefreshService.getInstance();
     const unsubscribe = refreshService.addListener(() => {
       console.log('Group details received expense refresh notification');
-      if (group) {
+      if (localGroupData) {
         loadGroupExpenses();
       }
     });
@@ -125,19 +161,19 @@ export default function GroupDetailsModal({
     return () => {
       unsubscribe();
     };
-  }, [visible, group?.id, loadGroupExpenses]);
+  }, [visible, localGroupData?.id, loadGroupExpenses]);
 
   const handleRefresh = async () => {
     await loadGroupExpenses();
   };
 
   const handleShareInviteCode = async () => {
-    if (!group) return;
+    if (!localGroupData) return;
     
     try {
       await Share.share({
-        message: `Join "${group.name}" on Spendy! Use invite code: ${group.inviteCode}\n\nDownload Spendy: https://spendy.app/join/${group.inviteCode}`,
-        title: `Join ${group.name} on Spendy`
+        message: `Join "${localGroupData.name}" on Spendy! Use invite code: ${localGroupData.inviteCode}\n\nDownload Spendy: https://spendy.app/join/${localGroupData.inviteCode}`,
+        title: `Join ${localGroupData.name} on Spendy`
       });
     } catch (error) {
       console.error('Share error:', error);
@@ -147,7 +183,7 @@ export default function GroupDetailsModal({
   const handleLeaveGroup = () => {
     Alert.alert(
       'Leave Group',
-      `Are you sure you want to leave "${group?.name}"? You'll lose access to all group expenses and conversations.`,
+      `Are you sure you want to leave "${localGroupData?.name}"? You'll lose access to all group expenses and conversations.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -155,9 +191,9 @@ export default function GroupDetailsModal({
           style: 'destructive',
           onPress: async () => {
             try {
-              if (group && currentUser) {
-                await SplittingService.leaveGroup(group.id, currentUser.id);
-                Alert.alert('Left Group', `You have left "${group.name}"`);
+              if (localGroupData && currentUser) {
+                await SplittingService.leaveGroup(localGroupData.id, currentUser.id);
+                Alert.alert('Left Group', `You have left "${localGroupData.name}"`);
                 onGroupLeft?.(); // Call the callback to refresh the groups list
                 onClose();
               }
@@ -171,15 +207,16 @@ export default function GroupDetailsModal({
   };
 
   const handleMakeAdmin = async (userId: string) => {
-    if (!group || !currentUser || !isUserAdmin) return;
+    if (!localGroupData || !currentUser || !isUserAdmin) return;
     
     try {
       // Update the group using SplittingService
-      await SplittingService.updateMemberRole(group.id, userId, 'admin');
+      await SplittingService.updateMemberRole(localGroupData.id, userId, 'admin');
       
       Alert.alert('Success', 'Member has been made an admin');
       
-      // Refresh group data by calling parent refresh
+      // Refresh local group data first, then parent
+      await loadGroupData();
       onRefresh?.();
       await loadGroupExpenses();
     } catch (error: any) {
@@ -192,16 +229,16 @@ export default function GroupDetailsModal({
 // Update handleRemoveAdmin function around line 220:
 
 const handleRemoveAdmin = async (userId: string) => {
-  if (!group || !currentUser || !isUserAdmin) return;
+  if (!localGroupData || !currentUser || !isUserAdmin) return;
   
-  const member = group.members.find(m => m.userId === userId);
+  const member = localGroupData.members.find(m => m.userId === userId);
   if (!member) return;
   
   // Check if member has pending balances
   if (member.balance !== 0) {
     Alert.alert(
       'Cannot Remove Admin',
-      `${member.userData.fullName} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(group.currency)}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
+      `${member.userData.fullName} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(localGroupData.currency)}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
       [{ text: 'OK' }]
     );
     return;
@@ -217,8 +254,11 @@ const handleRemoveAdmin = async (userId: string) => {
         style: 'destructive',
         onPress: async () => {
           try {
-            await SplittingService.updateMemberRole(group.id, userId, 'member');
+            await SplittingService.updateMemberRole(localGroupData.id, userId, 'member');
             Alert.alert('Success', 'Admin privileges removed');
+            
+            // Refresh local group data first, then parent
+            await loadGroupData();
             onRefresh?.();
             await loadGroupExpenses();
           } catch (error: any) {
@@ -232,9 +272,9 @@ const handleRemoveAdmin = async (userId: string) => {
 };
 
   const handleRemoveMember = async (userId: string) => {
-    if (!group || !currentUser || !isUserAdmin) return;
+    if (!localGroupData || !currentUser || !isUserAdmin) return;
     
-    const member = group.members.find(m => m.userId === userId);
+    const member = localGroupData.members.find(m => m.userId === userId);
     if (!member) return;
     
     // Check if member has pending balances
@@ -257,11 +297,12 @@ const handleRemoveAdmin = async (userId: string) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await SplittingService.removeMemberFromGroup(group.id, userId);
+              await SplittingService.removeMemberFromGroup(localGroupData.id, userId);
               
               Alert.alert('Success', 'Member has been removed from the group');
               
-              // Refresh group data by calling parent refresh
+              // Refresh local group data first, then parent
+              await loadGroupData();
               onRefresh?.();
               await loadGroupExpenses();
             } catch (error: any) {
@@ -275,17 +316,25 @@ const handleRemoveAdmin = async (userId: string) => {
   };
 
   const handleAddFriendToGroup = async (friendId: string) => {
-    if (!group || !currentUser) return;
+    if (!localGroupData || !currentUser) return;
     
     try {
-      await SplittingService.addGroupMember(group.id, friendId);
+      await SplittingService.addGroupMember(localGroupData.id, friendId);
       Alert.alert('Success', 'Friend has been added to the group');
       setShowAddMember(false);
-      // Refresh group data by calling parent refresh
+      
+      // Refresh local group data first to update members list immediately
+      await loadGroupData();
+      // Then refresh parent and expenses
       onRefresh?.();
-      // Also refresh expenses
       await loadGroupExpenses();
+      
+      // Trigger expense refresh service to notify other components
+      const refreshService = ExpenseRefreshService.getInstance();
+      refreshService.notifyExpenseAdded();
+      
     } catch (error: any) {
+      console.error('Add friend to group error:', error);
       Alert.alert('Error', error.message || 'Failed to add friend to group');
     }
   };
@@ -337,7 +386,7 @@ const handleRemoveAdmin = async (userId: string) => {
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Members ({group?.members.length})
+          Members ({localGroupData?.members.length})
         </Text>
         {isUserAdmin && (
           <TouchableOpacity
@@ -352,7 +401,7 @@ const handleRemoveAdmin = async (userId: string) => {
         )}
       </View>
       
-      {group?.members.map((member) => (
+      {localGroupData?.members.map((member) => (
         <View key={member.userId} style={styles.memberItem}>
           <View style={styles.memberLeft}>
             <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
@@ -377,11 +426,11 @@ const handleRemoveAdmin = async (userId: string) => {
                 </Text>
               ) : member.balance > 0 ? (
                 <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                  +{group?.currency === 'USD' ? '$' : group?.currency === 'EUR' ? '€' : group?.currency === 'INR' ? '₹' : group?.currency || '$'}{Math.abs(member.balance).toFixed(2)}
+                  +{localGroupData?.currency === 'USD' ? '$' : localGroupData?.currency === 'EUR' ? '€' : localGroupData?.currency === 'INR' ? '₹' : localGroupData?.currency || '$'}{Math.abs(member.balance).toFixed(2)}
                 </Text>
               ) : (
                 <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                  -{group?.currency === 'USD' ? '$' : group?.currency === 'EUR' ? '€' : group?.currency === 'INR' ? '₹' : group?.currency || '$'}{Math.abs(member.balance).toFixed(2)}
+                  -{localGroupData?.currency === 'USD' ? '$' : localGroupData?.currency === 'EUR' ? '€' : localGroupData?.currency === 'INR' ? '₹' : localGroupData?.currency || '$'}{Math.abs(member.balance).toFixed(2)}
                 </Text>
               )}
             </View>
@@ -459,9 +508,8 @@ const renderExpensesList = () => (
               </Text>
             </View>
           </View>
-          <View style={styles.expenseRight}>
-            <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-              {group?.currency === 'USD' ? '$' : group?.currency === 'EUR' ? '€' : group?.currency === 'INR' ? '₹' : group?.currency || '$'}{expense.amount.toFixed(2)}
+          <View style={styles.expenseRight}>              <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
+              {localGroupData?.currency === 'USD' ? '$' : localGroupData?.currency === 'EUR' ? '€' : localGroupData?.currency === 'INR' ? '₹' : localGroupData?.currency || '$'}{expense.amount.toFixed(2)}
             </Text>
             <View style={[
               styles.expenseStatus,
@@ -499,7 +547,7 @@ const renderExpenseCard = (expense: Expense) => (
   <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
     <View style={styles.statItem}>
       <Text style={[styles.statValue, { color: theme.colors.text }]}>
-        {getCurrencySymbol(group?.currency || 'AUD')}{group?.totalExpenses.toFixed(2)}
+        {getCurrencySymbol(localGroupData?.currency || 'AUD')}{localGroupData?.totalExpenses.toFixed(2)}
       </Text>
       <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
         Total Spent
@@ -508,7 +556,7 @@ const renderExpenseCard = (expense: Expense) => (
     <View style={styles.statDivider} />
     <View style={styles.statItem}>
       <Text style={[styles.statValue, { color: theme.colors.text }]}>
-        {getCurrencySymbol(group?.currency || 'AUD')}{group ? (group.totalExpenses / group.members.length).toFixed(2) : '0.00'}
+        {getCurrencySymbol(localGroupData?.currency || 'AUD')}{localGroupData ? (localGroupData.totalExpenses / localGroupData.members.length).toFixed(2) : '0.00'}
       </Text>
       <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
         Per Person
@@ -526,7 +574,7 @@ const renderExpenseCard = (expense: Expense) => (
   </View>
 );
 
-  if (!group) return null;
+  if (!localGroupData) return null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -545,21 +593,21 @@ const renderExpenseCard = (expense: Expense) => (
         <ScrollView contentContainerStyle={styles.content}>
           {/* Group Info - Fixed at top */}
           <View style={styles.groupInfo}>
-            <Text style={styles.groupAvatar}>{group.avatar}</Text>
+            <Text style={styles.groupAvatar}>{localGroupData.avatar}</Text>
             <Text style={[styles.groupName, { color: theme.colors.text }]}>
-              {group.name}
+              {localGroupData.name}
             </Text>
-            {group.description && (
+            {localGroupData.description && (
               <Text style={[styles.groupDescription, { color: theme.colors.textSecondary }]}>
-                {group.description}
+                {localGroupData.description}
               </Text>
             )}
             <View style={styles.groupMeta}>
               <Text style={[styles.groupMetaText, { color: theme.colors.textSecondary }]}>
-                Created {group.createdAt.toLocaleDateString()}
+                Created {localGroupData.createdAt.toLocaleDateString()}
               </Text>
               <Text style={[styles.groupMetaText, { color: theme.colors.textSecondary }]}>
-                Currency: {group.currency}
+                Currency: {localGroupData.currency}
               </Text>
             </View>
           </View>
@@ -637,7 +685,7 @@ const renderExpenseCard = (expense: Expense) => (
                 </Text>
                 <View style={[styles.inviteCodeContainer, { backgroundColor: theme.colors.background }]}>
                   <Text style={[styles.inviteCode, { color: theme.colors.primary }]}>
-                    {group.inviteCode}
+                    {localGroupData.inviteCode}
                   </Text>
                   <TouchableOpacity
                     onPress={() => {
@@ -693,7 +741,7 @@ const renderExpenseCard = (expense: Expense) => (
         </Text>
         
         {(() => {
-          const member = group?.members.find(m => m.userId === selectedMemberForAction);
+          const member = localGroupData?.members.find(m => m.userId === selectedMemberForAction);
           return member ? (
             <>
               <TouchableOpacity
@@ -788,7 +836,7 @@ const renderExpenseCard = (expense: Expense) => (
                 
                 {friends.filter(friend => 
                   friend.status === 'accepted' && 
-                  !group?.members.some(member => member.userId === friend.friendId)
+                  !localGroupData?.members.some(member => member.userId === friend.friendId)
                 ).length === 0 ? (
                   <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
                     <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} />
@@ -803,7 +851,7 @@ const renderExpenseCard = (expense: Expense) => (
                   friends
                     .filter(friend => 
                       friend.status === 'accepted' && 
-                      !group?.members.some(member => member.userId === friend.friendId)
+                      !localGroupData?.members.some(member => member.userId === friend.friendId)
                     )
                     .map((friend) => (
                       <TouchableOpacity
@@ -842,7 +890,7 @@ const renderExpenseCard = (expense: Expense) => (
           visible={showQRModal}
           onClose={() => setShowQRModal(false)}
           user={currentUser}
-          selectedGroup={group}
+          selectedGroup={localGroupData}
         />
       )}
 
@@ -861,7 +909,7 @@ const renderExpenseCard = (expense: Expense) => (
         <ExpenseModal
           visible={showGroupExpenseModal}
           onClose={() => setShowGroupExpenseModal(false)}
-          groupId={group?.id}
+          groupId={localGroupData?.id}
         />
       )}
       <ExpenseSettlementModal

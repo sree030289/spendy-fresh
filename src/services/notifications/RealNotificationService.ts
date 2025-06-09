@@ -863,8 +863,8 @@ export class RealNotificationService {
     }
   }
 
-  // **NEW** Helper methods for notification content
-  private static async getNotificationSettings(userId: string): Promise<NotificationSettings> {
+  // **PUBLIC** Get notification settings for user
+  static async getNotificationSettings(userId: string): Promise<NotificationSettings> {
     try {
       const settings = await AsyncStorage.getItem(`notification_settings_${userId}`);
       if (settings) {
@@ -896,6 +896,64 @@ export class RealNotificationService {
         soundEnabled: true,
         vibrationEnabled: true
       };
+    }
+  }
+
+  // **PUBLIC** Update notification settings for user
+  static async updateNotificationSettings(userId: string, settings: NotificationSettings): Promise<void> {
+    try {
+      await AsyncStorage.setItem(`notification_settings_${userId}`, JSON.stringify(settings));
+      console.log('✅ Notification settings updated for user:', userId);
+    } catch (error) {
+      console.error('Failed to update notification settings:', error);
+      throw error;
+    }
+  }
+
+  // **PUBLIC** Send test notification
+  static async sendTestNotification(userId: string): Promise<void> {
+    try {
+      const settings = await this.getNotificationSettings(userId);
+      
+      if (!settings.enabled || !settings.pushEnabled) {
+        Alert.alert('Notifications Disabled', 'Please enable notifications in your settings first.');
+        return;
+      }
+
+      await this.sendImmediateNotification(
+        'Test Notification',
+        'This is a test notification from Spendy. Your notifications are working perfectly!',
+        { type: 'test' }
+      );
+
+      Alert.alert('Test Sent', 'Test notification sent successfully!');
+    } catch (error) {
+      console.error('❌ Failed to send test notification:', error);
+      Alert.alert('Test Failed', 'Failed to send test notification. Please check your notification settings.');
+    }
+  }
+
+  // **PUBLIC** Send immediate notification
+  static async sendImmediateNotification(
+    title: string,
+    body: string,
+    data?: any
+  ): Promise<void> {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data: data || {},
+          sound: 'default',
+          badge: 1,
+        },
+        trigger: null, // Immediate notification
+      });
+
+      console.log(`🔔 Sent immediate notification: ${title}`);
+    } catch (error) {
+      console.error('❌ Failed to send immediate notification:', error);
     }
   }
 

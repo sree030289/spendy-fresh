@@ -20,7 +20,7 @@ interface ManualSettlementModalProps {
   onClose: () => void;
   friend: Friend | null;
   userCurrency: string;
-  onSettlement: (friendId: string, amount: number, description?: string) => Promise<void>;
+  onSettlement: (friendId: string, amount: number, type: 'pay' | 'request', description?: string) => Promise<void>;
 }
 
 export default function ManualSettlementModal({
@@ -34,6 +34,7 @@ export default function ManualSettlementModal({
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+  const [settlementType, setSettlementType] = useState<'pay' | 'request'>('pay');
 
   const resetForm = () => {
     setAmount('');
@@ -45,22 +46,63 @@ export default function ManualSettlementModal({
     onClose();
   };
 
-  const handleMarkAsPaid = async () => {
+  const handleSubmitAction = async () => {
     if (!friend) return;
     
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+    // Enhanced validation
+    const trimmedAmount = amount.trim();
+    
+    // Check if amount is empty
+    if (!trimmedAmount) {
+      Alert.alert('Invalid Amount', 'Please enter an amount');
       return;
     }
+    
+    // Parse and validate amount
+    const amountNum = parseFloat(trimmedAmount);
+    
+    // Check for invalid number
+    if (isNaN(amountNum)) {
+      Alert.alert('Invalid Amount', 'Please enter a valid number');
+      return;
+    }
+    
+    // Check for negative or zero amounts
+    if (amountNum <= 0) {
+      Alert.alert('Invalid Amount', 'Amount must be greater than 0');
+      return;
+    }
+    
+    // Check for reasonable maximum amount (e.g., $100,000)
+    if (amountNum > 100000) {
+      Alert.alert('Invalid Amount', 'Amount cannot exceed 100,000');
+      return;
+    }
+    
+    // Check for too many decimal places (currency typically has 2)
+    const decimalPlaces = (trimmedAmount.split('.')[1] || '').length;
+    if (decimalPlaces > 2) {
+      Alert.alert('Invalid Amount', 'Amount cannot have more than 2 decimal places');
+      return;
+    }
+    
+    // Round to 2 decimal places to handle floating point precision
+    const finalAmount = Math.round(amountNum * 100) / 100;
 
     setLoading(true);
     try {
-      await onSettlement(friend.friendId, amountNum, description || 'Manual settlement');
-      Alert.alert('Success', 'Payment marked as paid successfully!');
+      await onSettlement(friend.friendId, finalAmount, settlementType, description.trim() || 'Manual settlement');
+      
+      const successMessage = settlementType === 'pay' 
+        ? 'Payment marked as paid successfully!'
+        : 'Payment request sent successfully!';
+      Alert.alert('Success', successMessage);
       handleClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to mark payment as paid');
+      const errorMessage = settlementType === 'pay'
+        ? 'Failed to mark payment as paid'
+        : 'Failed to send payment request';
+      Alert.alert('Error', error.message || errorMessage);
     } finally {
       setLoading(false);
     }
@@ -69,9 +111,17 @@ export default function ManualSettlementModal({
   const handleSettleAllBalances = async () => {
     if (!friend || friend.balance === 0) return;
 
+    const absoluteBalance = Math.abs(friend.balance);
+    
+    // Validate the balance amount
+    if (absoluteBalance > 100000) {
+      Alert.alert('Amount Too Large', 'Balance exceeds maximum settleable amount of 100,000');
+      return;
+    }
+
     Alert.alert(
       'Settle All Balances',
-      `Are you sure you want to settle all outstanding balances (${userCurrency} ${Math.abs(friend.balance).toFixed(2)}) with ${friend.friendData.fullName}?`,
+      `Are you sure you want to settle all outstanding balances (${userCurrency} ${absoluteBalance.toFixed(2)}) with ${friend.friendData.fullName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -79,7 +129,10 @@ export default function ManualSettlementModal({
           onPress: async () => {
             setLoading(true);
             try {
-              await onSettlement(friend.friendId, Math.abs(friend.balance), 'Settlement of all balances');
+              // Round to 2 decimal places to handle floating point precision
+              const finalAmount = Math.round(absoluteBalance * 100) / 100;
+              
+              await onSettlement(friend.friendId, finalAmount, 'pay', 'Settlement of all balances');
               Alert.alert('Success', 'All balances settled successfully!');
               handleClose();
             } catch (error: any) {
@@ -143,7 +196,73 @@ export default function ManualSettlementModal({
             </View>
           </View>
 
-          {/* Settlement Options */}
+          {/* Settlement Type Selector */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Settlement Action
+            </Text>
+            <View style={styles.settlementTypeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.settlementTypeButton,
+                  settlementType === 'pay' && [styles.activeSettlementType, { backgroundColor: theme.colors.success }],
+                  settlementType !== 'pay' && { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }
+                ]}
+                onPress={() => setSettlementType('pay')}
+              >
+                <Ionicons 
+                  name="checkmark-circle" 
+                  size={24} 
+                  color={settlementType === 'pay' ? 'white' : theme.colors.textSecondary} 
+                />
+                <View style={styles.settlementTypeContent}>
+                  <Text style={[
+                    styles.settlementTypeTitle,
+                    { color: settlementType === 'pay' ? 'white' : theme.colors.text }
+                  ]}>
+                    Mark as Paid
+                  </Text>
+                  <Text style={[
+                    styles.settlementTypeDescription,
+                    { color: settlementType === 'pay' ? 'rgba(255,255,255,0.8)' : theme.colors.textSecondary }
+                  ]}>
+                    Record that payment has been completed
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.settlementTypeButton,
+                  settlementType === 'request' && [styles.activeSettlementType, { backgroundColor: theme.colors.primary }],
+                  settlementType !== 'request' && { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }
+                ]}
+                onPress={() => setSettlementType('request')}
+              >
+                <Ionicons 
+                  name="send" 
+                  size={24} 
+                  color={settlementType === 'request' ? 'white' : theme.colors.textSecondary} 
+                />
+                <View style={styles.settlementTypeContent}>
+                  <Text style={[
+                    styles.settlementTypeTitle,
+                    { color: settlementType === 'request' ? 'white' : theme.colors.text }
+                  ]}>
+                    Send Request
+                  </Text>
+                  <Text style={[
+                    styles.settlementTypeDescription,
+                    { color: settlementType === 'request' ? 'rgba(255,255,255,0.8)' : theme.colors.textSecondary }
+                  ]}>
+                    Request payment from {friend?.friendData.fullName}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Quick Settlement */}
           {friend.balance !== 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
@@ -159,7 +278,7 @@ export default function ManualSettlementModal({
               >
                 <Ionicons name="checkmark-circle" size={20} color="white" />
                 <Text style={styles.quickSettleText}>
-                  Settle All Balances ({userCurrency} {owedAmount.toFixed(2)})
+                  Mark All as Paid ({userCurrency} {owedAmount.toFixed(2)})
                 </Text>
               </TouchableOpacity>
             </View>
@@ -184,8 +303,34 @@ export default function ManualSettlementModal({
                 placeholder={`Enter amount in ${userCurrency}`}
                 placeholderTextColor={theme.colors.textSecondary}
                 value={amount}
-                onChangeText={setAmount}
+                onChangeText={(text) => {
+                  // Format input to handle currency properly
+                  let formattedText = text;
+                  
+                  // Remove any non-numeric characters except decimal point
+                  formattedText = formattedText.replace(/[^0-9.]/g, '');
+                  
+                  // Ensure only one decimal point
+                  const parts = formattedText.split('.');
+                  if (parts.length > 2) {
+                    formattedText = parts[0] + '.' + parts.slice(1).join('');
+                  }
+                  
+                  // Limit to 2 decimal places
+                  if (parts[1] && parts[1].length > 2) {
+                    formattedText = parts[0] + '.' + parts[1].substring(0, 2);
+                  }
+                  
+                  // Prevent amounts over 100,000
+                  const numValue = parseFloat(formattedText);
+                  if (!isNaN(numValue) && numValue > 100000) {
+                    return; // Don't update if over limit
+                  }
+                  
+                  setAmount(formattedText);
+                }}
                 keyboardType="decimal-pad"
+                maxLength={10} // Limit input length
               />
             </View>
 
@@ -208,10 +353,13 @@ export default function ManualSettlementModal({
             </View>
 
             <Button
-              title="Mark as Paid"
-              onPress={handleMarkAsPaid}
+              title={settlementType === 'pay' ? "Mark as Paid" : "Send Payment Request"}
+              onPress={handleSubmitAction}
               loading={loading}
-              style={StyleSheet.flatten([styles.markPaidButton, { backgroundColor: theme.colors.success }])}
+              style={StyleSheet.flatten([
+                styles.markPaidButton, 
+                { backgroundColor: settlementType === 'pay' ? theme.colors.success : theme.colors.primary }
+              ])}
               disabled={!amount.trim() || loading}
             />
           </View>
@@ -338,5 +486,36 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
+  },
+  settlementTypeContainer: {
+    gap: 12,
+  },
+  settlementTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  activeSettlementType: {
+    borderWidth: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  settlementTypeContent: {
+    flex: 1,
+  },
+  settlementTypeTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  settlementTypeDescription: {
+    fontSize: 14,
+    lineHeight: 18,
   },
 });

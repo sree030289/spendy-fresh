@@ -2,7 +2,7 @@
 import { Platform, Alert, PermissionsAndroid } from 'react-native';
 
 export interface PushNotificationData {
-  type: 'friend_request' | 'expense_added' | 'payment_received' | 'group_invite' | 'expense_settled' | 'payment_reminder';
+  type: 'friend_request' | 'expense_added' | 'payment_received' | 'group_invite' | 'expense_settled' | 'payment_reminder' | 'payment_request';
   title: string;
   body: string;
   data: {

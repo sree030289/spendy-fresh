@@ -26,6 +26,30 @@ class ExpenseRefreshService {
       }
     });
   }
+
+  // Notify all listeners that group members have been updated
+  notifyGroupMembersUpdated() {
+    console.log('Notifying group members updated to', this.listeners.size, 'listeners');
+    this.listeners.forEach(listener => {
+      try {
+        listener();
+      } catch (error) {
+        console.error('Error in group members refresh listener:', error);
+      }
+    });
+  }
+
+  // Notify all listeners that group data has been updated
+  notifyGroupUpdated() {
+    console.log('Notifying group updated to', this.listeners.size, 'listeners');
+    this.listeners.forEach(listener => {
+      try {
+        listener();
+      } catch (error) {
+        console.error('Error in group refresh listener:', error);
+      }
+    });
+  }
 }
 
 export default ExpenseRefreshService;

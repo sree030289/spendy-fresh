@@ -22,6 +22,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { db, storage } from './config';
 import { User } from '../../types';
 import { getCurrencySymbol } from '../../utils/currency';
+import { PushNotificationData } from '../notifications/PushNotificationService';
 
 // Types for Splitting Features
 export interface Friend {
@@ -145,7 +146,7 @@ export interface FriendRequest {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'friend_request' | 'expense_added' | 'payment_received' | 'group_invite' | 'expense_settled' | 'group_message'|'expense_approval_required'|'expense_approved'|'expense_rejected'|'recurring_expense_created';
+  type: 'friend_request' | 'expense_added' | 'payment_received' | 'group_invite' | 'expense_settled' | 'group_message'|'expense_approval_required'|'expense_approved'|'expense_rejected'|'recurring_expense_created'|'payment_request';
   title: string;
   message: string;
   data: any;
@@ -936,7 +937,17 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
       
       console.log('Member added successfully to group');
       
-      // Send group invitation notification to the new member (if not creating group)
+      // Trigger refresh notifications for UI updates
+      try {
+        const ExpenseRefreshService = (await import('@/services/expenseRefreshService')).default;
+        const refreshService = ExpenseRefreshService.getInstance();
+        refreshService.notifyGroupMembersUpdated();
+        refreshService.notifyGroupUpdated();
+      } catch (refreshError) {
+        console.error('❌ Error triggering refresh notifications:', refreshError);
+      }
+      
+      // Send group invitation notification using NotificationManager
       try {
         // Only send invitation notification if the user is being added by someone else
         // (i.e., not when creating the group as admin)
@@ -945,25 +956,15 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
           const groupAdmin = groupData.members?.find(member => member.role === 'admin');
           
           if (groupAdmin) {
-            // Create notification for the new member
-            await this.createNotification({
-              userId: userId,
-              type: 'group_invite',
-              title: 'Group Invitation',
-              message: `${groupAdmin.userData.fullName} invited you to join "${groupData.name}"`,
-              data: {
-                groupId: groupId,
-                groupName: groupData.name,
-                inviteCode: groupData.inviteCode,
-                senderName: groupAdmin.userData.fullName,
-                senderAvatar: groupAdmin.userData.avatar || '',
-                groupDescription: groupData.description || '',
-                // Navigation data
-                navigationType: 'groupDetails'
-              },
-              isRead: false,
-              createdAt: new Date()
-            });
+            // Use NotificationManager for enhanced push notifications and in-app notifications
+            const { notificationManager } = await import('../NotificationManager');
+            
+            // Get updated group data for notification
+            const updatedGroupDoc = await getDoc(doc(db, 'groups', groupId));
+            if (updatedGroupDoc.exists()) {
+              const updatedGroupData = updatedGroupDoc.data() as Group;
+              await notificationManager.notifyGroupInvitation(updatedGroupData, userId, groupAdmin.userId);
+            }
             
             console.log(`✅ Sent group invitation notification to ${userData?.fullName || userId}`);
           }
@@ -1075,40 +1076,24 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     await batch.commit();
     console.log('✅ Expense added successfully:', expenseRef.id);
     
-    // Send notifications to all group members (except the person who added the expense)
+    // Send notifications to all group members using NotificationManager
     try {
       // Get group data to get member list and group name
       const groupDoc = await getDoc(doc(db, 'groups', expenseData.groupId));
       if (groupDoc.exists()) {
         const groupData = groupDoc.data() as Group;
         
-        // Send notification to each member (except the one who added the expense)
-        const membersToNotify = groupData.members.filter(member => 
-          member.userId !== expenseData.paidBy && member.isActive
-        );
+        // Use NotificationManager for push notifications and in-app notifications
+        const { notificationManager } = await import('../NotificationManager');
         
-        for (const member of membersToNotify) {
-          await this.createNotification({
-            userId: member.userId,
-            type: 'expense_added',
-            title: 'New Expense Added',
-            message: `${expenseData.paidByData.fullName} added "${expenseData.description}" for ${expenseData.currency} ${expenseData.amount} in ${groupData.name}`,
-            data: {
-              expenseId: expenseRef.id,
-              groupId: expenseData.groupId,
-              groupName: groupData.name,
-              senderName: expenseData.paidByData.fullName,
-              senderAvatar: '', // Will be filled from user data if available
-              amount: expenseData.amount,
-              currency: expenseData.currency,
-              description: expenseData.description
-            },
-            isRead: false,
-            createdAt: new Date()
-          });
-        }
+        // Create the expense object for notification
+        const expense: Expense = {
+          id: expenseRef.id,
+          ...newExpense,
+          date: newExpense.createdAt // Use createdAt as date if not provided
+        };
         
-        console.log(`✅ Sent expense notifications to ${membersToNotify.length} group members`);
+        await notificationManager.notifyExpenseAdded(expense, groupData, expenseData.paidBy);
       }
     } catch (error) {
       console.error('❌ Error sending expense notifications:', error);
@@ -1309,6 +1294,104 @@ static async getNotifications(userId: string): Promise<Notification[]> {
       throw error;
     }
   }
+
+  // PAYMENT REQUESTS
+  static async createPaymentRequest(requestData: {
+    fromUserId: string;
+    toUserId: string;
+    amount: number;
+    currency: string;
+    message?: string;
+  }): Promise<string> {
+    try {
+      console.log('Creating payment request:', requestData);
+
+      // Get user data for both users
+      const [fromUserDoc, toUserDoc] = await Promise.all([
+        getDoc(doc(db, 'users', requestData.fromUserId)),
+        getDoc(doc(db, 'users', requestData.toUserId))
+      ]);
+
+      if (!fromUserDoc.exists() || !toUserDoc.exists()) {
+        throw new Error('User data not found');
+      }
+
+      const fromUserData = fromUserDoc.data();
+      const toUserData = toUserDoc.data();
+
+      // Create payment request record
+      const paymentRequest = {
+        fromUserId: requestData.fromUserId,
+        fromUserData: {
+          fullName: fromUserData?.fullName || 'Unknown User',
+          email: fromUserData?.email || '',
+          avatar: fromUserData?.profilePicture || ''
+        },
+        toUserId: requestData.toUserId,
+        toUserData: {
+          fullName: toUserData?.fullName || 'Unknown User',
+          email: toUserData?.email || '',
+          avatar: toUserData?.profilePicture || ''
+        },
+        amount: requestData.amount,
+        currency: requestData.currency,
+        message: requestData.message || '',
+        status: 'pending' as const,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const docRef = await addDoc(collection(db, 'paymentRequests'), paymentRequest);
+
+      // Send notification to the recipient
+      await this.createNotification({
+        userId: requestData.toUserId,
+        type: 'payment_request',
+        title: 'Payment Request',
+        message: `${fromUserData?.fullName} requested ${requestData.currency} ${requestData.amount}${requestData.message ? ': ' + requestData.message : ''}`,
+        data: {
+          requestId: docRef.id,
+          fromUserId: requestData.fromUserId,
+          amount: requestData.amount,
+          currency: requestData.currency,
+          message: requestData.message,
+          navigationType: 'paymentRequestDetails'
+        },
+        isRead: false,
+        createdAt: new Date()
+      });
+
+      // Try to send push notification using the notification service
+      try {
+        const { PushNotificationService } = await import('../notifications/PushNotificationService');
+        
+        const pushNotification: PushNotificationData = {
+          type: 'payment_request',
+          title: 'Payment Request',
+          body: `${fromUserData?.fullName} requested ${requestData.currency} ${requestData.amount}`,
+          data: {
+            requestId: docRef.id,
+            fromUserId: requestData.fromUserId,
+            amount: requestData.amount,
+            currency: requestData.currency,
+            message: requestData.message
+          }
+        };
+
+        await PushNotificationService.sendNotificationToUser(requestData.toUserId, pushNotification);
+        console.log('✅ Push notification sent for payment request');
+      } catch (error) {
+        console.log('❌ Failed to send push notification for payment request:', error);
+      }
+
+      console.log('✅ Payment request created successfully:', docRef.id);
+      return docRef.id;
+
+    } catch (error) {
+      console.error('❌ Create payment request error:', error);
+      throw error;
+    }
+  }
   
   // RECEIPT SCANNING
   static async uploadReceipt(file: File, expenseId: string): Promise<string> {
@@ -1380,6 +1463,40 @@ static async getNotifications(userId: string): Promise<Notification[]> {
       callback(requests);
     });
   }
+
+  static onFriends(userId: string, callback: (friends: Friend[]) => void): () => void {
+    const friendsQuery = query(
+      collection(db, 'friends'),
+      where('userId', '==', userId),
+      orderBy('lastActivity', 'desc')
+    );
+    
+    return onSnapshot(friendsQuery, async (snapshot) => {
+      try {
+        const acceptedFriends = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          // Ensure proper date conversion
+          lastActivity: doc.data().lastActivity?.toDate ? doc.data().lastActivity.toDate() : new Date(doc.data().lastActivity || Date.now()),
+          createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(doc.data().createdAt || Date.now())
+        })) as Friend[];
+
+        // Get pending invitations
+        const pendingInvitations = await SplittingService.getPendingFriendInvitations(userId);
+        
+        // Combine and return
+        const allFriends = [...acceptedFriends, ...pendingInvitations];
+        callback(allFriends);
+      } catch (error) {
+        console.error('❌ Friends listener error:', error);
+        callback([]);
+      }
+    }, (error) => {
+      console.error('❌ Friends listener Firebase error:', error);
+      callback([]);
+    });
+  }
+  
   // GET PENDING FRIEND INVITATIONS
 static async getPendingFriendInvitations(userId: string): Promise<Friend[]> {
   try {
@@ -1411,6 +1528,35 @@ static async getPendingFriendInvitations(userId: string): Promise<Friend[]> {
     return [];
   }
 }
+
+// GET USER BY ID
+static async getUserById(userId: string): Promise<User | null> {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    
+    if (!userDoc.exists()) {
+      return null;
+    }
+    
+    const userData = userDoc.data();
+    return {
+      id: userDoc.id,
+      fullName: userData.fullName,
+      email: userData.email,
+      country: userData.country || 'US',
+      mobile: userData.mobile || '',
+      currency: userData.currency || 'USD',
+      profilePicture: userData.profilePicture,
+      biometricEnabled: userData.biometricEnabled || false,
+      createdAt: userData.createdAt?.toDate() || new Date(),
+      updatedAt: userData.updatedAt?.toDate() || new Date(),
+    } as User;
+  } catch (error) {
+    console.error('Get user by ID error:', error);
+    return null;
+  }
+}
+
   // GET USER GROUPS
 static async getUserGroups(userId: string): Promise<Group[]> {
   try {
@@ -2998,42 +3144,63 @@ static async markPaymentAsPaid(
     
     console.log('✅ Settlement transaction created:', settlementId);
     
-    // Send confirmation notifications
-    await this.createNotification({
-      userId: toUserId,
-      type: 'payment_received',
-      title: 'Payment Received',
-      message: `${fromUserData.fullName} marked a payment of ${currency} ${amount} as paid`,
-      data: {
-        settlementId,
+    // Send confirmation notifications using NotificationManager
+    try {
+      const { notificationManager } = await import('../NotificationManager');
+      
+      // Send payment settlement notification
+      await notificationManager.notifyPaymentSettled(
         fromUserId,
-        amount,
-        currency,
-        method: 'manual_settlement',
-        groupId,
-        navigationType: 'settlementDetails'
-      },
-      isRead: false,
-      createdAt: new Date()
-    });
-    
-    await this.createNotification({
-      userId: fromUserId,
-      type: 'expense_settled',
-      title: 'Payment Confirmed',
-      message: `Your payment of ${currency} ${amount} to ${toUserData.fullName} has been recorded`,
-      data: {
-        settlementId,
         toUserId,
         amount,
         currency,
-        method: 'manual_settlement',
+        description || 'Manual settlement',
+        settlementId,
         groupId,
-        navigationType: 'settlementDetails'
-      },
-      isRead: false,
-      createdAt: new Date()
-    });
+        groupData?.name
+      );
+      
+      console.log('✅ Payment settlement notifications sent via NotificationManager');
+    } catch (notificationError) {
+      console.error('❌ Error sending payment settlement notifications:', notificationError);
+      
+      // Fallback to direct notification creation if NotificationManager fails
+      await this.createNotification({
+        userId: toUserId,
+        type: 'payment_received',
+        title: 'Payment Received',
+        message: `${fromUserData.fullName} marked a payment of ${currency} ${amount} as paid`,
+        data: {
+          settlementId,
+          fromUserId,
+          amount,
+          currency,
+          method: 'manual_settlement',
+          groupId,
+          navigationType: 'settlementDetails'
+        },
+        isRead: false,
+        createdAt: new Date()
+      });
+
+      await this.createNotification({
+        userId: fromUserId,
+        type: 'expense_settled',
+        title: 'Payment Confirmed',
+        message: `Your payment of ${currency} ${amount} to ${toUserData.fullName} has been recorded`,
+        data: {
+          settlementId,
+          toUserId,
+          amount,
+          currency,
+          method: 'manual_settlement',
+          groupId,
+          navigationType: 'settlementDetails'
+        },
+        isRead: false,
+        createdAt: new Date()
+      });
+    }
     
     // Add settlement message to group chat if in a group
     if (groupId && groupId !== 'personal' && groupData) {

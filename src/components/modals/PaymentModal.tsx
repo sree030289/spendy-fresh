@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { PaymentService } from '@/services/payments/PaymentService';
 import { Friend, SplittingService } from '@/services/firebase/splitting';
@@ -35,6 +36,7 @@ export default function PaymentModal({
   userCountry 
 }: PaymentModalProps) {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [step, setStep] = useState<'amount' | 'method' | 'confirm'>('amount');
   const [amount, setAmount] = useState('');
   const [customAmount, setCustomAmount] = useState(false);

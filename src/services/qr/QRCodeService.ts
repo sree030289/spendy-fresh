@@ -307,7 +307,7 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
   return new Promise((resolve) => {
     Alert.alert(
       'Group Invitation',
-      `Join "${qrData.groupData.name}" group with ${qrData.groupData.memberCount} members?`,
+      `Join "${qrData.groupData!.name}" group with ${qrData.groupData!.memberCount} members?`,
       [
         {
           text: 'Cancel',

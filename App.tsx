@@ -19,6 +19,7 @@ import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { RealNotificationService } from './src/services/notifications/RealNotificationService';
 import { SplittingService } from '@/services/firebase/splitting';
+import { notificationManager } from '@/services/NotificationManager';
 
 const Stack = createStackNavigator();
 
@@ -42,6 +43,13 @@ const AppNavigator = () => {
     // Initialize notifications
     RealNotificationService.initialize();
   }, []);
+
+  // Initialize NotificationManager when user is authenticated
+  useEffect(() => {
+    if (user?.id) {
+      notificationManager.initialize(user.id);
+    }
+  }, [user?.id]);
   // Initialize QR deep links
 useEffect(() => {
   const cleanup = QRCodeService.initializeDeepLinkListener();
