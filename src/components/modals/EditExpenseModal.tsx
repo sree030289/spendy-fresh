@@ -296,6 +296,11 @@ export default function EditExpenseModal({
         categoryIcon: selectedCategory.icon,
         groupId: expense.groupId,
         paidBy,
+        paidByData: {
+          fullName: selectedGroup?.members.find(m => m.userId === paidBy)?.userData.fullName || user?.fullName || 'Unknown',
+          email: selectedGroup?.members.find(m => m.userId === paidBy)?.userData.email || user?.email || '',
+          avatar: selectedGroup?.members.find(m => m.userId === paidBy)?.userData.avatar || ''
+        },
         splitType,
         splitData: splitData.filter(split => split.isIncluded).map(split => ({
           userId: split.userId,
@@ -312,12 +317,12 @@ export default function EditExpenseModal({
       console.log('Submitting updated expense:', expenseData);
       await onSubmit(expenseData);
       
-      // FIXED: Show success message instead of immediately closing
+      // Show success message instead of immediately closing
       setShowSuccessMessage(true);
       
       // Close modal after showing success message
       setTimeout(() => {
-        resetForm();
+        setShowSuccessMessage(false);
         onClose();
       }, 2000);
       
@@ -329,23 +334,74 @@ export default function EditExpenseModal({
     }
   };
 
-  const updateSplitAmount = (userId: string, newAmount: number) => {
-    setSplitData(prev => prev.map(split => 
-      split.userId === userId 
-        ? { ...split, amount: newAmount }
-        : split
-    ));
+const updateSplitAmount = (userId: string, newAmount: number) => {
+    const totalAmount = parseFloat(amount);
+    
+    setSplitData(prev => {
+      const updated = prev.map(split => 
+        split.userId === userId 
+          ? { ...split, amount: newAmount }
+          : split
+      );
+      
+      // Auto-adjust remaining amounts for custom split
+      if (splitType === 'custom') {
+        const otherIncludedSplits = updated.filter(s => s.userId !== userId && s.isIncluded);
+        
+        if (otherIncludedSplits.length > 0) {
+          const remainingAmount = totalAmount - newAmount;
+          const amountPerOther = remainingAmount / otherIncludedSplits.length;
+          
+          return updated.map(split => {
+            if (split.userId !== userId && split.isIncluded) {
+              return { 
+                ...split, 
+                amount: Math.max(0, amountPerOther),
+                percentage: totalAmount > 0 ? (amountPerOther / totalAmount) * 100 : 0
+              };
+            }
+            return split;
+          });
+        }
+      }
+      
+      return updated;
+    });
   };
 
-  const updateSplitPercentage = (userId: string, percentage: number) => {
+const updateSplitPercentage = (userId: string, percentage: number) => {
     const totalAmount = parseFloat(amount);
     const newAmount = (totalAmount * percentage) / 100;
     
-    setSplitData(prev => prev.map(split => 
-      split.userId === userId 
-        ? { ...split, percentage, amount: newAmount }
-        : split
-    ));
+    setSplitData(prev => {
+      const updated = prev.map(split => 
+        split.userId === userId 
+          ? { ...split, percentage, amount: newAmount }
+          : split
+      );
+      
+      // Auto-adjust remaining percentages
+      const otherIncludedSplits = updated.filter(s => s.userId !== userId && s.isIncluded);
+      
+      if (otherIncludedSplits.length > 0) {
+        const remainingPercentage = 100 - percentage;
+        const percentagePerOther = remainingPercentage / otherIncludedSplits.length;
+        
+        return updated.map(split => {
+          if (split.userId !== userId && split.isIncluded) {
+            const otherAmount = (totalAmount * percentagePerOther) / 100;
+            return { 
+              ...split, 
+              percentage: percentagePerOther,
+              amount: otherAmount
+            };
+          }
+          return split;
+        });
+      }
+      
+      return updated;
+    });
   };
 
   const toggleSplitInclusion = (userId: string) => {
@@ -992,10 +1048,7 @@ export default function EditExpenseModal({
     >
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Show success message overlay when expense is updated */}
-        {showSuccessMessage && renderSuccessMessage()}
-        
-        {/* Normal modal content */}
-        {!showSuccessMessage && (
+        {showSuccessMessage ? renderSuccessMessage() : (
           <>
             {/* Header */}
             <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>

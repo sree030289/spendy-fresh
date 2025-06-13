@@ -30,6 +30,7 @@ import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
 import ExpenseSettlementModal from './ExpenseSettlementModal';
 
+import SimpleExpenseListModal from './SimpleExpenseListModal';
 interface GroupDetailsModalProps {
   visible: boolean;
   onClose: () => void;
@@ -72,6 +73,11 @@ export default function GroupDetailsModal({
   // Local state for group data to enable real-time updates
   const [localGroupData, setLocalGroupData] = useState<Group | null>(null);
   
+   // Simple Expense List Modal states
+  const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
+  const [expenseListGroupId, setExpenseListGroupId] = useState<string | undefined>(undefined);
+  const [expenseListTitle, setExpenseListTitle] = useState('All Expenses');
+
   const isUserAdmin = localGroupData?.members?.find(member => 
     member.userId === currentUser?.id
   )?.role === 'admin';
@@ -438,7 +444,11 @@ export default function GroupDetailsModal({
             <Ionicons name="refresh" size={16} color={theme.colors.primary} />
           </TouchableOpacity>
           {groupExpenses.length > 0 && (
-            <TouchableOpacity onPress={() => setShowGroupExpenseModal(true)}>
+            <TouchableOpacity onPress={() => {
+              setExpenseListGroupId(localGroupData?.id);
+              setExpenseListTitle(`${localGroupData?.name} Expenses`);
+              setShowSimpleExpenseList(true);
+            }}>
               <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
                 View All
               </Text>
@@ -483,7 +493,7 @@ export default function GroupDetailsModal({
                   {expense.description}
                 </Text>
                 <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
-                  {expense.date.toLocaleDateString()} • {expense.paidByData.fullName}
+                  {expense.date.toLocaleDateString()} • {expense.paidByData?.fullName || 'Unknown'}
                 </Text>
               </View>
             </View>
@@ -491,16 +501,31 @@ export default function GroupDetailsModal({
               <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
                 {getCurrencySymbol(localGroupData?.currency || 'USD')}{expense.amount.toFixed(2)}
               </Text>
-              <View style={[
-                styles.expenseStatus,
-                { backgroundColor: expense.isSettled ? theme.colors.success + '20' : theme.colors.error + '20' }
-              ]}>
-                <Text style={[
-                  styles.expenseStatusText,
-                  { color: expense.isSettled ? theme.colors.success : theme.colors.error }
-                ]}>
-                  {expense.isSettled ? 'Settled' : 'Pending'}
-                </Text>
+
+            <View style={styles.expenseActions}>
+                {(() => {
+                  // Debug logging for edited badge
+                  const hasUpdated = expense.updatedAt && expense.createdAt;
+                  const timeDiff = hasUpdated ? Math.abs(expense.updatedAt.getTime() - expense.createdAt.getTime()) : 0;
+                  const isEdited = hasUpdated && timeDiff > 1000;
+                  
+                  console.log('Group expense edited check:', {
+                    id: expense.id,
+                    description: expense.description,
+                    hasUpdated,
+                    timeDiff,
+                    isEdited,
+                    createdAt: expense.createdAt,
+                    updatedAt: expense.updatedAt
+                  });
+                  
+                  return isEdited ? (
+                    <View style={[styles.editedBadge, { backgroundColor: theme.colors.primary + '20' }]}>
+                      <Ionicons name="create" size={12} color={theme.colors.primary} />
+                      <Text style={[styles.editedText, { color: theme.colors.primary }]}>Edited</Text>
+                    </View>
+                  ) : null;
+                })()}
               </View>
             </View>
           </TouchableOpacity>
@@ -864,6 +889,19 @@ export default function GroupDetailsModal({
         />
       )}
 
+      {/* Simple Expense List Modal */}
+      <SimpleExpenseListModal
+        visible={showSimpleExpenseList}
+        onClose={() => setShowSimpleExpenseList(false)}
+        groupId={expenseListGroupId}
+        title={expenseListTitle}
+        onExpensePress={(expense) => {
+          setShowSimpleExpenseList(false);
+          handleEditExpense(expense);
+        }}
+      />
+
+
       {/* Settlement Modal */}
       <ExpenseSettlementModal
         visible={showSettlementModal}
@@ -1059,13 +1097,6 @@ const styles = StyleSheet.create({
   expenseSubtitle: {
     fontSize: 12,
     marginTop: 2,
-  },
-  expenseRight: {
-    alignItems: 'flex-end',
-  },
-  expenseAmount: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   expenseStatus: {
     paddingHorizontal: 8,
@@ -1282,5 +1313,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: 'white',
+  },
+  expenseRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  expenseAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  expenseActions: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  editedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 2,
+  },
+  editedText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

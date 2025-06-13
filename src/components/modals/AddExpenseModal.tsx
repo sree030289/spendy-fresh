@@ -28,8 +28,7 @@ interface AddExpenseModalProps {
   onSubmit: (expenseData: any) => void;
   groups: Group[];
   friends: Friend[];
-  preSelectedGroup?: Group | null; // Add this prop
-
+  preSelectedGroup?: Group | null;
 }
 
 const EXPENSE_CATEGORIES = [
@@ -46,12 +45,13 @@ const EXPENSE_CATEGORIES = [
   { id: 'other', name: 'Other', icon: '💰' },
 ];
 
-export default function AddExpenseModal({ visible, onClose, onSubmit, groups, friends,preSelectedGroup }: AddExpenseModalProps) {
+export default function AddExpenseModal({ visible, onClose, onSubmit, groups, friends, preSelectedGroup }: AddExpenseModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [activeStep, setActiveStep] = useState<'details' | 'split' | 'review'>('details');
   const [loading, setLoading] = useState(false);
   const [isSwipeActive, setIsSwipeActive] = useState(false);
+  
   // Form data
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -74,7 +74,6 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
       if (user) {
         setPaidBy(user.id);
       }
-      // Set pre-selected group if provided
       if (preSelectedGroup) {
         setSelectedGroup(preSelectedGroup);
       }
@@ -83,7 +82,6 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
 
   useEffect(() => {
     if (selectedGroup) {
-      // Initialize split data when group is selected
       initializeSplitData();
     }
   }, [selectedGroup, amount]);
@@ -122,48 +120,46 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
     setSplitData(initialSplitData);
   };
 
-const validateStep = (step: string): boolean => {
-  const newErrors: any = {};
+  const validateStep = (step: string): boolean => {
+    const newErrors: any = {};
 
-  if (step === 'details') {
-    if (!description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-    if (!amount.trim()) {
-      newErrors.amount = 'Amount is required';
-    } else if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-      newErrors.amount = 'Please enter a valid amount';
-    }
-    if (!selectedGroup) {
-      newErrors.group = 'Please select a group';
-    }
-  }
-
-  if (step === 'split') {
-    const totalAmount = parseFloat(amount);
-    const splitTotal = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0);
-    
-    // FIXED: Strict validation - must be exactly equal (within 1 cent)
-    if (Math.abs(splitTotal - totalAmount) > 0.01) {
-      newErrors.split = `Split amounts must equal exactly ${getCurrencySymbol(user?.currency || 'USD')}${totalAmount.toFixed(2)}. Current total: ${getCurrencySymbol(user?.currency || 'USD')}${splitTotal.toFixed(2)}`;
-    }
-    
-    if (splitData.filter(split => split.isIncluded).length === 0) {
-      newErrors.split = 'At least one person must be included in the split';
-    }
-    
-    // Additional validation for percentage splits
-    if (splitType === 'percentage') {
-      const totalPercentage = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.percentage : 0), 0);
-      if (Math.abs(totalPercentage - 100) > 0.1) {
-        newErrors.split = `Percentages must total exactly 100%. Current total: ${totalPercentage.toFixed(1)}%`;
+    if (step === 'details') {
+      if (!description.trim()) {
+        newErrors.description = 'Description is required';
+      }
+      if (!amount.trim()) {
+        newErrors.amount = 'Amount is required';
+      } else if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        newErrors.amount = 'Please enter a valid amount';
+      }
+      if (!selectedGroup) {
+        newErrors.group = 'Please select a group';
       }
     }
-  }
 
-  setErrors(newErrors);
-  return Object.keys(newErrors).length === 0;
-};
+    if (step === 'split') {
+      const totalAmount = parseFloat(amount);
+      const splitTotal = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0);
+      
+      if (Math.abs(splitTotal - totalAmount) > 0.01) {
+        newErrors.split = `Split amounts must equal exactly ${getCurrencySymbol(user?.currency || 'USD')}${totalAmount.toFixed(2)}. Current total: ${getCurrencySymbol(user?.currency || 'USD')}${splitTotal.toFixed(2)}`;
+      }
+      
+      if (splitData.filter(split => split.isIncluded).length === 0) {
+        newErrors.split = 'At least one person must be included in the split';
+      }
+      
+      if (splitType === 'percentage') {
+        const totalPercentage = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.percentage : 0), 0);
+        if (Math.abs(totalPercentage - 100) > 0.1) {
+          newErrors.split = `Percentages must total exactly 100%. Current total: ${totalPercentage.toFixed(1)}%`;
+        }
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleNext = () => {
     if (activeStep === 'details' && validateStep('details')) {
@@ -194,6 +190,11 @@ const validateStep = (step: string): boolean => {
         categoryIcon: selectedCategory.icon,
         groupId: selectedGroup?.id,
         paidBy,
+        paidByData: {
+          fullName: selectedGroup?.members.find(m => m.userId === paidBy)?.userData.fullName || user?.fullName || 'Unknown',
+          email: selectedGroup?.members.find(m => m.userId === paidBy)?.userData.email || user?.email || '',
+          avatar: selectedGroup?.members.find(m => m.userId === paidBy)?.userData.avatar || ''
+        },
         splitType,
         splitData: splitData.filter(split => split.isIncluded).map(split => ({
           userId: split.userId,
@@ -215,76 +216,127 @@ const validateStep = (step: string): boolean => {
     }
   };
 
-const updateSplitAmount = (userId: string, newAmount: number) => {
-  setSplitData(prev => prev.map(split => 
-    split.userId === userId 
-      ? { ...split, amount: newAmount }
-      : split
-  ));
-};
+  // UPDATED: Dynamic split calculation for percentage
+  const updateSplitPercentage = (userId: string, percentage: number) => {
+    const totalAmount = parseFloat(amount);
+    const newAmount = (totalAmount * percentage) / 100;
+    
+    setSplitData(prev => {
+      const updated = prev.map(split => 
+        split.userId === userId 
+          ? { ...split, percentage, amount: newAmount }
+          : split
+      );
+      
+      // Auto-adjust remaining percentages
+      const otherIncludedSplits = updated.filter(s => s.userId !== userId && s.isIncluded);
+      
+      if (otherIncludedSplits.length > 0) {
+        const remainingPercentage = 100 - percentage;
+        const percentagePerOther = remainingPercentage / otherIncludedSplits.length;
+        
+        return updated.map(split => {
+          if (split.userId !== userId && split.isIncluded) {
+            const otherAmount = (totalAmount * percentagePerOther) / 100;
+            return { 
+              ...split, 
+              percentage: percentagePerOther,
+              amount: otherAmount
+            };
+          }
+          return split;
+        });
+      }
+      
+      return updated;
+    });
+  };
 
-const updateSplitPercentage = (userId: string, percentage: number) => {
-  const totalAmount = parseFloat(amount);
-  const newAmount = (totalAmount * percentage) / 100;
-  
-  setSplitData(prev => prev.map(split => 
-    split.userId === userId 
-      ? { ...split, percentage, amount: newAmount }
-      : split
-  ));
-};
+  // UPDATED: Dynamic split calculation for custom amounts
+  const updateSplitAmount = (userId: string, newAmount: number) => {
+    const totalAmount = parseFloat(amount);
+    
+    setSplitData(prev => {
+      const updated = prev.map(split => 
+        split.userId === userId 
+          ? { ...split, amount: newAmount }
+          : split
+      );
+      
+      // Auto-adjust remaining amounts for custom split
+      if (splitType === 'custom') {
+        const otherIncludedSplits = updated.filter(s => s.userId !== userId && s.isIncluded);
+        
+        if (otherIncludedSplits.length > 0) {
+          const remainingAmount = totalAmount - newAmount;
+          const amountPerOther = remainingAmount / otherIncludedSplits.length;
+          
+          return updated.map(split => {
+            if (split.userId !== userId && split.isIncluded) {
+              return { 
+                ...split, 
+                amount: Math.max(0, amountPerOther),
+                percentage: totalAmount > 0 ? (amountPerOther / totalAmount) * 100 : 0
+              };
+            }
+            return split;
+          });
+        }
+      }
+      
+      return updated;
+    });
+  };
 
   const toggleSplitInclusion = (userId: string) => {
-  setSplitData(prev => {
-    const updated = prev.map(split => 
-      split.userId === userId 
-        ? { ...split, isIncluded: !split.isIncluded }
-        : split
-    );
-    
-    // Auto-recalculate after toggle based on current split type
-    const totalAmount = parseFloat(amount);
-    const includedMembers = updated.filter(split => split.isIncluded);
-    
-    if (includedMembers.length > 0 && totalAmount > 0) {
-      if (splitType === 'equal') {
-        const equalShare = totalAmount / includedMembers.length;
-        return updated.map(split => 
-          split.isIncluded 
-            ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
-            : { ...split, amount: 0, percentage: 0 }
-        );
-      } else if (splitType === 'percentage') {
-        const equalPercentage = 100 / includedMembers.length;
-        const equalAmount = totalAmount / includedMembers.length;
-        return updated.map(split => 
-          split.isIncluded 
-            ? { ...split, percentage: equalPercentage, amount: equalAmount }
-            : { ...split, percentage: 0, amount: 0 }
-        );
+    setSplitData(prev => {
+      const updated = prev.map(split => 
+        split.userId === userId 
+          ? { ...split, isIncluded: !split.isIncluded }
+          : split
+      );
+      
+      const totalAmount = parseFloat(amount);
+      const includedMembers = updated.filter(split => split.isIncluded);
+      
+      if (includedMembers.length > 0 && totalAmount > 0) {
+        if (splitType === 'equal') {
+          const equalShare = totalAmount / includedMembers.length;
+          return updated.map(split => 
+            split.isIncluded 
+              ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
+              : { ...split, amount: 0, percentage: 0 }
+          );
+        } else if (splitType === 'percentage') {
+          const equalPercentage = 100 / includedMembers.length;
+          const equalAmount = totalAmount / includedMembers.length;
+          return updated.map(split => 
+            split.isIncluded 
+              ? { ...split, percentage: equalPercentage, amount: equalAmount }
+              : { ...split, percentage: 0, amount: 0 }
+          );
+        }
       }
-    }
-    
-    return updated;
-  });
-};
+      
+      return updated;
+    });
+  };
 
   const recalculateEqual = () => {
-  const totalAmount = parseFloat(amount);
-  const includedMembers = splitData.filter(split => split.isIncluded);
-  if (includedMembers.length === 0 || totalAmount <= 0) return;
+    const totalAmount = parseFloat(amount);
+    const includedMembers = splitData.filter(split => split.isIncluded);
+    if (includedMembers.length === 0 || totalAmount <= 0) return;
 
-  const equalShare = totalAmount / includedMembers.length;
-  
-  setSplitData(prev => prev.map(split => 
-    split.isIncluded 
-      ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
-      : { ...split, amount: 0, percentage: 0 }
-  ));
-};
+    const equalShare = totalAmount / includedMembers.length;
+    
+    setSplitData(prev => prev.map(split => 
+      split.isIncluded 
+        ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
+        : { ...split, amount: 0, percentage: 0 }
+    ));
+  };
 
   const handleReceiptData = (receiptData: any) => {
-    // Auto-populate form with receipt data
     if (receiptData.merchant) {
       setDescription(receiptData.merchant);
     }
@@ -294,9 +346,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
     if (receiptData.date) {
       setExpenseDate(new Date(receiptData.date));
     }
-    // Set appropriate category based on merchant or items
     if (receiptData.merchant) {
-      // Simple logic to categorize based on merchant name
       const merchantLower = receiptData.merchant.toLowerCase();
       if (merchantLower.includes('restaurant') || merchantLower.includes('cafe') || merchantLower.includes('food')) {
         setSelectedCategory(EXPENSE_CATEGORIES.find(cat => cat.id === 'food') || EXPENSE_CATEGORIES[0]);
@@ -348,30 +398,27 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
   );
 
   const handleSwipe = (event: any) => {
-  if (isSwipeActive) return; // Prevent multiple rapid swipes
-  
-  const { translationX, state } = event.nativeEvent;
-  
-  if (state === State.END) {
-    const swipeThreshold = 120; // Increased threshold
-    const velocity = Math.abs(event.nativeEvent.velocityX);
+    if (isSwipeActive) return;
     
-    if (Math.abs(translationX) > swipeThreshold && velocity > 500) {
-      setIsSwipeActive(true);
+    const { translationX, state } = event.nativeEvent;
+    
+    if (state === State.END) {
+      const swipeThreshold = 120;
+      const velocity = Math.abs(event.nativeEvent.velocityX);
       
-      if (translationX > 0 && activeStep !== 'details') {
-        // Swipe right - go back
-        handleBack();
-      } else if (translationX < 0 && activeStep !== 'review') {
-        // Swipe left - go forward
-        handleNext();
+      if (Math.abs(translationX) > swipeThreshold && velocity > 500) {
+        setIsSwipeActive(true);
+        
+        if (translationX > 0 && activeStep !== 'details') {
+          handleBack();
+        } else if (translationX < 0 && activeStep !== 'review') {
+          handleNext();
+        }
+        
+        setTimeout(() => setIsSwipeActive(false), 500);
       }
-      
-      // Reset swipe active after delay
-      setTimeout(() => setIsSwipeActive(false), 500);
     }
-  }
-};
+  };
 
   const renderDetailsStep = () => (
     <ScrollView contentContainerStyle={styles.stepContent}>
@@ -425,36 +472,36 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
 
       {/* Amount */}
       <View style={styles.inputContainer}>
-  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount *</Text>
-  <View style={styles.amountInputContainer}>
-    <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
-      {getCurrencySymbol(user?.currency || 'USD')}
-    </Text>
-    <TextInput
-      style={[
-        styles.amountInput,
-        {
-          backgroundColor: theme.colors.surface,
-          borderColor: errors.amount ? theme.colors.error : theme.colors.border,
-          color: theme.colors.text,
-        }
-      ]}
-      placeholder="0.00"
-      placeholderTextColor={theme.colors.textSecondary}
-      value={amount}
-      onChangeText={(text) => {
-        setAmount(text);
-        if (errors.amount) setErrors((prev: any) => ({ ...prev, amount: '' }));
-      }}
-      keyboardType="decimal-pad"
-    />
-  </View>
-  {errors.amount && (
-    <Text style={[styles.errorText, { color: theme.colors.error }]}>
-      {errors.amount}
-    </Text>
-  )}
-</View>
+        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount *</Text>
+        <View style={styles.amountInputContainer}>
+          <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
+            {getCurrencySymbol(user?.currency || 'USD')}
+          </Text>
+          <TextInput
+            style={[
+              styles.amountInput,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: errors.amount ? theme.colors.error : theme.colors.border,
+                color: theme.colors.text,
+              }
+            ]}
+            placeholder="0.00"
+            placeholderTextColor={theme.colors.textSecondary}
+            value={amount}
+            onChangeText={(text) => {
+              setAmount(text);
+              if (errors.amount) setErrors((prev: any) => ({ ...prev, amount: '' }));
+            }}
+            keyboardType="decimal-pad"
+          />
+        </View>
+        {errors.amount && (
+          <Text style={[styles.errorText, { color: theme.colors.error }]}>
+            {errors.amount}
+          </Text>
+        )}
+      </View>
 
       {/* Category */}
       <View style={styles.inputContainer}>
@@ -490,7 +537,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
         </ScrollView>
       </View>
 
-      {/* Date */}
+      {/* Date - FIXED: Calendar icon click handler */}
       <View style={styles.inputContainer}>
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Date</Text>
         <TouchableOpacity
@@ -509,7 +556,9 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
           <Text style={[styles.dateText, { color: theme.colors.text }]}>
             {expenseDate.toLocaleDateString()}
           </Text>
-          <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+          <TouchableOpacity onPress={() => setShowDatePicker(!showDatePicker)}>
+            <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
         </TouchableOpacity>
         {showDatePicker && (
           <DateTimePicker
@@ -793,10 +842,10 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
                   </View>
                 )}
                 {splitType === 'equal' && (
-                <Text style={[styles.splitAmount, { color: theme.colors.text }]}>
-                  {getCurrencySymbol(user?.currency || 'USD')}{split.amount.toFixed(2)}
-                </Text>
-              )}
+                  <Text style={[styles.splitAmount, { color: theme.colors.text }]}>
+                    {getCurrencySymbol(user?.currency || 'USD')}{split.amount.toFixed(2)}
+                  </Text>
+                )}
               </View>
             )}
           </View>
@@ -811,21 +860,21 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
         {/* Split Summary */}
         <View style={[styles.splitSummary, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.summaryRow}>
-          <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
-            Total Amount
-          </Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-            {getCurrencySymbol(user?.currency || 'USD')}{parseFloat(amount).toFixed(2)}
-          </Text>
-        </View>
+            <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
+              Total Amount
+            </Text>
+            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+              {getCurrencySymbol(user?.currency || 'USD')}{parseFloat(amount).toFixed(2)}
+            </Text>
+          </View>
           <View style={styles.summaryRow}>
-          <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
-            Split Total
-          </Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-            {getCurrencySymbol(user?.currency || 'USD')}{splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0).toFixed(2)}
-          </Text>
-        </View>
+            <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
+              Split Total
+            </Text>
+            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+              {getCurrencySymbol(user?.currency || 'USD')}{splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0).toFixed(2)}
+            </Text>
+          </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
@@ -917,8 +966,8 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
               </View>
               <View style={styles.reviewSplitRight}>
                 <Text style={[styles.reviewSplitAmount, { color: theme.colors.text }]}>
-                {getCurrencySymbol(user?.currency || 'USD')}{split.amount.toFixed(2)}
-              </Text>
+                  {getCurrencySymbol(user?.currency || 'USD')}{split.amount.toFixed(2)}
+                </Text>
                 {splitType === 'percentage' && (
                   <Text style={[styles.reviewSplitPercentage, { color: theme.colors.textSecondary }]}>
                     ({split.percentage.toFixed(1)}%)

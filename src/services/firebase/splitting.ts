@@ -2136,6 +2136,7 @@ static async updateGroupMemberBalance(groupId: string, userId: string, amount: n
   // UPDATE EXPENSE
   static async updateExpense(expenseData: any): Promise<void> {
     try {
+      
       const expenseId = expenseData.id;
       console.log('Updating expense:', expenseId, expenseData.description);
       
@@ -2159,11 +2160,11 @@ static async updateGroupMemberBalance(groupId: string, userId: string, amount: n
       const { id, ...expenseDataWithoutId } = expenseData;
       const updatedExpense = {
         ...expenseDataWithoutId,
-        updatedAt: new Date()
+        updatedAt: new Date() // Ensure we always set a new timestamp
       };
       
       batch.update(doc(db, 'expenses', expenseId), updatedExpense);
-      console.log('Expense update prepared');
+      console.log('Expense update prepared with new timestamp:', updatedExpense.updatedAt);
       
       // Calculate the difference in amount to adjust group total
       const amountDifference = expenseData.amount - currentExpense.amount;

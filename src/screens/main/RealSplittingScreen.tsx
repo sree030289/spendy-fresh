@@ -62,7 +62,7 @@ import { getCurrencySymbol } from '@/utils/currency';
 import QRCodeScanner from '@/components/QRCodeScanner';
 import QRScannerManager from '@/services/qr/QRScannerManager';
 import EditExpenseModal from '@/components/modals/EditExpenseModal';
-
+import SimpleExpenseListModal from '@/components/modals/SimpleExpenseListModal';
 export default function RealSplittingScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
@@ -120,6 +120,11 @@ export default function RealSplittingScreen() {
   // Friend request modal state
   const [showFriendRequest, setShowFriendRequest] = useState(false);
   const [selectedFriendRequest, setSelectedFriendRequest] = useState<any>(null);
+
+   // Simple Expense List Modal states
+  const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
+  const [expenseListGroupId, setExpenseListGroupId] = useState<string | undefined>(undefined);
+  const [expenseListTitle, setExpenseListTitle] = useState('All Expenses');
 
   // Reset to overview tab when the screen gains focus (when bottom tab is pressed)
   useFocusEffect(
@@ -316,6 +321,12 @@ export default function RealSplittingScreen() {
     console.error('Load notifications error:', error);
   }
 };
+  // Navigate to expenses modal instead of tab
+  const navigateToExpenses = () => {
+    setExpenseListGroupId(undefined);
+    setExpenseListTitle('All Expenses');
+    setShowSimpleExpenseList(true);
+  };
 const loadRecurringExpenses = async () => {
   try {
     if (!user?.id) return;
@@ -1359,10 +1370,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
     }
   };
 
-  // Navigate to expenses modal instead of tab
-  const navigateToExpenses = () => {
-    setShowExpenseModal(true);
-  };
+
 
   // Render overview tab
   const renderOverviewTab = () => (
@@ -1470,7 +1478,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
             {expense.description}
           </Text>
           <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
-            {expense.date.toLocaleDateString()} • Paid by {expense.paidByData.fullName}
+            {expense.date.toLocaleDateString()} • Paid by {expense.paidByData?.fullName || 'Unknown'}
           </Text>
             </View>
           </View>
@@ -1478,16 +1486,30 @@ const showExpenseActionsMenu = (expense: Expense) => {
             <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
           ${expense.amount.toFixed(2)}
             </Text>
-            <View style={[
-          styles.expenseStatus,
-          { backgroundColor: expense.isSettled ? theme.colors.success + '20' : theme.colors.error + '20' }
-            ]}>
-          <Text style={[
-            styles.expenseStatusText,
-            { color: expense.isSettled ? theme.colors.success : theme.colors.error }
-          ]}>
-            {expense.isSettled ? 'Settled' : 'Pending'}
-          </Text>
+            <View style={styles.expenseActions}>
+              {(() => {
+                // Debug logging for edited badge
+                const hasUpdated = expense.updatedAt && expense.createdAt;
+                const timeDiff = hasUpdated ? Math.abs(expense.updatedAt.getTime() - expense.createdAt.getTime()) : 0;
+                const isEdited = hasUpdated && timeDiff > 1000; // More than 1 second difference
+                
+                console.log('Expense edited check:', {
+                  id: expense.id,
+                  description: expense.description,
+                  hasUpdated,
+                  timeDiff,
+                  isEdited,
+                  createdAt: expense.createdAt,
+                  updatedAt: expense.updatedAt
+                });
+                
+                return isEdited ? (
+                  <View style={[styles.editedBadge, { backgroundColor: theme.colors.primary + '20' }]}>
+                    <Ionicons name="create" size={12} color={theme.colors.primary} />
+                    <Text style={[styles.editedText, { color: theme.colors.primary }]}>Edited</Text>
+                  </View>
+                ) : null;
+              })()}
             </View>
           </View>
         </TouchableOpacity>
@@ -2113,7 +2135,19 @@ const showExpenseActionsMenu = (expense: Expense) => {
       userCurrency={user?.currency || 'USD'}
       currentUserId={user?.id || ''}
       onRefresh={loadRecentExpenses}
-    />      <QRCodeScanner
+    />     
+    {/* Simple Expense List Modal */}
+      <SimpleExpenseListModal
+        visible={showSimpleExpenseList}
+        onClose={() => setShowSimpleExpenseList(false)}
+        groupId={expenseListGroupId}
+        title={expenseListTitle}
+        onExpensePress={(expense) => {
+          setShowSimpleExpenseList(false);
+          handleEditExpenseFromDetails(expense);
+        }}
+      /> 
+    <QRCodeScanner
         visible={showQRScanner}
         onClose={() => {
           setShowQRScanner(false);
@@ -2716,6 +2750,22 @@ groupFooterActions: {
   },
   expenseStatusText: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  expenseActions: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  editedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 2,
+  },
+  editedText: {
+    fontSize: 10,
     fontWeight: '600',
   },
   friendAvatarText: {
