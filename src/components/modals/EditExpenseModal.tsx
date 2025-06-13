@@ -1,45 +1,49 @@
 // src/components/modals/EditExpenseModal.tsx - FIXED VERSION
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Modal,
-  TextInput,
   TouchableOpacity,
+  TextInput,
   ScrollView,
   Alert,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useTheme } from '../../hooks/useTheme';
-import { useAuth } from '../../hooks/useAuth';
-import { getCurrencySymbol } from '../../utils/currency';
-import { Expense, ExpenseSplit, SplittingService, Group } from '../../services/firebase/splitting';
-import ExpenseRefreshService from '../../services/expenseRefreshService';
+import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/common/Button';
+import { Friend, Group, Expense, SplittingService } from '@/services/firebase/splitting';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { getCurrencySymbol } from '@/utils/currency';
 import ExpenseDeletionModal from './ExpenseDeletionModal';
 
 interface EditExpenseModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (expenseData: any) => Promise<void>;
+  onSubmit: (expenseData: any) => void;
   expense: Expense | null;
   onExpenseDeleted?: () => void;
   isUserAdmin?: boolean;
-  groups?: Group[]; // Add groups prop
+  groups?: Group[];
 }
 
-const expenseCategories = [
-  { id: 'food', name: 'Food & Dining', icon: '🍕' },
+const EXPENSE_CATEGORIES = [
+  { id: 'settlement', name: 'Settlement', icon: '💸', isSpecial: true },
+  { id: 'food', name: 'Food & Dining', icon: '🍽️' },
   { id: 'transport', name: 'Transportation', icon: '🚗' },
   { id: 'entertainment', name: 'Entertainment', icon: '🎬' },
-  { id: 'shopping', name: 'Shopping', icon: '🛍️' },
-  { id: 'utilities', name: 'Bills & Utilities', icon: '💡' },
+  { id: 'shopping', name: 'Shopping', icon: '🛒' },
+  { id: 'utilities', name: 'Utilities', icon: '⚡' },
+  { id: 'housing', name: 'Housing', icon: '🏠' },
   { id: 'healthcare', name: 'Healthcare', icon: '🏥' },
+  { id: 'education', name: 'Education', icon: '📚' },
   { id: 'travel', name: 'Travel', icon: '✈️' },
-  { id: 'other', name: 'Other', icon: '📝' },
+  { id: 'other', name: 'Other', icon: '💰' },
 ];
 
 export default function EditExpenseModal({ 
@@ -54,52 +58,170 @@ export default function EditExpenseModal({
   const { theme } = useTheme();
   const { user } = useAuth();
   
-  // Form state - matching AddExpenseModal pattern
   const [activeStep, setActiveStep] = useState<'details' | 'split' | 'review'>('details');
+  const [loading, setLoading] = useState(false);
+  const [isSwipeActive, setIsSwipeActive] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  
+  // Use ref to track if we've initialized the form to prevent step resetting
+  const isInitialized = useRef(false);
+  const currentExpenseId = useRef<string | null>(null);
+  
+  // Form data - exactly like AddExpenseModal
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(expenseCategories[0]);
+  const [selectedCategory, setSelectedCategory] = useState(EXPENSE_CATEGORIES[0]);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [paidBy, setPaidBy] = useState<string>('');
+  const [splitType, setSplitType] = useState<'equal' | 'custom' | 'percentage'>('equal');
+  const [splitData, setSplitData] = useState<any[]>([]);
   const [notes, setNotes] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [splitData, setSplitData] = useState<ExpenseSplit[]>([]);
-  const [splitType, setSplitType] = useState<'equal' | 'custom' | 'percentage'>('equal');
-  const [paidBy, setPaidBy] = useState<string>('');
-  const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  
+  // Errors
   const [errors, setErrors] = useState<any>({});
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
+  // Initialize form with expense data - FIXED: Only when expense changes or modal opens
   useEffect(() => {
-    if (expense && visible) {
+    if (expense && visible && (!isInitialized.current || currentExpenseId.current !== expense.id)) {
+      console.log('Initializing edit form with expense:', expense);
+      
       // Find the group from groups prop
       const group = groups.find(g => g.id === expense.groupId);
       setSelectedGroup(group || null);
+      console.log('Found group for expense:', group?.name || 'Not found');
       
+      // Set basic fields
       setDescription(expense.description);
       setAmount(expense.amount.toString());
       setNotes(expense.notes || '');
-      setSplitData(expense.splitData);
-      setSplitType(expense.splitType);
       setPaidBy(expense.paidBy);
+      setSplitType(expense.splitType);
       setExpenseDate(expense.date);
       
-      const category = expenseCategories.find(cat => cat.id === expense.category);
+      // Set category
+      const category = EXPENSE_CATEGORIES.find(cat => cat.id === expense.category);
       if (category) {
         setSelectedCategory(category);
+      } else {
+        setSelectedCategory(EXPENSE_CATEGORIES[0]);
       }
+      
+      // Initialize split data with group members
+      if (group) {
+        const activeMembers = group.members.filter(member => member.isActive);
+        console.log('Active members found:', activeMembers.length);
+        
+        // Create enhanced split data with proper member info
+        const enhancedSplitData = expense.splitData.map(split => {
+          const member = activeMembers.find(m => m.userId === split.userId);
+          console.log(`Processing split for ${split.userId}:`, member?.userData.fullName || 'Unknown');
+          
+          return {
+            userId: split.userId,
+            userData: member?.userData || {
+              fullName: split.userId === user?.id ? 'You' : 'Unknown User',
+              email: '',
+              avatar: ''
+            },
+            amount: split.amount,
+            percentage: split.percentage || ((split.amount / expense.amount) * 100),
+            isIncluded: true,
+            isPaid: split.isPaid || false,
+            paidAt: split.paidAt
+          };
+        });
+        
+        // Add any missing group members who weren't in the original split
+        activeMembers.forEach(member => {
+          if (!enhancedSplitData.find(split => split.userId === member.userId)) {
+            enhancedSplitData.push({
+              userId: member.userId,
+              userData: member.userData,
+              amount: 0,
+              percentage: 0,
+              isIncluded: false,
+              isPaid: false
+            });
+          }
+        });
+        
+        setSplitData(enhancedSplitData);
+        console.log('Enhanced split data set:', enhancedSplitData.length, 'entries');
+      }
+      
+      // Reset step and errors only on initial load
+      setActiveStep('details');
+      setErrors({});
+      setShowSuccessMessage(false);
+      
+      // Mark as initialized and track current expense
+      isInitialized.current = true;
+      currentExpenseId.current = expense.id;
     }
-  }, [expense, visible, groups]);
+  }, [expense?.id, visible]); // FIXED: Only depend on expense ID and visibility
+
+  // Reset initialization when modal closes
+  useEffect(() => {
+    if (!visible) {
+      isInitialized.current = false;
+      currentExpenseId.current = null;
+      setShowSuccessMessage(false);
+    }
+  }, [visible]);
 
   const resetForm = () => {
-    setActiveStep('details');
     setDescription('');
     setAmount('');
-    setNotes('');
+    setSelectedCategory(EXPENSE_CATEGORIES[0]);
+    setSelectedGroup(null);
+    setPaidBy(user?.id || '');
+    setSplitType('equal');
     setSplitData([]);
-    setSelectedCategory(expenseCategories[0]);
+    setNotes('');
     setExpenseDate(new Date());
     setErrors({});
+    setActiveStep('details');
+    setShowSuccessMessage(false);
+    isInitialized.current = false;
+    currentExpenseId.current = null;
+  };
+
+  const initializeSplitData = () => {
+    if (!selectedGroup || !amount) return;
+    
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount)) return;
+
+    const activeMembers = selectedGroup.members.filter(member => member.isActive);
+    const equalShare = numericAmount / activeMembers.length;
+
+    // If we already have split data, update amounts. Otherwise create new.
+    if (splitData.length > 0) {
+      const updatedSplitData = splitData.map(split => {
+        if (split.isIncluded) {
+          return {
+            ...split,
+            amount: splitType === 'equal' ? equalShare : split.amount,
+            percentage: splitType === 'percentage' ? (100 / activeMembers.length) : ((split.amount / numericAmount) * 100)
+          };
+        }
+        return split;
+      });
+      setSplitData(updatedSplitData);
+    } else {
+      const initialSplitData = activeMembers.map(member => ({
+        userId: member.userId,
+        userData: member.userData,
+        amount: splitType === 'equal' ? equalShare : 0,
+        percentage: splitType === 'percentage' ? (100 / activeMembers.length) : 0,
+        isIncluded: true,
+        isPaid: false
+      }));
+      setSplitData(initialSplitData);
+    }
   };
 
   const validateStep = (step: string): boolean => {
@@ -114,22 +236,25 @@ export default function EditExpenseModal({
       } else if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
         newErrors.amount = 'Please enter a valid amount';
       }
+      if (!selectedGroup) {
+        newErrors.group = 'Please select a group';
+      }
     }
 
     if (step === 'split') {
       const totalAmount = parseFloat(amount);
-      const splitTotal = splitData.reduce((sum, split) => sum + (split.isIncluded !== false ? split.amount : 0), 0);
+      const splitTotal = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0);
       
-      if (Math.abs(splitTotal - totalAmount) > 0.001) {
+      if (Math.abs(splitTotal - totalAmount) > 0.01) {
         newErrors.split = `Split amounts must equal exactly ${getCurrencySymbol(user?.currency || 'USD')}${totalAmount.toFixed(2)}. Current total: ${getCurrencySymbol(user?.currency || 'USD')}${splitTotal.toFixed(2)}`;
       }
       
-      if (splitData.filter(split => split.isIncluded !== false).length === 0) {
+      if (splitData.filter(split => split.isIncluded).length === 0) {
         newErrors.split = 'At least one person must be included in the split';
       }
       
       if (splitType === 'percentage') {
-        const totalPercentage = splitData.reduce((sum, split) => sum + (split.isIncluded !== false ? (split.percentage || 0) : 0), 0);
+        const totalPercentage = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.percentage : 0), 0);
         if (Math.abs(totalPercentage - 100) > 0.1) {
           newErrors.split = `Percentages must total exactly 100%. Current total: ${totalPercentage.toFixed(1)}%`;
         }
@@ -157,51 +282,51 @@ export default function EditExpenseModal({
     }
   };
 
-  const initializeSplitData = () => {
-    if (!selectedGroup || !amount) return;
-    
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount)) return;
+  const handleSubmit = async () => {
+    if (!validateStep('split') || !expense || !user?.id) return;
 
-    const activeMembers = selectedGroup.members.filter(member => member.isActive);
-    const includedMembers = splitData.filter(split => split.isIncluded !== false);
-    
-    if (includedMembers.length === 0) {
-      // First time initialization - include all active members
-      const equalShare = numericAmount / activeMembers.length;
+    setLoading(true);
+    try {
+      const expenseData = {
+        id: expense.id,
+        description: description.trim(),
+        amount: parseFloat(amount),
+        currency: user?.currency || 'AUD',
+        category: selectedCategory.id,
+        categoryIcon: selectedCategory.icon,
+        groupId: expense.groupId,
+        paidBy,
+        splitType,
+        splitData: splitData.filter(split => split.isIncluded).map(split => ({
+          userId: split.userId,
+          amount: split.amount,
+          percentage: split.percentage,
+          isPaid: split.isPaid || false,
+          ...(split.paidAt ? { paidAt: split.paidAt } : {})
+        })),
+        notes: notes.trim(),
+        tags: expense.tags || [],
+        expenseDate,
+      };
+
+      console.log('Submitting updated expense:', expenseData);
+      await onSubmit(expenseData);
       
-      const initialSplitData = activeMembers.map(member => {
-        const existingSplit = splitData.find(s => s.userId === member.userId);
-        return {
-          userId: member.userId,
-          userData: member.userData,
-          amount: splitType === 'equal' ? equalShare : (existingSplit?.amount || 0),
-          percentage: splitType === 'percentage' ? (100 / activeMembers.length) : (existingSplit?.percentage || 0),
-          isIncluded: true,
-          isPaid: existingSplit?.isPaid || false,
-          paidAt: existingSplit?.paidAt
-        };
-      });
-
-      setSplitData(initialSplitData);
-    } else {
-      // Recalculate based on included members
-      recalculateEqual();
+      // FIXED: Show success message instead of immediately closing
+      setShowSuccessMessage(true);
+      
+      // Close modal after showing success message
+      setTimeout(() => {
+        resetForm();
+        onClose();
+      }, 2000);
+      
+    } catch (error: any) {
+      console.error('Update expense error:', error);
+      Alert.alert('Error', error.message || 'Failed to update expense. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const recalculateEqual = () => {
-    const totalAmount = parseFloat(amount);
-    const includedMembers = splitData.filter(split => split.isIncluded !== false);
-    if (includedMembers.length === 0) return;
-
-    const equalShare = totalAmount / includedMembers.length;
-    
-    setSplitData(prev => prev.map(split => 
-      split.isIncluded !== false
-        ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
-        : split
-    ));
   };
 
   const updateSplitAmount = (userId: string, newAmount: number) => {
@@ -227,61 +352,71 @@ export default function EditExpenseModal({
     setSplitData(prev => {
       const updated = prev.map(split => 
         split.userId === userId 
-          ? { ...split, isIncluded: split.isIncluded === false ? true : false }
+          ? { ...split, isIncluded: !split.isIncluded }
           : split
       );
       
-      // Recalculate after toggle
-      setTimeout(() => {
+      // Auto-recalculate after toggle
+      const totalAmount = parseFloat(amount);
+      const includedMembers = updated.filter(split => split.isIncluded);
+      
+      if (includedMembers.length > 0 && totalAmount > 0) {
         if (splitType === 'equal') {
-          recalculateEqual();
+          const equalShare = totalAmount / includedMembers.length;
+          return updated.map(split => 
+            split.isIncluded 
+              ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
+              : { ...split, amount: 0, percentage: 0 }
+          );
+        } else if (splitType === 'percentage') {
+          const equalPercentage = 100 / includedMembers.length;
+          const equalAmount = totalAmount / includedMembers.length;
+          return updated.map(split => 
+            split.isIncluded 
+              ? { ...split, percentage: equalPercentage, amount: equalAmount }
+              : { ...split, percentage: 0, amount: 0 }
+          );
         }
-      }, 0);
+      }
       
       return updated;
     });
   };
 
-  const handleSubmit = async () => {
-    if (!validateStep('split') || !expense || !user?.id) return;
+  const recalculateEqual = () => {
+    const totalAmount = parseFloat(amount);
+    const includedMembers = splitData.filter(split => split.isIncluded);
+    if (includedMembers.length === 0 || totalAmount <= 0) return;
 
-    setLoading(true);
-    try {
-      const expenseData = {
-        id: expense.id,
-        description: description.trim(),
-        amount: parseFloat(amount),
-        currency: user?.currency || 'AUD',
-        category: selectedCategory.id,
-        categoryIcon: selectedCategory.icon,
-        groupId: expense.groupId,
-        paidBy,
-        splitType,
-        splitData: splitData.filter(split => split.isIncluded !== false).map(split => ({
-          userId: split.userId,
-          amount: split.amount,
-          percentage: split.percentage,
-          isPaid: split.isPaid,
-          paidAt: split.paidAt
-        })),
-        notes: notes.trim(),
-        tags: expense.tags || [],
-        expenseDate,
-      };
+    const equalShare = totalAmount / includedMembers.length;
+    
+    setSplitData(prev => prev.map(split => 
+      split.isIncluded 
+        ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
+        : { ...split, amount: 0, percentage: 0 }
+    ));
+  };
 
-      await SplittingService.updateExpense(expenseData);
+  const handleSwipe = (event: any) => {
+    if (isSwipeActive) return;
+    
+    const { translationX, state } = event.nativeEvent;
+    
+    if (state === State.END) {
+      const swipeThreshold = 120;
+      const velocity = Math.abs(event.nativeEvent.velocityX);
       
-      Alert.alert('Success', 'Expense updated successfully!');
-      resetForm();
-      onClose();
-      
-      ExpenseRefreshService.getInstance().notifyExpenseAdded();
-      
-    } catch (error) {
-      console.error('Update expense error:', error);
-      Alert.alert('Error', 'Failed to update expense. Please try again.');
-    } finally {
-      setLoading(false);
+      if (Math.abs(translationX) > swipeThreshold && velocity > 500) {
+        setIsSwipeActive(true);
+        
+        if (translationX > 0 && activeStep !== 'details') {
+          handleBack();
+        } else if (translationX < 0 && activeStep !== 'review') {
+          handleNext();
+        }
+        
+        setTimeout(() => setIsSwipeActive(false), 500);
+      }
     }
   };
 
@@ -320,6 +455,23 @@ export default function EditExpenseModal({
           </Text>
         </View>
       ))}
+    </View>
+  );
+
+  // FIXED: Success message component
+  const renderSuccessMessage = () => (
+    <View style={[styles.successContainer, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.successCard, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.successIcon, { backgroundColor: theme.colors.success + '20' }]}>
+          <Ionicons name="checkmark-circle" size={60} color={theme.colors.success} />
+        </View>
+        <Text style={[styles.successTitle, { color: theme.colors.text }]}>
+          Expense Updated!
+        </Text>
+        <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>
+          Your expense has been successfully updated and all members have been notified.
+        </Text>
+      </View>
     </View>
   );
 
@@ -391,7 +543,7 @@ export default function EditExpenseModal({
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Category</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.categoryList}>
-            {expenseCategories.map((category) => (
+            {EXPENSE_CATEGORIES.map((category) => (
               <TouchableOpacity
                 key={category.id}
                 style={[
@@ -439,7 +591,9 @@ export default function EditExpenseModal({
           <Text style={[styles.dateText, { color: theme.colors.text }]}>
             {expenseDate.toLocaleDateString()}
           </Text>
-          <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+          <TouchableOpacity onPress={() => setShowDatePicker(!showDatePicker)}>
+            <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
         </TouchableOpacity>
         {showDatePicker && (
           <DateTimePicker
@@ -455,6 +609,24 @@ export default function EditExpenseModal({
             maximumDate={new Date()}
           />
         )}
+      </View>
+
+      {/* Group Display (Read-only since we're editing) */}
+      <View style={styles.inputContainer}>
+        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Group</Text>
+        <View style={[styles.input, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <View style={styles.groupDisplay}>
+            <Text style={styles.groupIcon}>{selectedGroup?.avatar}</Text>
+            <View>
+              <Text style={[styles.groupName, { color: theme.colors.text }]}>
+                {selectedGroup?.name || 'Unknown Group'}
+              </Text>
+              <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
+                {selectedGroup?.members.length || 0} members
+              </Text>
+            </View>
+          </View>
+        </View>
       </View>
 
       {/* Paid By */}
@@ -597,7 +769,7 @@ export default function EditExpenseModal({
       <View style={styles.inputContainer}>
         <View style={styles.splitHeader}>
           <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-            Split Details ({splitData.filter(s => s.isIncluded !== false).length} people)
+            Split Details ({splitData.filter(s => s.isIncluded).length} people)
           </Text>
           {splitType === 'equal' && (
             <TouchableOpacity onPress={recalculateEqual}>
@@ -617,12 +789,13 @@ export default function EditExpenseModal({
               >
                 <View style={[
                   styles.checkbox,
-                  split.isIncluded !== false && [styles.checkedBox, { backgroundColor: theme.colors.primary }]
+                  split.isIncluded && [styles.checkedBox, { backgroundColor: theme.colors.primary }]
                 ]}>
-                  {split.isIncluded !== false && (
+                  {split.isIncluded && (
                     <Ionicons name="checkmark" size={16} color="white" />
                   )}
                 </View>
+              
               </TouchableOpacity>
               
               <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
@@ -633,7 +806,7 @@ export default function EditExpenseModal({
               
               <View>
                 <Text style={[styles.splitMemberName, { color: theme.colors.text }]}>
-                  {split.userId === user?.id ? 'You' : split.userData?.fullName || 'Unknown'}
+                  {split.userId === user?.id ? 'You' : (split.userData?.fullName || 'Unknown User')}
                 </Text>
                 <Text style={[styles.splitMemberEmail, { color: theme.colors.textSecondary }]}>
                   {split.userData?.email || ''}
@@ -641,7 +814,7 @@ export default function EditExpenseModal({
               </View>
             </View>
 
-            {split.isIncluded !== false && (
+            {split.isIncluded && (
               <View style={styles.splitItemRight}>
                 {splitType === 'custom' && (
                   <TextInput
@@ -699,7 +872,7 @@ export default function EditExpenseModal({
               Split Total
             </Text>
             <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-              {getCurrencySymbol(user?.currency || 'USD')}{splitData.reduce((sum, split) => sum + (split.isIncluded !== false ? split.amount : 0), 0).toFixed(2)}
+              {getCurrencySymbol(user?.currency || 'USD')}{splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0).toFixed(2)}
             </Text>
           </View>
           <View style={styles.summaryDivider} />
@@ -710,12 +883,12 @@ export default function EditExpenseModal({
             <Text style={[
               styles.summaryValue,
               {
-                color: Math.abs(splitData.reduce((sum, split) => sum + (split.isIncluded !== false ? split.amount : 0), 0) - parseFloat(amount)) < 0.01
+                color: Math.abs(splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0) - parseFloat(amount)) < 0.01
                   ? theme.colors.success
                   : theme.colors.error
               }
             ]}>
-              {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(splitData.reduce((sum, split) => sum + (split.isIncluded !== false ? split.amount : 0), 0) - parseFloat(amount)).toFixed(2)}
+              {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0) - parseFloat(amount)).toFixed(2)}
             </Text>
           </View>
         </View>
@@ -751,6 +924,14 @@ export default function EditExpenseModal({
           </View>
           
           <View style={styles.reviewItem}>
+            <Text style={[styles.reviewLabel, { color: theme.colors.textSecondary }]}>Group</Text>
+            <View style={styles.reviewCategoryValue}>
+              <Text style={styles.reviewCategoryIcon}>{selectedGroup?.avatar}</Text>
+              <Text style={[styles.reviewValue, { color: theme.colors.text }]}>{selectedGroup?.name}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.reviewItem}>
             <Text style={[styles.reviewLabel, { color: theme.colors.textSecondary }]}>Paid by</Text>
             <Text style={[styles.reviewValue, { color: theme.colors.text }]}>
               {paidBy === user?.id ? 'You' : selectedGroup?.members.find(m => m.userId === paidBy)?.userData.fullName || 'Unknown'}
@@ -771,7 +952,7 @@ export default function EditExpenseModal({
             Split Details ({splitType})
           </Text>
           
-          {splitData.filter(split => split.isIncluded !== false).map((split) => (
+          {splitData.filter(split => split.isIncluded).map((split) => (
             <View key={split.userId} style={styles.reviewSplitItem}>
               <View style={styles.reviewSplitLeft}>
                 <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
@@ -780,7 +961,7 @@ export default function EditExpenseModal({
                   </Text>
                 </View>
                 <Text style={[styles.reviewSplitName, { color: theme.colors.text }]}>
-                  {split.userId === user?.id ? 'You' : split.userData?.fullName || 'Unknown'}
+                  {split.userId === user?.id ? 'You' : (split.userData?.fullName || 'Unknown User')}
                 </Text>
               </View>
               <View style={styles.reviewSplitRight}>
@@ -809,78 +990,84 @@ export default function EditExpenseModal({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          {/* Header */}
-          <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-            <TouchableOpacity onPress={onClose} disabled={loading}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-              Edit Expense
-            </Text>
-            <TouchableOpacity 
-              onPress={() => setShowDeleteModal(true)}
-              style={styles.deleteButton}
-            >
-              <Ionicons name="trash" size={20} color={theme.colors.error} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Step Indicator */}
-          {renderStepIndicator()}
-
-          {/* Step Content */}
-          <View style={styles.content}>
-            {activeStep === 'details' && renderDetailsStep()}
-            {activeStep === 'split' && renderSplitStep()}
-            {activeStep === 'review' && renderReviewStep()}
-          </View>
-
-          {/* Footer */}
-          <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
-            <View style={styles.footerButtons}>
-              {activeStep !== 'details' && (
-                <Button
-                  title="Back"
-                  onPress={handleBack}
-                  variant="outline"
-                  style={styles.footerButton}
-                  disabled={loading}
-                />
-              )}
-              
-              {activeStep === 'review' ? (
-                <Button
-                  title="Update Expense"
-                  onPress={handleSubmit}
-                  loading={loading}
-                  style={StyleSheet.flatten([styles.footerButton, activeStep === 'review' && styles.fullWidthButton])}
-                />
-              ) : (
-                <Button
-                  title="Next"
-                  onPress={handleNext}
-                  style={StyleSheet.flatten([styles.footerButton, activeStep === 'details' && styles.fullWidthButton])}
-                  disabled={loading}
-                />
-              )}
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        {/* Show success message overlay when expense is updated */}
+        {showSuccessMessage && renderSuccessMessage()}
+        
+        {/* Normal modal content */}
+        {!showSuccessMessage && (
+          <>
+            {/* Header */}
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+              <TouchableOpacity onPress={onClose} disabled={loading}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+                Edit Expense
+              </Text>
+              <TouchableOpacity 
+                onPress={() => setShowDeleteModal(true)}
+                style={styles.deleteButton}
+              >
+                <Ionicons name="trash" size={20} color={theme.colors.error} />
+              </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
 
+            {/* Step Indicator */}
+            {renderStepIndicator()}
+
+            {/* Step Content */}
+            <PanGestureHandler onGestureEvent={handleSwipe}>
+              <View style={styles.content}>
+                {activeStep === 'details' && renderDetailsStep()}
+                {activeStep === 'split' && renderSplitStep()}
+                {activeStep === 'review' && renderReviewStep()}
+              </View>
+            </PanGestureHandler>
+
+            {/* Footer */}
+            <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
+              <View style={styles.footerButtons}>
+                {activeStep !== 'details' && (
+                  <Button
+                    title="Back"
+                    onPress={handleBack}
+                    variant="outline"
+                    style={styles.footerButton}
+                    disabled={loading}
+                  />
+                )}
+                
+                {activeStep === 'review' ? (
+                  <Button
+                    title="Update Expense"
+                    onPress={handleSubmit}
+                    loading={loading}
+                    style={StyleSheet.flatten([styles.footerButton, activeStep === 'review' && styles.fullWidthButton])}
+                  />
+                ) : (
+                  <Button
+                    title="Next"
+                    onPress={handleNext}
+                    style={StyleSheet.flatten([styles.footerButton, activeStep === 'details' && styles.fullWidthButton])}
+                    disabled={loading}
+                  />
+                )}
+              </View>
+            </View>
+          </>
+        )}
+      </SafeAreaView>
+
+      {/* Delete Modal */}
       <ExpenseDeletionModal
         visible={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         expense={expense}
         currentUser={user}
         onDeletionComplete={() => {
-          onClose(); // Close edit modal
-          onExpenseDeleted?.(); // Refresh parent
+          onClose();
+          onExpenseDeleted?.();
         }}
         isUserAdmin={isUserAdmin}
       />
@@ -1008,6 +1195,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  groupDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  groupIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  groupName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  groupMembers: {
+    fontSize: 12,
+    marginTop: 2,
   },
   memberList: {
     flexDirection: 'row',
@@ -1233,4 +1436,48 @@ const styles = StyleSheet.create({
   fullWidthButton: {
     flex: 1,
   },
-});
+  // FIXED: Success message styles
+  successContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  successCard: {
+    alignItems: 'center',
+    padding: 40,
+    borderRadius: 20,
+    marginHorizontal: 40,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  successIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+});    

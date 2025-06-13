@@ -61,6 +61,7 @@ import FriendRequestModal from '@/components/modals/FriendRequestModal';
 import { getCurrencySymbol } from '@/utils/currency';
 import QRCodeScanner from '@/components/QRCodeScanner';
 import QRScannerManager from '@/services/qr/QRScannerManager';
+import EditExpenseModal from '@/components/modals/EditExpenseModal';
 
 export default function RealSplittingScreen() {
   const navigation = useNavigation();
@@ -383,7 +384,47 @@ const processRecurringExpenses = async () => {
     console.error('Process recurring expenses error:', error);
   }
 };
+const handleExpenseUpdate = async (expenseData: any) => {
+  try {
+    if (!user?.id) return;
+    
+    console.log('🔄 Updating expense with data:', expenseData);
+    
+    // Call the SplittingService updateExpense method
+    await SplittingService.updateExpense(expenseData);
+    
+    console.log('✅ Expense updated successfully in database');
+    
+    // Notify all listeners about the updated expense
+    ExpenseRefreshService.getInstance().notifyExpenseAdded();
+    
+    // Force refresh local data
+    await Promise.all([
+      loadGroups(),
+      loadRecentExpenses(),
+      friendsManager.notifyBalanceUpdated() // Notify FriendsManager about balance changes
+    ]);
+    
+    console.log('✅ Local data refreshed after expense update');
+    
+    // Note: Success alert is shown in the EditExpenseModal
+    
+  } catch (error: any) {
+    console.error('❌ Update expense error:', error);
+    // Re-throw so the modal can handle it
+    throw error;
+  }
+};
+const handleEditExpenseFromDetails = (expense: Expense) => {
+  setSelectedExpenseForAction(expense);
+  setShowEditExpense(true);
+};
 
+const handleEditExpenseFromGroup = (expense: Expense, group: Group) => {
+  setSelectedExpenseForAction(expense);
+  setSelectedGroup(group);
+  setShowEditExpense(true);
+};
 // Export data handler
 const handleExportData = async () => {
   try {
@@ -1404,47 +1445,52 @@ const showExpenseActionsMenu = (expense: Expense) => {
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Expenses</Text>
           <TouchableOpacity onPress={navigateToExpenses}>
-            <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>View All</Text>
+        <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>View All</Text>
           </TouchableOpacity>
         </View>
-        
+       
         {expenses.length === 0 ? (
           <View style={styles.emptyExpenses}>
-            <Text style={[styles.emptyExpensesText, { color: theme.colors.textSecondary }]}>
-              No expenses yet. Add your first expense!
-            </Text>
+        <Text style={[styles.emptyExpensesText, { color: theme.colors.textSecondary }]}>
+          No expenses yet. Add your first expense!
+        </Text>
           </View>
         ) : (
+          
           expenses.slice(0, 3).map((expense) => (
-            <View key={expense.id} style={styles.expenseItem}>
-              <View style={styles.expenseLeft}>
-                <Text style={styles.expenseIcon}>{expense.categoryIcon}</Text>
-                <View>
-                  <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
-                    {expense.description}
-                  </Text>
-                  <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
-                    {expense.date.toLocaleDateString()} • Paid by {expense.paidByData.fullName}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.expenseRight}>
-                <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-                  ${expense.amount.toFixed(2)}
-                </Text>
-                <View style={[
-                  styles.expenseStatus,
-                  { backgroundColor: expense.isSettled ? theme.colors.success + '20' : theme.colors.error + '20' }
-                ]}>
-                  <Text style={[
-                    styles.expenseStatusText,
-                    { color: expense.isSettled ? theme.colors.success : theme.colors.error }
-                  ]}>
-                    {expense.isSettled ? 'Settled' : 'Pending'}
-                  </Text>
-                </View>
-              </View>
+        <TouchableOpacity
+          key={expense.id}
+          style={styles.expenseItem}
+          onPress={() => handleEditExpenseFromDetails(expense)}
+        >
+          <View style={styles.expenseLeft}>
+            <Text style={styles.expenseIcon}>{expense.categoryIcon}</Text>
+            <View>
+          <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
+            {expense.description}
+          </Text>
+          <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
+            {expense.date.toLocaleDateString()} • Paid by {expense.paidByData.fullName}
+          </Text>
             </View>
+          </View>
+          <View style={styles.expenseRight}>
+            <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
+          ${expense.amount.toFixed(2)}
+            </Text>
+            <View style={[
+          styles.expenseStatus,
+          { backgroundColor: expense.isSettled ? theme.colors.success + '20' : theme.colors.error + '20' }
+            ]}>
+          <Text style={[
+            styles.expenseStatusText,
+            { color: expense.isSettled ? theme.colors.success : theme.colors.error }
+          ]}>
+            {expense.isSettled ? 'Settled' : 'Pending'}
+          </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
           ))
         )}
       </View>
@@ -1983,6 +2029,28 @@ const showExpenseActionsMenu = (expense: Expense) => {
         onDecline={() => selectedFriendRequest && handleDeclineFriendRequest(selectedFriendRequest.id)}
       />
 
+      <EditExpenseModal
+        visible={showEditExpense}
+        onClose={() => {
+          setShowEditExpense(false);
+          setSelectedExpenseForAction(null);
+        }}
+        expense={selectedExpenseForAction}
+        onSubmit={handleExpenseUpdate}
+        groups={groups}
+        isUserAdmin={groups.find(g => g.id === selectedExpenseForAction?.groupId)
+          ?.members.find(m => m.userId === user?.id)?.role === 'admin'}
+        onExpenseDeleted={() => {
+          setShowEditExpense(false);
+          setSelectedExpenseForAction(null);
+          // Refresh data after deletion
+          Promise.all([
+            loadGroups(),
+            loadRecentExpenses(),
+            friendsManager.notifyBalanceUpdated()
+          ]);
+        }}
+      />
       <ExpenseSettlementModal
       visible={showExpenseSettlement}
       onClose={() => setShowExpenseSettlement(false)}

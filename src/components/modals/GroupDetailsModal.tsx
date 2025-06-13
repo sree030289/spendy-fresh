@@ -1,4 +1,4 @@
-// src/components/modals/GroupDetailsModal.tsx
+// src/components/modals/GroupDetailsModal.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/common/Button'; // FIX: Added missing Button import
 import { Group, Expense, SplittingService, Friend } from '@/services/firebase/splitting';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/services/firebase/config';
@@ -87,7 +87,7 @@ export default function GroupDetailsModal({
       setGroupExpenses(expenses);
     } catch (error) {
       console.error('Load group expenses error:', error);
-      setGroupExpenses([]); // Set empty array on error
+      setGroupExpenses([]);
     } finally {
       setLoading(false);
     }
@@ -106,7 +106,6 @@ export default function GroupDetailsModal({
       }
     } catch (error) {
       console.error('Load group data error:', error);
-      // Fallback to prop data if API call fails
       setLocalGroupData(group);
     }
   }, [group]);
@@ -133,12 +132,12 @@ export default function GroupDetailsModal({
     // Initial load
     loadGroupExpenses();
     
-    // Set up a refresh interval to catch new expenses
+    // Set up a refresh interval
     const refreshInterval = setInterval(() => {
       if (visible && localGroupData) {
         loadGroupExpenses();
       }
-    }, 5000); // Refresh every 5 seconds when modal is open
+    }, 5000);
     
     return () => {
       clearInterval(refreshInterval);
@@ -194,7 +193,7 @@ export default function GroupDetailsModal({
               if (localGroupData && currentUser) {
                 await SplittingService.leaveGroup(localGroupData.id, currentUser.id);
                 Alert.alert('Left Group', `You have left "${localGroupData.name}"`);
-                onGroupLeft?.(); // Call the callback to refresh the groups list
+                onGroupLeft?.();
                 onClose();
               }
             } catch (error: any) {
@@ -210,12 +209,8 @@ export default function GroupDetailsModal({
     if (!localGroupData || !currentUser || !isUserAdmin) return;
     
     try {
-      // Update the group using SplittingService
       await SplittingService.updateMemberRole(localGroupData.id, userId, 'admin');
-      
       Alert.alert('Success', 'Member has been made an admin');
-      
-      // Refresh local group data first, then parent
       await loadGroupData();
       onRefresh?.();
       await loadGroupExpenses();
@@ -225,51 +220,45 @@ export default function GroupDetailsModal({
     }
   };
 
-  // In src/components/modals/GroupDetailsModal.tsx
-// Update handleRemoveAdmin function around line 220:
-
-const handleRemoveAdmin = async (userId: string) => {
-  if (!localGroupData || !currentUser || !isUserAdmin) return;
-  
-  const member = localGroupData.members.find(m => m.userId === userId);
-  if (!member) return;
-  
-  // Check if member has pending balances
-  if (member.balance !== 0) {
+  const handleRemoveAdmin = async (userId: string) => {
+    if (!localGroupData || !currentUser || !isUserAdmin) return;
+    
+    const member = localGroupData.members.find(m => m.userId === userId);
+    if (!member) return;
+    
+    if (member.balance !== 0) {
+      Alert.alert(
+        'Cannot Remove Admin',
+        `${member.userData.fullName} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(localGroupData.currency)}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     Alert.alert(
-      'Cannot Remove Admin',
-      `${member.userData.fullName} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(localGroupData.currency)}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
-      [{ text: 'OK' }]
-    );
-    return;
-  }
-  
-  Alert.alert(
-    'Remove Admin Privileges',
-    `Remove admin privileges from ${member.userData.fullName}?`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove Admin',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await SplittingService.updateMemberRole(localGroupData.id, userId, 'member');
-            Alert.alert('Success', 'Admin privileges removed');
-            
-            // Refresh local group data first, then parent
-            await loadGroupData();
-            onRefresh?.();
-            await loadGroupExpenses();
-          } catch (error: any) {
-            console.error('Remove admin error:', error);
-            Alert.alert('Error', error.message || 'Failed to remove admin privileges');
+      'Remove Admin Privileges',
+      `Remove admin privileges from ${member.userData.fullName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove Admin',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await SplittingService.updateMemberRole(localGroupData.id, userId, 'member');
+              Alert.alert('Success', 'Admin privileges removed');
+              await loadGroupData();
+              onRefresh?.();
+              await loadGroupExpenses();
+            } catch (error: any) {
+              console.error('Remove admin error:', error);
+              Alert.alert('Error', error.message || 'Failed to remove admin privileges');
+            }
           }
         }
-      }
-    ]
-  );
-};
+      ]
+    );
+  };
 
   const handleRemoveMember = async (userId: string) => {
     if (!localGroupData || !currentUser || !isUserAdmin) return;
@@ -277,7 +266,6 @@ const handleRemoveAdmin = async (userId: string) => {
     const member = localGroupData.members.find(m => m.userId === userId);
     if (!member) return;
     
-    // Check if member has pending balances
     if (member.balance !== 0) {
       Alert.alert(
         'Cannot Remove Member',
@@ -298,10 +286,7 @@ const handleRemoveAdmin = async (userId: string) => {
           onPress: async () => {
             try {
               await SplittingService.removeMemberFromGroup(localGroupData.id, userId);
-              
               Alert.alert('Success', 'Member has been removed from the group');
-              
-              // Refresh local group data first, then parent
               await loadGroupData();
               onRefresh?.();
               await loadGroupExpenses();
@@ -322,14 +307,10 @@ const handleRemoveAdmin = async (userId: string) => {
       await SplittingService.addGroupMember(localGroupData.id, friendId);
       Alert.alert('Success', 'Friend has been added to the group');
       setShowAddMember(false);
-      
-      // Refresh local group data first to update members list immediately
       await loadGroupData();
-      // Then refresh parent and expenses
       onRefresh?.();
       await loadGroupExpenses();
       
-      // Trigger expense refresh service to notify other components
       const refreshService = ExpenseRefreshService.getInstance();
       refreshService.notifyExpenseAdded();
       
@@ -355,7 +336,6 @@ const handleRemoveAdmin = async (userId: string) => {
       });
 
       if (data.length > 0) {
-        // For now, just show the share invite functionality
         await handleShareInviteCode();
       } else {
         Alert.alert('No Contacts', 'No contacts found on your device.');
@@ -375,7 +355,6 @@ const handleRemoveAdmin = async (userId: string) => {
     try {
       setShowEditExpense(false);
       setSelectedExpense(null);
-      // Refresh the expenses list
       await loadGroupExpenses();
     } catch (error) {
       console.error('Error after expense update:', error);
@@ -426,11 +405,11 @@ const handleRemoveAdmin = async (userId: string) => {
                 </Text>
               ) : member.balance > 0 ? (
                 <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                  +{localGroupData?.currency === 'USD' ? '$' : localGroupData?.currency === 'EUR' ? '€' : localGroupData?.currency === 'INR' ? '₹' : localGroupData?.currency || '$'}{Math.abs(member.balance).toFixed(2)}
+                  +{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(member.balance).toFixed(2)}
                 </Text>
               ) : (
                 <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                  -{localGroupData?.currency === 'USD' ? '$' : localGroupData?.currency === 'EUR' ? '€' : localGroupData?.currency === 'INR' ? '₹' : localGroupData?.currency || '$'}{Math.abs(member.balance).toFixed(2)}
+                  -{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(member.balance).toFixed(2)}
                 </Text>
               )}
             </View>
@@ -448,131 +427,118 @@ const handleRemoveAdmin = async (userId: string) => {
     </View>
   );
 
-const renderExpensesList = () => (
-  <View style={styles.section}>
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-        Recent Expenses ({groupExpenses.length})
-      </Text>
-      <View style={styles.expensesActions}>
-        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-          <Ionicons name="refresh" size={16} color={theme.colors.primary} />
-        </TouchableOpacity>
-        {groupExpenses.length > 0 && (
-          <TouchableOpacity onPress={() => setShowGroupExpenseModal(true)}>
+  const renderExpensesList = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          Recent Expenses ({groupExpenses.length})
+        </Text>
+        <View style={styles.expensesActions}>
+          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+            <Ionicons name="refresh" size={16} color={theme.colors.primary} />
+          </TouchableOpacity>
+          {groupExpenses.length > 0 && (
+            <TouchableOpacity onPress={() => setShowGroupExpenseModal(true)}>
+              <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
+                View All
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={onAddExpense}>
             <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
-              View All
+              Add New
             </Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity onPress={onAddExpense}>
-          <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
-            Add New
+        </View>
+      </View>
+      
+      {loading ? (
+        <View style={styles.loadingExpenses}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text style={[{ color: theme.colors.textSecondary, marginLeft: 8 }]}>
+            Loading expenses...
           </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-    
-    {loading ? (
-      <View style={styles.loadingExpenses}>
-        <ActivityIndicator size="small" color={theme.colors.primary} />
-        <Text style={[{ color: theme.colors.textSecondary, marginLeft: 8 }]}>
-          Loading expenses...
-        </Text>
-      </View>
-    ) : groupExpenses.length === 0 ? (
-      <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-        <Ionicons name="receipt-outline" size={48} color={theme.colors.textSecondary} />
-        <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
-          No expenses yet
-        </Text>
-        <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-          Add your first expense to start tracking
-        </Text>
-      </View>
-    ) : (
-      groupExpenses.slice(0, 10).map((expense) => (
-        <TouchableOpacity
-          key={expense.id}
-          style={styles.expenseItem}
-          onPress={() => handleEditExpense(expense)}
-        >
-          <View style={styles.expenseLeft}>
-            <Text style={styles.expenseIcon}>{expense.categoryIcon}</Text>
-            <View>
-              <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
-                {expense.description}
-              </Text>
-              <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
-                {expense.date.toLocaleDateString()} • {expense.paidByData.fullName}
-              </Text>
+        </View>
+      ) : groupExpenses.length === 0 ? (
+        <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+          <Ionicons name="receipt-outline" size={48} color={theme.colors.textSecondary} />
+          <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
+            No expenses yet
+          </Text>
+          <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+            Add your first expense to start tracking
+          </Text>
+        </View>
+      ) : (
+        groupExpenses.slice(0, 10).map((expense) => (
+          <TouchableOpacity
+            key={expense.id}
+            style={styles.expenseItem}
+            onPress={() => handleEditExpense(expense)}
+          >
+            <View style={styles.expenseLeft}>
+              <Text style={styles.expenseIcon}>{expense.categoryIcon}</Text>
+              <View>
+                <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
+                  {expense.description}
+                </Text>
+                <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
+                  {expense.date.toLocaleDateString()} • {expense.paidByData.fullName}
+                </Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.expenseRight}>              <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-              {localGroupData?.currency === 'USD' ? '$' : localGroupData?.currency === 'EUR' ? '€' : localGroupData?.currency === 'INR' ? '₹' : localGroupData?.currency || '$'}{expense.amount.toFixed(2)}
-            </Text>
-            <View style={[
-              styles.expenseStatus,
-              { backgroundColor: expense.isSettled ? theme.colors.success + '20' : theme.colors.error + '20' }
-            ]}>
-              <Text style={[
-                styles.expenseStatusText,
-                { color: expense.isSettled ? theme.colors.success : theme.colors.error }
+            <View style={styles.expenseRight}>
+              <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
+                {getCurrencySymbol(localGroupData?.currency || 'USD')}{expense.amount.toFixed(2)}
+              </Text>
+              <View style={[
+                styles.expenseStatus,
+                { backgroundColor: expense.isSettled ? theme.colors.success + '20' : theme.colors.error + '20' }
               ]}>
-                {expense.isSettled ? 'Settled' : 'Pending'}
-              </Text>
+                <Text style={[
+                  styles.expenseStatusText,
+                  { color: expense.isSettled ? theme.colors.success : theme.colors.error }
+                ]}>
+                  {expense.isSettled ? 'Settled' : 'Pending'}
+                </Text>
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
-      ))
-    )}
-  </View>
-);
-const renderExpenseCard = (expense: Expense) => (
-  <TouchableOpacity style={styles.expenseCard}>
-    {/* existing expense info */}
-    {!expense.isSettled && (
-      <Button
-        title="Settle"
-        onPress={() => {
-          setSelectedExpense(expense);
-          setShowSettlementModal(true);
-        }}
-      />
-    )}
-  </TouchableOpacity>
-);
+          </TouchableOpacity>
+        ))
+      )}
+    </View>
+  );
 
   const renderGroupStats = () => (
-  <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
-    <View style={styles.statItem}>
-      <Text style={[styles.statValue, { color: theme.colors.text }]}>
-        {getCurrencySymbol(localGroupData?.currency || 'AUD')}{localGroupData?.totalExpenses.toFixed(2)}
-      </Text>
-      <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-        Total Spent
-      </Text>
+    <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
+      <View style={styles.statItem}>
+        <Text style={[styles.statValue, { color: theme.colors.text }]}>
+          {getCurrencySymbol(localGroupData?.currency || 'AUD')}{localGroupData?.totalExpenses.toFixed(2)}
+        </Text>
+        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+          Total Spent
+        </Text>
+      </View>
+      <View style={styles.statDivider} />
+      <View style={styles.statItem}>
+        <Text style={[styles.statValue, { color: theme.colors.text }]}>
+          {getCurrencySymbol(localGroupData?.currency || 'AUD')}{localGroupData ? (localGroupData.totalExpenses / localGroupData.members.length).toFixed(2) : '0.00'}
+        </Text>
+        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+          Per Person
+        </Text>
+      </View>
+      <View style={styles.statDivider} />
+      <View style={styles.statItem}>
+        <Text style={[styles.statValue, { color: theme.colors.text }]}>
+          {groupExpenses.length}
+        </Text>
+        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+          Expenses
+        </Text>
+      </View>
     </View>
-    <View style={styles.statDivider} />
-    <View style={styles.statItem}>
-      <Text style={[styles.statValue, { color: theme.colors.text }]}>
-        {getCurrencySymbol(localGroupData?.currency || 'AUD')}{localGroupData ? (localGroupData.totalExpenses / localGroupData.members.length).toFixed(2) : '0.00'}
-      </Text>
-      <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-        Per Person
-      </Text>
-    </View>
-    <View style={styles.statDivider} />
-    <View style={styles.statItem}>
-      <Text style={[styles.statValue, { color: theme.colors.text }]}>
-        {groupExpenses.length}
-      </Text>
-      <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-        Expenses
-      </Text>
-    </View>
-  </View>
-);
+  );
 
   if (!localGroupData) return null;
 
@@ -591,7 +557,7 @@ const renderExpenseCard = (expense: Expense) => (
         </View>
 
         <ScrollView contentContainerStyle={styles.content}>
-          {/* Group Info - Fixed at top */}
+          {/* Group Info */}
           <View style={styles.groupInfo}>
             <Text style={styles.groupAvatar}>{localGroupData.avatar}</Text>
             <Text style={[styles.groupName, { color: theme.colors.text }]}>
@@ -612,10 +578,10 @@ const renderExpenseCard = (expense: Expense) => (
             </View>
           </View>
 
-          {/* Group Stats - Fixed at top */}
+          {/* Group Stats */}
           {renderGroupStats()}
 
-          {/* Tab Navigation - Now below stats */}
+          {/* Tab Navigation */}
           <View style={[styles.tabContainer, { borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity
               style={[
@@ -662,20 +628,8 @@ const renderExpenseCard = (expense: Expense) => (
           </View>
 
           {/* Tab Content */}
-          {activeTab === 'expenses' && (
-            <>
-              {/* Expenses List */}
-              {renderExpensesList()}
-            </>
-          )}
-
-          {activeTab === 'members' && (
-            <>
-              {/* Members List */}
-              {renderMembersList()}
-            </>
-          )}
-
+          {activeTab === 'expenses' && renderExpensesList()}
+          {activeTab === 'members' && renderMembersList()}
           {activeTab === 'settings' && (
             <>
               {/* Invite Code */}
@@ -689,7 +643,6 @@ const renderExpenseCard = (expense: Expense) => (
                   </Text>
                   <TouchableOpacity
                     onPress={() => {
-                      // Copy to clipboard functionality
                       Alert.alert('Copied!', 'Invite code copied to clipboard');
                     }}
                     style={{ padding: 8 }}
@@ -701,7 +654,6 @@ const renderExpenseCard = (expense: Expense) => (
                   Share this code with friends to invite them to the group
                 </Text>
                 
-                {/* QR Code Button */}
                 <TouchableOpacity
                   style={[styles.qrButton, { backgroundColor: theme.colors.primary }]}
                   onPress={() => setShowQRModal(true)}
@@ -731,68 +683,67 @@ const renderExpenseCard = (expense: Expense) => (
       </SafeAreaView>
       
       {/* Member Action Modal */}
-
-{selectedMemberForAction && (
-  <Modal visible={true} transparent animationType="fade">
-    <View style={styles.modalOverlay}>
-      <View style={[styles.actionModalContent, { backgroundColor: theme.colors.surface }]}>
-        <Text style={[styles.actionModalTitle, { color: theme.colors.text }]}>
-          Member Actions
-        </Text>
-        
-        {(() => {
-          const member = localGroupData?.members.find(m => m.userId === selectedMemberForAction);
-          return member ? (
-            <>
-              <TouchableOpacity
-                style={styles.actionModalOption}
-                onPress={() => {
-                  setSelectedMemberForAction(null);
-                  if (member.role === 'admin') {
-                    handleRemoveAdmin(selectedMemberForAction);
-                  } else {
-                    handleMakeAdmin(selectedMemberForAction);
-                  }
-                }}
-              >
-                <Ionicons 
-                  name={member.role === 'admin' ? 'person-remove' : 'ribbon'} 
-                  size={20} 
-                  color={theme.colors.primary} 
-                />
-                <Text style={[styles.actionModalOptionText, { color: theme.colors.text }]}>
-                  {member.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
-                </Text>
-              </TouchableOpacity>
+      {selectedMemberForAction && (
+        <Modal visible={true} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.actionModalContent, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.actionModalTitle, { color: theme.colors.text }]}>
+                Member Actions
+              </Text>
+              
+              {(() => {
+                const member = localGroupData?.members.find(m => m.userId === selectedMemberForAction);
+                return member ? (
+                  <>
+                    <TouchableOpacity
+                      style={styles.actionModalOption}
+                      onPress={() => {
+                        setSelectedMemberForAction(null);
+                        if (member.role === 'admin') {
+                          handleRemoveAdmin(selectedMemberForAction);
+                        } else {
+                          handleMakeAdmin(selectedMemberForAction);
+                        }
+                      }}
+                    >
+                      <Ionicons 
+                        name={member.role === 'admin' ? 'person-remove' : 'ribbon'} 
+                        size={20} 
+                        color={theme.colors.primary} 
+                      />
+                      <Text style={[styles.actionModalOptionText, { color: theme.colors.text }]}>
+                        {member.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={styles.actionModalOption}
+                      onPress={() => {
+                        setSelectedMemberForAction(null);
+                        handleRemoveMember(selectedMemberForAction);
+                      }}
+                    >
+                      <Ionicons name="person-remove" size={20} color={theme.colors.error} />
+                      <Text style={[styles.actionModalOptionText, { color: theme.colors.error }]}>
+                        Remove from Group
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null;
+              })()}
               
               <TouchableOpacity
-                style={styles.actionModalOption}
-                onPress={() => {
-                  setSelectedMemberForAction(null);
-                  handleRemoveMember(selectedMemberForAction);
-                }}
+                style={[styles.actionModalOption, styles.cancelOption]}
+                onPress={() => setSelectedMemberForAction(null)}
               >
-                <Ionicons name="person-remove" size={20} color={theme.colors.error} />
-                <Text style={[styles.actionModalOptionText, { color: theme.colors.error }]}>
-                  Remove from Group
+                <Text style={[styles.actionModalOptionText, { color: theme.colors.textSecondary }]}>
+                  Cancel
                 </Text>
               </TouchableOpacity>
-            </>
-          ) : null;
-        })()}
-        
-        <TouchableOpacity
-          style={[styles.actionModalOption, styles.cancelOption]}
-          onPress={() => setSelectedMemberForAction(null)}
-        >
-          <Text style={[styles.actionModalOptionText, { color: theme.colors.textSecondary }]}>
-            Cancel
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </Modal>
-)}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* Add Member Modal */}
       {showAddMember && (
@@ -810,7 +761,6 @@ const renderExpenseCard = (expense: Expense) => (
               </View>
               
               <ScrollView style={styles.addMemberContent}>
-                {/* Invite from Contacts */}
                 <View style={styles.inviteSection}>
                   <Text style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 8 }]}>
                     Invite New Users
@@ -901,6 +851,7 @@ const renderExpenseCard = (expense: Expense) => (
           onClose={() => setShowEditExpense(false)}
           expense={selectedExpense}
           onSubmit={handleExpenseUpdated}
+          groups={[localGroupData]}
         />
       )}
 
@@ -912,6 +863,8 @@ const renderExpenseCard = (expense: Expense) => (
           groupId={localGroupData?.id}
         />
       )}
+
+      {/* Settlement Modal */}
       <ExpenseSettlementModal
         visible={showSettlementModal}
         onClose={() => setShowSettlementModal(false)}
@@ -969,38 +922,36 @@ const styles = StyleSheet.create({
   groupMetaText: {
     fontSize: 14,
   },
-statsCard: {
-  flexDirection: 'row',
-  padding: 16, // Reduced from 20
-  borderRadius: 16,
-  marginBottom: 24,
-  alignItems: 'center',
-  justifyContent: 'space-between',
-},
-statItem: {
-  alignItems: 'center',
-  flex: 1,
-  minWidth: 0, // Allow flex shrinking
-  paddingHorizontal: 8, // Add horizontal padding
-},
-statValue: {
-  fontSize: 16, // Reduced from 18-20
-  fontWeight: 'bold',
-  marginBottom: 4,
-  textAlign: 'center',
-  //numberOfLines: 1, // Ensure single line
-},
-statLabel: {
-  fontSize: 11, // Reduced from 12
-  textAlign: 'center',
-  //numberOfLines: 1, // Ensure single line
-},
-statDivider: {
-  width: 1,
-  height: 32, // Reduced from 40
-  backgroundColor: '#E5E7EB',
-  marginHorizontal: 8, // Reduced from 16
-},
+  statsCard: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  statLabel: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 8,
+  },
   inviteSection: {
     padding: 16,
     borderRadius: 12,
@@ -1022,7 +973,7 @@ statDivider: {
     borderRadius: 8,
   },
   inviteCode: {
-    fontSize: 20, // Reduced from 24
+    fontSize: 20,
     fontWeight: 'bold',
     letterSpacing: 1,
   },
@@ -1083,14 +1034,6 @@ statDivider: {
   balanceText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  expenseCard: {
-    padding: 16,
-    borderRadius: 12,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    backgroundColor: '#FFFFFF',
   },
   expenseItem: {
     flexDirection: 'row',
@@ -1168,7 +1111,7 @@ statDivider: {
     fontSize: 14,
     fontWeight: '600',
   },
-   expensesActions: {
+  expensesActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
