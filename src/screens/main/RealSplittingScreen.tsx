@@ -677,61 +677,60 @@ const handleExportData = async () => {
     );
   };
 
-  const showFriendActionsMenu = (friend: Friend) => {
-    const actions: Array<{
-      text: string;
-      style?: 'cancel' | 'destructive' | 'default';
-      onPress?: () => void;
-    }> = [
-      {
-        text: 'Cancel',
-        style: 'cancel'
+ const showFriendActionsMenu = (friend: Friend) => {
+  const actions: Array<{
+    text: string;
+    style?: 'cancel' | 'destructive' | 'default';
+    onPress?: () => void;
+  }> = [
+    {
+      text: 'Cancel',
+      style: 'cancel'
+    }
+  ];
+
+  // Add manual settlement action if there's a balance
+  if (friend.balance !== 0 && friend.status === 'accepted') {
+    actions.unshift({
+      text: 'Mark as Paid',
+      onPress: () => {
+        setSelectedFriend(friend);
+        setShowManualSettlement(true);
       }
-    ];
-
-    // Add manual settlement action if there's a balance
-    if (friend.balance !== 0 && friend.status === 'accepted') {
-      actions.unshift({
-        text: 'Mark as Paid',
-        onPress: () => {
-          setSelectedFriend(friend);
-          setShowManualSettlement(true);
-        }
-      });
-    }
-
-    // Add payment action if there's a balance
-    if (friend.balance !== 0 && friend.status === 'accepted') {
-      actions.unshift({
-        text: friend.balance > 0 ? 'Request Payment' : 'Send Payment',
-        onPress: () => {
-          setSelectedFriend(friend);
-          setShowPayment(true);
-        }
-      });
-    }
-
-    // Add remove friend action
-    actions.unshift({
-      text: 'Remove Friend',
-      style: 'destructive',
-      onPress: () => handleRemoveFriend(friend)
     });
+  }
 
-    // Add block friend action (optional)
+  // Add payment action if there's a balance
+  if (friend.balance !== 0 && friend.status === 'accepted') {
     actions.unshift({
-      text: 'Block Friend',
-      style: 'destructive',
-      onPress: () => handleBlockFriend(friend)
+      text: friend.balance > 0 ? 'Request Payment' : 'Send Payment',
+      onPress: () => {
+        setSelectedFriend(friend);
+        setShowPayment(true);
+      }
     });
+  }
 
-    Alert.alert(
-      friend.friendData.fullName,
-      'Choose an action:',
-      actions
-    );
-  };
+  // Add remove friend action
+  actions.unshift({
+    text: 'Remove Friend',
+    style: 'destructive',
+    onPress: () => handleRemoveFriend(friend)
+  });
 
+  // ENHANCED: Add block friend with reason selection
+  actions.unshift({
+    text: 'Block Friend',
+    style: 'destructive',
+    onPress: () => showBlockReasonDialog(friend)
+  });
+
+  Alert.alert(
+    friend.friendData.fullName,
+    'Choose an action:',
+    actions
+  );
+};
   const handlePhoneInvitationAccepted = async (phoneNumber: string, newUser: User) => {
     try {
       // Find pending invitation for this phone number
@@ -1139,6 +1138,62 @@ const handleNavigationIntent = async (intent: any) => {
 };
 
 
+
+const showBlockReasonDialog = (friend: Friend) => {
+  Alert.alert(
+    'Block Friend',
+    `Why are you blocking ${friend.friendData.fullName}?`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Spam/Unwanted Contact', 
+        onPress: () => blockFriendWithReason(friend, 'Spam or unwanted contact') 
+      },
+      { 
+        text: 'Inappropriate Behavior', 
+        onPress: () => blockFriendWithReason(friend, 'Inappropriate behavior or harassment') 
+      },
+      { 
+        text: 'Privacy Concerns', 
+        onPress: () => blockFriendWithReason(friend, 'Privacy and security concerns') 
+      },
+      { 
+        text: 'Other Reason', 
+        onPress: () => blockFriendWithReason(friend, 'Other personal reasons') 
+      }
+    ]
+  );
+};
+
+const blockFriendWithReason = async (friend: Friend, reason: string) => {
+  Alert.alert(
+    'Confirm Block',
+    `Are you sure you want to block ${friend.friendData.fullName}? This will:\n\n• Prevent them from sending you friend requests\n• Hide your activity from them in shared groups\n• Remove them from your friends list\n\nReason: ${reason}`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await SplittingService.blockFriend(user!.id, friend.friendId, reason);
+            
+            Alert.alert(
+              'Friend Blocked',
+              `${friend.friendData.fullName} has been blocked and will no longer be able to contact you.`,
+              [{ text: 'OK' }]
+            );
+            
+            // Refresh friends list
+            await friendsManager.notifyFriendRemoved();
+          } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to block friend');
+          }
+        }
+      }
+    ]
+  );
+};
 const showExpenseActionsMenu = (expense: Expense) => {
   // Check if current user is admin of the group this expense belongs to
   const isUserAdmin = groups.find(g => g.id === expense.groupId)
@@ -2446,8 +2501,11 @@ expenseItem: {
   },
   addExpenseButton: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 6, // Keep consistent with other buttons
     borderRadius: 6,
+    minHeight: 32, // Add consistent height
+    justifyContent: 'center', // Center the text
+    alignItems: 'center',
   },
   addExpenseButtonText: {
     color: 'white',
@@ -2489,17 +2547,21 @@ expenseItem: {
     fontSize: 13,
     fontWeight: '600',
   },
-  groupFooterActions: {
+groupFooterActions: {
     flexDirection: 'row',
+    alignItems: 'center', // Add this to center align all buttons
     gap: 8,
+    flex: 1, // Add this to take remaining space
+    justifyContent: 'flex-end', // Add this to align buttons to the right
   },
   chatButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 6, // Standardize padding
     borderRadius: 6,
     gap: 4,
+    minHeight: 32, // Add consistent height
   },
   chatButtonText: {
     fontSize: 12,
@@ -2509,9 +2571,10 @@ expenseItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 6, // Standardize padding
     borderRadius: 6,
     gap: 4,
+    minHeight: 32, // Add consistent height
   },
   settlementButtonText: {
     fontSize: 12,

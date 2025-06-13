@@ -122,48 +122,48 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
     setSplitData(initialSplitData);
   };
 
-  const validateStep = (step: string): boolean => {
-    const newErrors: any = {};
+const validateStep = (step: string): boolean => {
+  const newErrors: any = {};
 
-    if (step === 'details') {
-      if (!description.trim()) {
-        newErrors.description = 'Description is required';
-      }
-      if (!amount.trim()) {
-        newErrors.amount = 'Amount is required';
-      } else if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-        newErrors.amount = 'Please enter a valid amount';
-      }
-      if (!selectedGroup) {
-        newErrors.group = 'Please select a group';
+  if (step === 'details') {
+    if (!description.trim()) {
+      newErrors.description = 'Description is required';
+    }
+    if (!amount.trim()) {
+      newErrors.amount = 'Amount is required';
+    } else if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      newErrors.amount = 'Please enter a valid amount';
+    }
+    if (!selectedGroup) {
+      newErrors.group = 'Please select a group';
+    }
+  }
+
+  if (step === 'split') {
+    const totalAmount = parseFloat(amount);
+    const splitTotal = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0);
+    
+    // FIXED: Strict validation - must be exactly equal (within 1 cent)
+    if (Math.abs(splitTotal - totalAmount) > 0.01) {
+      newErrors.split = `Split amounts must equal exactly ${getCurrencySymbol(user?.currency || 'USD')}${totalAmount.toFixed(2)}. Current total: ${getCurrencySymbol(user?.currency || 'USD')}${splitTotal.toFixed(2)}`;
+    }
+    
+    if (splitData.filter(split => split.isIncluded).length === 0) {
+      newErrors.split = 'At least one person must be included in the split';
+    }
+    
+    // Additional validation for percentage splits
+    if (splitType === 'percentage') {
+      const totalPercentage = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.percentage : 0), 0);
+      if (Math.abs(totalPercentage - 100) > 0.1) {
+        newErrors.split = `Percentages must total exactly 100%. Current total: ${totalPercentage.toFixed(1)}%`;
       }
     }
+  }
 
-    if (step === 'split') {
-      const totalAmount = parseFloat(amount);
-      const splitTotal = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0);
-      
-      // Strict validation - no difference allowed
-      if (Math.abs(splitTotal - totalAmount) > 0.001) {
-        newErrors.split = `Split amounts must equal exactly ${getCurrencySymbol(user?.currency || 'USD')}${totalAmount.toFixed(2)}. Current total: ${getCurrencySymbol(user?.currency || 'USD')}${splitTotal.toFixed(2)}`;
-      }
-      
-      if (splitData.filter(split => split.isIncluded).length === 0) {
-        newErrors.split = 'At least one person must be included in the split';
-      }
-      
-      // Additional validation for percentage splits
-      if (splitType === 'percentage') {
-        const totalPercentage = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.percentage : 0), 0);
-        if (Math.abs(totalPercentage - 100) > 0.1) {
-          newErrors.split = `Percentages must total exactly 100%. Current total: ${totalPercentage.toFixed(1)}%`;
-        }
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
   const handleNext = () => {
     if (activeStep === 'details' && validateStep('details')) {
@@ -215,46 +215,73 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
     }
   };
 
-  const updateSplitAmount = (userId: string, newAmount: number) => {
-    setSplitData(prev => prev.map(split => 
-      split.userId === userId 
-        ? { ...split, amount: newAmount }
-        : split
-    ));
-  };
+const updateSplitAmount = (userId: string, newAmount: number) => {
+  setSplitData(prev => prev.map(split => 
+    split.userId === userId 
+      ? { ...split, amount: newAmount }
+      : split
+  ));
+};
 
-  const updateSplitPercentage = (userId: string, percentage: number) => {
-    const totalAmount = parseFloat(amount);
-    const newAmount = (totalAmount * percentage) / 100;
-    
-    setSplitData(prev => prev.map(split => 
-      split.userId === userId 
-        ? { ...split, percentage, amount: newAmount }
-        : split
-    ));
-  };
+const updateSplitPercentage = (userId: string, percentage: number) => {
+  const totalAmount = parseFloat(amount);
+  const newAmount = (totalAmount * percentage) / 100;
+  
+  setSplitData(prev => prev.map(split => 
+    split.userId === userId 
+      ? { ...split, percentage, amount: newAmount }
+      : split
+  ));
+};
 
   const toggleSplitInclusion = (userId: string) => {
-    setSplitData(prev => prev.map(split => 
+  setSplitData(prev => {
+    const updated = prev.map(split => 
       split.userId === userId 
         ? { ...split, isIncluded: !split.isIncluded }
         : split
-    ));
-  };
+    );
+    
+    // Auto-recalculate after toggle based on current split type
+    const totalAmount = parseFloat(amount);
+    const includedMembers = updated.filter(split => split.isIncluded);
+    
+    if (includedMembers.length > 0 && totalAmount > 0) {
+      if (splitType === 'equal') {
+        const equalShare = totalAmount / includedMembers.length;
+        return updated.map(split => 
+          split.isIncluded 
+            ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
+            : { ...split, amount: 0, percentage: 0 }
+        );
+      } else if (splitType === 'percentage') {
+        const equalPercentage = 100 / includedMembers.length;
+        const equalAmount = totalAmount / includedMembers.length;
+        return updated.map(split => 
+          split.isIncluded 
+            ? { ...split, percentage: equalPercentage, amount: equalAmount }
+            : { ...split, percentage: 0, amount: 0 }
+        );
+      }
+    }
+    
+    return updated;
+  });
+};
 
   const recalculateEqual = () => {
-    const totalAmount = parseFloat(amount);
-    const includedMembers = splitData.filter(split => split.isIncluded);
-    if (includedMembers.length === 0) return;
+  const totalAmount = parseFloat(amount);
+  const includedMembers = splitData.filter(split => split.isIncluded);
+  if (includedMembers.length === 0 || totalAmount <= 0) return;
 
-    const equalShare = totalAmount / includedMembers.length;
-    
-    setSplitData(prev => prev.map(split => 
-      split.isIncluded 
-        ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
-        : split
-    ));
-  };
+  const equalShare = totalAmount / includedMembers.length;
+  
+  setSplitData(prev => prev.map(split => 
+    split.isIncluded 
+      ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
+      : { ...split, amount: 0, percentage: 0 }
+  ));
+};
 
   const handleReceiptData = (receiptData: any) => {
     // Auto-populate form with receipt data

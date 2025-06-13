@@ -362,7 +362,23 @@ export class SplittingService {
     
     if (existingCheck.isFriend) {
       const { friendData, status } = existingCheck;
+      // Find user by email
+    const usersQuery = query(
+      collection(db, 'users'),
+      where('email', '==', toEmail.toLowerCase())
+    );
+    const userSnapshot = await getDocs(usersQuery);
+    
+    if (!userSnapshot.empty) {
+      const toUser = userSnapshot.docs[0];
+      const toUserId = toUser.id;
       
+      // CHECK IF BLOCKED - This prevents spam and harassment
+      const isBlocked = await this.isUserBlocked(fromUserId, toUserId);
+      if (isBlocked) {
+        throw new Error('Unable to send friend request. This user has restricted friend requests.');
+      }
+    }
       switch (status) {
         case 'accepted':
           throw new Error(`${friendData.fullName} is already in your friends list.`);
@@ -453,11 +469,12 @@ export class SplittingService {
   }
 }
 
-static async blockFriend(userId: string, friendId: string): Promise<void> {
+// Enhanced blocking implementation in splitting.ts
+static async blockFriend(userId: string, friendId: string, reason?: string): Promise<void> {
   try {
     const batch = writeBatch(db);
     
-    // Find existing friendship records
+    // 1. Update existing friendship to blocked status
     const userFriendshipQuery = query(
       collection(db, 'friends'),
       where('userId', '==', userId),
@@ -465,22 +482,172 @@ static async blockFriend(userId: string, friendId: string): Promise<void> {
     );
     const userSnapshot = await getDocs(userFriendshipQuery);
     
-    // Update status to blocked instead of deleting
     userSnapshot.docs.forEach(doc => {
       batch.update(doc.ref, {
         status: 'blocked',
         blockedAt: new Date(),
+        blockReason: reason || 'No reason provided',
+        updatedAt: new Date()
+      });
+    });
+    
+    // 2. Create a block record for future prevention
+    const blockRecord = {
+      blockedBy: userId,
+      blockedUser: friendId,
+      reason: reason || 'No reason provided',
+      createdAt: new Date(),
+      isActive: true
+    };
+    
+    batch.set(doc(collection(db, 'blockedUsers')), blockRecord);
+    
+    // 3. Remove any pending friend requests between users
+    const pendingRequestsQuery = query(
+      collection(db, 'friendRequests'),
+      where('status', '==', 'pending')
+    );
+    const pendingSnapshot = await getDocs(pendingRequestsQuery);
+    
+    pendingSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if ((data.fromUserId === userId && data.toUserId === friendId) ||
+          (data.fromUserId === friendId && data.toUserId === userId)) {
+        batch.update(doc.ref, {
+          status: 'blocked',
+          blockedAt: new Date()
+        });
+      }
+    });
+    
+    // 4. Hide user from group member lists (they can still see expenses but not interact)
+    // This is handled in the UI layer by filtering out blocked users
+    
+    await batch.commit();
+    
+    console.log('Friend blocked successfully with enhanced protection');
+    
+  } catch (error) {
+    console.error('❌ Block friend error:', error);
+    throw new Error('Failed to block friend. Please try again.');
+  }
+}
+
+// Check if a user is blocked before sending friend requests
+static async isUserBlocked(userId: string, targetUserId: string): Promise<boolean> {
+  try {
+    const blockQuery = query(
+      collection(db, 'blockedUsers'),
+      where('blockedBy', '==', targetUserId),
+      where('blockedUser', '==', userId),
+      where('isActive', '==', true)
+    );
+    
+    const blockSnapshot = await getDocs(blockQuery);
+    return !blockSnapshot.empty;
+  } catch (error) {
+    console.error('Check block status error:', error);
+    return false;
+  }
+}
+
+// Get blocked users list for management
+static async getBlockedUsers(userId: string): Promise<Array<{
+  id: string;
+  blockedUser: string;
+  blockedUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  reason: string;
+  blockedAt: Date;
+}>> {
+  try {
+    const blockedQuery = query(
+      collection(db, 'blockedUsers'),
+      where('blockedBy', '==', userId),
+      where('isActive', '==', true),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const snapshot = await getDocs(blockedQuery);
+    const blockedUsers = [];
+    
+    for (const docSnapshot of snapshot.docs) {
+      const blockData = docSnapshot.data();
+      
+      // Get blocked user data
+      const userDoc = await getDoc(doc(db, 'users', blockData.blockedUser));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        blockedUsers.push({
+          id: docSnapshot.id,
+          blockedUser: blockData.blockedUser,
+          blockedUserData: {
+            fullName: userData.fullName,
+            email: userData.email,
+            avatar: userData.profilePicture
+          },
+          reason: blockData.reason,
+          blockedAt: blockData.createdAt.toDate()
+        });
+      }
+    }
+    
+    return blockedUsers;
+  } catch (error) {
+    console.error('Get blocked users error:', error);
+    return [];
+  }
+}
+
+// Unblock user
+static async unblockUser(userId: string, blockedUserId: string): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    
+    // 1. Deactivate block record
+    const blockQuery = query(
+      collection(db, 'blockedUsers'),
+      where('blockedBy', '==', userId),
+      where('blockedUser', '==', blockedUserId),
+      where('isActive', '==', true)
+    );
+    
+    const blockSnapshot = await getDocs(blockQuery);
+    blockSnapshot.docs.forEach(doc => {
+      batch.update(doc.ref, {
+        isActive: false,
+        unblockedAt: new Date()
+      });
+    });
+    
+    // 2. Update friendship status back to accepted (if it exists)
+    const friendshipQuery = query(
+      collection(db, 'friends'),
+      where('userId', '==', userId),
+      where('friendId', '==', blockedUserId),
+      where('status', '==', 'blocked')
+    );
+    
+    const friendshipSnapshot = await getDocs(friendshipQuery);
+    friendshipSnapshot.docs.forEach(doc => {
+      batch.update(doc.ref, {
+        status: 'accepted',
+        blockedAt: null,
+        blockReason: null,
         updatedAt: new Date()
       });
     });
     
     await batch.commit();
     
-    console.log('Friend blocked successfully');
+    console.log('User unblocked successfully');
     
   } catch (error) {
-    console.error('❌ Block friend error:', error);
-    throw new Error('Failed to block friend. Please try again.');
+    console.error('Unblock user error:', error);
+    throw new Error('Failed to unblock user. Please try again.');
   }
 }
 
@@ -703,8 +870,16 @@ static async declineFriendRequest(requestId: string): Promise<void> {
   }
 }
 
-static async removeFriend(userId: string, friendId: string): Promise<void> {
+static async removeFriend(userId: string, friendId: string, friendRequestId?: string): Promise<void> {
   try {
+    console.log('Removing friend:', { userId, friendId, friendRequestId });
+    
+    // If there's a friend request ID, it's a pending invitation
+    if (friendRequestId) {
+      await this.removePendingFriendInvitation(userId, friendRequestId);
+      return;
+    }
+    
     const batch = writeBatch(db);
     
     // Find and delete friendship from user's side
@@ -734,10 +909,10 @@ static async removeFriend(userId: string, friendId: string): Promise<void> {
     
     await batch.commit();
     
-    console.log('Friend removed successfully');
+    console.log('✅ Friend removed successfully');
     
   } catch (error) {
-    console.error('Remove friend error:', error);
+    console.error('❌ Remove friend error:', error);
     throw new Error('Failed to remove friend. Please try again.');
   }
 }
@@ -2678,7 +2853,43 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
   }
 }
 
+static async removePendingFriendInvitation(userId: string, friendRequestId: string): Promise<void> {
+  try {
+    console.log('Removing pending friend invitation:', friendRequestId);
+    
+    // Delete the friend request
+    await deleteDoc(doc(db, 'friendRequests', friendRequestId));
+    
+    // Also remove any pending invitation records
+    const pendingQuery = query(
+      collection(db, 'emailInvitations'),
+      where('fromUserId', '==', userId),
+      where('status', '==', 'sent')
+    );
+    
+    const pendingSnapshot = await getDocs(pendingQuery);
+    const batch = writeBatch(db);
+    
+    pendingSnapshot.docs.forEach(docSnapshot => {
+      batch.delete(docSnapshot.ref);
+    });
+    
+    if (pendingSnapshot.docs.length > 0) {
+      await batch.commit();
+    }
+    
+    console.log('✅ Pending friend invitation removed successfully');
+    
+  } catch (error) {
+    console.error('❌ Remove pending friend invitation error:', error);
+    throw new Error('Failed to remove pending invitation. Please try again.');
+  }
+}
+
 // SETTLEMENT TRANSACTION METHODS
+// Fix for Settlement Transaction undefined fields error in splitting.ts
+// Replace the createSettlementTransaction method with this fixed version
+
 static async createSettlementTransaction(settlementData: {
   fromUserId: string;
   toUserId: string;
@@ -2725,7 +2936,7 @@ static async createSettlementTransaction(settlementData: {
     
     const batch = writeBatch(db);
     
-    // 1. Create the settlement transaction record
+    // 1. Create the settlement transaction record - FIXED: Handle undefined fields properly
     const settlementTransaction: Omit<SettlementTransaction, 'id'> = {
       fromUserId: settlementData.fromUserId,
       fromUserData: {
@@ -2742,9 +2953,10 @@ static async createSettlementTransaction(settlementData: {
       amount: settlementData.amount,
       currency: settlementData.currency,
       description: settlementData.description || `Settlement payment to ${toUserData?.fullName}`,
-      groupId: settlementData.groupId,
-      groupData,
-      expenseId: settlementData.expenseId,
+      // FIXED: Convert undefined to null for Firebase
+      groupId: settlementData.groupId || null,
+      groupData: groupData || null,
+      expenseId: settlementData.expenseId || null,
       method: settlementData.method,
       status: 'completed',
       notes: settlementData.notes || '',
@@ -2980,6 +3192,9 @@ static async getGroupSettlementTransactions(groupId: string): Promise<Settlement
 }
 
 // GROUP SETTLEMENT SUGGESTIONS - Calculate optimal settlement suggestions for all group members
+// Fix for Settlement Suggestions in splitting.ts
+// Replace the getGroupSettlementSuggestions method with this corrected version
+
 static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
   fromUserId: string;
   fromUserName: string;
@@ -3008,28 +3223,30 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
       return [];
     }
     
-    // Separate creditors (positive balance) and debtors (negative balance)
+    // FIXED: Correct interpretation of balances
+    // Positive balance = they are OWED money (creditor)
+    // Negative balance = they OWE money (debtor)
     const creditors = membersWithBalances
-      .filter(member => member.balance > 0.01)
+      .filter(member => member.balance > 0.01) // People who are OWED money
       .map(member => ({
         userId: member.userId,
         userName: member.userData.fullName,
         userAvatar: member.userData.avatar,
-        amount: member.balance
+        amount: member.balance // Amount they are owed
       }))
       .sort((a, b) => b.amount - a.amount); // Largest creditor first
     
     const debtors = membersWithBalances
-      .filter(member => member.balance < -0.01)
+      .filter(member => member.balance < -0.01) // People who OWE money
       .map(member => ({
         userId: member.userId,
         userName: member.userData.fullName,
         userAvatar: member.userData.avatar,
-        amount: Math.abs(member.balance)
+        amount: Math.abs(member.balance) // Amount they owe (convert negative to positive)
       }))
       .sort((a, b) => b.amount - a.amount); // Largest debtor first
     
-    console.log('Creditors:', creditors.length, 'Debtors:', debtors.length);
+    console.log('Creditors (people owed money):', creditors.length, 'Debtors (people who owe):', debtors.length);
     
     // Generate optimal settlement suggestions using debt minimization algorithm
     const settlements: Array<{
@@ -3048,18 +3265,19 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
     
     // Settlement algorithm: match largest debtor with largest creditor
     while (workingCreditors.length > 0 && workingDebtors.length > 0) {
-      const creditor = workingCreditors[0];
-      const debtor = workingDebtors[0];
+      const creditor = workingCreditors[0]; // Person who is owed money
+      const debtor = workingDebtors[0]; // Person who owes money
       
       // Calculate settlement amount (minimum of what creditor is owed and what debtor owes)
       const settlementAmount = Math.min(creditor.amount, debtor.amount);
       
       if (settlementAmount > 0.01) { // Only create settlements for amounts > 1 cent
+        // FIXED: Correct direction - FROM debtor TO creditor
         settlements.push({
-          fromUserId: debtor.userId,
+          fromUserId: debtor.userId, // Person who owes (pays)
           fromUserName: debtor.userName,
           fromUserAvatar: debtor.userAvatar,
-          toUserId: creditor.userId,
+          toUserId: creditor.userId, // Person who is owed (receives)
           toUserName: creditor.userName,
           toUserAvatar: creditor.userAvatar,
           amount: parseFloat(settlementAmount.toFixed(2))
@@ -3067,8 +3285,8 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
       }
       
       // Update balances
-      creditor.amount -= settlementAmount;
-      debtor.amount -= settlementAmount;
+      creditor.amount -= settlementAmount; // Reduce what they're owed
+      debtor.amount -= settlementAmount; // Reduce what they owe
       
       // Remove settled parties
       if (creditor.amount <= 0.01) {
