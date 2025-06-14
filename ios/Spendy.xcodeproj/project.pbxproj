@@ -12,7 +12,7 @@
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		584320213F04A2ADFE883612 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FC832631E7331A2F7AA4ACB6 /* PrivacyInfo.xcprivacy */; };
 		63C46E30C3D5C59367E954C4 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985276B6F22E563159173011 /* ExpoModulesProvider.swift */; };
-		7B8948B572D642D99DBC8B6A /* notification-sound.wav in Resources */ = {isa = PBXBuildFile; fileRef = E7B8312A6B6A4DAE9B6CC04D /* notification-sound.wav */; };
+		7B8948B572D642D99DBC8B6A /* notification_sound.wav in Resources */ = {isa = PBXBuildFile; fileRef = E7B8312A6B6A4DAE9B6CC04D /* notification_sound.wav */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
@@ -27,7 +27,7 @@
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Spendy/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		C9B5CA56410E36FD834D6601 /* Pods-Spendy.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Spendy.release.xcconfig"; path = "Target Support Files/Pods-Spendy/Pods-Spendy.release.xcconfig"; sourceTree = "<group>"; };
-		E7B8312A6B6A4DAE9B6CC04D /* notification-sound.wav */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "notification-sound.wav"; path = "Spendy/notification-sound.wav"; sourceTree = "<group>"; };
+		E7B8312A6B6A4DAE9B6CC04D /* notification_sound.wav */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "notification_sound.wav"; path = "Spendy/notification_sound.wav"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Spendy/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Spendy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Spendy-Bridging-Header.h"; path = "Spendy/Spendy-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -55,7 +55,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				E7B8312A6B6A4DAE9B6CC04D /* notification-sound.wav */,
+				E7B8312A6B6A4DAE9B6CC04D /* notification_sound.wav */,
 				FC832631E7331A2F7AA4ACB6 /* PrivacyInfo.xcprivacy */,
 			);
 			name = Spendy;
@@ -201,7 +201,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				7B8948B572D642D99DBC8B6A /* notification-sound.wav in Resources */,
+				7B8948B572D642D99DBC8B6A /* notification_sound.wav in Resources */,
 				584320213F04A2ADFE883612 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -21,18 +21,18 @@ import { Button } from '@/components/common/Button';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { InviteService } from '@/services/payments/PaymentService';
 import { requestCameraPermissionsAsync } from 'expo-image-picker';
-
-
-interface AddFriendModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onSubmit: (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData) => void;
-  onOpenQRScanner?: () => void; // Add callback for QR scanner
-}
+import * as Contacts from 'expo-contacts';
 
 interface ContactData {
   name: string;
   phoneNumber: string;
+}
+
+interface AddFriendModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData | ContactData[]) => void;
+  onOpenQRScanner?: () => void;
 }
 
 export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRScanner }: AddFriendModalProps) {
@@ -42,9 +42,13 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [contactName, setContactName] = useState('');
+  const [selectedContacts, setSelectedContacts] = useState<ContactData[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({ email: '', phone: '', name: '' });
   const [showContactNameInput, setShowContactNameInput] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
+
+  const MAX_CONTACTS = 5;
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -89,28 +93,123 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
 
   const requestContactsPermission = async (): Promise<boolean> => {
     try {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
-          {
-            title: 'Contacts Permission',
-            message: 'Spendy needs access to your contacts to help you find friends',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
-        return granted === PermissionsAndroid.RESULTS.GRANTED;
-      }
-      return true; // iOS handles permissions automatically
+      const { status } = await Contacts.requestPermissionsAsync();
+      return status === 'granted';
     } catch (error) {
       console.error('Permission request error:', error);
       return false;
     }
   };
 
+  const addContactToSelection = (name: string, phone: string) => {
+    // Ensure we always have a valid name
+    const validName = name?.trim() || 'Friend';
+    
+    const newContact: ContactData = {
+      name: validName,
+      phoneNumber: phone.trim()
+    };
+
+    // Check if contact already exists
+    const existingContact = selectedContacts.find(
+      c => c.phoneNumber === newContact.phoneNumber
+    );
+
+    if (existingContact) {
+      Alert.alert(
+        'Contact Already Added',
+        `${validName} is already in your selection.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (selectedContacts.length >= MAX_CONTACTS) {
+      Alert.alert(
+        'Maximum Contacts Reached',
+        `You can only select up to ${MAX_CONTACTS} contacts at once.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    setSelectedContacts(prev => [...prev, newContact]);
+    
+    // Show success message
+    const remaining = MAX_CONTACTS - selectedContacts.length - 1;
+    const message = remaining > 0 
+      ? `${validName} added! You can add ${remaining} more contact${remaining !== 1 ? 's' : ''}.`
+      : `${validName} added! You've reached the maximum of ${MAX_CONTACTS} contacts.`;
+    
+    Alert.alert('Contact Added', message, [{ text: 'OK' }]);
+  };
+
+  const removeContactFromSelection = (index: number) => {
+    setSelectedContacts(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addManualContact = () => {
+    if (!validatePhone(phoneNumber) || !validateName(contactName)) return;
+
+    const newContact: ContactData = {
+      name: contactName.trim(),
+      phoneNumber: phoneNumber.trim()
+    };
+
+    // Check if contact already exists
+    const existingContact = selectedContacts.find(
+      c => c.phoneNumber === newContact.phoneNumber
+    );
+
+    if (existingContact) {
+      Alert.alert(
+        'Contact Already Added',
+        `A contact with this phone number is already in your selection.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (selectedContacts.length >= MAX_CONTACTS) {
+      Alert.alert(
+        'Maximum Contacts Reached',
+        `You can only select up to ${MAX_CONTACTS} contacts at once.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    setSelectedContacts(prev => [...prev, newContact]);
+    
+    // Clear manual input
+    setPhoneNumber('');
+    setContactName('');
+    setShowManualInput(false);
+    setShowContactNameInput(false);
+    
+    // Show success message
+    const remaining = MAX_CONTACTS - selectedContacts.length - 1;
+    const message = remaining > 0 
+      ? `${newContact.name} added! You can add ${remaining} more contact${remaining !== 1 ? 's' : ''}.`
+      : `${newContact.name} added! You've reached the maximum of ${MAX_CONTACTS} contacts.`;
+    
+    Alert.alert('Contact Added', message, [{ text: 'OK' }]);
+  };
+
   const handlePickContact = async () => {
     try {
+      if (selectedContacts.length >= MAX_CONTACTS) {
+        Alert.alert(
+          'Maximum Contacts Reached',
+          `You can only select up to ${MAX_CONTACTS} contacts at once.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      setLoading(true);
+      
+      // Request contacts permission
       const hasPermission = await requestContactsPermission();
       if (!hasPermission) {
         Alert.alert(
@@ -124,27 +223,65 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         return;
       }
 
-      // For now, show a placeholder since expo-contacts needs to be installed
+      // Present contact picker
+      const contact = await Contacts.presentContactPickerAsync();
+      
+      if (contact) {
+        console.log('Selected contact:', contact);
+        
+        // Extract phone number
+        let selectedPhone = '';
+        if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+          // If multiple phone numbers, let user choose
+          if (contact.phoneNumbers.length > 1) {
+            const phoneOptions = contact.phoneNumbers.map(phone => ({
+              text: `${phone.label || 'Phone'}: ${phone.number}`,
+              onPress: () => {
+                addContactToSelection(contact.name || '', phone.number || '');
+              }
+            }));
+            
+            phoneOptions.push({ text: 'Cancel', onPress: () => {} });
+            
+            Alert.alert(
+              'Select Phone Number',
+              `${contact.name} has multiple phone numbers. Which one would you like to use?`,
+              phoneOptions as any
+            );
+          } else {
+            selectedPhone = contact.phoneNumbers[0].number || '';
+          }
+        }
+        
+        // Extract name - ensure we always have a valid name
+        const selectedName = contact.name?.trim() || contact.firstName?.trim() || contact.lastName?.trim() || 'Friend';
+        
+        if (selectedPhone && contact.phoneNumbers?.length === 1) {
+          addContactToSelection(selectedName, selectedPhone);
+        } else if (!selectedPhone) {
+          Alert.alert(
+            'No Phone Number',
+            `${selectedName || 'This contact'} doesn't have a phone number. Please add them manually or select a different contact.`,
+            [{ text: 'OK' }]
+          );
+        }
+      }
+      
+    } catch (error: any) {
+      console.error('Contact picker error:', error);
+      
+      if (error.code === 'E_CONTACT_CANCELLED') {
+        // User cancelled - do nothing
+        return;
+      }
+      
       Alert.alert(
-        'Contact Picker',
-        'Contact picker would open here. For now, please enter the phone number manually.',
+        'Contact Picker Error', 
+        'Failed to access contacts. Please enter the contact information manually.',
         [{ text: 'OK' }]
       );
-
-      // TODO: Implement actual contact picker
-      // const { status } = await Contacts.requestPermissionsAsync();
-      // if (status === 'granted') {
-      //   const contact = await Contacts.presentContactPickerAsync();
-      //   if (contact && contact.phoneNumbers && contact.phoneNumbers.length > 0) {
-      //     setPhoneNumber(contact.phoneNumbers[0].number);
-      //     setContactName(contact.name);
-      //     setShowContactNameInput(false);
-      //   }
-      // }
-      
-    } catch (error) {
-      console.error('Contact picker error:', error);
-      Alert.alert('Error', 'Failed to access contacts');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -165,8 +302,6 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
     
     setLoading(true);
     try {
-      // The duplicate checking is now handled in the parent component
-      // and in the SplittingService.sendFriendRequest method
       await onSubmit(email, 'email');
       setEmail('');
       onClose();
@@ -178,68 +313,127 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   };
 
   const handleSendSMS = async () => {
-    if (!validatePhone(phoneNumber)) return;
-    if (showContactNameInput && !validateName(contactName)) return;
+    if (selectedContacts.length === 0) {
+      Alert.alert('No Contacts Selected', 'Please select at least one contact to send SMS invitations.');
+      return;
+    }
     
     setLoading(true);
     try {
-      const contactData: ContactData = {
-        name: contactName || 'Friend',
-        phoneNumber: phoneNumber.trim()
-      };
+      const successfulInvites: string[] = [];
+      const failedInvites: string[] = [];
 
-      const message = InviteService.generateFriendInviteMessage(user?.fullName || 'Friend');
-      await InviteService.sendSMSInvite(phoneNumber, message);
+      // Validate all contacts have names before sending
+      const validatedContacts = selectedContacts.map(contact => ({
+        ...contact,
+        name: contact.name?.trim() || 'Friend'
+      }));
+
+      for (const contact of validatedContacts) {
+        try {
+          const message = InviteService.generateFriendInviteMessage(user?.fullName || 'Friend');
+          await InviteService.sendSMSInvite(contact.phoneNumber, message);
+          successfulInvites.push(contact.name);
+        } catch (error) {
+          console.error(`Failed to send SMS to ${contact.name}:`, error);
+          failedInvites.push(contact.name);
+        }
+      }
+
+      // Send all contacts to parent for friend creation
+      await onSubmit('', 'sms', validatedContacts);
       
-      // Also send contact data to parent for potential friend creation
-      await onSubmit('', 'sms', contactData);
+      // Show results
+      let resultMessage = '';
+      if (successfulInvites.length > 0) {
+        resultMessage += `SMS invitations sent to: ${successfulInvites.join(', ')}`;
+      }
+      if (failedInvites.length > 0) {
+        if (resultMessage) resultMessage += '\n\n';
+        resultMessage += `Failed to send to: ${failedInvites.join(', ')}`;
+      }
       
-      Alert.alert('Success', 'SMS invitation sent!');
+      Alert.alert(
+        successfulInvites.length > 0 ? 'Invitations Sent!' : 'Some Invitations Failed',
+        resultMessage,
+        [{ text: 'OK' }]
+      );
+      
+      // Reset and close
+      setSelectedContacts([]);
       resetPhoneForm();
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send SMS');
+      Alert.alert('Error', error.message || 'Failed to send SMS invitations');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSendWhatsApp = async () => {
-    if (!validatePhone(phoneNumber)) return;
-    if (showContactNameInput && !validateName(contactName)) return;
+    if (selectedContacts.length === 0) {
+      Alert.alert('No Contacts Selected', 'Please select at least one contact to send WhatsApp invitations.');
+      return;
+    }
     
     setLoading(true);
     try {
-      const contactData: ContactData = {
-        name: contactName || 'Friend',
-        phoneNumber: phoneNumber.trim()
-      };
+      const successfulInvites: string[] = [];
+      const failedInvites: string[] = [];
 
-      const message = InviteService.generateFriendInviteMessage(user?.fullName || 'Friend');
-      await InviteService.sendWhatsAppInvite(phoneNumber, message);
+      // Validate all contacts have names before sending
+      const validatedContacts = selectedContacts.map(contact => ({
+        ...contact,
+        name: contact.name?.trim() || 'Friend'
+      }));
+
+      for (const contact of validatedContacts) {
+        try {
+          const message = InviteService.generateFriendInviteMessage(user?.fullName || 'Friend');
+          await InviteService.sendWhatsAppInvite(contact.phoneNumber, message);
+          successfulInvites.push(contact.name);
+        } catch (error) {
+          console.error(`Failed to send WhatsApp to ${contact.name}:`, error);
+          failedInvites.push(contact.name);
+        }
+      }
+
+      // Send all contacts to parent for friend creation
+      await onSubmit('', 'whatsapp', validatedContacts);
       
-      // Also send contact data to parent for potential friend creation
-      await onSubmit('', 'whatsapp', contactData);
+      // Show results
+      let resultMessage = '';
+      if (successfulInvites.length > 0) {
+        resultMessage += `WhatsApp invitations sent to: ${successfulInvites.join(', ')}`;
+      }
+      if (failedInvites.length > 0) {
+        if (resultMessage) resultMessage += '\n\n';
+        resultMessage += `Failed to send to: ${failedInvites.join(', ')}`;
+      }
       
-      Alert.alert('Success', 'WhatsApp invitation sent!');
+      Alert.alert(
+        successfulInvites.length > 0 ? 'Invitations Sent!' : 'Some Invitations Failed',
+        resultMessage,
+        [{ text: 'OK' }]
+      );
+      
+      // Reset and close
+      setSelectedContacts([]);
       resetPhoneForm();
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send WhatsApp message');
+      Alert.alert('Error', error.message || 'Failed to send WhatsApp invitations');
     } finally {
       setLoading(false);
     }
-  };
-
-  // Handle QR code scanning by delegating to parent
-  const handleQRCodeScanned = async (qrData: string) => {
-    // This function is no longer needed since QR scanning is handled by parent
   };
 
   const resetPhoneForm = () => {
     setPhoneNumber('');
     setContactName('');
     setShowContactNameInput(false);
+    setShowManualInput(false);
+    setSelectedContacts([]);
   };
 
   const handleShowQR = () => {
@@ -247,29 +441,28 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
     onClose();
   };
 
-const handleScanQR = async () => {
-  try {
-    // Check camera permissions first
-    const { status } = await requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Camera Permission Required',
-        'Please allow camera access to scan QR codes',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+  const handleScanQR = async () => {
+    try {
+      // Check camera permissions first
+      const { status } = await requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Camera Permission Required',
+          'Please allow camera access to scan QR codes',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
 
-    // Close this modal and open QR scanner in parent
-    onClose();
-    if (onOpenQRScanner) {
-      onOpenQRScanner();
+      // Close this modal and open QR scanner in parent
+      onClose();
+      if (onOpenQRScanner) {
+        onOpenQRScanner();
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to open QR scanner');
     }
-  } catch (error: any) {
-    Alert.alert('Error', error.message || 'Failed to open QR scanner');
-  }
-};
-
+  };
 
   const renderEmailMethod = () => (
     <View style={styles.methodContent}>
@@ -320,14 +513,61 @@ const handleScanQR = async () => {
 
   const renderPhoneMethod = () => (
     <View style={styles.methodContent}>
+      {/* Selected Contacts Display */}
+      {selectedContacts.length > 0 && (
+        <View style={styles.selectedContactsContainer}>
+          <View style={styles.selectedContactsHeader}>
+            <Text style={[styles.selectedContactsTitle, { color: theme.colors.text }]}>
+              Selected Contacts ({selectedContacts.length}/{MAX_CONTACTS})
+            </Text>
+            <TouchableOpacity
+              onPress={() => setSelectedContacts([])}
+              style={styles.clearAllButton}
+            >
+              <Text style={[styles.clearAllText, { color: theme.colors.primary }]}>Clear All</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedContactsList}>
+            {selectedContacts.map((contact, index) => (
+              <View key={index} style={[styles.selectedContactChip, { backgroundColor: theme.colors.primary + '15' }]}>
+                <View style={styles.selectedContactInfo}>
+                  <Text style={[styles.selectedContactName, { color: theme.colors.text }]} numberOfLines={1}>
+                    {contact.name}
+                  </Text>
+                  <Text style={[styles.selectedContactPhone, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                    {contact.phoneNumber}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => removeContactFromSelection(index)}
+                  style={styles.removeContactButton}
+                >
+                  <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Contact Picker Button */}
       <TouchableOpacity
-        style={[styles.contactPickerButton, { backgroundColor: theme.colors.surface }]}
+        style={[
+          styles.contactPickerButton, 
+          { 
+            backgroundColor: theme.colors.surface,
+            opacity: selectedContacts.length >= MAX_CONTACTS ? 0.5 : 1
+          }
+        ]}
         onPress={handlePickContact}
+        disabled={loading || selectedContacts.length >= MAX_CONTACTS}
       >
         <Ionicons name="people" size={24} color={theme.colors.primary} />
         <Text style={[styles.contactPickerText, { color: theme.colors.text }]}>
-          Pick from Contacts
+          {loading ? 'Loading...' : 
+           selectedContacts.length >= MAX_CONTACTS ? `Maximum ${MAX_CONTACTS} contacts selected` :
+           `Pick from Contacts (${selectedContacts.length}/${MAX_CONTACTS})`}
         </Text>
         <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
       </TouchableOpacity>
@@ -338,83 +578,122 @@ const handleScanQR = async () => {
         <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
       </View>
 
-      {/* Manual Phone Input */}
-      <View style={styles.inputContainer}>
-        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Phone Number</Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.colors.surface,
-              borderColor: errors.phone ? theme.colors.error : theme.colors.border,
-              color: theme.colors.text,
-            }
-          ]}
-          placeholder="Enter phone number with country code"
-          placeholderTextColor={theme.colors.textSecondary}
-          value={phoneNumber}
-          onChangeText={handlePhoneNumberChange}
-          keyboardType="phone-pad"
-        />
-        {errors.phone ? (
-          <Text style={[styles.errorText, { color: theme.colors.error }]}>
-            {errors.phone}
+      {/* Manual Contact Entry */}
+      {!showManualInput && selectedContacts.length < MAX_CONTACTS && (
+        <TouchableOpacity
+          style={[styles.manualEntryButton, { backgroundColor: theme.colors.surface }]}
+          onPress={() => setShowManualInput(true)}
+        >
+          <Ionicons name="add-circle-outline" size={24} color={theme.colors.primary} />
+          <Text style={[styles.manualEntryText, { color: theme.colors.text }]}>
+            Add Contact Manually
           </Text>
-        ) : null}
-      </View>
+        </TouchableOpacity>
+      )}
 
-      {/* Contact Name Input (shown when phone is manually entered) */}
-      {showContactNameInput && (
-        <View style={styles.inputContainer}>
-          <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Contact Name</Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: errors.name ? theme.colors.error : theme.colors.border,
-                color: theme.colors.text,
-              }
-            ]}
-            placeholder="Enter your friend's name"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={contactName}
-            onChangeText={(text) => {
-              setContactName(text);
-              if (errors.name) validateName(text);
-            }}
-            autoCapitalize="words"
-          />
-          {errors.name ? (
-            <Text style={[styles.errorText, { color: theme.colors.error }]}>
-              {errors.name}
-            </Text>
-          ) : null}
+      {/* Manual Input Form */}
+      {showManualInput && (
+        <View style={styles.manualInputContainer}>
+          <View style={styles.inputContainer}>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Phone Number</Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: errors.phone ? theme.colors.error : theme.colors.border,
+                  color: theme.colors.text,
+                }
+              ]}
+              placeholder="Enter phone number with country code"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={phoneNumber}
+              onChangeText={handlePhoneNumberChange}
+              keyboardType="phone-pad"
+            />
+            {errors.phone ? (
+              <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                {errors.phone}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Contact Name</Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: errors.name ? theme.colors.error : theme.colors.border,
+                  color: theme.colors.text,
+                }
+              ]}
+              placeholder="Enter your friend's name"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={contactName}
+              onChangeText={(text) => {
+                setContactName(text);
+                if (errors.name) validateName(text);
+              }}
+              autoCapitalize="words"
+            />
+            {errors.name ? (
+              <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                {errors.name}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.manualInputActions}>
+            <TouchableOpacity
+              style={[styles.cancelManualButton, { borderColor: theme.colors.border }]}
+              onPress={() => {
+                setShowManualInput(false);
+                setPhoneNumber('');
+                setContactName('');
+                setErrors({ email: '', phone: '', name: '' });
+              }}
+            >
+              <Text style={[styles.cancelManualText, { color: theme.colors.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.addManualButton, { backgroundColor: theme.colors.primary }]}
+              onPress={addManualContact}
+              disabled={!phoneNumber.trim() || !contactName.trim()}
+            >
+              <Text style={styles.addManualText}>Add Contact</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
       {/* Action Buttons */}
-      <View style={styles.phoneActions}>
-        <Button
-          title="Send SMS"
-          onPress={handleSendSMS}
-          loading={loading}
-          style={StyleSheet.flatten([styles.phoneButton, { backgroundColor: '#2563EB' }])}
-          disabled={!phoneNumber.trim() || (showContactNameInput && !contactName.trim())}
-        />
-        <Button
-          title="Send WhatsApp"
-          onPress={handleSendWhatsApp}
-          loading={loading}
-          style={StyleSheet.flatten([styles.phoneButton, { backgroundColor: '#25D366' }])}
-          disabled={!phoneNumber.trim() || (showContactNameInput && !contactName.trim())}
-        />
-      </View>
+      {selectedContacts.length > 0 && (
+        <View style={styles.phoneActions}>
+          <Button
+            title={`Send SMS (${selectedContacts.length})`}
+            onPress={handleSendSMS}
+            loading={loading}
+            style={StyleSheet.flatten([styles.phoneButton, { backgroundColor: '#2563EB' }])}
+          />
+          <Button
+            title={`Send WhatsApp (${selectedContacts.length})`}
+            onPress={handleSendWhatsApp}
+            loading={loading}
+            style={StyleSheet.flatten([styles.phoneButton, { backgroundColor: '#25D366' }])}
+          />
+        </View>
+      )}
 
       <View style={styles.infoCard}>
         <Ionicons name="chatbubble-outline" size={20} color={theme.colors.primary} />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
-          Send invitation via SMS or WhatsApp with a link to download Spendy.
+          {selectedContacts.length > 0 
+            ? `Send invitations to ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''} via SMS or WhatsApp with a link to download Spendy.`
+            : `Select up to ${MAX_CONTACTS} contacts and send invitations via SMS or WhatsApp with a link to download Spendy.`
+          }
         </Text>
       </View>
     </View>
@@ -590,6 +869,53 @@ const styles = StyleSheet.create({
   methodContent: {
     flex: 1,
   },
+  selectedContactsContainer: {
+    marginBottom: 20,
+  },
+  selectedContactsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  selectedContactsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  clearAllButton: {
+    padding: 4,
+  },
+  clearAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedContactsList: {
+    flexDirection: 'row',
+  },
+  selectedContactChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    marginRight: 8,
+    minWidth: 120,
+    maxWidth: 160,
+  },
+  selectedContactInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
+  selectedContactName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedContactPhone: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  removeContactButton: {
+    padding: 2,
+  },
   contactPickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -617,6 +943,59 @@ const styles = StyleSheet.create({
   dividerText: {
     fontSize: 14,
     paddingHorizontal: 16,
+  },
+  manualEntryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  manualEntryText: {
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+    marginLeft: 12,
+  },
+  manualInputContainer: {
+    marginBottom: 20,
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  manualInputActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  cancelManualButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  cancelManualText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  addManualButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  addManualText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   inputContainer: {
     marginBottom: 20,

@@ -1518,18 +1518,21 @@ static async getNotifications(userId: string): Promise<Notification[]> {
 
       const docRef = await addDoc(collection(db, 'paymentRequests'), paymentRequest);
 
-      // Send notification to the recipient
+      // Ensure message field is never undefined
+      const safeMessage = requestData.message || '';
+
+      // Send notification to the recipient with safe data
       await this.createNotification({
         userId: requestData.toUserId,
         type: 'payment_request',
         title: 'Payment Request',
-        message: `${fromUserData?.fullName} requested ${requestData.currency} ${requestData.amount}${requestData.message ? ': ' + requestData.message : ''}`,
+        message: `${fromUserData?.fullName || 'Someone'} requested ${requestData.currency} ${requestData.amount}${safeMessage ? ': ' + safeMessage : ''}`,
         data: {
           requestId: docRef.id,
           fromUserId: requestData.fromUserId,
           amount: requestData.amount,
           currency: requestData.currency,
-          message: requestData.message,
+          message: safeMessage,
           navigationType: 'paymentRequestDetails'
         },
         isRead: false,
@@ -1540,6 +1543,9 @@ static async getNotifications(userId: string): Promise<Notification[]> {
       try {
         const { PushNotificationService } = await import('../notifications/PushNotificationService');
         
+        // Ensure message field is never undefined
+        const safeMessage = requestData.message || '';
+        
         const pushNotification: PushNotificationData = {
           type: 'payment_request',
           title: 'Payment Request',
@@ -1549,7 +1555,7 @@ static async getNotifications(userId: string): Promise<Notification[]> {
             fromUserId: requestData.fromUserId,
             amount: requestData.amount,
             currency: requestData.currency,
-            message: requestData.message
+            message: safeMessage
           }
         };
 

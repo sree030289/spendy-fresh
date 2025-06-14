@@ -1,4 +1,4 @@
-// src/components/modals/AddExpenseModal.tsx
+// Complete src/components/modals/AddExpenseModal.tsx with validation and fixed custom split
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -216,7 +216,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
     }
   };
 
-  // UPDATED: Dynamic split calculation for percentage
+  // Dynamic split calculation for percentage
   const updateSplitPercentage = (userId: string, percentage: number) => {
     const totalAmount = parseFloat(amount);
     const newAmount = (totalAmount * percentage) / 100;
@@ -252,39 +252,18 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
     });
   };
 
-  // UPDATED: Dynamic split calculation for custom amounts
+  // FIXED: Custom split - only update the specific amount, don't auto-adjust others
   const updateSplitAmount = (userId: string, newAmount: number) => {
-    const totalAmount = parseFloat(amount);
-    
     setSplitData(prev => {
-      const updated = prev.map(split => 
+      return prev.map(split => 
         split.userId === userId 
-          ? { ...split, amount: newAmount }
+          ? { 
+              ...split, 
+              amount: newAmount,
+              percentage: parseFloat(amount) > 0 ? (newAmount / parseFloat(amount)) * 100 : 0
+            }
           : split
       );
-      
-      // Auto-adjust remaining amounts for custom split
-      if (splitType === 'custom') {
-        const otherIncludedSplits = updated.filter(s => s.userId !== userId && s.isIncluded);
-        
-        if (otherIncludedSplits.length > 0) {
-          const remainingAmount = totalAmount - newAmount;
-          const amountPerOther = remainingAmount / otherIncludedSplits.length;
-          
-          return updated.map(split => {
-            if (split.userId !== userId && split.isIncluded) {
-              return { 
-                ...split, 
-                amount: Math.max(0, amountPerOther),
-                percentage: totalAmount > 0 ? (amountPerOther / totalAmount) * 100 : 0
-              };
-            }
-            return split;
-          });
-        }
-      }
-      
-      return updated;
     });
   };
 
@@ -315,6 +294,13 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
               ? { ...split, percentage: equalPercentage, amount: equalAmount }
               : { ...split, percentage: 0, amount: 0 }
           );
+        } else if (splitType === 'custom') {
+          // For custom split, just reset excluded members to 0, keep included members' existing amounts
+          return updated.map(split => 
+            split.isIncluded 
+              ? split // Keep existing amount for included members
+              : { ...split, amount: 0, percentage: 0 } // Reset excluded members
+          );
         }
       }
       
@@ -323,6 +309,43 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
   };
 
   const recalculateEqual = () => {
+    const totalAmount = parseFloat(amount);
+    const includedMembers = splitData.filter(split => split.isIncluded);
+    if (includedMembers.length === 0 || totalAmount <= 0) return;
+
+    const equalShare = totalAmount / includedMembers.length;
+    
+    setSplitData(prev => prev.map(split => 
+      split.isIncluded 
+        ? { ...split, amount: equalShare, percentage: (equalShare / totalAmount) * 100 }
+        : { ...split, amount: 0, percentage: 0 }
+    ));
+  };
+
+  // NEW: Distribute remaining amount for custom split
+  const distributeRemainingAmount = () => {
+    const totalAmount = parseFloat(amount);
+    const currentTotal = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0);
+    const remainingAmount = totalAmount - currentTotal;
+    const includedMembers = splitData.filter(split => split.isIncluded);
+    
+    if (includedMembers.length === 0 || Math.abs(remainingAmount) < 0.01) return;
+    
+    const amountPerMember = remainingAmount / includedMembers.length;
+    
+    setSplitData(prev => prev.map(split => 
+      split.isIncluded 
+        ? { 
+            ...split, 
+            amount: split.amount + amountPerMember,
+            percentage: totalAmount > 0 ? ((split.amount + amountPerMember) / totalAmount) * 100 : 0
+          }
+        : split
+    ));
+  };
+
+  // NEW: Reset custom split to equal amounts
+  const resetCustomSplit = () => {
     const totalAmount = parseFloat(amount);
     const includedMembers = splitData.filter(split => split.isIncluded);
     if (includedMembers.length === 0 || totalAmount <= 0) return;
@@ -537,7 +560,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
         </ScrollView>
       </View>
 
-      {/* Date - FIXED: Calendar icon click handler */}
+      {/* Date */}
       <View style={styles.inputContainer}>
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Date</Text>
         <TouchableOpacity
@@ -772,13 +795,29 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
           <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
             Split Details ({splitData.filter(s => s.isIncluded).length} people)
           </Text>
-          {splitType === 'equal' && (
-            <TouchableOpacity onPress={recalculateEqual}>
-              <Text style={[styles.recalculateText, { color: theme.colors.primary }]}>
-                Recalculate
-              </Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.splitHeaderActions}>
+            {splitType === 'equal' && (
+              <TouchableOpacity onPress={recalculateEqual}>
+                <Text style={[styles.recalculateText, { color: theme.colors.primary }]}>
+                  Recalculate
+                </Text>
+              </TouchableOpacity>
+            )}
+            {splitType === 'custom' && (
+              <View style={styles.customSplitActions}>
+                <TouchableOpacity onPress={distributeRemainingAmount} style={styles.customActionButton}>
+                  <Text style={[styles.customActionText, { color: theme.colors.secondary }]}>
+                    Distribute
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={resetCustomSplit} style={styles.customActionButton}>
+                  <Text style={[styles.customActionText, { color: theme.colors.primary }]}>
+                    Reset Equal
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
 
         {splitData.map((split) => (
@@ -818,13 +857,19 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
               <View style={styles.splitItemRight}>
                 {splitType === 'custom' && (
                   <TextInput
-                    style={[styles.splitAmountInput, { color: theme.colors.text }]}
+                    style={[styles.splitAmountInput, { 
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.background
+                    }]}
                     value={split.amount.toFixed(2)}
                     onChangeText={(text) => {
                       const newAmount = parseFloat(text) || 0;
                       updateSplitAmount(split.userId, newAmount);
                     }}
                     keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    placeholderTextColor={theme.colors.textSecondary}
                   />
                 )}
                 {splitType === 'percentage' && (
@@ -878,7 +923,7 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
           <View style={styles.summaryDivider} />
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
-              Difference
+              {splitType === 'custom' ? 'Remaining' : 'Difference'}
             </Text>
             <Text style={[
               styles.summaryValue,
@@ -891,6 +936,15 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
               {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(splitData.reduce((sum, split) => sum + (split.isIncluded ? split.amount : 0), 0) - parseFloat(amount)).toFixed(2)}
             </Text>
           </View>
+          
+          {/* Custom split helper text */}
+          {splitType === 'custom' && (
+            <View style={styles.customSplitHelper}>
+              <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>
+                💡 Tip: Use "Distribute" to spread remaining amount equally, or "Reset Equal" to start over
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </ScrollView>
@@ -1316,9 +1370,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  splitHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   recalculateText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  customSplitActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  customActionButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  customActionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   splitItem: {
     flexDirection: 'row',
@@ -1364,6 +1437,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'right',
     minWidth: 80,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
   },
   percentageContainer: {
     flexDirection: 'row',
@@ -1405,6 +1482,17 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E5E7EB',
     marginVertical: 8,
+  },
+  customSplitHelper: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 8,
+  },
+  helperText: {
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   reviewCard: {
     borderRadius: 12,

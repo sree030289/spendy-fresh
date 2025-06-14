@@ -558,7 +558,7 @@ const handleExportData = async () => {
   };
 
   // Handle add friend
-  const handleAddFriend = async (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData) => {
+  const handleAddFriend = async (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData | ContactData[]) => {
     try {
       if (!user?.id) return;
       
@@ -603,12 +603,18 @@ const handleExportData = async () => {
       } else if (method === 'sms' || method === 'whatsapp') {
         // For SMS/WhatsApp invitations with contact data
         if (contactData) {
-          // Create a pending friend entry to track the invitation
-          await createPendingFriendInvitation(contactData, method);
+          // Handle both single contact and array of contacts
+          const contacts = Array.isArray(contactData) ? contactData : [contactData];
           
+          for (const contact of contacts) {
+            // Create a pending friend entry to track the invitation
+            await createPendingFriendInvitation(contact, method);
+          }
+          
+          const contactNames = contacts.map(c => c.name || 'Friend').join(', ');
           Alert.alert(
             'Invitation Sent!', 
-            `${method.toUpperCase()} invitation sent to ${contactData.name}. They'll appear in your friends list once they join Spendy.`,
+            `${method.toUpperCase()} invitation${contacts.length > 1 ? 's' : ''} sent to ${contactNames}. They'll appear in your friends list once they join Spendy.`,
             [{ text: 'OK' }]
           );
         }
@@ -628,6 +634,9 @@ const handleExportData = async () => {
     try {
       if (!user?.id) return;
       
+      // Ensure contactData.name is never undefined or empty
+      const fullName = contactData.name?.trim() || 'Friend';
+      
       // Create a pending friend invitation record
       const pendingInvitation = {
         fromUserId: user.id,
@@ -638,7 +647,7 @@ const handleExportData = async () => {
           mobile: user.mobile || ''
         },
         toUserData: {
-          fullName: contactData.name,
+          fullName: fullName,
           email: '', // No email for phone invitations
           mobile: contactData.phoneNumber,
           avatar: ''
@@ -1381,7 +1390,11 @@ const showExpenseActionsMenu = (expense: Expense) => {
       }
     >
       {/* Balance Summary - FIXED */}
-      <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
+      <TouchableOpacity 
+        style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}
+        onPress={() => setActiveTab('friends')}
+        activeOpacity={0.8}
+      >
         <Text style={styles.balanceTitle}>Your Balance</Text>
         <View style={styles.balanceGrid}>
           <View style={styles.balanceItem}>
@@ -1399,7 +1412,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
             <Text style={styles.balanceLabel}>Net balance</Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>

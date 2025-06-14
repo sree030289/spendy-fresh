@@ -170,32 +170,45 @@ export class NotificationManager {
         return;
       }
 
+      // Validate required data before creating notification
+      const safeGroupData = {
+        id: groupData.id || '',
+        name: groupData.name || 'Unknown Group',
+        inviteCode: groupData.inviteCode || '',
+        description: groupData.description || ''
+      };
+      
+      const safeInviterData = {
+        fullName: inviterMember.userData.fullName || 'Unknown User',
+        avatar: inviterMember.userData.avatar || ''
+      };
+
       // Create group invitation notification
       const notification = PushNotificationService.createGroupInviteNotification(
-        inviterMember.userData.fullName,
-        groupData.name,
-        groupData.id,
-        groupData.inviteCode,
-        inviterMember.userData.avatar,
-        groupData.description
+        safeInviterData.fullName,
+        safeGroupData.name,
+        safeGroupData.id,
+        safeGroupData.inviteCode,
+        safeInviterData.avatar,
+        safeGroupData.description
       );
 
       // Send push notification
       await PushNotificationService.sendNotificationToUser(invitedUserId, notification);
 
-      // Create in-app notification record
+      // Create in-app notification record with validated data
       await SplittingService.createNotification({
         userId: invitedUserId,
         type: 'group_invite',
         title: 'Group Invitation',
-        message: `${inviterMember.userData.fullName} invited you to join "${groupData.name}"`,
+        message: `${safeInviterData.fullName} invited you to join "${safeGroupData.name}"`,
         data: {
-          groupId: groupData.id,
-          groupName: groupData.name,
-          inviteCode: groupData.inviteCode,
-          senderName: inviterMember.userData.fullName,
-          senderAvatar: inviterMember.userData.avatar || '',
-          groupDescription: groupData.description || '',
+          groupId: safeGroupData.id,
+          groupName: safeGroupData.name,
+          inviteCode: safeGroupData.inviteCode,
+          senderName: safeInviterData.fullName,
+          senderAvatar: safeInviterData.avatar,
+          groupDescription: safeGroupData.description,
           // Deep linking data
           navigationType: 'groupJoin',
           targetGroupId: groupData.id
@@ -307,7 +320,7 @@ export class NotificationManager {
         case 'expense_added':
           return {
             action: 'navigate',
-            screen: 'GroupDetails',
+            screen: 'Groups', // Navigate to Groups tab instead
             params: {
               groupId: data.groupId,
               initialTab: 'expenses',
@@ -330,7 +343,7 @@ export class NotificationManager {
           if (data.groupId) {
             return {
               action: 'navigate',
-              screen: 'GroupDetails',
+              screen: 'Groups', // Navigate to Groups tab instead
               params: {
                 groupId: data.groupId,
                 initialTab: 'settlements',

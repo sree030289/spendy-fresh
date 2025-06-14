@@ -1,7 +1,7 @@
 // src/services/qr/QRCodeService.ts
 import React from 'react';
 import QRCode from 'react-native-qrcode-svg';
-import { RNCamera } from 'react-native-camera';
+import { CameraView } from 'expo-camera';
 import { Linking, Alert, Share } from 'react-native';
 import { SplittingService } from '../firebase/splitting';
 import { InviteService } from '../payments/PaymentService';
@@ -232,7 +232,8 @@ static decodeQRData(qrString: string): QRData {
         const groupId = await this.handleGroupInviteQR(qrData, currentUserId);
         if (groupId) {
           // Navigate to group details
-          navigation.navigate('GroupDetails', { groupId });
+          // Use modal instead of navigation - will be handled by parent component
+          console.log('Group found, groupId:', groupId);
         }
         break;
         
@@ -614,22 +615,17 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
 // Camera component for QR scanning
 export class QRScanner {
   static renderScanner(onQRCodeScanned: (data: string) => void): React.ReactElement {
-    return React.createElement(RNCamera, {
+    return React.createElement(CameraView, {
       style: { flex: 1 },
-      type: RNCamera.Constants.Type.back,
-      flashMode: RNCamera.Constants.FlashMode.auto,
-      androidCameraPermissionOptions: {
-        title: 'Permission to use camera',
-        message: 'We need your permission to use your camera to scan QR codes',
-        buttonPositive: 'Ok',
-        buttonNegative: 'Cancel',
-      },
-      onBarCodeRead: (scanResult: any) => {
-        if (scanResult.data && scanResult.type === 'QR_CODE') {
+      facing: 'back',
+      onBarcodeScanned: (scanResult: any) => {
+        if (scanResult.data) {
           onQRCodeScanned(scanResult.data);
         }
       },
-      barCodeTypes: [RNCamera.Constants.BarCodeType.qr]
+      barcodeScannerSettings: {
+        barcodeTypes: ['qr']
+      }
     });
   }
 }
