@@ -3590,7 +3590,7 @@ expo-blur@^14.1.5:
 
 expo-camera@~16.1.8:
   version "16.1.8"
-  resolved "https://registry.npmjs.org/expo-camera/-/expo-camera-16.1.8.tgz"
+  resolved "https://registry.yarnpkg.com/expo-camera/-/expo-camera-16.1.8.tgz#6c30dfb5c982795351f1053c36f048a11869e21b"
   integrity sha512-NpBbkUhHG6cs2TNUQBFSEtXb5j1/kTPIhiuqBcHosZG2yb/8MuM/ii4McJaqfe/6pn0YPqkH4k0Uod11DOSLmw==
   dependencies:
     invariant "^2.2.4"
