@@ -2180,19 +2180,22 @@ static async updateGroupMemberBalance(groupId: string, userId: string, amount: n
       
       // Add update notification to group chat
       const updateMessage = {
-        groupId: expenseData.groupId,
-        userId: expenseData.paidBy,
-        userName: currentExpense.paidByData?.fullName || 'Unknown User',
-        message: `Updated expense: ${expenseData.description}`,
-        timestamp: serverTimestamp(),
-        type: 'system' as const,
-        expenseData: {
-          id: expenseId,
-          description: expenseData.description,
-          amount: expenseData.amount,
-          currency: expenseData.currency
-        }
-      };
+          groupId: expenseData.groupId,
+          userId: expenseData.paidBy,
+          userName: expenseData.paidByData?.fullName || 'Unknown User',
+          userAvatar: expenseData.paidByData?.avatar || '',
+          message: `Edited expense: ${expenseData.description}`,
+          timestamp: serverTimestamp(),
+          type: 'expense' as const, // Changed from 'system' to 'expense'
+          isEdit: true, // Add this flag to distinguish edited expenses
+          expenseData: {
+            id: expenseId,
+            description: expenseData.description,
+            amount: expenseData.amount,
+            currency: expenseData.currency,
+            expenseDate: expenseData.expenseDate
+          }
+        };
       
       batch.set(doc(collection(db, 'groupMessages')), updateMessage);
       console.log('Update message prepared');

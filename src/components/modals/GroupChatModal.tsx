@@ -19,6 +19,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { Group, SplittingService } from '@/services/firebase/splitting';
 import { User } from '@/types';
+import { getCurrencySymbol } from '@/utils/currency';
 
 interface ChatMessage {
   id: string;
@@ -172,41 +173,61 @@ const handleAddExpense = () => {
     }
   };
 
-  const renderMessage = (message: ChatMessage, index: number) => {
-    const isCurrentUser = message.userId === currentUser?.id;
-    const isSystem = message.type === 'system' || message.type === 'expense';
-    
-    // Check if we should show the user info (first message from user or different user than previous)
-    const prevMessage = messages[index - 1];
-    const showUserInfo = !prevMessage || 
-                        prevMessage.userId !== message.userId || 
-                        prevMessage.type !== 'message' ||
-                        (message.timestamp.getTime() - prevMessage.timestamp.getTime()) > 300000; // 5 minutes
+const renderMessage = (message: ChatMessage, index: number) => {
+  const isCurrentUser = message.userId === currentUser?.id;
+  const isSystem = message.type === 'system';
+  
+  // Check if we should show the user info
+  const prevMessage = messages[index - 1];
+  const showUserInfo = !prevMessage || 
+                      prevMessage.userId !== message.userId || 
+                      prevMessage.type !== 'message' ||
+                      (message.timestamp.getTime() - prevMessage.timestamp.getTime()) > 300000;
 
-    if (message.type === 'expense') {
-      return (
-        <View key={message.id} style={[styles.systemMessage, { backgroundColor: theme.colors.success + '20' }]}>
-          <View style={styles.expenseMessageHeader}>
-            <Ionicons name="receipt" size={16} color={theme.colors.success} />
-            <Text style={[styles.expenseMessageTitle, { color: theme.colors.success }]}>
-              Expense Added
-            </Text>
-          </View>
-          <Text style={[styles.expenseMessageText, { color: theme.colors.text }]}>
-            {message.expenseData?.description} - ${message.expenseData?.amount.toFixed(2)}
-          </Text>
-          <Text style={[styles.expenseMessageSubtext, { color: theme.colors.textSecondary }]}>
-            Added by {message.userName}
-            {message.expenseData?.expenseDate && 
-              ` • Expense date: ${new Date(message.expenseData.expenseDate).toLocaleDateString()}`
-            }
-          </Text>
-          <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
-            {formatMessageTime(message.timestamp)}
+  if (message.type === 'expense') {
+    // Check if this is an edited expense
+    const isEditedExpense = (message as any).isEdit === true;
+    
+    return (
+      <View key={message.id} style={[
+        styles.systemMessage, 
+        { 
+          backgroundColor: isEditedExpense 
+            ? theme.colors.warning + '20' // Orange/yellow for edited
+            : theme.colors.success + '20'  // Green for new
+        }
+      ]}>
+        <View style={styles.expenseMessageHeader}>
+          <Ionicons 
+            name={isEditedExpense ? "create-outline" : "receipt"} 
+            size={16} 
+            color={isEditedExpense ? theme.colors.warning : theme.colors.success} 
+          />
+          <Text style={[
+            styles.expenseMessageTitle, 
+            { color: isEditedExpense ? theme.colors.warning : theme.colors.success }
+          ]}>
+            {isEditedExpense ? 'Expense Edited' : 'Expense Added'}
           </Text>
         </View>
-      );
-    }
+        
+        <Text style={[styles.expenseMessageText, { color: theme.colors.text }]}>
+          {message.expenseData?.description} - {getCurrencySymbol(message.expenseData?.currency || 'USD')}{message.expenseData?.amount.toFixed(2)}
+        </Text>
+        
+        <Text style={[styles.expenseMessageSubtext, { color: theme.colors.textSecondary }]}>
+          {isEditedExpense ? 'Edited' : 'Added'} by {message.userName}
+          {message.expenseData?.expenseDate && 
+            ` • Expense date: ${new Date(message.expenseData.expenseDate).toLocaleDateString()}`
+          }
+        </Text>
+        
+        <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
+          {formatMessageTime(message.timestamp)}
+        </Text>
+      </View>
+    );
+  }
 
     if (isSystem) {
       return (

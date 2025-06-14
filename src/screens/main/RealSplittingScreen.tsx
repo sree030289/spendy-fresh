@@ -1573,138 +1573,143 @@ const showExpenseActionsMenu = (expense: Expense) => {
   );
 
   // FIX: Render groups tab with empty state
-  const renderGroupsTab = () => (
-    <ScrollView 
-      contentContainerStyle={styles.tabContent}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View style={styles.tabHeader}>
-        <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Your Groups</Text>
+const renderGroupsTab = () => (
+  <ScrollView 
+    contentContainerStyle={styles.tabContent}
+    refreshControl={
+      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+    }
+  >
+    <View style={styles.tabHeader}>
+      <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Your Groups</Text>
+      <TouchableOpacity
+        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+        onPress={() => setShowCreateGroup(true)}
+      >
+        <Ionicons name="add" size={20} color="white" />
+        <Text style={styles.headerButtonText}>Create</Text>
+      </TouchableOpacity>
+    </View>
+
+    {/* Empty state for groups */}
+    {groups.length === 0 ? (
+      <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+        <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
+        <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Groups Yet</Text>
+        <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+          Create a group to start splitting expenses with friends
+        </Text>
         <TouchableOpacity
-          style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+          style={[styles.addFirstGroupButton, { backgroundColor: theme.colors.primary }]}
           onPress={() => setShowCreateGroup(true)}
         >
-          <Ionicons name="add" size={20} color="white" />
-          <Text style={styles.headerButtonText}>Create</Text>
+          <Text style={styles.addFirstGroupText}>Create Your First Group</Text>
         </TouchableOpacity>
       </View>
-
-      {/* FIX: Add empty state for groups */}
-      {groups.length === 0 ? (
-        <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Groups Yet</Text>
-          <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-            Create a group to start splitting expenses with friends
-          </Text>
-          <TouchableOpacity
-            style={[styles.addFirstGroupButton, { backgroundColor: theme.colors.primary }]}
-            onPress={() => setShowCreateGroup(true)}
-          >
-            <Text style={styles.addFirstGroupText}>Create Your First Group</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        groups.map((group) => (
-          <TouchableOpacity
-            key={group.id}
-            style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}
-            onPress={() => {
-              setSelectedGroup(group);
-              setShowGroupDetails(true);
-            }}
-          >
-            <View style={styles.groupHeader}>
-              <View style={styles.groupLeft}>
-                <Text style={styles.groupAvatar}>{group.avatar}</Text>
-                <View>
-                  <Text style={[styles.groupName, { color: theme.colors.text }]}>
-                    {group.name}
-                  </Text>
+    ) : (
+      groups.map((group) => (
+        <TouchableOpacity
+          key={group.id}
+          style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => {
+            setSelectedGroup(group);
+            setShowGroupDetails(true);
+          }}
+        >
+          <View style={styles.groupHeader}>
+            <View style={styles.groupLeft}>
+              <Text style={styles.groupAvatar}>{group.avatar}</Text>
+              <View style={styles.groupInfo}>
+                <Text style={[styles.groupName, { color: theme.colors.text }]}>
+                  {group.name}
+                </Text>
+                <View style={styles.groupMetaRow}>
                   <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
                     {group.members.length} members
                   </Text>
+                  <Text style={[styles.groupDivider, { color: theme.colors.textSecondary }]}>
+                    •
+                  </Text>
+                  <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
+                    {group.updatedAt.toLocaleDateString()}
+                  </Text>
                 </View>
               </View>
-              <View style={styles.groupActions}>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedGroup(group);
-                    setShowQRCode(true);
-                  }}
-                  style={styles.groupActionButton}
-                >
-                  <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
             </View>
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedGroup(group);
+                setShowQRCode(true);
+              }}
+              style={styles.groupActionButton}
+            >
+              <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
-            <View style={styles.groupStats}>
-              <View style={styles.groupStat}>
-                <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-                  Total spent
-                </Text>
-                <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                  ${group.totalExpenses.toFixed(2)}
-                </Text>
-              </View>
-              <View style={styles.groupStat}>
-                <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-                  Your share
-                </Text>
-                <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                  ${(group.totalExpenses / group.members.length).toFixed(2)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.groupFooter}>
-              <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
-                Last activity: {group.updatedAt.toLocaleDateString()}
+          <View style={styles.groupStats}>
+            <View style={styles.groupStat}>
+              <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
+                Total spent
               </Text>
-              <View style={styles.groupFooterActions}>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedGroup(group);
-                    setShowGroupChat(true);
-                  }}
-                  style={[styles.chatButton, { backgroundColor: theme.colors.primary + '20' }]}
-                >
-                  <Ionicons name="chatbubble" size={16} color={theme.colors.primary} />
-                  <Text style={[styles.chatButtonText, { color: theme.colors.primary }]}>Chat</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedGroup(group);
-                    setShowGroupSettlement(true);
-                  }}
-                  style={[styles.settlementButton, { backgroundColor: theme.colors.success + '20' }]}
-                >
-                  <Ionicons name="card" size={16} color={theme.colors.success} />
-                  <Text style={[styles.settlementButtonText, { color: theme.colors.success }]}>Settle</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedGroupForExpense(group);
-                    setShowAddExpense(true);
-                  }}
-                  style={[styles.addExpenseButton, { backgroundColor: theme.colors.primary }]}
-                >
-                  <Text style={styles.addExpenseButtonText}>Add Expense</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
+                ${group.totalExpenses.toFixed(2)}
+              </Text>
             </View>
-          </TouchableOpacity>
-        ))
-      )}
-    </ScrollView>
-  );
+            <View style={styles.groupStat}>
+              <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
+                Your share
+              </Text>
+              <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
+                ${(group.totalExpenses / group.members.length).toFixed(2)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Action buttons row - now has proper spacing */}
+          <View style={styles.groupActions}>
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedGroup(group);
+                setShowGroupChat(true);
+              }}
+              style={[styles.actionButton, styles.chatButton, { backgroundColor: theme.colors.primary + '20' }]}
+            >
+              <Ionicons name="chatbubble" size={16} color={theme.colors.primary} />
+              <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Chat</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedGroup(group);
+                setShowGroupSettlement(true);
+              }}
+              style={[styles.actionButton, styles.settleButton, { backgroundColor: theme.colors.success + '20' }]}
+            >
+              <Ionicons name="card" size={16} color={theme.colors.success} />
+              <Text style={[styles.actionButtonText, { color: theme.colors.success }]}>Settle</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedGroupForExpense(group);
+                setShowAddExpense(true);
+              }}
+              style={[styles.actionButton, styles.addExpenseActionButton, { backgroundColor: theme.colors.primary }]}
+            >
+              <Ionicons name="add" size={16} color="white" />
+              <Text style={[styles.actionButtonText, { color: 'white' }]}>Add Expense</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      ))
+    )}
+  </ScrollView>
+);
 
   // Render friends tab
   const renderFriendsTab = () => (
@@ -2293,6 +2298,43 @@ const showExpenseActionsMenu = (expense: Expense) => {
 }
 
 const styles = StyleSheet.create({
+  groupInfo: {
+    flex: 1,
+  },
+  groupMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  groupDivider: {
+    marginHorizontal: 6,
+    fontSize: 12,
+  },
+  groupActivity: {
+    fontSize: 12,
+  },
+  groupActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 36,
+  },
+  actionButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   container: {
     flex: 1,
   },
@@ -2598,9 +2640,6 @@ expenseItem: {
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  groupActivity: {
-    fontSize: 12,
-  },
   addExpenseButton: {
     paddingHorizontal: 12,
     paddingVertical: 6, // Keep consistent with other buttons
@@ -2810,10 +2849,6 @@ groupFooterActions: {
   groupMembers: {
     fontSize: 14,
     opacity: 0.7,
-  },
-  groupActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   groupActionButton: {
     padding: 8,

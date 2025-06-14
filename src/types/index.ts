@@ -37,6 +37,7 @@ export interface AppTheme {
     border: string;
     error: string;
     success: string;
+    warning: string; 
   };
 }
 

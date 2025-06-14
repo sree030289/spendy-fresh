@@ -11,7 +11,9 @@ export const LIGHT_THEME: AppTheme = {
     textSecondary: '#6B7280',
     border: '#E5E7EB',
     error: '#EF4444',
+    warning: '#F59E0B', // Add this line
     success: '#10B981',
+   
   },
 };
 
@@ -27,5 +29,6 @@ export const DARK_THEME: AppTheme = {
     border: '#374151',
     error: '#EF4444',
     success: '#10B981',
+    warning: '#FBBF24', 
   },
 };
