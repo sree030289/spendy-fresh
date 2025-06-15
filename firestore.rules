@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection - users can read/write their own data, read others for friend discovery
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null; // Allow reading other users for friend requests
+    }
+    
+    // Reminders - users can manage their own reminders
+    match /reminders/{reminderId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Friend requests - authenticated users can create/read/update
+    match /friendRequests/{requestId} {
+      allow create: if request.auth != null;
+      allow read, update: if request.auth != null && 
+        (request.auth.uid == resource.data.fromUserId || 
+         request.auth.uid == resource.data.toUserId);
+      allow read: if request.auth != null; // Allow reading for friend discovery
+    }
+    
+    // Friends collection - users can manage their friendships
+    match /friends/{friendId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || 
+         request.auth.uid == resource.data.friendId);
+      allow create: if request.auth != null;
+    }
+    
+    // Groups - authenticated users can read/write groups they're members of
+    match /groups/{groupId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+    
+    // Expenses - authenticated users can read/write expenses
+    match /expenses/{expenseId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+    
+    // Group messages - authenticated users can read/write messages in their groups
+    match /groupMessages/{messageId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+    
+    // Notifications - users can read/write their own notifications
+    match /notifications/{notificationId} {
+      allow read, write: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null;
+    }
+    
+    // Payments - users can read/write payments they're involved in
+    match /payments/{paymentId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.fromUserId || 
+         request.auth.uid == resource.data.toUserId);
+      allow create: if request.auth != null;
+    }
+    
+    // Uncomment this section for development only
+    match /{document=**} {
+      allow read, write: if true;
+    }
+    
+     match /databases/{database}/documents {
+    // Allow read access to deals
+    match /deals/{dealId} {
+      allow read: if true;
+    }
+    
+    // Allow read access to metadata
+    match /metadata/{document} {
+      allow read: if true;
+    }
+    
+    // Deny all writes from client (only functions can write)
+    match /{document=**} {
+      allow write: if false;
+    }
+  }
+  }
+}

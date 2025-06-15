@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Money Add Expense Modal - Enhanced Features Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .demo-container {
+            max-width: 400px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .header {
+            background: #f8f9fa;
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .close-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: #f3f4f6;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .save-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .content {
+            padding: 20px 24px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+
+        .section-title.required::after {
+            content: " *";
+            color: #ef4444;
+        }
+
+        .amount-container {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 4px 16px;
+        }
+
+        .currency-symbol {
+            font-size: 24px;
+            font-weight: 600;
+            color: #9ca3af;
+            margin-right: 8px;
+        }
+
+        .amount-input {
+            flex: 1;
+            font-size: 24px;
+            font-weight: 600;
+            color: #1f2937;
+            border: none;
+            padding: 16px;
+            outline: none;
+        }
+
+        .input {
+            width: 100%;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 16px;
+            color: #1f2937;
+            outline: none;
+        }
+
+        .categories-container {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+
+        .category-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px;
+            border-radius: 12px;
+            min-width: 80px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            background: #f9fafb;
+            transition: all 0.2s;
+        }
+
+        .category-item.selected {
+            background: #f0fdf4;
+            border-color: #10b981;
+        }
+
+        .category-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            font-size: 20px;
+        }
+
+        .category-text {
+            font-size: 12px;
+            font-weight: 500;
+            color: #6b7280;
+            text-align: center;
+        }
+
+        .category-item.selected .category-text {
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .location-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .location-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #10b981;
+            background: none;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #eff6ff;
+            color: #1e40af;
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .add-tag-container {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .tag-input {
+            flex: 1;
+            border: none;
+            padding: 16px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .add-tag-btn {
+            padding: 16px;
+            background: none;
+            border: none;
+            color: #10b981;
+            cursor: pointer;
+        }
+
+        .suggested-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .suggested-tag {
+            background: #f3f4f6;
+            color: #6b7280;
+            border-radius: 16px;
+            padding: 6px 12px;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .toggle-info h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .toggle-info p {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .toggle {
+            width: 50px;
+            height: 30px;
+            border-radius: 15px;
+            background: #e5e7eb;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .toggle.active {
+            background: #10b981;
+        }
+
+        .toggle-knob {
+            width: 26px;
+            height: 26px;
+            border-radius: 13px;
+            background: white;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .toggle.active .toggle-knob {
+            transform: translateX(20px);
+        }
+
+        .submit-btn {
+            background: linear-gradient(45deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .demo-info {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .demo-info h3 {
+            color: #0369a1;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .demo-info ul {
+            color: #075985;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-left: 16px;
+        }
+
+        .currency-indicator {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: #10b981;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .auto-category-hint {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #92400e;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        /* Dark theme */
+        body.dark {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        }
+
+        body.dark .demo-container {
+            background: #1f2937;
+            color: #f9fafb;
+        }
+
+        body.dark .header {
+            background: #374151;
+            border-bottom-color: #4b5563;
+        }
+
+        body.dark .header-title {
+            color: #f9fafb;
+        }
+
+        body.dark .close-btn {
+            background: #4b5563;
+        }
+
+        body.dark .section-title {
+            color: #f9fafb;
+        }
+
+        body.dark .input {
+            background: #374151;
+            border-color: #4b5563;
+            color: #f9fafb;
+        }
+
+        body.dark .amount-container {
+            background: #374151;
+            border-color: #4b5563;
+        }
+
+        body.dark .amount-input {
+            color: #f9fafb;
+        }
+
+        body.dark .category-item {
+            background: #374151;
+        }
+
+        body.dark .category-item.selected {
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        body.dark .category-text {
+            color: #9ca3af;
+        }
+
+        body.dark .toggle-container,
+        body.dark .add-tag-container {
+            background: #374151;
+            border-color: #4b5563;
+        }
+
+        body.dark .tag-input {
+            color: #f9fafb;
+        }
+
+        body.dark .toggle-info h4 {
+            color: #f9fafb;
+        }
+
+        body.dark .toggle-info p {
+            color: #9ca3af;
+        }
+
+        body.dark .suggested-tag {
+            background: #4b5563;
+            color: #9ca3af;
+        }
+
+        body.dark .demo-info {
+            background: #1e293b;
+            border-color: #0ea5e9;
+        }
+
+        .regional-categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .regional-category {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 12px;
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        body.dark .regional-category {
+            background: #334155;
+            border-color: #475569;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    
+    <div class="demo-container">
+        <div class="currency-indicator" id="currencyIndicator">AUD</div>
+        
+        <!-- Header -->
+        <div class="header">
+            <button class="close-btn">✕</button>
+            <h2 class="header-title">Add Expense</h2>
+            <button class="save-btn">Save</button>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Demo Info -->
+            <div class="demo-info">
+                <h3>🎉 Enhanced Smart Money Modal Features</h3>
+                <ul>
+                    <li>✅ Removed excessive top padding</li>
+                    <li>✅ Name field with auto-category detection</li>
+                    <li>✅ Description moved down (optional)</li>
+                    <li>✅ Auto-detects region from user profile</li>
+                    <li>✅ Regional categories (AUD/INR/USD/EUR/GBP)</li>
+                    <li>✅ Location tracking with permission</li>
+                    <li>✅ Dark/Light theme support</li>
+                    <li>✅ Modern UI with better spacing</li>
+                    <li>🔄 No manual currency selection needed!</li>
+                </ul>
+            </div>
+
+            <!-- Amount -->
+            <div class="section">
+                <h3 class="section-title required">Amount</h3>
+                <div class="amount-container">
+                    <span class="currency-symbol" id="currencySymbol">A$</span>
+                    <input class="amount-input" type="text" placeholder="0.00" value="42.50">
+                </div>
+            </div>
+
+            <!-- Name (New Primary Field) -->
+            <div class="section">
+                <h3 class="section-title required">Name</h3>
+                <input class="input" type="text" placeholder="What did you spend on?" value="Coles Groceries" oninput="autoSelectCategory(this.value)">
+                <div class="auto-category-hint" id="categoryHint" style="display: none;">
+                    💡 Auto-selected category based on name
+                </div>
+            </div>
+
+            <!-- Categories -->
+            <div class="section">
+                <h3 class="section-title required">Category</h3>
+                <div class="categories-container" id="categoriesContainer">
+                    <!-- Categories will be populated by JavaScript -->
+                </div>
+                
+                <!-- Regional Categories Info -->
+                <div style="margin-top: 12px;">
+                    <h4 style="font-size: 14px; color: #6b7280; margin-bottom: 8px;">Auto-detected from user profile (<span id="regionName">Australia</span>):</h4>
+                    <div class="regional-categories" id="regionalCategories">
+                        <!-- Regional categories will be populated -->
+                    </div>
+                    <div style="margin-top: 8px; font-size: 12px; color: #059669; font-style: italic;">
+                        💡 Region automatically set from user's currency preference during registration
+                    </div>
+                </div>
+            </div>
+
+            <!-- Merchant -->
+            <div class="section">
+                <h3 class="section-title">Merchant</h3>
+                <input class="input" type="text" placeholder="Where did you spend?" value="Coles Supermarket">
+            </div>
+
+            <!-- Description (Moved Down & Optional) -->
+            <div class="section">
+                <h3 class="section-title">Description</h3>
+                <textarea class="input" placeholder="Additional details (optional)" rows="2" style="resize: vertical; min-height: 60px;">Weekly grocery shopping for fresh produce and household items</textarea>
+            </div>
+
+            <!-- Location -->
+            <div class="section">
+                <div class="location-header">
+                    <h3 class="section-title">Location</h3>
+                    <button class="location-btn" onclick="getCurrentLocation()">
+                        📍 Get Current
+                    </button>
+                </div>
+                <input class="input" type="text" placeholder="Optional location" value="Coles Bondi Junction, NSW">
+            </div>
+
+            <!-- Tags -->
+            <div class="section">
+                <h3 class="section-title">Tags</h3>
+                
+                <div class="tags-container">
+                    <span class="tag">groceries ✕</span>
+                    <span class="tag">weekly ✕</span>
+                </div>
+
+                <div class="add-tag-container">
+                    <input class="tag-input" type="text" placeholder="Add a tag">
+                    <button class="add-tag-btn">+</button>
+                </div>
+
+                <div class="suggested-tags">
+                    <button class="suggested-tag">work</button>
+                    <button class="suggested-tag">personal</button>
+                    <button class="suggested-tag">urgent</button>
+                    <button class="suggested-tag">subscription</button>
+                </div>
+            </div>
+
+            <!-- Recurring Toggle -->
+            <div class="section">
+                <div class="toggle-container">
+                    <div class="toggle-info">
+                        <h4>Recurring Expense</h4>
+                        <p>This expense repeats regularly</p>
+                    </div>
+                    <div class="toggle" onclick="toggleRecurring(this)">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button class="submit-btn">
+                ✓ Add Expense
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let isDark = false;
+        let currentCurrency = 'AUD';
+        let selectedCategory = 'Coles';
+
+        // Categories data structure
+        const categories = {
+            'AUD': [
+                { name: 'Coles', icon: '🛒', color: '#E74C3C' },
+                { name: 'Woolworths', icon: '🛒', color: '#27AE60' },
+                { name: 'Bunnings', icon: '🔨', color: '#E67E22' },
+                { name: 'JB Hi-Fi', icon: '📱', color: '#3498DB' },
+                { name: 'Coffee', icon: '☕', color: '#795548' },
+                { name: 'Petrol', icon: '⛽', color: '#E17055' },
+                { name: 'Restaurants', icon: '🍽️', color: '#FF7675' },
+                { name: 'Car Loan', icon: '🚗', color: '#4ECDC4' },
+                { name: 'Home Loan', icon: '🏠', color: '#FF6B6B' },
+                { name: 'Electricity', icon: '⚡', color: '#96CEB4' },
+                { name: 'Internet', icon: '📶', color: '#74B9FF' },
+                { name: 'Other', icon: '📊', color: '#636E72' }
+            ],
+            'INR': [
+                { name: 'Amazon India', icon: '📦', color: '#FF9F00' },
+                { name: 'Flipkart', icon: '🛒', color: '#2874F0' },
+                { name: 'Swiggy', icon: '🍽️', color: '#FC8019' },
+                { name: 'Zomato', icon: '🍽️', color: '#E23744' },
+                { name: 'Coffee', icon: '☕', color: '#795548' },
+                { name: 'Petrol', icon: '⛽', color: '#E17055' },
+                { name: 'BigBasket', icon: '🛒', color: '#84C341' },
+                { name: 'Home Loan', icon: '🏠', color: '#FF6B6B' },
+                { name: 'Car Loan', icon: '🚗', color: '#4ECDC4' },
+                { name: 'Electricity', icon: '⚡', color: '#96CEB4' },
+                { name: 'Internet', icon: '📶', color: '#74B9FF' },
+                { name: 'Other', icon: '📊', color: '#636E72' }
+            ],
+            'USD': [
+                { name: 'Amazon', icon: '📦', color: '#FF9F00' },
+                { name: 'Walmart', icon: '🛒', color: '#004C91' },
+                { name: 'Starbucks', icon: '☕', color: '#00704A' },
+                { name: 'McDonald\'s', icon: '🍟', color: '#FFC72C' },
+                { name: 'Uber Eats', icon: '🍽️', color: '#000000' },
+                { name: 'Petrol', icon: '⛽', color: '#E17055' },
+                { name: 'Target', icon: '🛍️', color: '#E74C3C' },
+                { name: 'Home Loan', icon: '🏠', color: '#FF6B6B' },
+                { name: 'Car Loan', icon: '🚗', color: '#4ECDC4' },
+                { name: 'Electricity', icon: '⚡', color: '#96CEB4' },
+                { name: 'Internet', icon: '📶', color: '#74B9FF' },
+                { name: 'Other', icon: '📊', color: '#636E72' }
+            ]
+        };
+
+        const nameMapping = {
+            'AUD': {
+                'coles': 'Coles',
+                'woolworths': 'Woolworths',
+                'bunnings': 'Bunnings',
+                'jb': 'JB Hi-Fi',
+                'coffee': 'Coffee',
+                'petrol': 'Petrol',
+                'gas': 'Petrol'
+            },
+            'INR': {
+                'amazon': 'Amazon India',
+                'flipkart': 'Flipkart',
+                'swiggy': 'Swiggy',
+                'zomato': 'Zomato',
+                'bigbasket': 'BigBasket',
+                'coffee': 'Coffee',
+                'petrol': 'Petrol'
+            },
+            'USD': {
+                'amazon': 'Amazon',
+                'walmart': 'Walmart',
+                'starbucks': 'Coffee',
+                'mcdonalds': 'McDonald\'s',
+                'coffee': 'Coffee',
+                'petrol': 'Petrol'
+            }
+        };
+
+        function toggleTheme() {
+            isDark = !isDark;
+            document.body.classList.toggle('dark', isDark);
+            document.querySelector('.theme-toggle').textContent = isDark ? '☀️' : '🌙';
+        }
+
+        function toggleRecurring(toggle) {
+            toggle.classList.toggle('active');
+        }
+
+        function autoSelectCategory(name) {
+            const nameLower = name.toLowerCase();
+            const mapping = nameMapping[currentCurrency];
+            
+            for (const [keyword, categoryName] of Object.entries(mapping)) {
+                if (nameLower.includes(keyword)) {
+                    selectedCategory = categoryName;
+                    renderCategories();
+                    
+                    // Show hint
+                    const hint = document.getElementById('categoryHint');
+                    hint.style.display = 'block';
+                    hint.textContent = `💡 Auto-selected "${categoryName}" category`;
+                    
+                    setTimeout(() => {
+                        hint.style.display = 'none';
+                    }, 3000);
+                    
+                    break;
+                }
+            }
+        }
+
+        function renderCategories() {
+            const container = document.getElementById('categoriesContainer');
+            const currentCategories = categories[currentCurrency];
+            
+            container.innerHTML = currentCategories.map(cat => `
+                <div class="category-item ${cat.name === selectedCategory ? 'selected' : ''}" 
+                     onclick="selectCategory('${cat.name}')">
+                    <div class="category-icon" style="background-color: ${cat.color}20;">
+                        ${cat.icon}
+                    </div>
+                    <div class="category-text">${cat.name}</div>
+                </div>
+            `).join('');
+
+            // Update regional categories display
+            const regionalContainer = document.getElementById('regionalCategories');
+            const regionalCats = currentCategories.filter(cat => 
+                ['Coles', 'Woolworths', 'Bunnings', 'Amazon India', 'Flipkart', 'Amazon', 'Walmart'].includes(cat.name)
+            );
+            
+            regionalContainer.innerHTML = regionalCats.map(cat => `
+                <div class="regional-category">${cat.icon} ${cat.name}</div>
+            `).join('');
+        }
+
+        function selectCategory(categoryName) {
+            selectedCategory = categoryName;
+            renderCategories();
+        }
+
+        function changeCurrency(currency) {
+            currentCurrency = currency;
+            
+            // Update currency display
+            const symbols = { 'AUD': 'A$', 'INR': '₹', 'USD': '$' };
+            const regions = { 'AUD': 'Australia', 'INR': 'India', 'USD': 'United States' };
+            
+            document.getElementById('currencySymbol').textContent = symbols[currency];
+            document.getElementById('currencyIndicator').textContent = currency;
+            document.getElementById('regionName').textContent = regions[currency];
+            
+            // Reset selected category and re-render
+            selectedCategory = categories[currency][0].name;
+            renderCategories();
+        }
+
+        function getCurrentLocation() {
+            const locations = {
+                'AUD': 'Coles Bondi Junction, Sydney NSW 2022',
+                'INR': 'Phoenix MarketCity, Mumbai MH 400013',
+                'USD': 'Walmart Supercenter, Austin TX 78745'
+            };
+            
+            document.querySelector('input[placeholder="Optional location"]').value = locations[currentCurrency];
+            
+            // Show notification
+            const btn = document.querySelector('.location-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '✅ Located';
+            btn.style.color = '#10b981';
+            
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.color = '#10b981';
+            }, 2000);
+        }
+
+        // Initialize
+        renderCategories();
+
+        // Add currency switcher
+        document.querySelector('.demo-info').innerHTML += `
+            <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+                <span style="font-weight: 600;">Simulate User Profile:</span>
+                <button onclick="changeCurrency('AUD')" style="padding: 4px 8px; border: 1px solid #0ea5e9; border-radius: 4px; background: ${currentCurrency === 'AUD' ? '#0ea5e9' : 'white'}; color: ${currentCurrency === 'AUD' ? 'white' : '#0ea5e9'}; cursor: pointer;">🇦🇺 AUD</button>
+                <button onclick="changeCurrency('INR')" style="padding: 4px 8px; border: 1px solid #0ea5e9; border-radius: 4px; background: ${currentCurrency === 'INR' ? '#0ea5e9' : 'white'}; color: ${currentCurrency === 'INR' ? 'white' : '#0ea5e9'}; cursor: pointer;">🇮🇳 INR</button>
+                <button onclick="changeCurrency('USD')" style="padding: 4px 8px; border: 1px solid #0ea5e9; border-radius: 4px; background: ${currentCurrency === 'USD' ? '#0ea5e9' : 'white'}; color: ${currentCurrency === 'USD' ? 'white' : '#0ea5e9'}; cursor: pointer;">🇺🇸 USD</button>
+            </div>
+        `;
+    </script>
+</body>
+</html>

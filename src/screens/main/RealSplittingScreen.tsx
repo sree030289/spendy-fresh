@@ -1,5 +1,5 @@
 // src/screens/main/RealSplittingScreen.tsx - FIXED VERSION
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -88,6 +88,10 @@ export default function RealSplittingScreen() {
     totalOwing: 0,
     netBalance: 0
   });
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
+  const isLoadingBalancesRef = useRef(false);
+  const balanceLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastBalanceUpdateRef = useRef<number>(0);
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [selectedGroupForExpense, setSelectedGroupForExpense] = useState<Group | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -139,7 +143,9 @@ export default function RealSplittingScreen() {
     
     // Refresh friends list when friends tab is selected using FriendsManager
     if (tabId === 'friends') {
-      friendsManager.refreshFriends();
+      friendsManager.refreshFriends().catch(() => {
+        console.log('FriendsManager not ready for friends tab refresh');
+      });
     }
     // Refresh groups when groups tab is selected  
     else if (tabId === 'groups') {
@@ -148,7 +154,9 @@ export default function RealSplittingScreen() {
     // Refresh overview data when overview tab is selected
     else if (tabId === 'overview') {
       Promise.all([
-        friendsManager.refreshFriends(),
+        friendsManager.refreshFriends().catch(() => {
+          console.log('FriendsManager not ready for overview refresh');
+        }),
         loadGroups(), 
         loadRecentExpenses()
       ]);
@@ -156,114 +164,57 @@ export default function RealSplittingScreen() {
   }, []);
 
   // Real-time listeners
-  useEffect(() => {
-    if (!user?.id) return;
+useEffect(() => {
+  if (!user?.id) return;
 
-    let unsubscribeFriends: (() => void) | undefined;
-    let unsubscribeNotifications: (() => void) | undefined;
-    let unsubscribeFriendRequests: (() => void) | undefined;
+  let unsubscribeFriends: (() => void) | undefined;
+  let unsubscribeNotifications: (() => void) | undefined;
+  let unsubscribeFriendRequests: (() => void) | undefined;
 
-    const initializeData = async () => {
-      try {
-        setLoading(true);
-        
-        // Initialize push notifications
-        try {
-          const pushService = PushNotificationService.getInstance();
-          await pushService.initialize(user.id);
-        } catch (pushError) {
-          console.warn('Push notification initialization failed:', pushError);
-          // Continue without push notifications
-        }
-
-        // Process recurring expenses on app startup
-      try {
-        await SplittingService.processRecurringExpenses();
-        console.log('Recurring expenses processed');
-      } catch (recurringError) {
-        console.warn('Recurring expenses processing failed:', recurringError);
-      }
-        
-        // Initialize FriendsManager with user ID
-        await friendsManager.initialize(user.id);
-        
-        // Get initial friends state from FriendsManager
-        const friendsState = friendsManager.getState();
-        setFriends(friendsState.friends);
-        setBalances({
-          totalOwed: friendsState.balances.totalOwed,
-          totalOwing: friendsState.balances.totalOwing,
-          netBalance: friendsState.balances.netBalance
-        });
-        
-        // Get initial state from FriendsManager
-        const initialFriendsState = friendsManager.getState();
-        setFriends(initialFriendsState.friends);
-        setBalances({
-          totalOwed: initialFriendsState.balances.totalOwed,
-          totalOwing: initialFriendsState.balances.totalOwing,
-          netBalance: initialFriendsState.balances.netBalance
-        });
-        
-        // Load initial data
-        await Promise.all([
-          loadGroups(),
-          loadRecentExpenses(),
-          loadNotifications(), // FIX: Add this to load notifications
-          loadRecurringExpenses()
-        ]);
-        
-        // Set up real-time listeners
-        unsubscribeNotifications = SplittingService.onUserNotifications(
-          user.id,
-          (newNotifications) => {
-            setNotifications(newNotifications);
-          }
-        );
-        
-        unsubscribeFriendRequests = SplittingService.onFriendRequests(
-          user.id,
-          (requests) => {
-            // Handle incoming friend requests
-            if (requests.length > 0) {
-              showFriendRequestAlert(requests[0]);
-            }
-          }
-        );
-
-        // Use FriendsManager for friends updates instead of direct SplittingService
-        unsubscribeFriends = friendsManager.addListener((friendsData) => {
-          console.log('✅ Friends updated via FriendsManager:', friendsData.friends.length);
-          setFriends(friendsData.friends);
-          
-          // Update balances from FriendsManager state
-          setBalances({
-            totalOwed: friendsData.balances.totalOwed,
-            totalOwing: friendsData.balances.totalOwing,
-            netBalance: friendsData.balances.netBalance
-          });
-        });
-        
-      } catch (error) {
-        console.error('Initialize splitting screen error:', error);
-        Alert.alert('Error', 'Failed to load data. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeData();
-
-    // Cleanup listeners on unmount
-    return () => {
-      unsubscribeFriends?.();
-      unsubscribeNotifications?.();
-      unsubscribeFriendRequests?.();
+  const initializeData = async () => {
+    try {
+      setLoading(true);
       
-      // Cleanup FriendsManager when component unmounts
-      friendsManager.cleanup();
-    };
-  }, [user?.id]);
+      // Initialize FriendsManager for the current user
+      await friendsManager.initialize(user.id);
+      
+      // Load comprehensive balances instead of just friends
+      await Promise.all([
+        loadGroups(),
+        loadRecentExpenses(),
+        loadNotifications(),
+        loadComprehensiveBalances() // NEW: Load comprehensive balances
+      ]);
+      
+      // Set up listeners...
+      unsubscribeFriends = friendsManager.addListener(async (friendsData) => {
+        console.log('✅ Friends updated, scheduling comprehensive balances refresh');
+        setFriends(friendsData.friends);
+        
+        // Use debounced version to prevent excessive calls
+        debouncedLoadComprehensiveBalances();
+      });
+      
+    } catch (error) {
+      console.error('Initialize splitting screen error:', error);
+      Alert.alert('Error', 'Failed to load data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  initializeData();
+
+  return () => {
+    if (balanceLoadTimeoutRef.current) {
+      clearTimeout(balanceLoadTimeoutRef.current);
+    }
+    unsubscribeFriends?.();
+    unsubscribeNotifications?.();
+    unsubscribeFriendRequests?.();
+    friendsManager.cleanup();
+  };
+}, [user?.id]);
 
   useEffect(() => {
     const refreshService = ExpenseRefreshService.getInstance();
@@ -272,7 +223,15 @@ export default function RealSplittingScreen() {
       // Refresh all data when an expense is added
       loadRecentExpenses();
       loadGroups();
-      friendsManager.notifyBalanceUpdated();
+      
+      // Only notify balance updated if we haven't recently loaded balances
+      const now = Date.now();
+      if (now - lastBalanceUpdateRef.current > 2000) {
+        console.log('📊 Notifying balance updated from expense refresh');
+        friendsManager.notifyBalanceUpdated();
+      } else {
+        console.log('⏭️ Skipping balance notification - recently updated');
+      }
     });
 
     return () => {
@@ -367,18 +326,35 @@ const loadRecurringExpenses = async () => {
       if (!user?.id) return;
       
       console.log('Loading friends via FriendsManager for user:', user.id);
-      await friendsManager.refreshFriends();
       
-      // Get current state from FriendsManager
-      const currentState = friendsManager.getState();
-      setFriends(currentState.friends);
-      setBalances({
-        totalOwed: currentState.balances.totalOwed,
-        totalOwing: currentState.balances.totalOwing,
-        netBalance: currentState.balances.netBalance
-      });
+      let currentState;
+      try {
+        await friendsManager.refreshFriends();
+        
+        // Get current state from FriendsManager
+        currentState = friendsManager.getState();
+        setFriends(currentState.friends);
+        setBalances({
+          totalOwed: currentState.balances.totalOwed,
+          totalOwing: currentState.balances.totalOwing,
+          netBalance: currentState.balances.netBalance
+        });
+      } catch (friendsManagerError) {
+        console.error('FriendsManager error, initializing:', friendsManagerError);
+        // Try to initialize and retry
+        await friendsManager.initialize(user.id);
+        await friendsManager.refreshFriends();
+        
+        currentState = friendsManager.getState();
+        setFriends(currentState.friends);
+        setBalances({
+          totalOwed: currentState.balances.totalOwed,
+          totalOwing: currentState.balances.totalOwing,
+          netBalance: currentState.balances.netBalance
+        });
+      }
       
-      console.log('Friends loaded via FriendsManager:', currentState.friends.length);
+      console.log('Friends loaded via FriendsManager:', currentState?.friends.length || 0);
     } catch (error) {
       console.error('Load friends error:', error);
       setFriends([]);
@@ -429,6 +405,63 @@ const handleExpenseUpdate = async (expenseData: any) => {
 const handleEditExpenseFromDetails = (expense: Expense) => {
   setSelectedExpenseForAction(expense);
   setShowEditExpense(true);
+};
+
+const handleGroupJoined = async (groupId: string, groupName: string) => {
+  try {
+    await loadGroups();
+    debouncedLoadComprehensiveBalances(); // Refresh balances
+    
+    // Show success with auto-friend option
+    Alert.alert(
+      'Welcome to the Group! 🎉',
+      `You've joined "${groupName}"!\n\nWould you like to connect with other group members? This makes it easier to split expenses and request payments.`,
+      [
+        {
+          text: 'Not Now',
+          style: 'cancel'
+        },
+        {
+          text: 'Connect with Members',
+          onPress: async () => {
+            try {
+              const result = await SplittingService.autoConnectGroupMembers(groupId, user!.id);
+              
+              let message = '';
+              if (result.requestsSent > 0) {
+                message += `✅ Sent ${result.requestsSent} friend request(s)\n`;
+              }
+              if (result.alreadyConnected > 0) {
+                message += `👥 Already connected with ${result.alreadyConnected} member(s)\n`;
+              }
+              if (result.failed > 0) {
+                message += `⚠️ ${result.failed} request(s) failed\n`;
+              }
+              
+              Alert.alert(
+                'Connection Requests Sent! 📤',
+                message + '\nYou can now easily split expenses and settle payments with group members.',
+                [{ text: 'Great!' }]
+              );
+              
+              // Refresh data
+              await Promise.all([
+                loadComprehensiveBalances(),
+                friendsManager.refreshFriends().catch(() => {
+                  console.log('FriendsManager refresh failed, will be handled by loadComprehensiveBalances');
+                })
+              ]);
+              
+            } catch (error) {
+              Alert.alert('Error', 'Failed to connect with group members. You can manually add them from the Friends tab.');
+            }
+          }
+        }
+      ]
+    );
+  } catch (error) {
+    console.error('Handle group joined error:', error);
+  }
 };
 
 const handleEditExpenseFromGroup = (expense: Expense, group: Group) => {
@@ -959,6 +992,79 @@ const handleExportData = async () => {
   }
 };
 
+// Add this state for comprehensive balances
+const [comprehensiveBalances, setComprehensiveBalances] = useState<{
+  totalOwed: number;
+  totalOwing: number;
+  netBalance: number;
+  friendBalances: Array<{
+    userId: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    balance: number;
+    source: 'friend' | 'group';
+    groupName?: string;
+    groupId?: string;
+  }>;
+}>({
+  totalOwed: 0,
+  totalOwing: 0,
+  netBalance: 0,
+  friendBalances: []
+});
+
+const loadComprehensiveBalances = async () => {
+  try {
+    if (!user?.id || isLoadingBalancesRef.current) {
+      console.log('⏭️ Skipping comprehensive balances load - already loading or no user');
+      return;
+    }
+    
+    isLoadingBalancesRef.current = true;
+    setIsLoadingBalances(true);
+    console.log('🔄 Loading comprehensive balances for user:', user.id);
+    
+    // Get comprehensive balances including groups
+    const balanceData = await SplittingService.getComprehensiveUserBalances(user.id);
+    setComprehensiveBalances(balanceData);
+    
+    // Update the main balances state for the balance card
+    setBalances({
+      totalOwed: balanceData.totalOwed,
+      totalOwing: balanceData.totalOwing,
+      netBalance: balanceData.netBalance
+    });
+    
+    console.log('✅ Comprehensive balances loaded:', balanceData);
+    
+  } catch (error) {
+    console.error('❌ Load comprehensive balances error:', error);
+  } finally {
+    isLoadingBalancesRef.current = false;
+    setIsLoadingBalances(false);
+  }
+};
+
+// Debounced version to prevent excessive calls
+const debouncedLoadComprehensiveBalances = useCallback(() => {
+  const now = Date.now();
+  
+  // Prevent calls within 1 second of each other
+  if (now - lastBalanceUpdateRef.current < 1000) {
+    console.log('⏭️ Skipping balance update - too recent');
+    return;
+  }
+  
+  if (balanceLoadTimeoutRef.current) {
+    clearTimeout(balanceLoadTimeoutRef.current);
+  }
+  
+  balanceLoadTimeoutRef.current = setTimeout(() => {
+    lastBalanceUpdateRef.current = Date.now();
+    loadComprehensiveBalances();
+  }, 500); // 500ms debounce
+}, [user?.id]);
 // Handle deep linking navigation from notifications
 const handleNavigationIntent = async (intent: any) => {
   try {
@@ -1398,15 +1504,34 @@ const showExpenseActionsMenu = (expense: Expense) => {
         <Text style={styles.balanceTitle}>Your Balance</Text>
         <View style={styles.balanceGrid}>
           <View style={styles.balanceItem}>
-            <Text style={styles.balanceAmount}>${balances.totalOwed.toFixed(2)}</Text>
+            <Text 
+              style={styles.balanceAmount}
+              adjustsFontSizeToFit={true}
+              numberOfLines={1}
+              minimumFontScale={0.8}
+            >
+              ${balances.totalOwed.toFixed(2)}
+            </Text>
             <Text style={styles.balanceLabel}>You're owed</Text>
           </View>
           <View style={styles.balanceItem}>
-            <Text style={styles.balanceAmount}>${balances.totalOwing.toFixed(2)}</Text>
+            <Text 
+              style={styles.balanceAmount}
+              adjustsFontSizeToFit={true}
+              numberOfLines={1}
+              minimumFontScale={0.8}
+            >
+              ${balances.totalOwing.toFixed(2)}
+            </Text>
             <Text style={styles.balanceLabel}>You owe</Text>
           </View>
           <View style={styles.balanceItem}>
-            <Text style={[styles.balanceAmount, { color: '#FFD700' }]}>
+            <Text 
+              style={[styles.balanceAmount, { color: '#FFD700' }]}
+              adjustsFontSizeToFit={true}
+              numberOfLines={1}
+              minimumFontScale={0.8}
+            >
               ${Math.abs(balances.netBalance).toFixed(2)}
             </Text>
             <Text style={styles.balanceLabel}>Net balance</Text>
@@ -1585,7 +1710,7 @@ const showExpenseActionsMenu = (expense: Expense) => {
     </ScrollView>
   );
 
-  // FIX: Render groups tab with empty state
+// Fixed renderGroupsTab function - replace the existing one
 const renderGroupsTab = () => (
   <ScrollView 
     contentContainerStyle={styles.tabContent}
@@ -1620,78 +1745,101 @@ const renderGroupsTab = () => (
         </TouchableOpacity>
       </View>
     ) : (
-      groups.map((group) => (
-        <TouchableOpacity
-          key={group.id}
-          style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}
-          onPress={() => {
-            setSelectedGroup(group);
-            setShowGroupDetails(true);
-          }}
-        >
-          <View style={styles.groupHeader}>
-            <View style={styles.groupLeft}>
-              <Text style={styles.groupAvatar}>{group.avatar}</Text>
-              <View style={styles.groupInfo}>
-                <Text style={[styles.groupName, { color: theme.colors.text }]}>
-                  {group.name}
-                </Text>
-                <View style={styles.groupMetaRow}>
-                  <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
-                    {group.members.length} members
+      groups.map((group) => {
+        // FIXED: Find the logged-in user's actual balance in this group
+        const currentUserMember = group.members.find(member => member.userId === user?.id);
+        const userBalance = currentUserMember?.balance || 0;
+        
+        // Calculate user's share based on their actual balance
+        // Positive balance means they are owed money (others owe them)
+        // Negative balance means they owe money to others
+        const userShare = Math.abs(userBalance);
+        const shareStatus = userBalance === 0 ? 'settled' : (userBalance > 0 ? 'owed' : 'owes');
+        
+        return (
+          <TouchableOpacity
+            key={group.id}
+            style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}
+            onPress={() => {
+              setSelectedGroup(group);
+              setShowGroupDetails(true);
+            }}
+          >
+            <View style={styles.groupHeader}>
+              <View style={styles.groupLeft}>
+                <Text style={styles.groupAvatar}>{group.avatar}</Text>
+                <View style={styles.groupInfo}>
+                  <Text style={[styles.groupName, { color: theme.colors.text }]}>
+                    {group.name}
                   </Text>
-                  <Text style={[styles.groupDivider, { color: theme.colors.textSecondary }]}>
-                    •
-                  </Text>
-                  <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
-                    {group.updatedAt.toLocaleDateString()}
-                  </Text>
+                  <View style={styles.groupMetaRow}>
+                    <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
+                      {group.members.length} members
+                    </Text>
+                    <Text style={[styles.groupDivider, { color: theme.colors.textSecondary }]}>
+                      •
+                    </Text>
+                    <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
+                      {group.updatedAt.toLocaleDateString()}
+                    </Text>
+                  </View>
                 </View>
               </View>
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setSelectedGroup(group);
+                  setShowQRCode(true);
+                }}
+                style={styles.groupActionButton}
+              >
+                <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                setSelectedGroup(group);
-                setShowQRCode(true);
-              }}
-              style={styles.groupActionButton}
-            >
-              <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.groupStats}>
-            <View style={styles.groupStat}>
-              <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-                Total spent
-              </Text>
-              <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                ${group.totalExpenses.toFixed(2)}
-              </Text>
+            <View style={styles.groupStats}>
+              <View style={styles.groupStat}>
+                <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
+                  Total spent
+                </Text>
+                <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
+                  ${group.totalExpenses.toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.groupStat}>
+                <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
+                  {shareStatus === 'settled' ? 'Settled up' : 
+                   shareStatus === 'owed' ? 'You\'re owed' : 'You owe'}
+                </Text>
+                <Text style={[
+                  styles.groupStatValue, 
+                  { 
+                    color: shareStatus === 'settled' ? theme.colors.textSecondary :
+                           shareStatus === 'owed' ? theme.colors.success : 
+                           theme.colors.error 
+                  }
+                ]}>
+                  {shareStatus === 'settled' ? '✓' : `$${userShare.toFixed(2)}`}
+                </Text>
+              </View>
             </View>
-            <View style={styles.groupStat}>
-              <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-                Your share
-              </Text>
-              <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                ${(group.totalExpenses / group.members.length).toFixed(2)}
-              </Text>
-            </View>
-          </View>
 
-          {/* Action buttons row - now has proper spacing */}
-          <View style={styles.groupActions}>
+            {/* Action buttons row - now has proper spacing */}
+            <View style={styles.groupActions}>
             <TouchableOpacity
               onPress={(e) => {
                 e.stopPropagation();
                 setSelectedGroup(group);
                 setShowGroupChat(true);
               }}
-              style={[styles.actionButton, styles.chatButton, { backgroundColor: theme.colors.primary + '20' }]}
+              style={[styles.actionButton, styles.enhancedChatButton]}
             >
-              <Ionicons name="chatbubble" size={16} color={theme.colors.primary} />
-              <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Chat</Text>
+              <Ionicons name="chatbubbles" size={18} color="white" />
+              <Text style={[styles.actionButtonText, { color: 'white', fontWeight: 'bold' }]}>Chat</Text>
+              {/* Optional: Add unread message badge */}
+              <View style={styles.chatBadge}>
+                <Text style={styles.chatBadgeText}>2</Text>
+              </View>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -1700,7 +1848,7 @@ const renderGroupsTab = () => (
                 setSelectedGroup(group);
                 setShowGroupSettlement(true);
               }}
-              style={[styles.actionButton, styles.settleButton, { backgroundColor: theme.colors.success + '20' }]}
+              style={[styles.actionButton, styles.settlementButton, { backgroundColor: theme.colors.success + '20' }]}
             >
               <Ionicons name="card" size={16} color={theme.colors.success} />
               <Text style={[styles.actionButtonText, { color: theme.colors.success }]}>Settle</Text>
@@ -1712,146 +1860,179 @@ const renderGroupsTab = () => (
                 setSelectedGroupForExpense(group);
                 setShowAddExpense(true);
               }}
-              style={[styles.actionButton, styles.addExpenseActionButton, { backgroundColor: theme.colors.primary }]}
+              style={[styles.actionButton, styles.addExpenseButton, { backgroundColor: theme.colors.primary }]}
             >
               <Ionicons name="add" size={16} color="white" />
               <Text style={[styles.actionButtonText, { color: 'white' }]}>Add Expense</Text>
             </TouchableOpacity>
+          </View>
+          </TouchableOpacity>
+        );
+      })
+    )}
+  </ScrollView>
+);
+
+  // Render friends tab
+const renderFriendsTab = () => (
+  <ScrollView 
+    contentContainerStyle={styles.tabContent}
+    refreshControl={
+      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+    }
+  >
+    <View style={styles.tabHeader}>
+      <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Friends & Balances</Text>
+      <TouchableOpacity
+        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+        onPress={() => setShowAddFriend(true)}
+      >
+        <Ionicons name="person-add" size={20} color="white" />
+        <Text style={styles.headerButtonText}>Add</Text>
+      </TouchableOpacity>
+    </View>
+
+    {/* Show all people with balances (friends + group members) */}
+    {comprehensiveBalances.friendBalances.length === 0 ? (
+      <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+        <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
+        <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Balances Yet</Text>
+        <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+          Add friends or join groups to start splitting expenses
+        </Text>
+        <TouchableOpacity
+          style={[styles.addFirstFriendButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => setShowAddFriend(true)}
+        >
+          <Text style={styles.addFirstFriendText}>Add Your First Friend</Text>
+        </TouchableOpacity>
+      </View>
+    ) : (
+      comprehensiveBalances.friendBalances.map((person) => (
+        <TouchableOpacity
+          key={`${person.userId}-${person.source}`}
+          style={[styles.friendCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => {
+            if (person.source === 'friend') {
+              // Existing friend - show normal actions
+              const friend = friends.find(f => f.friendId === person.userId);
+              if (friend) showFriendActionsMenu(friend);
+            } else {
+              // Group member who isn't friend yet - offer to connect
+              Alert.alert(
+                'Connect with Group Member?',
+                `${person.name} is in your group "${person.groupName}" but you're not friends yet. Send a friend request to easily split expenses and settle payments?`,
+                [
+                  { text: 'Not Now', style: 'cancel' },
+                  {
+                    text: 'Send Friend Request',
+                    onPress: async () => {
+                      try {
+                        await SplittingService.sendFriendRequest(
+                          user!.id,
+                          person.email,
+                          `Hi! We're both in the group "${person.groupName}". Let's connect to easily split expenses! 💰`
+                        );
+                        Alert.alert('Friend Request Sent! 📤', `Request sent to ${person.name}`);
+                        debouncedLoadComprehensiveBalances();
+                      } catch (error: any) {
+                        Alert.alert('Error', error.message || 'Failed to send friend request');
+                      }
+                    }
+                  }
+                ]
+              );
+            }
+          }}
+        >
+          <View style={styles.friendCardHeader}>
+            <View style={styles.friendLeft}>
+              <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
+                <Text style={styles.friendAvatarText}>
+                  {person.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View>
+                <Text style={[styles.friendName, { color: theme.colors.text }]}>
+                  {person.name}
+                </Text>
+                <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                  {person.email}
+                </Text>
+                <Text style={[
+                  styles.friendStatus, 
+                  { 
+                    color: person.source === 'friend' ? theme.colors.success : theme.colors.primary
+                  }
+                ]}>
+                  {person.source === 'friend' ? '✓ Friend' : `📱 Group: ${person.groupName}`}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.friendActions}>
+              {/* Payment button for anyone with balance */}
+              {Math.abs(person.balance) > 0.01 && (
+                <TouchableOpacity
+                  style={[styles.payButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => {
+                    if (person.source === 'friend') {
+                      const friend = friends.find(f => f.friendId === person.userId);
+                      if (friend) {
+                        setSelectedFriend(friend);
+                        setShowPayment(true);
+                      }
+                    } else {
+                      // For group members, offer to connect first
+                      Alert.alert(
+                        'Connect to Pay',
+                        'Send a friend request first to enable easy payments and expense splitting.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Send Request',
+                            onPress: async () => {
+                              try {
+                                await SplittingService.sendFriendRequest(user!.id, person.email);
+                                Alert.alert('Request Sent!', 'You can settle payments once they accept.');
+                              } catch (error: any) {
+                                Alert.alert('Error', error.message);
+                              }
+                            }
+                          }
+                        ]
+                      );
+                    }
+                  }}
+                >
+                  <Text style={styles.payButtonText}>
+                    {person.balance > 0 ? 'Request' : 'Pay'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.friendBalance}>
+            {Math.abs(person.balance) < 0.01 ? (
+              <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
+                All settled up! 🎉
+              </Text>
+            ) : person.balance > 0 ? (
+              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                {person.name} owes you ${Math.abs(person.balance).toFixed(2)}
+              </Text>
+            ) : (
+              <Text style={[styles.balanceText, { color: theme.colors.error }]}>
+                You owe {person.name} ${Math.abs(person.balance).toFixed(2)}
+              </Text>
+            )}
           </View>
         </TouchableOpacity>
       ))
     )}
   </ScrollView>
 );
-
-  // Render friends tab
-  const renderFriendsTab = () => (
-    <ScrollView 
-      contentContainerStyle={styles.tabContent}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View style={styles.tabHeader}>
-        <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Friends</Text>
-        <TouchableOpacity
-          style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
-          onPress={() => setShowAddFriend(true)}
-        >
-          <Ionicons name="person-add" size={20} color="white" />
-          <Text style={styles.headerButtonText}>Add</Text>
-        </TouchableOpacity>
-      </View>
-
-      {friends.length === 0 ? (
-        <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Friends Yet</Text>
-          <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-            Add friends to start splitting expenses together
-          </Text>
-          <TouchableOpacity
-            style={[styles.addFirstFriendButton, { backgroundColor: theme.colors.primary }]}
-            onPress={() => setShowAddFriend(true)}
-          >
-            <Text style={styles.addFirstFriendText}>Add Your First Friend</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        friends.map((friend) => (
-          <TouchableOpacity
-            key={friend.id}
-            style={[styles.friendCard, { backgroundColor: theme.colors.surface }]}
-            onPress={() => showFriendActionsMenu(friend)}
-            onLongPress={() => showFriendActionsMenu(friend)}
-          >
-            <View style={styles.friendCardHeader}>
-              <View style={styles.friendLeft}>
-                <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
-                  <Text style={styles.friendAvatarText}>
-                    {friend.friendData.fullName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View>
-                  <Text style={[styles.friendName, { color: theme.colors.text }]}>
-                    {friend.friendData.fullName}
-                  </Text>
-                  <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                    {friend.friendData.email}
-                  </Text>
-                  {/* Show friend status */}
-                  <Text style={[
-                    styles.friendStatus, 
-                    { 
-                      color: friend.status === 'accepted' ? theme.colors.success : 
-                             friend.status === 'invited' ? theme.colors.primary : 
-                             friend.status === 'pending' ? theme.colors.primary : 
-                             friend.status === 'blocked' ? theme.colors.error :
-                             theme.colors.textSecondary
-                    }
-                  ]}>
-                    {friend.status === 'accepted' ? '✓ Friends' : 
-                     friend.status === 'invited' ? '📤 Invitation Sent' : 
-                     friend.status === 'pending' ? '⏳ Pending Response' : 
-                     friend.status === 'blocked' ? '🚫 Blocked' :
-                     'Unknown'}
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={styles.friendActions}>
-                {/* Quick payment button for accepted friends with balance */}
-                {friend.balance !== 0 && friend.status === 'accepted' && (
-                  <TouchableOpacity
-                    style={[styles.payButton, { backgroundColor: theme.colors.primary }]}
-                    onPress={() => {
-                      setSelectedFriend(friend);
-                      setShowPayment(true);
-                    }}
-                  >
-                    <Text style={styles.payButtonText}>
-                      {friend.balance > 0 ? 'Request' : 'Pay'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                
-                {/* Options button */}
-                <TouchableOpacity
-                  style={styles.optionsButton}
-                  onPress={() => showFriendActionsMenu(friend)}
-                >
-                  <Ionicons name="ellipsis-vertical" size={20} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.friendBalance}>
-              {friend.status !== 'accepted' ? (
-                <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-                  {friend.status === 'invited' && friend.invitedAt && 
-                    `Invited ${friend.invitedAt.toLocaleDateString()}`
-                  }
-                  {friend.status === 'blocked' && 'Blocked'}
-                </Text>
-              ) : friend.balance === 0 ? (
-                <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-                  You're all settled up! 🎉
-                </Text>
-              ) : friend.balance > 0 ? (
-                <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                  {friend.friendData.fullName} owes you ${Math.abs(friend.balance).toFixed(2)}
-                </Text>
-              ) : (
-                <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                  You owe {friend.friendData.fullName} ${Math.abs(friend.balance).toFixed(2)}
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        ))
-      )}
-    </ScrollView>
-  );
 
   // Tab navigation
   const tabs = [
@@ -2446,20 +2627,28 @@ const styles = StyleSheet.create({
   },
   balanceGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 8,
   },
   balanceItem: {
     alignItems: 'center',
+    flex: 1,
+    paddingHorizontal: 4,
+    maxWidth: '33.33%',
   },
   balanceAmount: {
     color: 'white',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   balanceLabel: {
     color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 4,
+    textAlign: 'center',
+    lineHeight: 14,
   },
   quickActions: {
     flexDirection: 'row',
@@ -2866,5 +3055,40 @@ groupFooterActions: {
   groupActionButton: {
     padding: 8,
     marginLeft: 8,
+  },
+   enhancedChatButton: {
+    backgroundColor: '#00C851', // Bright green for chat
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 6,
+    flex: 1.2, // Make it slightly larger
+    justifyContent: 'center',
+    minHeight: 40,
+    shadowColor: '#00C851',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  
+  chatBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  chatBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });

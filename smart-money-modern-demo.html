@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartMoney - Modern & Sleek</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Light theme */
+            --bg-primary: #fafbfc;
+            --bg-secondary: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.8);
+            --bg-overlay: rgba(255, 255, 255, 0.95);
+            --text-primary: #0a0b0d;
+            --text-secondary: #6c7580;
+            --text-tertiary: #9ca0a8;
+            --accent-primary: #00c805;
+            --accent-secondary: #06d6a0;
+            --accent-tertiary: #f59e0b;
+            --accent-danger: #ef4444;
+            --border-light: rgba(0, 0, 0, 0.08);
+            --border-medium: rgba(0, 0, 0, 0.12);
+            --shadow-soft: 0 2px 16px rgba(0, 0, 0, 0.04);
+            --shadow-medium: 0 8px 32px rgba(0, 0, 0, 0.08);
+            --shadow-strong: 0 16px 64px rgba(0, 0, 0, 0.12);
+            --gradient-primary: linear-gradient(135deg, #00c805 0%, #00a804 100%);
+            --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-tertiary: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0a0a0b;
+            --bg-secondary: #141517;
+            --bg-glass: rgba(20, 21, 23, 0.8);
+            --bg-overlay: rgba(20, 21, 23, 0.95);
+            --text-primary: #f8f9fa;
+            --text-secondary: #b8bcc3;
+            --text-tertiary: #7c838d;
+            --accent-primary: #00c805;
+            --accent-secondary: #10b981;
+            --accent-tertiary: #f59e0b;
+            --accent-danger: #f87171;
+            --border-light: rgba(255, 255, 255, 0.08);
+            --border-medium: rgba(255, 255, 255, 0.12);
+            --shadow-soft: 0 2px 16px rgba(0, 0, 0, 0.2);
+            --shadow-medium: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --shadow-strong: 0 16px 64px rgba(0, 0, 0, 0.4);
+            --gradient-primary: linear-gradient(135deg, #00c805 0%, #00a804 100%);
+            --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-tertiary: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            min-height: 100vh;
+            background: var(--bg-primary);
+            position: relative;
+        }
+
+        /* Floating Header */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+            background: var(--bg-overlay);
+            border-bottom: 1px solid var(--border-light);
+            padding: 16px 24px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 14px;
+        }
+
+        .app-title {
+            font-size: 20px;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .theme-toggle {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-light);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 18px;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            background: var(--bg-secondary);
+            border-color: var(--accent-primary);
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 32px 24px;
+        }
+
+        /* Balance Card */
+        .balance-card {
+            background: var(--bg-secondary);
+            border-radius: 24px;
+            padding: 32px;
+            margin-bottom: 32px;
+            border: 1px solid var(--border-light);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .balance-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-primary);
+        }
+
+        .balance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .balance-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .balance-trend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-secondary);
+            font-weight: 500;
+        }
+
+        .balance-main {
+            margin-bottom: 24px;
+        }
+
+        .balance-amount {
+            font-size: 48px;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 8px;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .balance-subtitle {
+            font-size: 14px;
+            color: var(--text-tertiary);
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .action-btn {
+            aspect-ratio: 1;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-medium);
+            border-color: var(--accent-primary);
+            background: var(--bg-glass);
+        }
+
+        .action-icon {
+            font-size: 24px;
+            opacity: 0.8;
+        }
+
+        .action-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* Insights Section */
+        .insights-section {
+            margin-bottom: 32px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .section-action {
+            font-size: 14px;
+            color: var(--accent-primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .insight-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .insight-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-soft);
+            border-color: var(--border-medium);
+        }
+
+        .insight-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .insight-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .insight-change {
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .positive { color: var(--accent-secondary); }
+        .negative { color: var(--accent-danger); }
+
+        /* Transactions */
+        .transactions-section {
+            margin-bottom: 100px;
+        }
+
+        .transaction-list {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .transaction-item {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-item:hover {
+            background: var(--bg-glass);
+        }
+
+        .transaction-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .transaction-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .transaction-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .transaction-subtitle {
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+
+        .transaction-amount-wrapper {
+            text-align: right;
+        }
+
+        .transaction-amount {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .transaction-time {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+
+        /* Floating Action Button */
+        .fab {
+            position: fixed;
+            bottom: 32px;
+            right: 50%;
+            transform: translateX(50%);
+            width: 64px;
+            height: 64px;
+            background: var(--gradient-primary);
+            border-radius: 20px;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: var(--shadow-strong);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 50;
+        }
+
+        .fab:hover {
+            transform: translateX(50%) scale(1.1);
+            box-shadow: 0 20px 80px rgba(0, 200, 5, 0.4);
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .balance-amount {
+                font-size: 36px;
+            }
+            
+            .quick-actions {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo">S</div>
+                    <h1 class="app-title">SmartMoney</h1>
+                </div>
+                <div class="header-actions">
+                    <button class="theme-toggle" onclick="toggleTheme()">
+                        <span id="theme-icon">🌙</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Balance Card -->
+            <div class="balance-card fade-in-up">
+                <div class="balance-header">
+                    <div class="balance-label">Total Balance</div>
+                    <div class="balance-trend">
+                        <span>↗</span>
+                        <span>+12.5%</span>
+                    </div>
+                </div>
+                <div class="balance-main">
+                    <div class="balance-amount" id="balance-amount">$4,287.65</div>
+                    <div class="balance-subtitle">Available to spend</div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions fade-in-up">
+                <div class="action-btn">
+                    <div class="action-icon">📊</div>
+                    <div class="action-label">Analytics</div>
+                </div>
+                <div class="action-btn">
+                    <div class="action-icon">💳</div>
+                    <div class="action-label">Cards</div>
+                </div>
+                <div class="action-btn">
+                    <div class="action-icon">🏦</div>
+                    <div class="action-label">Banks</div>
+                </div>
+                <div class="action-btn">
+                    <div class="action-icon">📱</div>
+                    <div class="action-label">Scan</div>
+                </div>
+            </div>
+
+            <!-- Insights Section -->
+            <section class="insights-section fade-in-up">
+                <div class="section-header">
+                    <h2 class="section-title">Insights</h2>
+                    <a href="#" class="section-action">View all</a>
+                </div>
+                <div class="insights-grid">
+                    <div class="insight-card">
+                        <div class="insight-value">$342</div>
+                        <div class="insight-label">This Week</div>
+                        <div class="insight-change positive">
+                            <span>↗</span>
+                            <span>+8.2%</span>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-value">$1,205</div>
+                        <div class="insight-label">This Month</div>
+                        <div class="insight-change negative">
+                            <span>↘</span>
+                            <span>-3.1%</span>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-value">$89</div>
+                        <div class="insight-label">Daily Avg</div>
+                        <div class="insight-change positive">
+                            <span>↗</span>
+                            <span>+5.7%</span>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-value">23</div>
+                        <div class="insight-label">Transactions</div>
+                        <div class="insight-change positive">
+                            <span>↗</span>
+                            <span>+12%</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Recent Transactions -->
+            <section class="transactions-section fade-in-up">
+                <div class="section-header">
+                    <h2 class="section-title">Recent Activity</h2>
+                    <a href="#" class="section-action">View all</a>
+                </div>
+                <div class="transaction-list">
+                    <div class="transaction-item">
+                        <div class="transaction-avatar" style="background: var(--gradient-secondary);">
+                            ☕
+                        </div>
+                        <div class="transaction-details">
+                            <div class="transaction-title">Starbucks Coffee</div>
+                            <div class="transaction-subtitle">Food & Dining</div>
+                        </div>
+                        <div class="transaction-amount-wrapper">
+                            <div class="transaction-amount negative">-$6.50</div>
+                            <div class="transaction-time">2 hours ago</div>
+                        </div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-avatar" style="background: var(--gradient-tertiary);">
+                            🚗
+                        </div>
+                        <div class="transaction-details">
+                            <div class="transaction-title">Uber Ride</div>
+                            <div class="transaction-subtitle">Transportation</div>
+                        </div>
+                        <div class="transaction-amount-wrapper">
+                            <div class="transaction-amount negative">-$18.25</div>
+                            <div class="transaction-time">5 hours ago</div>
+                        </div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-avatar" style="background: var(--accent-secondary);">
+                            💰
+                        </div>
+                        <div class="transaction-details">
+                            <div class="transaction-title">Salary Deposit</div>
+                            <div class="transaction-subtitle">Income</div>
+                        </div>
+                        <div class="transaction-amount-wrapper">
+                            <div class="transaction-amount positive">+$3,200.00</div>
+                            <div class="transaction-time">Yesterday</div>
+                        </div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-avatar" style="background: var(--accent-tertiary);">
+                            🛒
+                        </div>
+                        <div class="transaction-details">
+                            <div class="transaction-title">Amazon Purchase</div>
+                            <div class="transaction-subtitle">Shopping</div>
+                        </div>
+                        <div class="transaction-amount-wrapper">
+                            <div class="transaction-amount negative">-$89.99</div>
+                            <div class="transaction-time">2 days ago</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Floating Action Button -->
+        <button class="fab" onclick="addExpense()">
+            +
+        </button>
+    </div>
+
+    <script>
+        let isDark = false;
+
+        function toggleTheme() {
+            isDark = !isDark;
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+            
+            if (isDark) {
+                body.setAttribute('data-theme', 'dark');
+                themeIcon.textContent = '☀️';
+            } else {
+                body.setAttribute('data-theme', 'light');
+                themeIcon.textContent = '🌙';
+            }
+        }
+
+        function addExpense() {
+            alert('Add Expense functionality - would open modal in actual app');
+        }
+
+        // Animate balance on load
+        function animateBalance() {
+            const balanceElement = document.getElementById('balance-amount');
+            const finalAmount = 4287.65;
+            let currentAmount = 0;
+            const increment = finalAmount / 50;
+            
+            const animation = setInterval(() => {
+                currentAmount += increment;
+                if (currentAmount >= finalAmount) {
+                    currentAmount = finalAmount;
+                    clearInterval(animation);
+                }
+                balanceElement.textContent = `$${currentAmount.toFixed(2)}`;
+            }, 40);
+        }
+
+        // Initialize animations
+        window.addEventListener('load', () => {
+            setTimeout(animateBalance, 500);
+        });
+
+        // Add scroll animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.fade-in-up');
+            elements.forEach(el => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(30px)';
+                el.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+                observer.observe(el);
+            });
+        });
+    </script>
+</body>
+</html>

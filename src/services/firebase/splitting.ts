@@ -1195,8 +1195,16 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     
     const batch = writeBatch(db);
     
+    // Sanitize paidByData to ensure no undefined values
+    const sanitizedPaidByData = {
+      fullName: expenseData.paidByData?.fullName || 'Unknown User',
+      email: expenseData.paidByData?.email || '',
+      avatar: expenseData.paidByData?.avatar || ''
+    };
+    
     const newExpense: Omit<Expense, 'id'> = {
       ...expenseData,
+      paidByData: sanitizedPaidByData,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -1256,7 +1264,10 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
       // Get group data to get member list and group name
       const groupDoc = await getDoc(doc(db, 'groups', expenseData.groupId));
       if (groupDoc.exists()) {
-        const groupData = groupDoc.data() as Group;
+        const groupData = { 
+          id: groupDoc.id, 
+          ...groupDoc.data() 
+        } as Group;
         
         // Use NotificationManager for push notifications and in-app notifications
         const { notificationManager } = await import('../NotificationManager');
@@ -2391,7 +2402,19 @@ static async processRecurringExpenses(): Promise<void> {
     const snapshot = await getDocs(recurringQuery);
     
     for (const docSnapshot of snapshot.docs) {
-      const recurring = { id: docSnapshot.id, ...docSnapshot.data() } as RecurringExpense;
+      const data = docSnapshot.data();
+      
+      // Convert Firebase Timestamps to JavaScript Dates
+      const recurring = { 
+        id: docSnapshot.id, 
+        ...data,
+        startDate: data.startDate?.toDate ? data.startDate.toDate() : new Date(data.startDate),
+        endDate: data.endDate?.toDate ? data.endDate.toDate() : (data.endDate ? new Date(data.endDate) : undefined),
+        nextDueDate: data.nextDueDate?.toDate ? data.nextDueDate.toDate() : new Date(data.nextDueDate),
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
+        lastProcessedDate: data.lastProcessedDate?.toDate ? data.lastProcessedDate.toDate() : (data.lastProcessedDate ? new Date(data.lastProcessedDate) : undefined)
+      } as RecurringExpense;
       
       // Check if we've reached max occurrences (only if maxOccurrences is set)
       if (recurring.maxOccurrences && recurring.processedCount >= recurring.maxOccurrences) {
@@ -2411,7 +2434,11 @@ static async processRecurringExpenses(): Promise<void> {
         categoryIcon: recurring.categoryIcon,
         groupId: recurring.groupId,
         paidBy: recurring.paidBy,
-        paidByData: recurring.paidByData,
+        paidByData: {
+          fullName: recurring.paidByData?.fullName || 'Unknown User',
+          email: recurring.paidByData?.email || '',
+          avatar: '' // RecurringExpense paidByData doesn't have avatar field
+        },
         splitType: recurring.splitType,
         splitData: recurring.splitData,
         notes: `Recurring: ${recurring.templateName}`,
@@ -2420,8 +2447,36 @@ static async processRecurringExpenses(): Promise<void> {
         isSettled: false
       });
       
-      // Calculate next due date
-      const nextDue = new Date(recurring.nextDueDate);
+      // Calculate next due date with proper validation
+      let nextDue: Date;
+      try {
+        // Handle Firebase Timestamp objects
+        if (recurring.nextDueDate && typeof recurring.nextDueDate === 'object' && 'toDate' in recurring.nextDueDate) {
+          nextDue = (recurring.nextDueDate as any).toDate();
+        } else {
+          nextDue = new Date(recurring.nextDueDate);
+        }
+        
+        // Validate the date
+        if (isNaN(nextDue.getTime())) {
+          console.error('Invalid nextDueDate for recurring expense:', recurring.id, recurring.nextDueDate);
+          // Skip this recurring expense and mark it as inactive
+          await updateDoc(doc(db, 'recurringExpenses', recurring.id), {
+            isActive: false,
+            updatedAt: new Date()
+          });
+          continue;
+        }
+      } catch (dateError) {
+        console.error('Date parsing error for recurring expense:', recurring.id, dateError);
+        // Skip this recurring expense and mark it as inactive
+        await updateDoc(doc(db, 'recurringExpenses', recurring.id), {
+          isActive: false,
+          updatedAt: new Date()
+        });
+        continue;
+      }
+      
       switch (recurring.frequency) {
         case 'weekly':
           nextDue.setDate(nextDue.getDate() + 7);
@@ -2435,6 +2490,17 @@ static async processRecurringExpenses(): Promise<void> {
         case 'yearly':
           nextDue.setFullYear(nextDue.getFullYear() + 1);
           break;
+      }
+      
+      // Validate the computed next due date
+      if (isNaN(nextDue.getTime())) {
+        console.error('Invalid computed nextDueDate for recurring expense:', recurring.id);
+        // Mark as inactive to prevent further processing
+        await updateDoc(doc(db, 'recurringExpenses', recurring.id), {
+          isActive: false,
+          updatedAt: new Date()
+        });
+        continue;
       }
       
       // Update recurring expense
@@ -2963,10 +3029,9 @@ static async createSettlementTransaction(settlementData: {
       amount: settlementData.amount,
       currency: settlementData.currency,
       description: settlementData.description || `Settlement payment to ${toUserData?.fullName}`,
-      // FIXED: Convert undefined to null for Firebase
-      groupId: settlementData.groupId || null,
-      groupData: groupData || null,
-      expenseId: settlementData.expenseId || null,
+      groupId: settlementData.groupId || undefined,
+      groupData: groupData || undefined,
+      expenseId: settlementData.expenseId || undefined,
       method: settlementData.method,
       status: 'completed',
       notes: settlementData.notes || '',
@@ -3446,6 +3511,239 @@ static async markPaymentAsPaid(
   } catch (error) {
     console.error('❌ Mark payment as paid error:', error);
     throw error;
+  }
+}
+// ==========================================
+// PHASE 1: COMPREHENSIVE BALANCE CALCULATION
+// ==========================================
+
+// Add this new service method to SplittingService (in splitting.ts)
+static async getComprehensiveUserBalances(userId: string): Promise<{
+  totalOwed: number;
+  totalOwing: number;
+  netBalance: number;
+  friendBalances: Array<{
+    userId: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    balance: number;
+    source: 'friend' | 'group';
+    groupName?: string;
+    groupId?: string;
+  }>;
+}> {
+  try {
+    let totalOwed = 0;
+    let totalOwing = 0;
+    const balanceDetails: Array<{
+      userId: string;
+      name: string;
+      email: string;
+      avatar?: string;
+      balance: number;
+      source: 'friend' | 'group';
+      groupName?: string;
+      groupId?: string;
+    }> = [];
+
+    // 1. Get balances from existing friends
+    const friends = await this.getFriends(userId);
+    const friendUserIds = new Set(friends.map(f => f.friendId));
+
+    friends.forEach(friend => {
+      if (friend.status === 'accepted' && Math.abs(friend.balance) > 0.01) {
+        balanceDetails.push({
+          userId: friend.friendId,
+          name: friend.friendData.fullName,
+          email: friend.friendData.email,
+          avatar: friend.friendData.avatar,
+          balance: friend.balance,
+          source: 'friend'
+        });
+
+        if (friend.balance > 0) {
+          totalOwed += friend.balance;
+        } else {
+          totalOwing += Math.abs(friend.balance);
+        }
+      }
+    });
+
+    // 2. Get balances from groups for non-friend members
+    const userGroups = await this.getUserGroups(userId);
+    
+    for (const group of userGroups) {
+      const userMember = group.members.find(member => member.userId === userId);
+      if (!userMember) continue;
+
+      // Calculate balances with each group member
+      for (const otherMember of group.members) {
+        if (otherMember.userId === userId) continue;
+        
+        // Skip if already counted as friend
+        if (friendUserIds.has(otherMember.userId)) continue;
+
+        // Calculate actual balance between these two users in this group
+        const balance = await this.calculatePairwiseBalance(userId, otherMember.userId, group.id);
+        
+        if (Math.abs(balance) > 0.01) {
+          // Check if we already have this user from another group
+          const existingIndex = balanceDetails.findIndex(b => 
+            b.userId === otherMember.userId && b.source === 'group'
+          );
+
+          if (existingIndex >= 0) {
+            // Combine balances if user appears in multiple groups
+            balanceDetails[existingIndex].balance += balance;
+            balanceDetails[existingIndex].groupName += `, ${group.name}`;
+          } else {
+            // Add new non-friend group member
+            balanceDetails.push({
+              userId: otherMember.userId,
+              name: otherMember.userData.fullName,
+              email: otherMember.userData.email,
+              avatar: otherMember.userData.avatar,
+              balance: balance,
+              source: 'group',
+              groupName: group.name,
+              groupId: group.id
+            });
+          }
+
+          if (balance > 0) {
+            totalOwed += balance;
+          } else {
+            totalOwing += Math.abs(balance);
+          }
+        }
+      }
+    }
+
+    const netBalance = totalOwed - totalOwing;
+
+    return {
+      totalOwed: parseFloat(totalOwed.toFixed(2)),
+      totalOwing: parseFloat(totalOwing.toFixed(2)),
+      netBalance: parseFloat(netBalance.toFixed(2)),
+      friendBalances: balanceDetails
+    };
+
+  } catch (error) {
+    console.error('❌ Get comprehensive balances error:', error);
+    return {
+      totalOwed: 0,
+      totalOwing: 0,
+      netBalance: 0,
+      friendBalances: []
+    };
+  }
+}
+
+// Helper method to calculate balance between two users in a specific group
+static async calculatePairwiseBalance(userId1: string, userId2: string, groupId: string): Promise<number> {
+  try {
+    // Get all expenses in this group
+    const expenses = await this.getGroupExpenses(groupId);
+    let balance = 0;
+
+    expenses.forEach(expense => {
+      // Case 1: userId1 paid, userId2 owes
+      if (expense.paidBy === userId1) {
+        const user2Split = expense.splitData.find(split => split.userId === userId2);
+        if (user2Split) {
+          balance += user2Split.amount; // userId2 owes userId1
+        }
+      }
+      
+      // Case 2: userId2 paid, userId1 owes
+      if (expense.paidBy === userId2) {
+        const user1Split = expense.splitData.find(split => split.userId === userId1);
+        if (user1Split) {
+          balance -= user1Split.amount; // userId1 owes userId2
+        }
+      }
+    });
+
+    return parseFloat(balance.toFixed(2));
+  } catch (error) {
+    console.error('Calculate pairwise balance error:', error);
+    return 0;
+  }
+}
+
+// ==========================================
+// PHASE 2: AUTO-FRIEND INTEGRATION
+// ==========================================
+
+// Enhanced auto-add function with better UX
+static async autoConnectGroupMembers(groupId: string, userId: string, showPrompt: boolean = true): Promise<{
+  success: boolean;
+  requestsSent: number;
+  alreadyConnected: number;
+  failed: number;
+}> {
+  try {
+    console.log('🔄 Auto-connecting group members for user:', userId, 'in group:', groupId);
+    
+    const group = await this.getGroup(groupId);
+    if (!group) throw new Error('Group not found');
+
+    const currentUserDoc = await getDoc(doc(db, 'users', userId));
+    if (!currentUserDoc.exists()) throw new Error('User not found');
+
+    let requestsSent = 0;
+    let alreadyConnected = 0;
+    let failed = 0;
+
+    // Process each member
+    for (const member of group.members) {
+      if (member.userId === userId) continue; // Skip self
+      
+      try {
+        // Check existing friendship
+        const existingCheck = await this.checkExistingFriendship(userId, member.userData.email);
+        
+        if (existingCheck.isFriend) {
+          alreadyConnected++;
+          console.log(`👥 Already connected with ${member.userData.fullName}`);
+        } else {
+          // Send friend request with group context
+          const result = await this.sendFriendRequest(
+            userId,
+            member.userData.email,
+            `Hi! We're both in the group "${group.name}". Let's connect to easily split expenses and settle payments! 💰`
+          );
+          
+          if (result.success) {
+            requestsSent++;
+            console.log(`✅ Friend request sent to ${member.userData.fullName}`);
+          } else {
+            failed++;
+            console.log(`❌ Failed to send request to ${member.userData.fullName}`);
+          }
+        }
+      } catch (error) {
+        failed++;
+        console.log(`❌ Error processing ${member.userData.fullName}:`, error);
+      }
+    }
+
+    return {
+      success: true,
+      requestsSent,
+      alreadyConnected,
+      failed
+    };
+
+  } catch (error) {
+    console.error('❌ Auto-connect group members error:', error);
+    return {
+      success: false,
+      requestsSent: 0,
+      alreadyConnected: 0,
+      failed: 0
+    };
   }
 }
 }

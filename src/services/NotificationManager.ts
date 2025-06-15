@@ -118,7 +118,7 @@ export class NotificationManager {
           message: `${expense.paidByData.fullName} added "${expense.description}" for ${expense.currency} ${expense.amount} in ${groupData.name}`,
           data: {
             expenseId: expense.id,
-            groupId: groupData.id,
+            groupId: groupData.id || expense.groupId, // Fallback to expense.groupId if groupData.id is undefined
             groupName: groupData.name,
             senderName: expense.paidByData.fullName,
             senderAvatar: expense.paidByData.avatar || '',
@@ -127,7 +127,7 @@ export class NotificationManager {
             description: expense.description,
             // Deep linking data
             navigationType: 'groupExpenseDetails',
-            targetGroupId: groupData.id,
+            targetGroupId: groupData.id || expense.groupId,
             targetExpenseId: expense.id
           },
           isRead: false,
