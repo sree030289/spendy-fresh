@@ -1,4 +1,4 @@
-import { AppTheme } from '@/types';
+import { AppTheme } from '@/types/index';
 
 export const LIGHT_THEME: AppTheme = {
   isDark: false,
