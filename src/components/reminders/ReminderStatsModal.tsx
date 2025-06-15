@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
-import { RemindersService } from '@/services/reminders/RemindersService1';
+import { RemindersService } from '@/services/reminders/RemindersService';
 import { ReminderCategory } from '@/types/reminder';
 import { formatCurrency } from '@/utils/currency';
 

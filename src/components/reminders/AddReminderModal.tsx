@@ -19,7 +19,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { CustomDateTimePicker } from '@/components/common/DateTimePicker'; // Use named import
-import { RemindersService } from '@/services/reminders/RemindersService1';
+import { RemindersService } from '@/services/reminders/RemindersService';
 import { ReminderCategory, RecurringType } from '@/types/reminder';
 import { formatCurrency } from '@/utils/currency';
 

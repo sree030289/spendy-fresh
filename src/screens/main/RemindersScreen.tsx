@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { RemindersService } from '@/services/reminders/RemindersService1';
+import { RemindersService } from '@/services/reminders/RemindersService';
 import { Reminder, ReminderCategory, ReminderStatus } from '@/types/reminder';
 import { formatCurrency } from '@/utils/currency';
 import AddReminderModal from '@/components/reminders/AddReminderModal';

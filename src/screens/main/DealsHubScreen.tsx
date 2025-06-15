@@ -21,7 +21,6 @@ import {
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/useTheme';
 
 interface Deal {
   id: string;
@@ -58,8 +57,7 @@ interface ChatMessage {
 
 const DEAL_CATEGORIES = ['All', 'OTT', 'Freebies', 'Group Buying', 'Local Deals', 'Partners'];
 
-function DealsHubScreen() {
-  const { theme } = useTheme();
+const DealsHubScreen: React.FC = () => {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -369,58 +367,202 @@ Found this deal on Spendy Deals Hub!`;
   };
 
   const renderDealCard = ({ item: deal }: { item: Deal }) => {
+    const categoryColors = getCategoryColor(deal.category);
     const isExpiringSoon = new Date(deal.expiresAt).getTime() - Date.now() < 24 * 60 * 60 * 1000;
 
     return (
-      <View style={[{ backgroundColor: '#f0f0f0' }]}>
-        <Text>Deal Card: {deal.title}</Text>
+      <View style={styles.dealCard}>
+        <LinearGradient
+          colors={categoryColors as [string, string, ...string[]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.dealGradient}
+        >
+          <BlurView intensity={20} style={styles.dealContent}>
+            {/* Header */}
+            <View style={styles.dealHeader}>
+              <View style={styles.dealBadges}>
+                <View style={styles.categoryBadge}>
+                  <Ionicons 
+                    name={getCategoryIcon(deal.category) as any} 
+                    size={12} 
+                    color="white" 
+                  />
+                  <Text style={styles.categoryText}>{deal.category}</Text>
+                </View>
+                {isExpiringSoon && (
+                  <View style={styles.urgentBadge}>
+                    <Ionicons name="time" size={10} color="#FF6B6B" />
+                    <Text style={styles.urgentText}>Expiring Soon</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.discountBadge}>
+                <Text style={styles.discountText}>{deal.discount}%</Text>
+                <Text style={styles.offText}>OFF</Text>
+              </View>
+            </View>
+
+            {/* Title & Description */}
+            <Text style={styles.dealTitle} numberOfLines={2}>{deal.title}</Text>
+            <Text style={styles.dealDescription} numberOfLines={2}>{deal.description}</Text>
+
+            {/* Business Info */}
+            {deal.businessName && (
+              <View style={styles.businessInfo}>
+                <Ionicons name="business" size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.businessName}>{deal.businessName}</Text>
+              </View>
+            )}
+
+            {/* Location */}
+            {deal.location && (
+              <View style={styles.locationInfo}>
+                <Ionicons name="location" size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.locationText}>{deal.location}</Text>
+              </View>
+            )}
+
+            {/* Pricing */}
+            <View style={styles.pricingSection}>
+              <View style={styles.priceContainer}>
+                <Text style={styles.originalPrice}>${deal.originalPrice}</Text>
+                <Text style={styles.discountedPrice}>${deal.discountedPrice}</Text>
+              </View>
+              <Text style={styles.savedAmount}>Save ${(deal.originalPrice - deal.discountedPrice).toFixed(2)}</Text>
+            </View>
+
+            {/* Group Deal Progress */}
+            {deal.isGroupDeal && (
+              <View style={styles.groupSection}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.groupTitle}>Group Progress</Text>
+                  <Text style={styles.participantCount}>
+                    {deal.currentParticipants}/{deal.maxParticipants} joined
+                  </Text>
+                </View>
+                <View style={styles.progressBar}>
+                  <View 
+                    style={[styles.progressFill, { width: `${deal.groupProgress || 0}%` }]} 
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Actions */}
+            <View style={styles.actionsContainer}>
+              <View style={styles.leftActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, deal.userLiked && styles.activeAction]}
+                  onPress={() => handleLike(deal.id)}
+                >
+                  <Ionicons 
+                    name={deal.userLiked ? "heart" : "heart-outline"} 
+                    size={18} 
+                    color={deal.userLiked ? "#FF6B6B" : "rgba(255,255,255,0.8)"} 
+                  />
+                  <Text style={styles.actionText}>{deal.likes}</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => openChat(deal)}
+                >
+                  <Ionicons name="chatbubble-outline" size={18} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.actionText}>Chat</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleShareDeal(deal)}
+                >
+                  <Ionicons name="share-outline" size={18} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.actionText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={styles.claimButton}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
+                  style={styles.claimGradient}
+                >
+                  <Text style={styles.claimText}>Claim Deal</Text>
+                  <Ionicons name="arrow-forward" size={16} color="white" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            {/* Footer */}
+            <View style={styles.dealFooter}>
+              <Text style={styles.postedBy}>by {deal.postedBy}</Text>
+              <Text style={styles.timeRemaining}>
+                {Math.ceil((new Date(deal.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000))} days left
+              </Text>
+            </View>
+          </BlurView>
+        </LinearGradient>
       </View>
     );
-  }
+  };
 
   const renderEmptyState = () => (
-    <View>
-      <Text>No deals found</Text>
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIconContainer}>
+        <Ionicons name="pricetag-outline" size={64} color="#CBD5E1" />
+      </View>
+      <Text style={styles.emptyTitle}>No deals found</Text>
+      <Text style={styles.emptySubtitle}>
+        Be the first to share an amazing deal with the community
+      </Text>
+      <TouchableOpacity
+        style={styles.postFirstDealButton}
+        onPress={() => setShowPostModal(true)}
+      >
+        <LinearGradient
+          colors={['#667eea', '#764ba2']}
+          style={styles.postFirstDealGradient}
+        >
+          <Text style={styles.postFirstDealText}>Post Your First Deal</Text>
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={[theme.colors.primary, theme.colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={['#667eea', '#764ba2']}
         style={styles.header}
       >
-        <View style={styles.headerContent}>
+        <BlurView intensity={20} style={styles.headerContent}>
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.headerTitle}>Deals Hub</Text>
               <Text style={styles.headerSubtitle}>Discover amazing savings</Text>
             </View>
             <TouchableOpacity
-              style={[styles.postButton, { backgroundColor: '#fff' }]}
+              style={styles.postButton}
               onPress={() => setShowPostModal(true)}
             >
-              <Ionicons name="add" size={24} color={theme.colors.primary} />
+              <Ionicons name="add" size={24} color="#667eea" />
             </TouchableOpacity>
           </View>
 
           {/* Search Bar */}
           <View style={styles.searchContainer}>
-            <View style={[styles.searchBar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <Ionicons name="search" size={20} color="#fff" />
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={20} color="#94A3B8" />
               <TextInput
-                style={[styles.searchInput, { color: '#fff' }]}
+                style={styles.searchInput}
                 placeholder="Search deals..."
-                placeholderTextColor="rgba(255,255,255,0.7)"
+                placeholderTextColor="#94A3B8"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <Ionicons name="close-circle" size={20} color="#fff" />
+                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
                 </TouchableOpacity>
               )}
             </View>
@@ -437,22 +579,14 @@ Found this deal on Spendy Deals Hub!`;
                 key={category}
                 style={[
                   styles.categoryButton,
-                  { borderColor: 'rgba(255,255,255,0.3)' },
-                  selectedCategory === category && [
-                    styles.categoryButtonActive, 
-                    { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: '#fff' }
-                  ]
+                  selectedCategory === category && styles.categoryButtonActive
                 ]}
                 onPress={() => setSelectedCategory(category)}
               >
                 <Text
                   style={[
                     styles.categoryButtonText,
-                    { color: '#fff' },
-                    selectedCategory === category && [
-                      styles.categoryButtonTextActive, 
-                      { fontWeight: '600' }
-                    ]
+                    selectedCategory === category && styles.categoryButtonTextActive
                   ]}
                 >
                   {category}
@@ -460,7 +594,7 @@ Found this deal on Spendy Deals Hub!`;
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </View>
+        </BlurView>
       </LinearGradient>
 
       {/* Deals List */}
@@ -726,7 +860,7 @@ Found this deal on Spendy Deals Hub!`;
       </Modal>
     </SafeAreaView>
   );
-}
+};
 
 const { width } = Dimensions.get('window');
 
