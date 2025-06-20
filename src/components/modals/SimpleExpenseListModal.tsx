@@ -149,7 +149,7 @@ export default function SimpleExpenseListModal({
             {expense.description}
           </Text>
           <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
-            {expense.date.toLocaleDateString()} • {expense.paidByData.fullName}
+            {expense.date && typeof expense.date.toLocaleDateString === 'function' ? expense.date.toLocaleDateString() : new Date().toLocaleDateString()} • {expense.paidByData?.fullName || 'Unknown'}
           </Text>
           {expense.notes && (
             <Text style={[styles.expenseNotes, { color: theme.colors.textSecondary }]}>
