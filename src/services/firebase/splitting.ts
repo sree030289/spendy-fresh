@@ -1846,13 +1846,16 @@ static async getUserExpenses(userId: string, limitCount: number = 20): Promise<E
     );
     
     const snapshot = await getDocs(expensesQuery);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      date: doc.data().date?.toDate() || new Date(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-    })) as Expense[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        date: data.date && typeof data.date.toDate === 'function' ? data.date.toDate() : new Date(),
+        createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(),
+        updatedAt: data.updatedAt && typeof data.updatedAt.toDate === 'function' ? data.updatedAt.toDate() : new Date(),
+      };
+    }) as Expense[];
     
   } catch (error) {
     console.error('Get user expenses error:', error);
