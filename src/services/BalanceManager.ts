@@ -1,6 +1,6 @@
-// src/services/BalanceManager.ts - Unified Balance Management System
+// src/services/BalanceManager.ts - FIXED Unified Balance Management System
 
-import { SplittingService, Friend, Group } from '@/services/firebase/splitting';
+import { SplittingService, Friend, Group, Expense } from '@/services/firebase/splitting';
 
 export interface BalanceDetail {
   userId: string;
@@ -32,7 +32,7 @@ export interface BalanceDisplayConfig {
 class BalanceManager {
   private static instance: BalanceManager;
   private balanceCache = new Map<string, BalanceSummary>();
-  private listeners = new Set<(balances: BalanceSummary) => void>();
+  private listeners = new Map<string, Set<(balances: BalanceSummary) => void>>();
   private refreshTimeout: NodeJS.Timeout | null = null;
   private isRefreshing = false;
 
@@ -45,13 +45,21 @@ class BalanceManager {
 
   // Add a listener for balance updates
   addListener(userId: string, callback: (balances: BalanceSummary) => void): () => void {
-    const wrappedCallback = (balances: BalanceSummary) => {
-      callback(balances);
-    };
-    this.listeners.add(wrappedCallback);
+    if (!this.listeners.has(userId)) {
+      this.listeners.set(userId, new Set());
+    }
+    this.listeners.get(userId)!.add(callback);
     
     // Return unsubscribe function
-    return () => this.listeners.delete(wrappedCallback);
+    return () => {
+      const userListeners = this.listeners.get(userId);
+      if (userListeners) {
+        userListeners.delete(callback);
+        if (userListeners.size === 0) {
+          this.listeners.delete(userId);
+        }
+      }
+    };
   }
 
   // Get cached balances or fetch fresh ones
@@ -66,7 +74,7 @@ class BalanceManager {
     return this.refreshBalances(userId);
   }
 
-  // Refresh balances from all sources
+  // FIXED: Single source of truth balance calculation
   async refreshBalances(userId: string): Promise<BalanceSummary> {
     if (this.isRefreshing) {
       // Return cached if refresh is in progress
@@ -89,7 +97,7 @@ class BalanceManager {
       let totalOwed = 0;
       let totalOwing = 0;
 
-      // Process friend balances
+      // PHASE 1: Process friend balances (these are already calculated correctly)
       const friendUserIds = new Set<string>();
       for (const friend of friends) {
         if (friend.status === 'accepted' && Math.abs(friend.balance) > 0.01) {
@@ -100,67 +108,96 @@ class BalanceManager {
             name: friend.friendData.fullName,
             email: friend.friendData.email,
             avatar: friend.friendData.avatar,
-            balance: friend.balance,
+            balance: friend.balance, // This is correct from the friend relationship
             source: 'friend',
             lastUpdated: friend.lastActivity || friend.createdAt
           };
 
           balanceDetails.push(detail);
 
+          // FIXED: Correct balance interpretation
           if (friend.balance > 0) {
-            totalOwed += friend.balance;
+            totalOwed += friend.balance; // Friend owes you
           } else {
-            totalOwing += Math.abs(friend.balance);
+            totalOwing += Math.abs(friend.balance); // You owe friend
           }
         }
       }
 
-      // Process group member balances (for non-friends only)
+      console.log(`✅ Processed ${friendUserIds.size} friend balances`);
+
+      // PHASE 2: Process group member balances (for non-friends only)
+      const groupMemberBalances = new Map<string, {
+        userId: string;
+        name: string;
+        email: string;
+        avatar?: string;
+        balance: number;
+        groupNames: string[];
+        groupIds: string[];
+      }>();
+
       for (const group of userGroups) {
-        const userMember = group.members.find(member => member.userId === userId);
-        if (!userMember) continue;
-
+        console.log(`🔍 Processing group: ${group.name} with ${group.members.length} members`);
+        
         for (const otherMember of group.members) {
-          if (otherMember.userId === userId) continue;
-          if (friendUserIds.has(otherMember.userId)) continue; // Skip friends
+          if (otherMember.userId === userId) continue; // Skip self
+          if (friendUserIds.has(otherMember.userId)) continue; // Skip friends (already counted)
 
-          // Calculate actual balance between users in this group
-          const pairwiseBalance = await this.calculatePairwiseBalance(userId, otherMember.userId, group.id);
+          // Calculate actual balance between users in this specific group
+          const pairwiseBalance = await this.calculatePairwiseGroupBalance(userId, otherMember.userId, group.id);
+          
+          console.log(`Balance between ${userId} and ${otherMember.userId} in ${group.name}: ${pairwiseBalance}`);
           
           if (Math.abs(pairwiseBalance) > 0.01) {
-            // Check if user already exists from another group
-            const existingIndex = balanceDetails.findIndex(detail => 
-              detail.userId === otherMember.userId && detail.source === 'group'
-            );
-
-            if (existingIndex >= 0) {
-              // Combine balances from multiple groups
-              balanceDetails[existingIndex].balance += pairwiseBalance;
-              balanceDetails[existingIndex].groupName += `, ${group.name}`;
+            const existingBalance = groupMemberBalances.get(otherMember.userId);
+            
+            if (existingBalance) {
+              // User appears in multiple groups - combine balances
+              existingBalance.balance += pairwiseBalance;
+              existingBalance.groupNames.push(group.name);
+              existingBalance.groupIds.push(group.id);
             } else {
-              const detail: BalanceDetail = {
+              // New group member
+              groupMemberBalances.set(otherMember.userId, {
                 userId: otherMember.userId,
                 name: otherMember.userData.fullName,
                 email: otherMember.userData.email,
                 avatar: otherMember.userData.avatar,
                 balance: pairwiseBalance,
-                source: 'group',
-                groupName: group.name,
-                groupId: group.id,
-                lastUpdated: group.updatedAt
-              };
-
-              balanceDetails.push(detail);
-            }
-
-            if (pairwiseBalance > 0) {
-              totalOwed += pairwiseBalance;
-            } else {
-              totalOwing += Math.abs(pairwiseBalance);
+                groupNames: [group.name],
+                groupIds: [group.id]
+              });
             }
           }
         }
       }
+
+      // Convert group member balances to balance details
+      for (const memberBalance of groupMemberBalances.values()) {
+        const detail: BalanceDetail = {
+          userId: memberBalance.userId,
+          name: memberBalance.name,
+          email: memberBalance.email,
+          avatar: memberBalance.avatar,
+          balance: memberBalance.balance,
+          source: 'group',
+          groupName: memberBalance.groupNames.join(', '),
+          groupId: memberBalance.groupIds[0], // Use first group ID
+          lastUpdated: new Date()
+        };
+
+        balanceDetails.push(detail);
+
+        // Add to totals
+        if (memberBalance.balance > 0) {
+          totalOwed += memberBalance.balance;
+        } else {
+          totalOwing += Math.abs(memberBalance.balance);
+        }
+      }
+
+      console.log(`✅ Processed ${groupMemberBalances.size} group member balances`);
 
       const netBalance = totalOwed - totalOwing;
       const balanceSummary: BalanceSummary = {
@@ -174,13 +211,13 @@ class BalanceManager {
       // Cache the result
       this.balanceCache.set(userId, balanceSummary);
 
-      // Notify all listeners
-      this.notifyListeners(balanceSummary);
+      // Notify all listeners for this user
+      this.notifyUserListeners(userId, balanceSummary);
 
       console.log('✅ Unified balances refreshed:', {
-        totalOwed,
-        totalOwing,
-        netBalance,
+        totalOwed: balanceSummary.totalOwed,
+        totalOwing: balanceSummary.totalOwing,
+        netBalance: balanceSummary.netBalance,
         detailCount: balanceDetails.length
       });
 
@@ -205,33 +242,33 @@ class BalanceManager {
     }
   }
 
-  // Calculate balance between two users in a specific group
-  private async calculatePairwiseBalance(userId1: string, userId2: string, groupId: string): Promise<number> {
+  // FIXED: Accurate pairwise balance calculation for group members
+  private async calculatePairwiseGroupBalance(userId1: string, userId2: string, groupId: string): Promise<number> {
     try {
       const expenses = await SplittingService.getGroupExpenses(groupId);
       let balance = 0;
 
       expenses.forEach(expense => {
-        // Case 1: userId1 paid, userId2 owes
+        // Case 1: userId1 paid, userId2 has a split
         if (expense.paidBy === userId1) {
           const user2Split = expense.splitData.find(split => split.userId === userId2);
           if (user2Split && !user2Split.isPaid) {
-            balance += user2Split.amount;
+            balance += user2Split.amount; // userId2 owes userId1
           }
         }
         
-        // Case 2: userId2 paid, userId1 owes  
+        // Case 2: userId2 paid, userId1 has a split
         if (expense.paidBy === userId2) {
           const user1Split = expense.splitData.find(split => split.userId === userId1);
           if (user1Split && !user1Split.isPaid) {
-            balance -= user1Split.amount;
+            balance -= user1Split.amount; // userId1 owes userId2
           }
         }
       });
 
       return parseFloat(balance.toFixed(2));
     } catch (error) {
-      console.error('Calculate pairwise balance error:', error);
+      console.error('Calculate pairwise group balance error:', error);
       return 0;
     }
   }
@@ -344,15 +381,18 @@ class BalanceManager {
     return Date.now() - balances.lastUpdated.getTime() < fiveMinutes;
   }
 
-  // Notify all listeners
-  private notifyListeners(balances: BalanceSummary): void {
-    this.listeners.forEach(listener => {
-      try {
-        listener(balances);
-      } catch (error) {
-        console.error('Error in balance listener:', error);
-      }
-    });
+  // Notify listeners for specific user
+  private notifyUserListeners(userId: string, balances: BalanceSummary): void {
+    const userListeners = this.listeners.get(userId);
+    if (userListeners) {
+      userListeners.forEach(listener => {
+        try {
+          listener(balances);
+        } catch (error) {
+          console.error('Error in balance listener:', error);
+        }
+      });
+    }
   }
 
   // Cleanup

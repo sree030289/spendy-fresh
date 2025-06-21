@@ -104,6 +104,7 @@ export interface Expense {
   createdAt: Date;
   updatedAt: Date;
   isSettled: boolean;
+  isSettlementTransaction?: boolean; // Flag to mark this as a settlement transaction (should not affect group totals)
 }
 
 export interface ExpenseSplit {
@@ -1213,12 +1214,20 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     batch.set(expenseRef, newExpense);
     console.log('Expense document prepared with ID:', expenseRef.id);
     
-    // Update group total expenses
-    batch.update(doc(db, 'groups', expenseData.groupId), {
-      totalExpenses: increment(expenseData.amount),
-      updatedAt: serverTimestamp()
-    });
-    console.log('Group update prepared');
+    // Update group total expenses - skip for settlement transactions
+    if (!expenseData.isSettlementTransaction) {
+      batch.update(doc(db, 'groups', expenseData.groupId), {
+        totalExpenses: increment(expenseData.amount),
+        updatedAt: serverTimestamp()
+      });
+      console.log('Group update prepared - updated total expenses');
+    } else {
+      // Just update the timestamp for settlement transactions
+      batch.update(doc(db, 'groups', expenseData.groupId), {
+        updatedAt: serverTimestamp()
+      });
+      console.log('Group update prepared - settlement transaction (not affecting total)');
+    }
     
     // Add expense notification to group chat
     const expenseMessage = {
@@ -1355,13 +1364,16 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     );
     
     const snapshot = await getDocs(expensesQuery);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      date: doc.data().date?.toDate() || new Date(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-    })) as Expense[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        date: data.date && typeof data.date.toDate === 'function' ? data.date.toDate() : new Date(),
+        createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(),
+        updatedAt: data.updatedAt && typeof data.updatedAt.toDate === 'function' ? data.updatedAt.toDate() : new Date(),
+      };
+    }) as Expense[];
   } catch (error) {
     console.error('Get group expenses error:', error);
     return [];
@@ -2190,12 +2202,21 @@ static async updateGroupMemberBalance(groupId: string, userId: string, amount: n
       const amountDifference = expenseData.amount - currentExpense.amount;
       
       if (amountDifference !== 0) {
-        // Update group total expenses
-        batch.update(doc(db, 'groups', expenseData.groupId), {
-          totalExpenses: increment(amountDifference),
-          updatedAt: serverTimestamp()
-        });
-        console.log('Group total update prepared, difference:', amountDifference);
+        // Only update group totals for regular expenses, not settlements
+        if (!currentExpense.isSettlementTransaction && !expenseData.isSettlementTransaction) {
+          // Update group total expenses
+          batch.update(doc(db, 'groups', expenseData.groupId), {
+            totalExpenses: increment(amountDifference),
+            updatedAt: serverTimestamp()
+          });
+          console.log('Group total update prepared, difference:', amountDifference);
+        } else {
+          // Just update timestamp for settlement transactions
+          batch.update(doc(db, 'groups', expenseData.groupId), {
+            updatedAt: serverTimestamp()
+          });
+          console.log('Group timestamp updated, settlement transaction not affecting total');
+        }
       }
       
       // Add update notification to group chat
@@ -2323,11 +2344,18 @@ static async deleteExpense(expenseId: string, deletedBy: string): Promise<void> 
     // 1. Delete the expense document
     batch.delete(doc(db, 'expenses', expenseId));
     
-    // 2. Reverse group total expenses
-    batch.update(doc(db, 'groups', expense.groupId), {
-      totalExpenses: increment(-expense.amount),
-      updatedAt: serverTimestamp()
-    });
+    // 2. Reverse group total expenses - but only for regular expenses, not settlements
+    if (!expense.isSettlementTransaction) {
+      batch.update(doc(db, 'groups', expense.groupId), {
+        totalExpenses: increment(-expense.amount),
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      // Just update timestamp for settlement transactions
+      batch.update(doc(db, 'groups', expense.groupId), {
+        updatedAt: serverTimestamp()
+      });
+    }
     
     // 3. Reverse all balance calculations
     for (const split of expense.splitData) {
@@ -3015,8 +3043,9 @@ static async createSettlementTransaction(settlementData: {
     
     const batch = writeBatch(db);
     
-    // 1. Create the settlement transaction record - FIXED: Handle undefined fields properly
-    const settlementTransaction: Omit<SettlementTransaction, 'id'> = {
+    // 1. Create the settlement transaction record - PROPERLY handle undefined fields
+    // Build the base transaction object without optional fields that might be undefined
+    const settlementTransaction: any = {
       fromUserId: settlementData.fromUserId,
       fromUserData: {
         fullName: fromUserData?.fullName || 'Unknown User',
@@ -3032,9 +3061,6 @@ static async createSettlementTransaction(settlementData: {
       amount: settlementData.amount,
       currency: settlementData.currency,
       description: settlementData.description || `Settlement payment to ${toUserData?.fullName}`,
-      groupId: settlementData.groupId || undefined,
-      groupData: groupData || undefined,
-      expenseId: settlementData.expenseId || undefined,
       method: settlementData.method,
       status: 'completed',
       notes: settlementData.notes || '',
@@ -3043,10 +3069,23 @@ static async createSettlementTransaction(settlementData: {
       updatedAt: new Date()
     };
     
+    // Only add optional fields if they have actual values (not undefined)
+    if (settlementData.groupId) {
+      settlementTransaction.groupId = settlementData.groupId;
+    }
+    
+    if (groupData) {
+      settlementTransaction.groupData = groupData;
+    }
+    
+    if (settlementData.expenseId) {
+      settlementTransaction.expenseId = settlementData.expenseId;
+    }
+    
     const settlementRef = doc(collection(db, 'settlementTransactions'));
     batch.set(settlementRef, settlementTransaction);
     
-    // 2. Create a special settlement expense record for tracking
+    // 2. Create a special settlement expense record for tracking ONLY (not for balance calculation)
     const settlementExpense: Omit<Expense, 'id'> = {
       description: `Settlement: ${settlementData.description || 'Payment'}`,
       amount: settlementData.amount,
@@ -3073,7 +3112,9 @@ static async createSettlementTransaction(settlementData: {
       date: new Date(),
       isSettled: true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      // Flag to indicate this is a settlement transaction and shouldn't affect group totals
+      isSettlementTransaction: true
     };
     
     const expenseRef = doc(collection(db, 'expenses'));

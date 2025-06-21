@@ -1,4 +1,4 @@
-// src/components/balance/BalanceComponents.tsx - Reusable Balance Display Components
+// src/components/balance/BalanceComponents.tsx - FIXED Reusable Balance Display Components
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
@@ -109,6 +109,7 @@ export const BalanceItem: React.FC<BalanceItemProps> = ({
   const { theme } = useTheme();
   const currencySymbol = getCurrencySymbol(currency);
   
+  // FIXED: Correct balance interpretation
   const getBalanceDisplay = () => {
     const absBalance = Math.abs(detail.balance);
     
@@ -120,6 +121,7 @@ export const BalanceItem: React.FC<BalanceItemProps> = ({
       };
     }
     
+    // FIXED: Positive balance = they owe you, Negative balance = you owe them
     if (detail.balance > 0) {
       return {
         text: `Owes you ${currencySymbol}${absBalance.toFixed(2)}`,
@@ -140,7 +142,7 @@ export const BalanceItem: React.FC<BalanceItemProps> = ({
   return (
     <TouchableOpacity
       style={[
-        compact ? styles.balanceItemCompact : styles.balanceItem,
+        compact ? styles.balanceItemCompact : styles.balanceItemFull,
         { backgroundColor: theme.colors.surface }
       ]}
       onPress={() => onPress?.(detail)}
@@ -165,7 +167,7 @@ export const BalanceItem: React.FC<BalanceItemProps> = ({
             </Text>
           )}
           
-          {showSource && detail.source === 'group' && (
+          {showSource && detail.source === 'group' && detail.groupName && (
             <View style={styles.sourceIndicator}>
               <Ionicons name="people" size={12} color={theme.colors.primary} />
               <Text style={[styles.sourceText, { color: theme.colors.primary }]} numberOfLines={1}>
@@ -230,8 +232,8 @@ export const BalanceSummary: React.FC<BalanceSummaryProps> = ({
       {netBalance > 0 ? (
         <>
           <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
-          <Text style={[styles.summaryText, { color: theme.colors.error }]}>
-            -{currencySymbol}{Math.abs(netBalance).toFixed(2)}
+          <Text style={[styles.summaryText, { color: theme.colors.success }]}>
+            +{currencySymbol}{Math.abs(netBalance).toFixed(2)}
           </Text>
         </>
       ) : (
@@ -469,6 +471,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 12,
+  },
+
+  // Balance Item
+  balanceItemFull: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
   },
   balanceItemCompact: {
     flexDirection: 'row',

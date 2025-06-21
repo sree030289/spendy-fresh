@@ -1,3 +1,4 @@
+// src/components/modals/GroupSettlementModal.tsx - FIXED to use unified balance system
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -13,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { SplittingService } from '@/services/firebase/splitting';
 import { Button } from '@/components/common/Button';
+import BalanceManager from '@/services/BalanceManager';
 
 interface GroupSettlementModalProps {
   visible: boolean;
@@ -57,11 +59,17 @@ export default function GroupSettlementModal({
     
     setLoading(true);
     try {
+      console.log('🔄 Loading settlement suggestions for group:', groupId);
+      
+      // FIXED: Use the corrected settlement suggestions from SplittingService
       const suggestions = await SplittingService.getGroupSettlementSuggestions(groupId);
+      console.log('✅ Loaded settlement suggestions:', suggestions.length);
+      
       setSuggestions(suggestions);
     } catch (error) {
-      console.error('Failed to load settlement suggestions:', error);
+      console.error('❌ Failed to load settlement suggestions:', error);
       Alert.alert('Error', 'Failed to load settlement suggestions');
+      setSuggestions([]);
     } finally {
       setLoading(false);
     }
@@ -72,9 +80,12 @@ export default function GroupSettlementModal({
     setProcessingSettlement(settlementKey);
 
     try {
+      console.log('🔄 Processing settlement:', suggestion);
+      
+      // FIXED: Use the correct direction - fromUserId pays toUserId
       await SplittingService.markPaymentAsPaid(
-        suggestion.fromUserId,
-        suggestion.toUserId,
+        suggestion.fromUserId, // Person who owes (pays)
+        suggestion.toUserId,   // Person who is owed (receives)
         suggestion.amount,
         groupId || undefined,
         `Group settlement: ${suggestion.fromUserName} to ${suggestion.toUserName}`
@@ -85,10 +96,15 @@ export default function GroupSettlementModal({
       // Refresh suggestions
       await loadSettlementSuggestions();
       
+      // FIXED: Notify unified balance system
+      const balanceManager = BalanceManager.getInstance();
+      balanceManager.notifyBalanceChange(currentUserId);
+      
       // Notify parent to refresh
       onRefresh?.();
       
     } catch (error: any) {
+      console.error('❌ Settlement processing error:', error);
       Alert.alert('Error', error.message || 'Failed to process settlement');
     } finally {
       setProcessingSettlement(null);
@@ -135,7 +151,7 @@ export default function GroupSettlementModal({
               </Text>
             </View>
             <Text style={[styles.userName, { color: theme.colors.text }]}>
-              {suggestion.fromUserName}
+              {suggestion.fromUserName === currentUserId ? 'You' : suggestion.fromUserName}
             </Text>
           </View>
 
@@ -153,7 +169,7 @@ export default function GroupSettlementModal({
               </Text>
             </View>
             <Text style={[styles.userName, { color: theme.colors.text }]}>
-              {suggestion.toUserName}
+              {suggestion.toUserId === currentUserId ? 'You' : suggestion.toUserName}
             </Text>
           </View>
         </View>
