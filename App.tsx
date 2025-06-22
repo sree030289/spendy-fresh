@@ -3,10 +3,15 @@ import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Import providers
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
 import { ThemeProvider } from './src/hooks/useTheme';
+import { TourProvider } from './src/components/tour/TourProvider';
+
+// Import tour components
+import { useTour } from './src/components/tour/TourProvider';
 
 // Import screens
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -26,9 +31,29 @@ const Stack = createStackNavigator();
 const AppNavigator = () => {
   const { user, isLoading } = useAuth();
   const [initializing, setInitializing] = useState(true);
+  const [hasShownTour, setHasShownTour] = useState(false);
+  const [tourCheckCompleted, setTourCheckCompleted] = useState(false);
+  const { startTour } = useTour();
 
   console.log('AppNavigator - User:', user ? 'Authenticated' : 'Not authenticated');
   console.log('AppNavigator - Loading:', isLoading);
+
+  useEffect(() => {
+    // Check if tour has been completed before
+    const checkTourStatus = async () => {
+      try {
+        const tourCompleted = await AsyncStorage.getItem('app_tour_completed');
+        console.log('🔍 Tour Status Check - Tour completed value:', tourCompleted);
+        setHasShownTour(tourCompleted === 'true');
+        setTourCheckCompleted(true);
+      } catch (error) {
+        console.log('Error checking tour status:', error);
+        setTourCheckCompleted(true);
+      }
+    };
+
+    checkTourStatus();
+  }, []);
 
   useEffect(() => {
     // Add a small delay to ensure auth state is properly checked
@@ -38,6 +63,28 @@ const AppNavigator = () => {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Show tour when user is authenticated and hasn't seen it yet
+  useEffect(() => {
+    console.log('🔍 Tour trigger check:', {
+      user: !!user,
+      isLoading,
+      initializing,
+      hasShownTour,
+      tourCheckCompleted
+    });
+    
+    if (user && !isLoading && !initializing && !hasShownTour && tourCheckCompleted) {
+      // Delay tour slightly to ensure main app is fully loaded
+      const timer = setTimeout(() => {
+        console.log('🎯 Showing onboarding tour for new user');
+        startTour();
+        setHasShownTour(true);
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, isLoading, initializing, hasShownTour, tourCheckCompleted, startTour]);
 
   useEffect(() => {
     // Initialize notifications
@@ -122,7 +169,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppNavigator />
+        <TourProvider>
+          <AppNavigator />
+        </TourProvider>
       </AuthProvider>
     </ThemeProvider>
   );

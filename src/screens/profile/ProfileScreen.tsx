@@ -16,6 +16,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import CurrencyModal from '@/components/modals/CurrencyModal';
+import { useTour } from '@/components/tour/TourProvider';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
@@ -23,6 +24,7 @@ export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const { startTour, resetTour } = useTour();
 
   const ProfileItem = ({ 
     icon, 
@@ -262,6 +264,27 @@ export default function ProfileScreen() {
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
             Support
           </Text>
+          
+          <ProfileItem
+            icon="play-circle-outline"
+            title="App Tour"
+            onPress={() => {
+              Alert.alert(
+                'App Tour',
+                'Would you like to see the app tour again? This will show you all the key features of Spendy.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Start Tour', 
+                    onPress: () => {
+                      resetTour();
+                      startTour();
+                    }
+                  }
+                ]
+              );
+            }}
+          />
           
           <ProfileItem
             icon="help-circle-outline"

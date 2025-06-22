@@ -67,6 +67,7 @@ import ExpenseSettlementModal from '@/components/modals/ExpenseSettlementModal';
 import ManualSettlementModal from '@/components/modals/ManualSettlementModal';
 import GroupSettlementModal from '@/components/modals/GroupSettlementModal';
 import FriendRequestModal from '@/components/modals/FriendRequestModal';
+import ImportSplitwiseModal from '@/components/modals/ImportSplitwise';
 import { getCurrencySymbol } from '@/utils/currency';
 import QRCodeScanner from '@/components/QRCodeScanner';
 import QRScannerManager from '@/services/qr/QRScannerManager';
@@ -130,6 +131,9 @@ export default function RealSplittingScreen() {
   // Friend request modal state
   const [showFriendRequest, setShowFriendRequest] = useState(false);
   const [selectedFriendRequest, setSelectedFriendRequest] = useState<any>(null);
+  
+  // Import Splitwise modal state
+  const [showImportSplitwise, setShowImportSplitwise] = useState(false);
 
   // Simple Expense List Modal states
   const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
@@ -652,7 +656,17 @@ const renderOverviewTab = () => {
     >
       {/* FIXED: Use unified balance data */}
       <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
-        <Text style={styles.balanceTitle}>Your Balance</Text>
+        <View style={styles.balanceHeader}>
+          <Text style={styles.balanceTitle}>Your Balance</Text>
+          <TouchableOpacity 
+            style={styles.importButton}
+            onPress={() => setShowImportSplitwise(true)}
+          >
+            <Ionicons name="cloud-download-outline" size={16} color="white" />
+            <Text style={styles.importButtonText}>Import from Splitwise</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.balanceGrid}>
           <View style={styles.balanceItem}>
             <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
@@ -1163,13 +1177,22 @@ const renderFriendsTab = () => {
     >
       <View style={styles.tabHeader}>
         <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Your Groups</Text>
-        <TouchableOpacity
-          style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
-          onPress={() => setShowCreateGroup(true)}
-        >
-          <Ionicons name="add" size={20} color="white" />
-          <Text style={styles.headerButtonText}>Create</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: theme.colors.secondary }]}
+            onPress={() => setShowImportSplitwise(true)}
+          >
+            <Ionicons name="cloud-download-outline" size={18} color="white" />
+            <Text style={styles.headerButtonText}>Import</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: theme.colors.primary, marginLeft: 8 }]}
+            onPress={() => setShowCreateGroup(true)}
+          >
+            <Ionicons name="add" size={18} color="white" />
+            <Text style={styles.headerButtonText}>Create</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {groups.length === 0 ? (
@@ -1817,6 +1840,15 @@ const renderFriendsTab = () => {
         onDecline={() => selectedFriendRequest && handleDeclineFriendRequest(selectedFriendRequest.id)}
       />
 
+      <ImportSplitwiseModal
+        visible={showImportSplitwise}
+        onClose={() => setShowImportSplitwise(false)}
+        onImportComplete={() => {
+          setShowImportSplitwise(false);
+          onRefresh(); // Refresh the screen data after import
+        }}
+      />
+
       <EditExpenseModal
         visible={showEditExpense}
         onClose={() => {
@@ -2114,6 +2146,10 @@ const styles = StyleSheet.create({
   tabTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerButton: {
     flexDirection: 'row',
@@ -2457,12 +2493,30 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 20,
   },
+  balanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   balanceTitle: {
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
-    textAlign: 'center',
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  importButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   balanceGrid: {
     flexDirection: 'row',
