@@ -2771,12 +2771,40 @@ static async getExpenseAnalytics(userId: string, timeframe: 'week' | 'month' | '
         const expensesSnapshot = await getDocs(expensesQuery);
         const batchExpenses = expensesSnapshot.docs.map(doc => {
           const data = doc.data();
+          
+          // Safe date parsing function
+          const parseDate = (dateField: any): Date => {
+            try {
+              if (!dateField) {
+                return new Date();
+              }
+              
+              if (dateField instanceof Date) {
+                return dateField;
+              }
+              
+              if (typeof dateField === 'object' && typeof dateField.toDate === 'function') {
+                return dateField.toDate();
+              }
+              
+              if (typeof dateField === 'string' || typeof dateField === 'number') {
+                const parsed = new Date(dateField);
+                return isNaN(parsed.getTime()) ? new Date() : parsed;
+              }
+              
+              return new Date();
+            } catch (error) {
+              console.warn('Date parsing error:', error, 'for field:', dateField);
+              return new Date();
+            }
+          };
+          
           return {
             id: doc.id,
             ...data,
-            date: data.date?.toDate() || data.createdAt?.toDate() || new Date(),
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
+            date: parseDate(data.date) || parseDate(data.createdAt) || new Date(),
+            createdAt: parseDate(data.createdAt) || new Date(),
+            updatedAt: parseDate(data.updatedAt) || new Date(),
           };
         }) as Expense[];
         

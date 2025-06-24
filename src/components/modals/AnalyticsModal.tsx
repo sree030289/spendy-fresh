@@ -9,6 +9,7 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,12 @@ interface AnalyticsModalProps {
   visible: boolean;
   onClose: () => void;
   currentUser: User | null;
+  groupId?: string; // Optional group filter
+}
+
+interface GroupAnalytics extends ExpenseAnalytics {
+  groupName?: string;
+  groupMemberCount?: number;
 }
 
 const screenWidth = Dimensions.get('window').width;
@@ -33,17 +40,25 @@ const TIMEFRAME_OPTIONS = [
   { value: 'year', label: 'Year', icon: 'calendar-number' },
 ];
 
+const VIEW_OPTIONS = [
+  { value: 'overview', label: 'Overview', icon: 'analytics' },
+  { value: 'groups', label: 'Groups', icon: 'people' },
+  { value: 'trends', label: 'Trends', icon: 'trending-up' },
+];
+
 const CHART_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
   '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA'
 ];
 
-export default function AnalyticsModal({ visible, onClose, currentUser }: AnalyticsModalProps) {
+export default function AnalyticsModal({ visible, onClose, currentUser, groupId }: AnalyticsModalProps) {
   const { theme } = useTheme();
   const [analytics, setAnalytics] = useState<ExpenseAnalytics | null>(null);
+  const [groupAnalytics, setGroupAnalytics] = useState<{ [groupId: string]: GroupAnalytics }>({});
   const [loading, setLoading] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
-  const [activeChart, setActiveChart] = useState<'spending' | 'categories' | 'trends'>('spending');
+  const [activeView, setActiveView] = useState<'overview' | 'groups' | 'trends'>('overview');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible && currentUser) {
@@ -55,13 +70,181 @@ export default function AnalyticsModal({ visible, onClose, currentUser }: Analyt
     if (!currentUser) return;
 
     setLoading(true);
+    setError(null);
     try {
+      console.log('Loading analytics for user:', currentUser.id, 'timeframe:', selectedTimeframe);
+      
+      // Load overall analytics
       const data = await SplittingService.getExpenseAnalytics(currentUser.id, selectedTimeframe);
+      console.log('Analytics data loaded:', data);
       setAnalytics(data);
+
+      // Load group-specific analytics if no specific group is selected
+      if (!groupId) {
+        await loadGroupAnalytics();
+      }
     } catch (error) {
       console.error('Load analytics error:', error);
+      setError('Failed to load analytics. Please try again.');
+      // Set empty analytics to prevent undefined errors
+      setAnalytics({
+        totalSpent: 0,
+        totalOwed: 0,
+        totalOwing: 0,
+        averageExpense: 0,
+        expenseCount: 0,
+        monthlySpending: [],
+        categoryBreakdown: [],
+        groupAnalytics: [],
+        splitWithMostFrequent: { userId: '', userName: '', count: 0 }
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadGroupAnalytics = async () => {
+    if (!currentUser) return;
+
+    try {
+      console.log('Loading group analytics for user:', currentUser.id);
+      
+      // Get user's groups
+      const userGroups = await SplittingService.getUserGroups(currentUser.id);
+      const groupAnalyticsData: { [groupId: string]: GroupAnalytics } = {};
+
+      console.log('Found user groups:', userGroups.length);
+
+      // Load analytics for each group
+      for (const group of userGroups) {
+        try {
+          console.log('Loading analytics for group:', group.name, group.id);
+          
+          // Get group-specific analytics by filtering
+          const groupExpenses = await SplittingService.getGroupExpenses(group.id);
+          
+          // Calculate group analytics manually to ensure consistency
+          const userGroupExpenses = groupExpenses.filter(expense => 
+            expense.paidBy === currentUser.id || 
+            expense.splitData?.some(split => split.userId === currentUser.id)
+          );
+
+          // Filter by timeframe
+          const now = new Date();
+          const startDate = new Date();
+          switch (selectedTimeframe) {
+            case 'week':
+              startDate.setDate(now.getDate() - 7);
+              break;
+            case 'month':
+              startDate.setMonth(now.getMonth() - 1);
+              break;
+            case 'quarter':
+              startDate.setMonth(now.getMonth() - 3);
+              break;
+            case 'year':
+              startDate.setFullYear(now.getFullYear() - 1);
+              break;
+          }
+
+          const filteredExpenses = userGroupExpenses.filter(expense => {
+            // Safe date parsing
+            let expenseDate;
+            try {
+              if (expense.date instanceof Date) {
+                expenseDate = expense.date;
+              } else if (expense.date && typeof expense.date === 'object' && 'toDate' in expense.date) {
+                expenseDate = (expense.date as any).toDate();
+              } else {
+                expenseDate = new Date(expense.date);
+              }
+              
+              if (isNaN(expenseDate.getTime())) {
+                expenseDate = new Date();
+              }
+            } catch (dateError) {
+              console.warn('Date parsing error for expense:', expense.id, dateError);
+              expenseDate = new Date();
+            }
+
+            return expenseDate >= startDate && expenseDate <= now;
+          });
+
+          // Calculate totals
+          let totalSpent = 0;
+          let totalOwed = 0;
+          let totalOwing = 0;
+          const categoryData: { [category: string]: number } = {};
+
+          filteredExpenses.forEach(expense => {
+            if (expense.paidBy === currentUser.id) {
+              totalSpent += expense.amount || 0;
+            }
+
+            const userSplit = expense.splitData?.find(split => split.userId === currentUser.id);
+            if (userSplit) {
+              if (expense.paidBy === currentUser.id) {
+                const othersOwe = (expense.amount || 0) - (userSplit.amount || 0);
+                totalOwed += othersOwe;
+              } else if (!userSplit.isPaid) {
+                totalOwing += userSplit.amount || 0;
+              }
+            }
+
+            // Category breakdown
+            if (expense.paidBy === currentUser.id) {
+              const category = expense.category || 'Other';
+              categoryData[category] = (categoryData[category] || 0) + (expense.amount || 0);
+            }
+          });
+
+          const categoryBreakdown = Object.entries(categoryData)
+            .map(([category, amount]) => ({
+              category,
+              amount,
+              percentage: totalSpent > 0 ? (amount / totalSpent) * 100 : 0
+            }))
+            .sort((a, b) => b.amount - a.amount);
+
+          groupAnalyticsData[group.id] = {
+            totalSpent: totalSpent || 0,
+            totalOwed: totalOwed || 0,
+            totalOwing: totalOwing || 0,
+            averageExpense: filteredExpenses.length > 0 ? totalSpent / filteredExpenses.filter(e => e.paidBy === currentUser.id).length : 0,
+            expenseCount: filteredExpenses.filter(e => e.paidBy === currentUser.id).length,
+            monthlySpending: [], // Simplified for now
+            categoryBreakdown,
+            groupAnalytics: [],
+            splitWithMostFrequent: { userId: '', userName: '', count: 0 },
+            groupName: group.name,
+            groupMemberCount: group.members.length
+          };
+          
+          console.log('Group analytics calculated for', group.name, ':', groupAnalyticsData[group.id]);
+        } catch (groupError) {
+          console.error(`Error loading analytics for group ${group.id}:`, groupError);
+          // Add fallback data for this group
+          groupAnalyticsData[group.id] = {
+            totalSpent: 0,
+            totalOwed: 0,
+            totalOwing: 0,
+            averageExpense: 0,
+            expenseCount: 0,
+            monthlySpending: [],
+            categoryBreakdown: [],
+            groupAnalytics: [],
+            splitWithMostFrequent: { userId: '', userName: '', count: 0 },
+            groupName: group.name,
+            groupMemberCount: group.members.length
+          };
+        }
+      }
+
+      console.log('Setting group analytics data:', Object.keys(groupAnalyticsData).length, 'groups');
+      setGroupAnalytics(groupAnalyticsData);
+    } catch (error) {
+      console.error('Load group analytics error:', error);
+      setGroupAnalytics({});
     }
   };
 
@@ -87,6 +270,36 @@ export default function AnalyticsModal({ visible, onClose, currentUser }: Analyt
           <Text style={[
             styles.timeframeText,
             { color: selectedTimeframe === option.value ? theme.colors.primary : theme.colors.textSecondary }
+          ]}>
+            {option.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  const renderViewSelector = () => (
+    <View style={styles.viewSelector}>
+      {VIEW_OPTIONS.map((option) => (
+        <TouchableOpacity
+          key={option.value}
+          style={[
+            styles.viewOption,
+            activeView === option.value && [
+              styles.selectedView,
+              { backgroundColor: theme.colors.primary + '20' }
+            ]
+          ]}
+          onPress={() => setActiveView(option.value as any)}
+        >
+          <Ionicons
+            name={option.icon as any}
+            size={16}
+            color={activeView === option.value ? theme.colors.primary : theme.colors.textSecondary}
+          />
+          <Text style={[
+            styles.viewText,
+            { color: activeView === option.value ? theme.colors.primary : theme.colors.textSecondary }
           ]}>
             {option.label}
           </Text>
@@ -163,69 +376,126 @@ export default function AnalyticsModal({ visible, onClose, currentUser }: Analyt
     );
   };
 
-  const renderChartSelector = () => (
-    <View style={styles.chartSelector}>
-      <TouchableOpacity
-        style={[
-          styles.chartOption,
-          activeChart === 'spending' && [styles.activeChartOption, { backgroundColor: theme.colors.primary + '20' }]
-        ]}
-        onPress={() => setActiveChart('spending')}
-      >
-        <Ionicons
-          name="pie-chart"
-          size={16}
-          color={activeChart === 'spending' ? theme.colors.primary : theme.colors.textSecondary}
-        />
-        <Text style={[
-          styles.chartOptionText,
-          { color: activeChart === 'spending' ? theme.colors.primary : theme.colors.textSecondary }
-        ]}>
-          Spending
-        </Text>
-      </TouchableOpacity>
+  const renderOverview = () => {
+    if (!analytics) return null;
 
-      <TouchableOpacity
-        style={[
-          styles.chartOption,
-          activeChart === 'categories' && [styles.activeChartOption, { backgroundColor: theme.colors.primary + '20' }]
-        ]}
-        onPress={() => setActiveChart('categories')}
-      >
-        <Ionicons
-          name="bar-chart"
-          size={16}
-          color={activeChart === 'categories' ? theme.colors.primary : theme.colors.textSecondary}
-        />
-        <Text style={[
-          styles.chartOptionText,
-          { color: activeChart === 'categories' ? theme.colors.primary : theme.colors.textSecondary }
-        ]}>
-          Categories
-        </Text>
-      </TouchableOpacity>
+    return (
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Summary Cards */}
+        {renderSummaryCards()}
 
-      <TouchableOpacity
-        style={[
-          styles.chartOption,
-          activeChart === 'trends' && [styles.activeChartOption, { backgroundColor: theme.colors.primary + '20' }]
-        ]}
-        onPress={() => setActiveChart('trends')}
-      >
-        <Ionicons
-          name="analytics"
-          size={16}
-          color={activeChart === 'trends' ? theme.colors.primary : theme.colors.textSecondary}
-        />
-        <Text style={[
-          styles.chartOptionText,
-          { color: activeChart === 'trends' ? theme.colors.primary : theme.colors.textSecondary }
-        ]}>
-          Trends
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+        {/* Spending Chart */}
+        {renderSpendingChart()}
+
+        {/* Top Categories */}
+        {renderCategoriesChart()}
+
+        {/* Insights */}
+        {renderInsights()}
+      </ScrollView>
+    );
+  };
+
+  const renderGroupsView = () => {
+    const currency = getCurrencySymbol(currentUser?.currency || 'USD');
+
+    return (
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={[styles.groupsContainer, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Group Analytics
+          </Text>
+          
+          {Object.entries(groupAnalytics).length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
+                No group data available
+              </Text>
+            </View>
+          ) : (
+            Object.entries(groupAnalytics).map(([groupId, groupData]) => (
+              <View key={groupId} style={[styles.groupCard, { backgroundColor: theme.colors.background }]}>
+                <View style={styles.groupHeader}>
+                  <View style={styles.groupInfo}>
+                    <Text style={[styles.groupName, { color: theme.colors.text }]}>
+                      {groupData.groupName || 'Unknown Group'}
+                    </Text>
+                    <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
+                      {groupData.groupMemberCount || 0} members
+                    </Text>
+                  </View>
+                  <Text style={[styles.groupTotal, { color: theme.colors.primary }]}>
+                    {currency}{groupData.totalSpent.toFixed(2)}
+                  </Text>
+                </View>
+                
+                <View style={styles.groupStats}>
+                  <View style={styles.groupStat}>
+                    <Text style={[styles.statValue, { color: theme.colors.text }]}>
+                      {groupData.expenseCount}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+                      Expenses
+                    </Text>
+                  </View>
+                  <View style={styles.groupStat}>
+                    <Text style={[styles.statValue, { color: theme.colors.success }]}>
+                      {currency}{groupData.totalOwed.toFixed(2)}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+                      You're Owed
+                    </Text>
+                  </View>
+                  <View style={styles.groupStat}>
+                    <Text style={[styles.statValue, { color: theme.colors.error }]}>
+                      {currency}{groupData.totalOwing.toFixed(2)}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+                      You Owe
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Top Categories for this group */}
+                {groupData.categoryBreakdown.length > 0 && (
+                  <View style={styles.groupCategories}>
+                    <Text style={[styles.categoriesTitle, { color: theme.colors.text }]}>
+                      Top Categories
+                    </Text>
+                    {groupData.categoryBreakdown.slice(0, 3).map((category, index) => (
+                      <View key={category.category} style={styles.categoryItem}>
+                        <Text style={[styles.categoryName, { color: theme.colors.text }]}>
+                          {category.category}
+                        </Text>
+                        <Text style={[styles.categoryAmount, { color: theme.colors.textSecondary }]}>
+                          {currency}{category.amount.toFixed(2)} ({category.percentage.toFixed(1)}%)
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderTrendsView = () => {
+    if (!analytics) return null;
+
+    return (
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Trends Chart */}
+        {renderTrendsChart()}
+
+        {/* Spending Patterns */}
+        {renderSpendingChart()}
+      </ScrollView>
+    );
+  };
 
   const renderSpendingChart = () => {
     if (!analytics || analytics.categoryBreakdown.length === 0) {
@@ -392,38 +662,6 @@ export default function AnalyticsModal({ visible, onClose, currentUser }: Analyt
     );
   };
 
-  const renderGroupAnalytics = () => {
-    if (!analytics || analytics.groupAnalytics.length === 0) return null;
-
-    return (
-      <View style={[styles.topExpensesContainer, { backgroundColor: theme.colors.surface }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Group Spending
-        </Text>
-        {analytics.groupAnalytics.slice(0, 5).map((group: { groupName: string; totalSpent: number; memberCount: number }, index: number) => (
-          <View key={index} style={styles.topExpenseItem}>
-            <View style={styles.topExpenseLeft}>
-              <View style={[styles.expenseRank, { backgroundColor: theme.colors.primary }]}>
-                <Text style={styles.expenseRankText}>{index + 1}</Text>
-              </View>
-              <View>
-                <Text style={[styles.expenseDescription, { color: theme.colors.text }]}>
-                  {group.groupName}
-                </Text>
-                <Text style={[styles.expenseDate, { color: theme.colors.textSecondary }]}>
-                  {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-              {getCurrencySymbol(currentUser?.currency || 'USD')}{group.totalSpent.toFixed(2)}
-            </Text>
-          </View>
-        ))}
-      </View>
-    );
-  };
-
   const renderInsights = () => {
     if (!analytics) return null;
 
@@ -493,8 +731,12 @@ export default function AnalyticsModal({ visible, onClose, currentUser }: Analyt
     );
   };
 
+  const handleRetry = () => {
+    loadAnalytics();
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet">
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
@@ -502,7 +744,7 @@ export default function AnalyticsModal({ visible, onClose, currentUser }: Analyt
             <Ionicons name="close" size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Expense Analytics
+            {groupId ? 'Group Analytics' : 'Expense Analytics'}
           </Text>
           <TouchableOpacity onPress={loadAnalytics}>
             <Ionicons name="refresh" size={24} color={theme.colors.primary} />
@@ -512,7 +754,26 @@ export default function AnalyticsModal({ visible, onClose, currentUser }: Analyt
         {/* Timeframe Selector */}
         {renderTimeframeSelector()}
 
-        {loading ? (
+        {/* View Selector */}
+        {!groupId && renderViewSelector()}
+
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color={theme.colors.error} />
+            <Text style={[styles.errorTitle, { color: theme.colors.error }]}>
+              Failed to Load Analytics
+            </Text>
+            <Text style={[styles.errorMessage, { color: theme.colors.textSecondary }]}>
+              {error}
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+              onPress={handleRetry}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
@@ -521,22 +782,9 @@ export default function AnalyticsModal({ visible, onClose, currentUser }: Analyt
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.content}>
-            {/* Summary Cards */}
-            {renderSummaryCards()}
-
-            {/* Chart Selector */}
-            {renderChartSelector()}
-
-            {/* Charts */}
-            {activeChart === 'spending' && renderSpendingChart()}
-            {activeChart === 'categories' && renderCategoriesChart()}
-            {activeChart === 'trends' && renderTrendsChart()}
-
-            {/* Top Expenses */}
-            {renderGroupAnalytics()}
-
-            {/* Insights */}
-            {renderInsights()}
+            {activeView === 'overview' && renderOverview()}
+            {activeView === 'groups' && renderGroupsView()}
+            {activeView === 'trends' && renderTrendsView()}
           </ScrollView>
         )}
       </SafeAreaView>
@@ -758,5 +1006,143 @@ const styles = StyleSheet.create({
   insightDescription: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  viewSelector: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 8,
+  },
+  viewOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    gap: 6,
+  },
+  selectedView: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  viewText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  groupsContainer: {
+    borderRadius: 16,
+    padding: 16,
+  },
+  groupCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  groupInfo: {
+    flex: 1,
+  },
+  groupName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  groupMembers: {
+    fontSize: 12,
+  },
+  groupTotal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  groupStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  groupStat: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 10,
+  },
+  groupCategories: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  categoriesTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  categoryName: {
+    fontSize: 12,
+    flex: 1,
+  },
+  categoryAmount: {
+    fontSize: 12,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

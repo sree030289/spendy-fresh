@@ -1,5 +1,5 @@
-// src/components/modals/GroupDetailsModal.tsx - COMPLETE FIXED VERSION
-import React, { useState, useEffect, useCallback } from 'react';
+// src/components/modals/GroupDetailsModal.tsx - REDESIGNED VERSION
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,13 @@ import {
   Share,
   TextInput,
   Linking,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Button } from '@/components/common/Button'; // FIX: Added missing Button import
+import { Button } from '@/components/common/Button';
 import { Group, Expense, SplittingService, Friend } from '@/services/firebase/splitting';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/services/firebase/config';
@@ -29,8 +31,10 @@ import { QRCodeService } from '@/services/qr/QRCodeService';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
 import ExpenseSettlementModal from './ExpenseSettlementModal';
-
 import SimpleExpenseListModal from './SimpleExpenseListModal';
+
+const { width, height } = Dimensions.get('window');
+
 interface GroupDetailsModalProps {
   visible: boolean;
   onClose: () => void;
@@ -69,14 +73,17 @@ export default function GroupDetailsModal({
   const [selectedMemberForAction, setSelectedMemberForAction] = useState<string | null>(null);
   const [showGroupExpenseModal, setShowGroupExpenseModal] = useState(false);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
-  
-  // Local state for group data to enable real-time updates
-  const [localGroupData, setLocalGroupData] = useState<Group | null>(null);
-  
-   // Simple Expense List Modal states
   const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
   const [expenseListGroupId, setExpenseListGroupId] = useState<string | undefined>(undefined);
   const [expenseListTitle, setExpenseListTitle] = useState('All Expenses');
+  
+  // Animation values
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  
+  // Local state for group data to enable real-time updates
+  const [localGroupData, setLocalGroupData] = useState<Group | null>(null);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   const isUserAdmin = localGroupData?.members?.find(member => 
     member.userId === currentUser?.id
@@ -99,7 +106,6 @@ export default function GroupDetailsModal({
     }
   }, [localGroupData]);
 
-  // Function to refresh group data
   const loadGroupData = useCallback(async () => {
     if (!group?.id) return;
     
@@ -116,14 +122,36 @@ export default function GroupDetailsModal({
     }
   }, [group]);
 
+  // Animation effects
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      slideAnim.setValue(0);
+      fadeAnim.setValue(0);
+    }
+  }, [visible]);
+
   // Sync local group data with prop changes
   useEffect(() => {
+    console.log('📊 GroupDetailsModal: group prop changed:', group?.name, group?.id);
     if (group) {
       setLocalGroupData(group);
+      console.log('✅ GroupDetailsModal: localGroupData set');
     }
   }, [group]);
 
-  // Load fresh group data when modal becomes visible
   useEffect(() => {
     if (visible && group) {
       loadGroupData();
@@ -135,10 +163,8 @@ export default function GroupDetailsModal({
       return undefined;
     }
     
-    // Initial load
     loadGroupExpenses();
     
-    // Set up a refresh interval
     const refreshInterval = setInterval(() => {
       if (visible && localGroupData) {
         loadGroupExpenses();
@@ -167,6 +193,25 @@ export default function GroupDetailsModal({
       unsubscribe();
     };
   }, [visible, localGroupData?.id, loadGroupExpenses]);
+
+  // Add timeout effect to prevent modal from getting stuck in loading state
+  useEffect(() => {
+    if (!visible || localGroupData) {
+      setLoadingTimeout(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (!localGroupData) {
+        setLoadingTimeout(true);
+        console.warn('GroupDetailsModal: Loading timeout reached');
+      }
+    }, 5000); // 5 second timeout
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [visible, localGroupData]);
 
   const handleRefresh = async () => {
     await loadGroupExpenses();
@@ -367,347 +412,406 @@ export default function GroupDetailsModal({
     }
   };
 
-  const renderMembersList = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Members ({localGroupData?.members.length})
-        </Text>
-        {isUserAdmin && (
-          <TouchableOpacity
-            onPress={() => setShowAddMember(true)}
-            style={styles.addMemberButton}
-          >
-            <Ionicons name="person-add" size={16} color={theme.colors.primary} />
-            <Text style={[styles.addMemberText, { color: theme.colors.primary }]}>
-              Add Member
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      
-      {localGroupData?.members.map((member) => (
-        <View key={member.userId} style={styles.memberItem}>
-          <View style={styles.memberLeft}>
-            <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.memberAvatarText}>
-                {member.userData.fullName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View>
-              <Text style={[styles.memberName, { color: theme.colors.text }]}>
-                {member.userId === currentUser?.id ? 'You' : member.userData.fullName}
-              </Text>
-              <Text style={[styles.memberRole, { color: theme.colors.textSecondary }]}>
-                {member.role === 'admin' ? '👑 Admin' : '👤 Member'}
-              </Text>
-            </View>
+  const renderExpenseCard = (expense: Expense, index: number) => {
+    const hasUpdated = expense.updatedAt && expense.createdAt;
+    const timeDiff = hasUpdated ? Math.abs(expense.updatedAt.getTime() - expense.createdAt.getTime()) : 0;
+    const isEdited = hasUpdated && timeDiff > 1000;
+
+    return (
+      <TouchableOpacity
+        key={expense.id}
+        style={[styles.card, { backgroundColor: theme.colors.surface }]}
+        onPress={() => handleEditExpense(expense)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.expenseRow}>
+          <View style={[styles.expenseIcon, { backgroundColor: theme.colors.background }]}>
+            <Text style={styles.expenseIconText}>{expense.categoryIcon}</Text>
           </View>
-          <View style={styles.memberActions}>
-            <View style={styles.memberBalance}>
-              {member.balance === 0 ? (
-                <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-                  Settled
-                </Text>
-              ) : member.balance > 0 ? (
-                <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                  +{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(member.balance).toFixed(2)}
-                </Text>
-              ) : (
-                <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                  -{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(member.balance).toFixed(2)}
-                </Text>
+          <View style={styles.expenseDetails}>
+            <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
+              {expense.description}
+            </Text>
+            <View style={styles.expenseMeta}>
+              <Text style={[styles.expenseMetaText, { color: theme.colors.textSecondary }]}>
+                {expense.date.toLocaleDateString()} • {expense.paidByData?.fullName || 'Unknown'}
+              </Text>
+              {isEdited && (
+                <View style={[styles.editedBadge, { backgroundColor: '#FEF3C7' }]}>
+                  <Ionicons name="create" size={10} color="#D97706" />
+                  <Text style={[styles.editedText, { color: '#D97706' }]}>Edited</Text>
+                </View>
               )}
             </View>
-            {isUserAdmin && member.userId !== currentUser?.id && (
-              <TouchableOpacity
-                onPress={() => setSelectedMemberForAction(member.userId)}
-                style={styles.memberOptionsButton}
-              >
-                <Ionicons name="ellipsis-horizontal" size={16} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-            )}
           </View>
+          <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
+            {getCurrencySymbol(localGroupData?.currency || 'USD')}{expense.amount.toFixed(2)}
+          </Text>
         </View>
-      ))}
-    </View>
-  );
+      </TouchableOpacity>
+    );
+  };
 
-  const renderExpensesList = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Recent Expenses ({groupExpenses.length})
-        </Text>
-        <View style={styles.expensesActions}>
-          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-            <Ionicons name="refresh" size={16} color={theme.colors.primary} />
-          </TouchableOpacity>
-          {groupExpenses.length > 0 && (
-            <TouchableOpacity onPress={() => {
-              setExpenseListGroupId(localGroupData?.id);
-              setExpenseListTitle(`${localGroupData?.name} Expenses`);
-              setShowSimpleExpenseList(true);
-            }}>
-              <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
-                View All
-              </Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={onAddExpense}>
-            <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
-              Add New
+  const renderMemberCard = (member: any, index: number) => (
+    <TouchableOpacity
+      key={member.userId}
+      style={[styles.card, { backgroundColor: theme.colors.surface }]}
+      onPress={() => isUserAdmin && member.userId !== currentUser?.id ? setSelectedMemberForAction(member.userId) : null}
+      activeOpacity={isUserAdmin && member.userId !== currentUser?.id ? 0.7 : 1}
+    >
+      <View style={styles.memberRow}>
+        <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
+          <Text style={styles.memberAvatarText}>
+            {member.userData.fullName.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <View style={styles.memberInfo}>
+          <Text style={[styles.memberName, { color: theme.colors.text }]}>
+            {member.userId === currentUser?.id ? 'You' : member.userData.fullName}
+          </Text>
+          <View style={styles.memberRole}>
+            <Text style={[styles.memberRoleText, { color: theme.colors.textSecondary }]}>
+              {member.role === 'admin' ? '👑 Admin' : '👤 Member'}
             </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      {loading ? (
-        <View style={styles.loadingExpenses}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-          <Text style={[{ color: theme.colors.textSecondary, marginLeft: 8 }]}>
-            Loading expenses...
-          </Text>
-        </View>
-      ) : groupExpenses.length === 0 ? (
-        <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="receipt-outline" size={48} color={theme.colors.textSecondary} />
-          <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
-            No expenses yet
-          </Text>
-          <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-            Add your first expense to start tracking
-          </Text>
-        </View>
-      ) : (
-        groupExpenses.slice(0, 10).map((expense) => (
-          <TouchableOpacity
-            key={expense.id}
-            style={styles.expenseItem}
-            onPress={() => handleEditExpense(expense)}
-          >
-            <View style={styles.expenseLeft}>
-              <Text style={styles.expenseIcon}>{expense.categoryIcon}</Text>
-              <View>
-                <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
-                  {expense.description}
-                </Text>
-                <Text style={[styles.expenseSubtitle, { color: theme.colors.textSecondary }]}>
-                  {expense.date.toLocaleDateString()} • {expense.paidByData?.fullName || 'Unknown'}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.expenseRight}>
-              <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-                {getCurrencySymbol(localGroupData?.currency || 'USD')}{expense.amount.toFixed(2)}
-              </Text>
-
-            <View style={styles.expenseActions}>
-                {(() => {
-                  // Debug logging for edited badge
-                  const hasUpdated = expense.updatedAt && expense.createdAt;
-                  const timeDiff = hasUpdated ? Math.abs(expense.updatedAt.getTime() - expense.createdAt.getTime()) : 0;
-                  const isEdited = hasUpdated && timeDiff > 1000;
-                  
-                  console.log('Group expense edited check:', {
-                    id: expense.id,
-                    description: expense.description,
-                    hasUpdated,
-                    timeDiff,
-                    isEdited,
-                    createdAt: expense.createdAt,
-                    updatedAt: expense.updatedAt
-                  });
-                  
-                  return isEdited ? (
-                    <View style={[styles.editedBadge, { backgroundColor: theme.colors.primary + '20' }]}>
-                      <Ionicons name="create" size={12} color={theme.colors.primary} />
-                      <Text style={[styles.editedText, { color: theme.colors.primary }]}>Edited</Text>
-                    </View>
-                  ) : null;
-                })()}
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))
-      )}
-    </View>
-  );
-
-  const renderGroupStats = () => (
-    <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.colors.text }]}>
-          {getCurrencySymbol(localGroupData?.currency || 'AUD')}{localGroupData?.totalExpenses.toFixed(2)}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-          Total Spent
-        </Text>
-      </View>
-      <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.colors.text }]}>
-          {getCurrencySymbol(localGroupData?.currency || 'AUD')}{localGroupData ? (localGroupData.totalExpenses / localGroupData.members.length).toFixed(2) : '0.00'}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-          Per Person
-        </Text>
-      </View>
-      <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.colors.text }]}>
-          {groupExpenses.length}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-          Expenses
-        </Text>
-      </View>
-    </View>
-  );
-
-  if (!localGroupData) return null;
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Group Details
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <ScrollView contentContainerStyle={styles.content}>
-          {/* Group Info */}
-          <View style={styles.groupInfo}>
-            <Text style={styles.groupAvatar}>{localGroupData.avatar}</Text>
-            <Text style={[styles.groupName, { color: theme.colors.text }]}>
-              {localGroupData.name}
-            </Text>
-            {localGroupData.description && (
-              <Text style={[styles.groupDescription, { color: theme.colors.textSecondary }]}>
-                {localGroupData.description}
-              </Text>
-            )}
-            <View style={styles.groupMeta}>
-              <Text style={[styles.groupMetaText, { color: theme.colors.textSecondary }]}>
-                Created {localGroupData.createdAt.toLocaleDateString()}
-              </Text>
-              <Text style={[styles.groupMetaText, { color: theme.colors.textSecondary }]}>
-                Currency: {localGroupData.currency}
-              </Text>
-            </View>
           </View>
-
-          {/* Group Stats */}
-          {renderGroupStats()}
-
-          {/* Tab Navigation */}
-          <View style={[styles.tabContainer, { borderBottomColor: theme.colors.border }]}>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                activeTab === 'expenses' && { borderBottomColor: theme.colors.primary }
-              ]}
-              onPress={() => setActiveTab('expenses')}
-            >
-              <Text style={[
-                styles.tabText,
-                { color: activeTab === 'expenses' ? theme.colors.primary : theme.colors.textSecondary }
-              ]}>
-                Expenses
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                activeTab === 'members' && { borderBottomColor: theme.colors.primary }
-              ]}
-              onPress={() => setActiveTab('members')}
-            >
-              <Text style={[
-                styles.tabText,
-                { color: activeTab === 'members' ? theme.colors.primary : theme.colors.textSecondary }
-              ]}>
-                Members
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                activeTab === 'settings' && { borderBottomColor: theme.colors.primary }
-              ]}
-              onPress={() => setActiveTab('settings')}
-            >
-              <Text style={[
-                styles.tabText,
-                { color: activeTab === 'settings' ? theme.colors.primary : theme.colors.textSecondary }
-              ]}>
-                Settings
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Tab Content */}
-          {activeTab === 'expenses' && renderExpensesList()}
-          {activeTab === 'members' && renderMembersList()}
-          {activeTab === 'settings' && (
+        </View>
+        <View style={styles.memberBalance}>
+          {member.balance === 0 ? (
             <>
-              {/* Invite Code */}
-              <View style={[styles.inviteSection, { backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.inviteSectionTitle, { color: theme.colors.text }]}>
-                  Group Invite Code
-                </Text>
-                <View style={[styles.inviteCodeContainer, { backgroundColor: theme.colors.background }]}>
-                  <Text style={[styles.inviteCode, { color: theme.colors.primary }]}>
-                    {localGroupData.inviteCode}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      Alert.alert('Copied!', 'Invite code copied to clipboard');
-                    }}
-                    style={{ padding: 8 }}
-                  >
-                    <Ionicons name="copy" size={20} color={theme.colors.primary} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={[{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 8 }]}>
-                  Share this code with friends to invite them to the group
-                </Text>
-                
-                <TouchableOpacity
-                  style={[styles.qrButton, { backgroundColor: theme.colors.primary }]}
-                  onPress={() => setShowQRModal(true)}
-                >
-                  <Ionicons name="qr-code" size={20} color="white" />
-                  <Text style={[styles.qrButtonText, { color: 'white' }]}>
-                    Show QR Code
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Danger Zone */}
-              <View style={styles.dangerZone}>
-                <TouchableOpacity
-                  style={[styles.dangerButton, { borderColor: theme.colors.error }]}
-                  onPress={handleLeaveGroup}
-                >
-                  <Ionicons name="exit" size={20} color={theme.colors.error} />
-                  <Text style={[styles.dangerButtonText, { color: theme.colors.error }]}>
-                    Leave Group
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={[styles.balanceAmount, { color: theme.colors.textSecondary }]}>
+                $0.00
+              </Text>
+              <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
+                Settled
+              </Text>
+            </>
+          ) : member.balance > 0 ? (
+            <>
+              <Text style={[styles.balanceAmount, styles.balancePositive]}>
+                +{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(member.balance).toFixed(2)}
+              </Text>
+              <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
+                Owed to you
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.balanceAmount, styles.balanceNegative]}>
+                -{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(member.balance).toFixed(2)}
+              </Text>
+              <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
+                Owes
+              </Text>
             </>
           )}
-        </ScrollView>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // Show loading state if modal is visible but no data yet
+  if (visible && !localGroupData) {
+    console.log('⏳ GroupDetailsModal: Showing loading state');
+    return (
+      <Modal visible={visible} animationType="slide" transparent>
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', minHeight: 300 }]}>
+            <TouchableOpacity 
+              style={[styles.closeBtn, { position: 'absolute', top: 20, right: 20, backgroundColor: theme.colors.surface }]}
+              onPress={onClose}
+            >
+              <Ionicons name="close" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+            
+            {loadingTimeout ? (
+              <>
+                <Ionicons name="warning" size={48} color={theme.colors.error} />
+                <Text style={[styles.loadingText, { color: theme.colors.text, marginTop: 16, textAlign: 'center' }]}>
+                  Failed to load group details
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.retryButton, { backgroundColor: theme.colors.primary, marginTop: 16 }]}
+                  onPress={() => {
+                    setLoadingTimeout(false);
+                    if (group) {
+                      setLocalGroupData(group);
+                    }
+                  }}
+                >
+                  <Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.text, marginTop: 16 }]}>Loading group details...</Text>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Don't render anything if modal is not visible or no group data
+  if (!visible || !localGroupData) {
+    console.log('❌ GroupDetailsModal: Not rendering - visible:', visible, 'localGroupData:', !!localGroupData);
+    return null;
+  }
+
+  const slideTransform = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0],
+  });
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet">
+      <SafeAreaView style={[styles.fullScreenContainer, { backgroundColor: theme.colors.background }]}>
+        <Animated.View 
+          style={[
+            styles.modalContent, 
+            { 
+              backgroundColor: theme.colors.background,
+              transform: [{ translateY: slideTransform }],
+              opacity: fadeAnim
+            }
+          ]}
+        >
+          {/* Header with Gradient */}
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.closeBtn}
+              onPress={onClose}
+            >
+              <Ionicons name="close" size={20} color="white" />
+            </TouchableOpacity>
+            
+            <View style={styles.groupHeader}>
+              <View style={styles.groupAvatar}>
+                <Text style={styles.groupAvatarText}>{localGroupData.avatar}</Text>
+              </View>
+              <Text style={styles.groupName}>{localGroupData.name}</Text>
+              {localGroupData.description && (
+                <Text style={styles.groupDescription}>{localGroupData.description}</Text>
+              )}
+              
+              <View style={styles.groupBadges}>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    📅 {localGroupData.createdAt.toLocaleDateString()}
+                  </Text>
+                </View>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>💰 {localGroupData.currency}</Text>
+                </View>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>👥 {localGroupData.members.length} members</Text>
+                </View>
+              </View>
+              
+              <View style={styles.statsContainer}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>
+                    {getCurrencySymbol(localGroupData.currency)}{localGroupData.totalExpenses.toFixed(2)}
+                  </Text>
+                  <Text style={styles.statLabel}>Total Spent</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>
+                    {getCurrencySymbol(localGroupData.currency)}{(localGroupData.totalExpenses / localGroupData.members.length).toFixed(2)}
+                  </Text>
+                  <Text style={styles.statLabel}>Per Person</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{groupExpenses.length}</Text>
+                  <Text style={styles.statLabel}>Expenses</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+          
+          {/* Content */}
+          <View style={[styles.content, { backgroundColor: theme.colors.background }]}>
+            {/* Tabs */}
+            <View style={[styles.tabs, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
+              {['expenses', 'members', 'settings'].map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[
+                    styles.tab,
+                    activeTab === tab && { borderBottomColor: theme.colors.primary }
+                  ]}
+                  onPress={() => setActiveTab(tab as any)}
+                >
+                  <Text style={[
+                    styles.tabText,
+                    { color: activeTab === tab ? theme.colors.primary : theme.colors.textSecondary }
+                  ]}>
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {/* Tab Content */}
+            <ScrollView 
+              style={{ maxHeight: height * 0.6 }}
+              contentContainerStyle={styles.tabContent} 
+              showsVerticalScrollIndicator={false}
+            >
+              {activeTab === 'expenses' && (
+                <View>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                      Recent Expenses
+                    </Text>
+                    <View style={styles.headerActions}>
+                      <TouchableOpacity onPress={handleRefresh} style={styles.refreshBtn}>
+                        <Ionicons name="refresh" size={16} color={theme.colors.primary} />
+                      </TouchableOpacity>
+                      {groupExpenses.length > 0 && (
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
+                          onPress={() => {
+                            setExpenseListGroupId(localGroupData?.id);
+                            setExpenseListTitle(`${localGroupData?.name} Expenses`);
+                            setShowSimpleExpenseList(true);
+                          }}
+                        >
+                          <Text style={styles.actionBtnText}>View All</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
+                        onPress={onAddExpense}
+                      >
+                        <Text style={styles.actionBtnText}>+ Add</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  
+                  {loading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                      <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+                        Loading expenses...
+                      </Text>
+                    </View>
+                  ) : groupExpenses.length === 0 ? (
+                    <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+                      <Text style={styles.emptyIcon}>📋</Text>
+                      <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                        No expenses yet
+                      </Text>
+                      <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                        Add your first expense to start tracking
+                      </Text>
+                    </View>
+                  ) : (
+                    groupExpenses.slice(0, 10).map((expense, index) => renderExpenseCard(expense, index))
+                  )}
+                </View>
+              )}
+              
+              {activeTab === 'members' && (
+                <View>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                      Group Members
+                    </Text>
+                    {isUserAdmin && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
+                        onPress={() => setShowAddMember(true)}
+                      >
+                        <Text style={styles.actionBtnText}>+ Add Member</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  
+                  {localGroupData.members.map((member, index) => renderMemberCard(member, index))}
+                </View>
+              )}
+              
+              {activeTab === 'settings' && (
+                <View>
+                  <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface }]}>
+                    <Text style={[styles.settingsTitle, { color: theme.colors.text }]}>
+                      Invite Friends
+                    </Text>
+                    <View style={[styles.inviteCodeDisplay, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                      <Text style={[styles.inviteCode, { color: theme.colors.primary }]}>
+                        {localGroupData.inviteCode}
+                      </Text>
+                      <Text style={[styles.inviteHint, { color: theme.colors.textSecondary }]}>
+                        Share this code to invite friends
+                      </Text>
+                    </View>
+                    <View style={styles.buttonGroup}>
+                      <TouchableOpacity
+                        style={[styles.secondaryBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
+                        onPress={() => Alert.alert('Copied!', 'Invite code copied to clipboard')}
+                      >
+                        <Ionicons name="copy" size={16} color={theme.colors.textSecondary} />
+                        <Text style={[styles.secondaryBtnText, { color: theme.colors.textSecondary }]}>
+                          Copy Code
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]}
+                        onPress={() => setShowQRModal(true)}
+                      >
+                        <Ionicons name="qr-code" size={16} color="white" />
+                        <Text style={styles.primaryBtnText}>QR Code</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  
+                  <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface }]}>
+                    <Text style={[styles.settingsTitle, { color: theme.colors.text }]}>
+                      Group Actions
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.actionRow, { borderBottomColor: theme.colors.border }]}
+                      onPress={handleShareInviteCode}
+                    >
+                      <Ionicons name="share" size={20} color={theme.colors.textSecondary} />
+                      <Text style={[styles.actionRowText, { color: theme.colors.text }]}>
+                        Share Invite Link
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionRow}
+                      onPress={() => Alert.alert('Export', 'Feature coming soon!')}
+                    >
+                      <Ionicons name="download" size={20} color={theme.colors.textSecondary} />
+                      <Text style={[styles.actionRowText, { color: theme.colors.text }]}>
+                        Export Group Data
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <View style={styles.dangerSection}>
+                    <TouchableOpacity
+                      style={[styles.dangerBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+                      onPress={handleLeaveGroup}
+                    >
+                      <Ionicons name="exit" size={20} color="#DC2626" />
+                      <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>
+                        Leave Group
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </Animated.View>
       </SafeAreaView>
       
-      {/* Member Action Modal */}
+      {/* All Modals */}
       {selectedMemberForAction && (
         <Modal visible={true} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -748,8 +852,8 @@ export default function GroupDetailsModal({
                         handleRemoveMember(selectedMemberForAction);
                       }}
                     >
-                      <Ionicons name="person-remove" size={20} color={theme.colors.error} />
-                      <Text style={[styles.actionModalOptionText, { color: theme.colors.error }]}>
+                      <Ionicons name="person-remove" size={20} color="#DC2626" />
+                      <Text style={[styles.actionModalOptionText, { color: '#DC2626' }]}>
                         Remove from Group
                       </Text>
                     </TouchableOpacity>
@@ -772,90 +876,88 @@ export default function GroupDetailsModal({
 
       {/* Add Member Modal */}
       {showAddMember && (
-        <Modal visible={true} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={[styles.addMemberModalContent, { backgroundColor: theme.colors.background }]}>
-              <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-                <TouchableOpacity onPress={() => setShowAddMember(false)}>
-                  <Ionicons name="close" size={24} color={theme.colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.modalHeaderTitle, { color: theme.colors.text }]}>
-                  Add Member
+        <Modal visible={true} animationType="slide" presentationStyle="pageSheet">
+          <SafeAreaView style={[styles.addMemberModal, { backgroundColor: theme.colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <TouchableOpacity onPress={() => setShowAddMember(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+              <Text style={[styles.modalHeaderTitle, { color: theme.colors.text }]}>
+                Add Member
+              </Text>
+              <View style={{ width: 24 }} />
+            </View>
+            
+            <ScrollView style={styles.addMemberContent}>
+              <View style={[styles.inviteSection, { backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                  Invite New Users
                 </Text>
-                <View style={{ width: 24 }} />
-              </View>
-              
-              <ScrollView style={styles.addMemberContent}>
-                <View style={styles.inviteSection}>
-                  <Text style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 8 }]}>
-                    Invite New Users
-                  </Text>
-                  <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary, marginBottom: 16 }]}>
-                    Invite friends who don't have the app yet
-                  </Text>
-                  
-                  <TouchableOpacity
-                    style={[styles.inviteContactsButton, { backgroundColor: theme.colors.primary }]}
-                    onPress={handleInviteFromContacts}
-                  >
-                    <Ionicons name="person-add" size={20} color="white" />
-                    <Text style={styles.inviteContactsButtonText}>
-                      Invite from Contacts
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 16 }]}>
-                  Your Friends
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
+                  Invite friends who don't have the app yet
                 </Text>
                 
-                {friends.filter(friend => 
-                  friend.status === 'accepted' && 
-                  !localGroupData?.members.some(member => member.userId === friend.friendId)
-                ).length === 0 ? (
-                  <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-                    <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} />
-                    <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
-                      No friends to add
-                    </Text>
-                    <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-                      All your friends are already in this group
-                    </Text>
-                  </View>
-                ) : (
-                  friends
-                    .filter(friend => 
-                      friend.status === 'accepted' && 
-                      !localGroupData?.members.some(member => member.userId === friend.friendId)
-                    )
-                    .map((friend) => (
-                      <TouchableOpacity
-                        key={friend.id}
-                        style={styles.friendItem}
-                        onPress={() => handleAddFriendToGroup(friend.friendId)}
-                      >
-                        <View style={styles.friendLeft}>
-                          <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
-                            <Text style={styles.friendAvatarText}>
-                              {friend.friendData.fullName.charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                          <View>
-                            <Text style={[styles.friendName, { color: theme.colors.text }]}>
-                              {friend.friendData.fullName}
-                            </Text>
-                            <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                              {friend.friendData.email}
-                            </Text>
-                          </View>
+                <TouchableOpacity
+                  style={[styles.inviteContactsBtn, { backgroundColor: theme.colors.primary }]}
+                  onPress={handleInviteFromContacts}
+                >
+                  <Ionicons name="person-add" size={20} color="white" />
+                  <Text style={styles.inviteContactsBtnText}>
+                    Invite from Contacts
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 24 }]}>
+                Your Friends
+              </Text>
+              
+              {friends.filter(friend => 
+                friend.status === 'accepted' && 
+                !localGroupData?.members.some(member => member.userId === friend.friendId)
+              ).length === 0 ? (
+                <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+                  <Text style={styles.emptyIcon}>👥</Text>
+                  <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                    No friends to add
+                  </Text>
+                  <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                    All your friends are already in this group
+                  </Text>
+                </View>
+              ) : (
+                friends
+                  .filter(friend => 
+                    friend.status === 'accepted' && 
+                    !localGroupData?.members.some(member => member.userId === friend.friendId)
+                  )
+                  .map((friend) => (
+                    <TouchableOpacity
+                      key={friend.id}
+                      style={[styles.card, { backgroundColor: theme.colors.surface }]}
+                      onPress={() => handleAddFriendToGroup(friend.friendId)}
+                    >
+                      <View style={styles.friendRow}>
+                        <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
+                          <Text style={styles.memberAvatarText}>
+                            {friend.friendData.fullName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.memberInfo}>
+                          <Text style={[styles.memberName, { color: theme.colors.text }]}>
+                            {friend.friendData.fullName}
+                          </Text>
+                          <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                            {friend.friendData.email}
+                          </Text>
                         </View>
                         <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
-                      </TouchableOpacity>
-                    ))
-                )}
-              </ScrollView>
-            </View>
-          </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+              )}
+            </ScrollView>
+          </SafeAreaView>
         </Modal>
       )}
 
@@ -901,7 +1003,6 @@ export default function GroupDetailsModal({
         }}
       />
 
-
       {/* Settlement Modal */}
       <ExpenseSettlementModal
         visible={showSettlementModal}
@@ -915,270 +1016,132 @@ export default function GroupDetailsModal({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  fullScreenContainer: {
     flex: 1,
   },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    flex: 1,
+    borderRadius: 0,
+    overflow: 'hidden',
+    flexDirection: 'column',
+  },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: '#667eea',
+    paddingTop: 40,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
+    zIndex: 10,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  content: {
-    flexGrow: 1,
-    padding: 20,
-  },
-  groupInfo: {
+  groupHeader: {
     alignItems: 'center',
-    marginBottom: 24,
+    zIndex: 2,
   },
   groupAvatar: {
-    fontSize: 48,
-    marginBottom: 12,
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  groupAvatarText: {
+    fontSize: 28,
   },
   groupName: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    color: 'white',
+    fontSize: 26,
+    fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',
   },
   groupDescription: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 22,
-  },
-  groupMeta: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  groupMetaText: {
+    color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 14,
+    marginBottom: 16,
+    lineHeight: 20,
+    textAlign: 'center',
   },
-  statsCard: {
+  groupBadges: {
     flexDirection: 'row',
-    padding: 16,
-    borderRadius: 16,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
     marginBottom: 24,
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  },
+  badge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
   },
   statItem: {
-    alignItems: 'center',
     flex: 1,
-    minWidth: 0,
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   statValue: {
+    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
     marginBottom: 4,
     textAlign: 'center',
   },
   statLabel: {
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 8,
-  },
-  inviteSection: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  inviteSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  inviteCodeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F9FAFB',
-    padding: 12,
-    borderRadius: 8,
-  },
-  inviteCode: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  sectionLink: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  memberItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  memberLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  memberAvatarText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  memberName: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  memberRole: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  memberBalance: {
-    alignItems: 'flex-end',
-  },
-  balanceText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  expenseItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  expenseLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  expenseIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  expenseTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  expenseSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  expenseStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  expenseStatusText: {
+    color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 10,
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 32,
-    borderRadius: 12,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 12,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  dangerZone: {
-    marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  dangerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
-  },
-  dangerButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  expensesActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  refreshButton: {
-    padding: 4,
-  },
-  loadingExpenses: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
-  },
-  addMemberButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  addMemberText: {
-    fontSize: 14,
     fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
-  memberActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  content: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
   },
-  memberOptionsButton: {
-    padding: 4,
-  },
-  tabContainer: {
+  tabs: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    marginHorizontal: 20,
+    paddingHorizontal: 0,
+    backgroundColor: 'white',
   },
   tab: {
     flex: 1,
@@ -1188,22 +1151,304 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
-  qrButton: {
+  tabContent: {
+    padding: 24,
+    flexGrow: 1,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  refreshBtn: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  actionBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  actionBtnText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  card: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  expenseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  expenseIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  expenseIconText: {
+    fontSize: 20,
+  },
+  expenseDetails: {
+    flex: 1,
+    minWidth: 0,
+  },
+  expenseTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  expenseMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  expenseMetaText: {
+    fontSize: 13,
+  },
+  expenseAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  editedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    gap: 2,
+  },
+  editedText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  memberAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  memberAvatarText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  memberInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  memberRole: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  memberRoleText: {
+    fontSize: 13,
+  },
+  memberBalance: {
+    alignItems: 'flex-end',
+  },
+  balanceAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  balancePositive: {
+    color: '#059669',
+  },
+  balanceNegative: {
+    color: '#DC2626',
+  },
+  balanceLabel: {
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  settingsSection: {
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  settingsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  inviteCodeDisplay: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  inviteCode: {
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: 2,
+    fontFamily: 'Monaco',
+    marginBottom: 8,
+  },
+  inviteHint: {
+    fontSize: 13,
+  },
+  buttonGroup: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  secondaryBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginTop: 12,
     gap: 8,
   },
-  qrButtonText: {
-    fontSize: 14,
+  secondaryBtnText: {
     fontWeight: '600',
+  },
+  primaryBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  primaryBtnText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    gap: 16,
+  },
+  actionRowText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  dangerSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  dangerBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  dangerBtnText: {
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 60,
+    borderRadius: 16,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+    opacity: 0.6,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
@@ -1213,7 +1458,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   actionModalContent: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
     minWidth: 280,
@@ -1241,11 +1485,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
-  addMemberModalContent: {
+  addMemberModal: {
     flex: 1,
-    marginTop: 60,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1262,80 +1503,46 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  friendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  friendLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  friendAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  friendAvatarText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  friendName: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  friendEmail: {
-    fontSize: 12,
-    marginTop: 2,
+  inviteSection: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
   },
   sectionSubtitle: {
     fontSize: 14,
     lineHeight: 20,
+    marginBottom: 16,
   },
-  inviteContactsButton: {
+  inviteContactsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     gap: 8,
   },
-  inviteContactsButtonText: {
+  inviteContactsBtnText: {
     fontSize: 14,
     fontWeight: '600',
     color: 'white',
   },
-  expenseRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  expenseAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  expenseActions: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  editedBadge: {
+  friendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 2,
+    gap: 16,
   },
-  editedText: {
-    fontSize: 10,
+  friendEmail: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
     fontWeight: '600',
   },
 });

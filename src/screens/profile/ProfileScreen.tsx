@@ -277,8 +277,10 @@ export default function ProfileScreen() {
                   { 
                     text: 'Start Tour', 
                     onPress: () => {
+                      console.log('🎯 Profile: User tapped Start Tour button');
                       resetTour();
                       startTour();
+                      console.log('✅ Profile: Called resetTour() and startTour()');
                     }
                   }
                 ]

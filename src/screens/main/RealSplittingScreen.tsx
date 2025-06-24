@@ -1222,8 +1222,10 @@ const renderFriendsTab = () => {
               key={group.id}
               style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}
               onPress={() => {
+                console.log('🔍 Group clicked:', group.name, group.id);
                 setSelectedGroup(group);
                 setShowGroupDetails(true);
+                console.log('📱 Modal state set to visible');
               }}
             >
               <View style={styles.groupHeader}>
