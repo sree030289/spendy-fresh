@@ -10,6 +10,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -140,6 +141,60 @@ export default function RealSplittingScreen() {
   const [expenseListGroupId, setExpenseListGroupId] = useState<string | undefined>(undefined);
   const [expenseListTitle, setExpenseListTitle] = useState('All Expenses');
 
+const [groupBalances, setGroupBalances] = useState<Map<string, number>>(new Map());
+const { calculateGroupBalance } = useOverviewBalances();
+
+// Calculate balances for all groups with detailed logging
+useEffect(() => {
+  const calculateAllGroupBalances = async () => {
+    if (!user?.id || !calculateGroupBalance) {
+      console.log('❌ Missing user ID or calculateGroupBalance function');
+      return;
+    }
+    
+    console.log('🔄 Calculating balances for', groups.length, 'groups');
+    const newBalances = new Map<string, number>();
+    
+    for (const group of groups) {
+      console.log(`\n📊 Calculating balance for group: ${group.name} (${group.id})`);
+      console.log(`👥 Group members: ${group.members.length}`);
+      
+      let totalGroupBalance = 0;
+      
+      for (const member of group.members) {
+        if (member.userId === user.id) {
+          console.log(`⏭️  Skipping self: ${member.userData.fullName}`);
+          continue;
+        }
+        
+        try {
+          const pairwiseBalance = await calculateGroupBalance(user.id, member.userId, group.id);
+          console.log(`💰 Balance with ${member.userData.fullName}: ${pairwiseBalance}`);
+          
+          // FIXED: Only add non-zero balances to avoid floating point errors
+          if (Math.abs(pairwiseBalance) > 0.01) {
+            totalGroupBalance += pairwiseBalance;
+          }
+        } catch (error) {
+          console.error(`❌ Error calculating balance with ${member.userData.fullName}:`, error);
+        }
+      }
+      
+      // Round to 2 decimal places to avoid floating point issues
+      totalGroupBalance = parseFloat(totalGroupBalance.toFixed(2));
+      
+      console.log(`✅ Total balance for ${group.name}: ${totalGroupBalance}`);
+      newBalances.set(group.id, totalGroupBalance);
+    }
+    
+    console.log('📋 Final group balances:', Array.from(newBalances.entries()));
+    setGroupBalances(newBalances);
+  };
+  
+  // Add debounce to prevent excessive calculations
+  const timeoutId = setTimeout(calculateAllGroupBalances, 500);
+  return () => clearTimeout(timeoutId);
+}, [groups, user?.id, calculateGroupBalance]);
   // FIXED: Unified balance change notification
   const notifyBalanceChange = useCallback(() => {
     overviewBalances.notifyChange();
@@ -1210,12 +1265,16 @@ const renderFriendsTab = () => {
           </TouchableOpacity>
         </View>
       ) : (
-        groups.map((group) => {
-          // FIXED: Use group member balance from group data (this is already calculated correctly)
-          const currentUserMember = group.members.find(member => member.userId === user?.id);
-          const userBalance = currentUserMember?.balance || 0;
-          const userShare = Math.abs(userBalance);
-          const shareStatus = userBalance === 0 ? 'settled' : (userBalance > 0 ? 'owed' : 'owes');
+groups.map((group) => {
+  // FIXED: Use pre-calculated group balances with debug logging
+  const userBalance = groupBalances.get(group.id) || 0;
+  const userShare = Math.abs(userBalance);
+  const shareStatus = userBalance === 0 ? 'settled' : (userBalance > 0 ? 'owed' : 'owes');
+  
+  // Debug logging for group card display
+  console.log(`🏷️  Rendering group card: ${group.name}`);
+  console.log(`💳 Group balance from map: ${userBalance}`);
+  console.log(`📊 Display: ${shareStatus} ${userShare}`);
           
           return (
             <TouchableOpacity

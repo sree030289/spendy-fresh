@@ -1,4 +1,4 @@
-// src/components/modals/GroupSettlementModal.tsx - FIXED to use unified balance system
+// src/components/modals/GroupSettlementModal.tsx - GROUP-SPECIFIC VERSION
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -12,27 +12,28 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useBalances } from '@/hooks/useBalances';
 import { SplittingService } from '@/services/firebase/splitting';
 import { Button } from '@/components/common/Button';
-import BalanceManager from '@/services/BalanceManager';
+import { getCurrencySymbol } from '@/utils/currency';
+
+interface DirectSettlement {
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  toUserName: string;
+  amount: number;
+  type: 'friend_direct' | 'group_settlement' | 'mixed_settlement';
+  description: string;
+}
 
 interface GroupSettlementModalProps {
   visible: boolean;
   onClose: () => void;
-  groupId: string | null;
+  groupId: string | null; // If null, show global settlements. If groupId, show group-specific
   userCurrency: string;
   currentUserId: string;
   onRefresh?: () => void;
-}
-
-interface SettlementSuggestion {
-  fromUserId: string;
-  fromUserName: string;
-  fromUserAvatar?: string;
-  toUserId: string;
-  toUserName: string;
-  toUserAvatar?: string;
-  amount: number;
 }
 
 export default function GroupSettlementModal({
@@ -44,61 +45,211 @@ export default function GroupSettlementModal({
   onRefresh
 }: GroupSettlementModalProps) {
   const { theme } = useTheme();
-  const [suggestions, setSuggestions] = useState<SettlementSuggestion[]>([]);
+  const { allBalances, calculateGroupBalance, refresh: refreshBalances } = useBalances();
+  
+  const [settlements, setSettlements] = useState<{
+    youWillReceive: DirectSettlement[];
+    youWillPay: DirectSettlement[];
+    summary: { totalToReceive: number; totalToPay: number; netPosition: number };
+  }>({
+    youWillReceive: [],
+    youWillPay: [],
+    summary: { totalToReceive: 0, totalToPay: 0, netPosition: 0 }
+  });
   const [loading, setLoading] = useState(false);
   const [processingSettlement, setProcessingSettlement] = useState<string | null>(null);
+  const [groupData, setGroupData] = useState<any>(null);
 
   useEffect(() => {
-    if (visible && groupId) {
-      loadSettlementSuggestions();
+    if (visible && currentUserId) {
+      loadSettlements();
     }
-  }, [visible, groupId]);
+  }, [visible, currentUserId, groupId]);
 
-  const loadSettlementSuggestions = async () => {
-    if (!groupId) return;
-    
+  const loadSettlements = async () => {
     setLoading(true);
     try {
-      console.log('🔄 Loading settlement suggestions for group:', groupId);
+      console.log('🔄 Loading settlement instructions for user:', currentUserId, 'groupId:', groupId);
       
-      // FIXED: Use the corrected settlement suggestions from SplittingService
-      const suggestions = await SplittingService.getGroupSettlementSuggestions(groupId);
-      console.log('✅ Loaded settlement suggestions:', suggestions.length);
+      if (groupId) {
+        // GROUP-SPECIFIC SETTLEMENTS
+        await loadGroupSpecificSettlements();
+      } else {
+        // GLOBAL SETTLEMENTS (all relationships)
+        await loadGlobalSettlements();
+      }
       
-      setSuggestions(suggestions);
     } catch (error) {
-      console.error('❌ Failed to load settlement suggestions:', error);
-      Alert.alert('Error', 'Failed to load settlement suggestions');
-      setSuggestions([]);
+      console.error('❌ Failed to load settlement instructions:', error);
+      Alert.alert('Error', 'Failed to load settlement information');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSettlement = async (suggestion: SettlementSuggestion) => {
-    const settlementKey = `${suggestion.fromUserId}-${suggestion.toUserId}`;
+  const loadGroupSpecificSettlements = async () => {
+    if (!groupId || !calculateGroupBalance) return;
+
+    console.log('📍 Loading GROUP-SPECIFIC settlements for group:', groupId);
+
+    // Get group data
+    const group = await SplittingService.getGroup(groupId);
+    if (!group) {
+      throw new Error('Group not found');
+    }
+    setGroupData(group);
+
+    const youWillReceive: DirectSettlement[] = [];
+    const youWillPay: DirectSettlement[] = [];
+    let totalToReceive = 0;
+    let totalToPay = 0;
+
+    // Calculate pairwise balances with each group member
+    for (const member of group.members) {
+      if (member.userId === currentUserId) continue;
+
+      const pairwiseBalance = await calculateGroupBalance(currentUserId, member.userId, groupId);
+      
+      console.log(`Group balance: ${currentUserId} vs ${member.userId} = ${pairwiseBalance}`);
+
+      if (Math.abs(pairwiseBalance) > 0.01) {
+        if (pairwiseBalance > 0) {
+          // They owe you
+          youWillReceive.push({
+            fromUserId: member.userId,
+            fromUserName: member.userData.fullName,
+            toUserId: currentUserId,
+            toUserName: 'You',
+            amount: pairwiseBalance,
+            type: 'group_settlement',
+            description: `Group expenses from: ${group.name}`
+          });
+          totalToReceive += pairwiseBalance;
+        } else {
+          // You owe them
+          youWillPay.push({
+            fromUserId: currentUserId,
+            fromUserName: 'You',
+            toUserId: member.userId,
+            toUserName: member.userData.fullName,
+            amount: Math.abs(pairwiseBalance),
+            type: 'group_settlement',
+            description: `Group expenses from: ${group.name}`
+          });
+          totalToPay += Math.abs(pairwiseBalance);
+        }
+      }
+    }
+
+    // Sort by amount (largest first)
+    youWillReceive.sort((a, b) => b.amount - a.amount);
+    youWillPay.sort((a, b) => b.amount - a.amount);
+
+    setSettlements({
+      youWillReceive,
+      youWillPay,
+      summary: {
+        totalToReceive: parseFloat(totalToReceive.toFixed(2)),
+        totalToPay: parseFloat(totalToPay.toFixed(2)),
+        netPosition: parseFloat((totalToReceive - totalToPay).toFixed(2))
+      }
+    });
+
+    console.log('✅ Group-specific settlements loaded:', {
+      groupName: group.name,
+      toReceive: youWillReceive.length,
+      toPay: youWillPay.length,
+      netPosition: (totalToReceive - totalToPay).toFixed(2)
+    });
+  };
+
+  const loadGlobalSettlements = async () => {
+    console.log('🌍 Loading GLOBAL settlements (all relationships)');
+
+    const youWillReceive: DirectSettlement[] = [];
+    const youWillPay: DirectSettlement[] = [];
+    let totalToReceive = 0;
+    let totalToPay = 0;
+
+    for (const balance of allBalances) {
+      if (Math.abs(balance.balance) <= 0.01) continue;
+
+      if (balance.balance > 0) {
+        // They owe you
+        youWillReceive.push({
+          fromUserId: balance.userId,
+          fromUserName: balance.name,
+          toUserId: currentUserId,
+          toUserName: 'You',
+          amount: balance.balance,
+          type: balance.source === 'friend' ? 'friend_direct' : 
+                balance.source === 'group' ? 'group_settlement' : 'mixed_settlement',
+          description: balance.source === 'friend' ? 'Direct friendship balance' :
+                      balance.source === 'group' ? `Group expenses from: ${balance.groupName}` :
+                      'Combined: friendship + groups'
+        });
+        totalToReceive += balance.balance;
+      } else {
+        // You owe them
+        youWillPay.push({
+          fromUserId: currentUserId,
+          fromUserName: 'You',
+          toUserId: balance.userId,
+          toUserName: balance.name,
+          amount: Math.abs(balance.balance),
+          type: balance.source === 'friend' ? 'friend_direct' : 
+                balance.source === 'group' ? 'group_settlement' : 'mixed_settlement',
+          description: balance.source === 'friend' ? 'Direct friendship balance' :
+                      balance.source === 'group' ? `Group expenses from: ${balance.groupName}` :
+                      'Combined: friendship + groups'
+        });
+        totalToPay += Math.abs(balance.balance);
+      }
+    }
+
+    // Sort by amount (largest first)
+    youWillReceive.sort((a, b) => b.amount - a.amount);
+    youWillPay.sort((a, b) => b.amount - a.amount);
+
+    setSettlements({
+      youWillReceive,
+      youWillPay,
+      summary: {
+        totalToReceive: parseFloat(totalToReceive.toFixed(2)),
+        totalToPay: parseFloat(totalToPay.toFixed(2)),
+        netPosition: parseFloat((totalToReceive - totalToPay).toFixed(2))
+      }
+    });
+
+    console.log('✅ Global settlements loaded:', {
+      toReceive: youWillReceive.length,
+      toPay: youWillPay.length,
+      netPosition: (totalToReceive - totalToPay).toFixed(2)
+    });
+  };
+
+  const handleSettlement = async (settlement: DirectSettlement) => {
+    const settlementKey = `${settlement.fromUserId}-${settlement.toUserId}`;
     setProcessingSettlement(settlementKey);
 
     try {
-      console.log('🔄 Processing settlement:', suggestion);
+      console.log('🔄 Processing settlement:', settlement);
       
-      // FIXED: Use the correct direction - fromUserId pays toUserId
       await SplittingService.markPaymentAsPaid(
-        suggestion.fromUserId, // Person who owes (pays)
-        suggestion.toUserId,   // Person who is owed (receives)
-        suggestion.amount,
+        settlement.fromUserId,
+        settlement.toUserId,
+        settlement.amount,
         groupId || undefined,
-        `Group settlement: ${suggestion.fromUserName} to ${suggestion.toUserName}`
+        `Settlement: ${settlement.description}`
       );
 
       Alert.alert('Success', 'Payment marked as paid successfully!');
       
-      // Refresh suggestions
-      await loadSettlementSuggestions();
+      // Refresh settlement data
+      await loadSettlements();
       
-      // FIXED: Notify unified balance system
-      const balanceManager = BalanceManager.getInstance();
-      balanceManager.notifyBalanceChange(currentUserId);
+      // Refresh the unified balance system
+      refreshBalances();
       
       // Notify parent to refresh
       onRefresh?.();
@@ -111,75 +262,94 @@ export default function GroupSettlementModal({
     }
   };
 
-  const confirmSettlement = (suggestion: SettlementSuggestion) => {
-    const isCurrentUserInvolved = suggestion.fromUserId === currentUserId || suggestion.toUserId === currentUserId;
+  const confirmSettlement = (settlement: DirectSettlement) => {
+    const isCurrentUserPaying = settlement.fromUserId === currentUserId;
     
     let title = 'Confirm Settlement';
-    let message = `Mark payment of ${userCurrency} ${suggestion.amount.toFixed(2)} from ${suggestion.fromUserName} to ${suggestion.toUserName} as paid?`;
+    let message = `Mark payment of ${userCurrency} ${settlement.amount.toFixed(2)} from ${settlement.fromUserName} to ${settlement.toUserName} as paid?`;
     
-    if (suggestion.fromUserId === currentUserId) {
-      message = `Mark your payment of ${userCurrency} ${suggestion.amount.toFixed(2)} to ${suggestion.toUserName} as paid?`;
-    } else if (suggestion.toUserId === currentUserId) {
-      message = `Mark ${suggestion.fromUserName}'s payment of ${userCurrency} ${suggestion.amount.toFixed(2)} to you as paid?`;
+    if (isCurrentUserPaying) {
+      message = `Mark your payment of ${userCurrency} ${settlement.amount.toFixed(2)} to ${settlement.toUserName} as paid?`;
+    } else {
+      message = `Mark ${settlement.fromUserName}'s payment of ${userCurrency} ${settlement.amount.toFixed(2)} to you as paid?`;
     }
 
     Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       { 
         text: 'Mark as Paid', 
-        onPress: () => handleSettlement(suggestion)
+        onPress: () => handleSettlement(settlement)
       }
     ]);
   };
 
-  const renderSettlementSuggestion = (suggestion: SettlementSuggestion, index: number) => {
-    const settlementKey = `${suggestion.fromUserId}-${suggestion.toUserId}`;
+  const renderSettlement = (settlement: DirectSettlement, index: number, isReceiving: boolean) => {
+    const settlementKey = `${settlement.fromUserId}-${settlement.toUserId}`;
     const isProcessing = processingSettlement === settlementKey;
-    const isCurrentUserInvolved = suggestion.fromUserId === currentUserId || suggestion.toUserId === currentUserId;
+    const isCurrentUserInvolved = settlement.fromUserId === currentUserId || settlement.toUserId === currentUserId;
 
     return (
-      <View key={index} style={[styles.suggestionCard, { 
+      <View key={index} style={[styles.settlementCard, { 
         backgroundColor: theme.colors.surface,
         borderColor: isCurrentUserInvolved ? theme.colors.primary : theme.colors.border,
-        borderWidth: isCurrentUserInvolved ? 2 : 1
+        borderWidth: 1
       }]}>
-        <View style={styles.suggestionHeader}>
+        <View style={styles.settlementHeader}>
           <View style={styles.userInfo}>
-            <View style={[styles.userAvatar, { backgroundColor: theme.colors.primary }]}>
+            <View style={[styles.userAvatar, { 
+              backgroundColor: isReceiving ? theme.colors.success : theme.colors.primary 
+            }]}>
               <Text style={styles.userAvatarText}>
-                {suggestion.fromUserName.charAt(0).toUpperCase()}
+                {settlement.fromUserName.charAt(0).toUpperCase()}
               </Text>
             </View>
             <Text style={[styles.userName, { color: theme.colors.text }]}>
-              {suggestion.fromUserName === currentUserId ? 'You' : suggestion.fromUserName}
+              {settlement.fromUserId === currentUserId ? 'You' : settlement.fromUserName}
             </Text>
           </View>
 
           <View style={styles.arrowContainer}>
-            <Ionicons name="arrow-forward" size={20} color={theme.colors.textSecondary} />
-            <Text style={[styles.amountText, { color: theme.colors.success }]}>
-              {userCurrency} {suggestion.amount.toFixed(2)}
+            <Ionicons 
+              name="arrow-forward" 
+              size={20} 
+              color={isReceiving ? theme.colors.success : theme.colors.error} 
+            />
+            <Text style={[styles.amountText, { 
+              color: isReceiving ? theme.colors.success : theme.colors.error 
+            }]}>
+              {userCurrency} {settlement.amount.toFixed(2)}
             </Text>
           </View>
 
           <View style={styles.userInfo}>
-            <View style={[styles.userAvatar, { backgroundColor: theme.colors.success }]}>
+            <View style={[styles.userAvatar, { 
+              backgroundColor: isReceiving ? theme.colors.primary : theme.colors.success 
+            }]}>
               <Text style={styles.userAvatarText}>
-                {suggestion.toUserName.charAt(0).toUpperCase()}
+                {settlement.toUserName.charAt(0).toUpperCase()}
               </Text>
             </View>
             <Text style={[styles.userName, { color: theme.colors.text }]}>
-              {suggestion.toUserId === currentUserId ? 'You' : suggestion.toUserName}
+              {settlement.toUserId === currentUserId ? 'You' : settlement.toUserName}
             </Text>
           </View>
         </View>
 
+        <View style={styles.settlementDetails}>
+          <Text style={[styles.settlementDescription, { color: theme.colors.textSecondary }]}>
+            {settlement.description}
+          </Text>
+          <Text style={[styles.settlementType, { color: theme.colors.textSecondary }]}>
+            Type: {settlement.type.replace('_', ' ').toUpperCase()}
+          </Text>
+        </View>
+
         <TouchableOpacity
           style={[styles.settleButton, { 
-            backgroundColor: theme.colors.primary,
+            backgroundColor: isReceiving ? theme.colors.success : theme.colors.primary,
             opacity: isProcessing ? 0.6 : 1
           }]}
-          onPress={() => confirmSettlement(suggestion)}
+          onPress={() => confirmSettlement(settlement)}
           disabled={isProcessing}
         >
           {isProcessing ? (
@@ -191,17 +361,12 @@ export default function GroupSettlementModal({
             </>
           )}
         </TouchableOpacity>
-
-        {isCurrentUserInvolved && (
-          <View style={[styles.involvedBadge, { backgroundColor: theme.colors.primary + '20' }]}>
-            <Text style={[styles.involvedText, { color: theme.colors.primary }]}>
-              You're involved in this settlement
-            </Text>
-          </View>
-        )}
       </View>
     );
   };
+
+  const hasSettlements = settlements.youWillReceive.length > 0 || settlements.youWillPay.length > 0;
+  const isGroupSpecific = !!groupId;
 
   return (
     <Modal
@@ -217,9 +382,9 @@ export default function GroupSettlementModal({
             <Ionicons name="close" size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Group Settlements
+            {isGroupSpecific ? `${groupData?.name || 'Group'} Settlement` : 'All Settlements'}
           </Text>
-          <TouchableOpacity onPress={loadSettlementSuggestions} style={styles.refreshButton}>
+          <TouchableOpacity onPress={loadSettlements} style={styles.refreshButton}>
             <Ionicons name="refresh" size={24} color={theme.colors.primary} />
           </TouchableOpacity>
         </View>
@@ -229,29 +394,86 @@ export default function GroupSettlementModal({
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.colors.primary} />
               <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
-                Loading settlement suggestions...
+                Calculating settlement instructions...
               </Text>
             </View>
-          ) : suggestions.length === 0 ? (
+          ) : !hasSettlements ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="checkmark-circle" size={64} color={theme.colors.success} />
               <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
                 All Settled!
               </Text>
               <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                No outstanding balances need to be settled in this group.
+                {isGroupSpecific 
+                  ? `No outstanding balances in ${groupData?.name || 'this group'}.`
+                  : 'No outstanding balances need to be settled.'
+                }
               </Text>
             </View>
           ) : (
             <>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Suggested Settlements
-              </Text>
-              <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
-                These settlements will help minimize the number of transactions needed to settle all balances.
-              </Text>
+              {/* Summary Card */}
+              <View style={[styles.summaryCard, { backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>
+                  {isGroupSpecific ? `${groupData?.name || 'Group'} Summary` : 'Settlement Summary'}
+                </Text>
+                
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
+                    You will receive
+                  </Text>
+                  <Text style={[styles.summaryValue, { color: theme.colors.success }]}>
+                    {getCurrencySymbol(userCurrency)}{settlements.summary.totalToReceive.toFixed(2)}
+                  </Text>
+                </View>
+                
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
+                    You will pay
+                  </Text>
+                  <Text style={[styles.summaryValue, { color: theme.colors.error }]}>
+                    {getCurrencySymbol(userCurrency)}{settlements.summary.totalToPay.toFixed(2)}
+                  </Text>
+                </View>
+                
+                <View style={[styles.summaryDivider, { backgroundColor: theme.colors.border }]} />
+                
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabelBold, { color: theme.colors.text }]}>
+                    Net Position
+                  </Text>
+                  <Text style={[styles.summaryValueBold, { 
+                    color: settlements.summary.netPosition >= 0 ? theme.colors.success : theme.colors.error 
+                  }]}>
+                    {settlements.summary.netPosition >= 0 ? '+' : ''}
+                    {getCurrencySymbol(userCurrency)}{Math.abs(settlements.summary.netPosition).toFixed(2)}
+                  </Text>
+                </View>
+              </View>
 
-              {suggestions.map((suggestion, index) => renderSettlementSuggestion(suggestion, index))}
+              {/* You Will Receive */}
+              {settlements.youWillReceive.length > 0 && (
+                <>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                    You Will Receive ({settlements.youWillReceive.length})
+                  </Text>
+                  {settlements.youWillReceive.map((settlement, index) => 
+                    renderSettlement(settlement, index, true)
+                  )}
+                </>
+              )}
+
+              {/* You Will Pay */}
+              {settlements.youWillPay.length > 0 && (
+                <>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                    You Will Pay ({settlements.youWillPay.length})
+                  </Text>
+                  {settlements.youWillPay.map((settlement, index) => 
+                    renderSettlement(settlement, index, false)
+                  )}
+                </>
+              )}
             </>
           )}
 
@@ -259,8 +481,10 @@ export default function GroupSettlementModal({
           <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
             <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
             <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
-              Manual settlements are recorded immediately. Make sure payments have been completed 
-              before marking them as paid. All group members will be notified of settlements.
+              {isGroupSpecific
+                ? `These settlements are specific to the ${groupData?.name || 'group'} and show balances between group members only.`
+                : 'These settlement instructions show all your balances across friends and groups.'
+              }
             </Text>
           </View>
         </ScrollView>
@@ -320,27 +544,57 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  summaryCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  summaryLabel: {
+    fontSize: 14,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  summaryLabelBold: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  summaryValueBold: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  summaryDivider: {
+    height: 1,
+    marginVertical: 8,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 16,
+    marginTop: 8,
   },
-  sectionSubtitle: {
-    fontSize: 14,
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  suggestionCard: {
+  settlementCard: {
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 1,
   },
-  suggestionHeader: {
+  settlementHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   userInfo: {
     alignItems: 'center',
@@ -373,6 +627,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 4,
   },
+  settlementDetails: {
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  settlementDescription: {
+    fontSize: 14,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  settlementType: {
+    fontSize: 12,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
   settleButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -385,16 +653,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-  },
-  involvedBadge: {
-    marginTop: 8,
-    padding: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  involvedText: {
-    fontSize: 12,
-    fontWeight: '500',
   },
   infoCard: {
     flexDirection: 'row',

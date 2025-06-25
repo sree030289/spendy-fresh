@@ -100,25 +100,47 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
     setActiveStep('details');
   };
 
-  const initializeSplitData = () => {
-    if (!selectedGroup || !amount) return;
-    
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount)) return;
+const initializeSplitData = () => {
+  if (!selectedGroup || !amount) return;
+  
+  console.log('🔍 DEBUGGING SPLIT DATA');
+  console.log('selectedGroup.members:', selectedGroup.members.length);
+  console.log('selectedGroup.members details:', selectedGroup.members.map(m => ({
+    userId: m.userId,
+    name: m.userData.fullName,
+    isActive: m.isActive
+  })));
+  
+  const numericAmount = parseFloat(amount);
+  if (isNaN(numericAmount)) return;
 
-    const members = selectedGroup.members.filter(member => member.isActive);
-    const equalShare = numericAmount / members.length;
+  const members = selectedGroup.members.filter(member => member.isActive);
+  console.log('🔍 Active members after filter:', members.length);
+  console.log('🔍 Active members details:', members.map(m => ({
+    userId: m.userId,
+    name: m.userData.fullName,
+    isActive: m.isActive
+  })));
 
-    const initialSplitData = members.map(member => ({
-      userId: member.userId,
-      userData: member.userData,
-      amount: splitType === 'equal' ? equalShare : 0,
-      percentage: splitType === 'percentage' ? (100 / members.length) : 0,
-      isIncluded: true,
-    }));
+  const equalShare = numericAmount / members.length;
 
-    setSplitData(initialSplitData);
-  };
+  const initialSplitData = members.map(member => ({
+    userId: member.userId,
+    userData: member.userData,
+    amount: splitType === 'equal' ? equalShare : 0,
+    percentage: splitType === 'percentage' ? (100 / members.length) : 0,
+    isIncluded: true,
+  }));
+
+  console.log('🔍 Final split data:', initialSplitData.map(s => ({
+    userId: s.userId,
+    name: s.userData.fullName,
+    amount: s.amount,
+    isIncluded: s.isIncluded
+  })));
+
+  setSplitData(initialSplitData);
+};
 
   const validateStep = (step: string): boolean => {
     const newErrors: any = {};
@@ -178,7 +200,15 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
   };
 
   const handleSubmit = async () => {
-    if (!validateStep('split')) return;
+     if (!validateStep('split')) return;
+
+  console.log('🔍 SUBMITTING EXPENSE');
+  console.log('🔍 Split data being submitted:', splitData.filter(split => split.isIncluded).map(split => ({
+    userId: split.userId,
+    name: split.userData.fullName,
+    amount: split.amount,
+    isIncluded: split.isIncluded
+  })));
 
     setLoading(true);
     try {
