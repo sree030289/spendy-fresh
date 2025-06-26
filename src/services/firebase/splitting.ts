@@ -3825,6 +3825,458 @@ static async autoConnectGroupMembers(groupId: string, userId: string, showPrompt
     };
   }
 }
+
+// Add these functions to the SplittingService class in splitting.ts
+
+// ENHANCED EXPENSE FILTERING AND SEARCH METHODS
+
+// Main filtering function with comprehensive options
+static async getFilteredExpenses(userId: string, filters: {
+  searchQuery?: string;
+  category?: string;
+  groupId?: string;
+  friendId?: string;
+  dateRange?: 'week' | 'month' | 'quarter' | 'year' | 'all';
+  status?: 'settled' | 'pending' | 'all';
+  sortBy?: 'date' | 'amount' | 'category' | 'description';
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+} = {}): Promise<Expense[]> {
+  try {
+    console.log('Getting filtered expenses for user:', userId, 'with filters:', filters);
+    
+    // Get all user expenses first
+    const allExpenses = await this.getUserExpenses(userId, filters.limit || 1000);
+    let filteredExpenses = [...allExpenses];
+    
+    // Apply search filter
+    if (filters.searchQuery && filters.searchQuery.trim()) {
+      const query = filters.searchQuery.toLowerCase();
+      filteredExpenses = filteredExpenses.filter(expense => 
+        expense.description.toLowerCase().includes(query) ||
+        expense.paidByData.fullName.toLowerCase().includes(query) ||
+        expense.notes?.toLowerCase().includes(query) ||
+        expense.tags?.some(tag => tag.toLowerCase().includes(query))
+      );
+    }
+    
+    // Apply category filter
+    if (filters.category && filters.category !== 'all') {
+      filteredExpenses = filteredExpenses.filter(expense => expense.category === filters.category);
+    }
+    
+    // Apply group filter
+    if (filters.groupId && filters.groupId !== 'all') {
+      filteredExpenses = filteredExpenses.filter(expense => expense.groupId === filters.groupId);
+    }
+    
+    // Apply friend filter
+    if (filters.friendId && filters.friendId !== 'all') {
+      filteredExpenses = filteredExpenses.filter(expense => 
+        expense.paidBy === filters.friendId || 
+        expense.splitData.some(split => split.userId === filters.friendId)
+      );
+    }
+    
+    // Apply date range filter
+    if (filters.dateRange && filters.dateRange !== 'all') {
+      const now = new Date();
+      const startDate = new Date();
+      
+      switch (filters.dateRange) {
+        case 'week':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          startDate.setMonth(now.getMonth() - 1);
+          break;
+        case 'quarter':
+          startDate.setMonth(now.getMonth() - 3);
+          break;
+        case 'year':
+          startDate.setFullYear(now.getFullYear() - 1);
+          break;
+      }
+      
+      filteredExpenses = filteredExpenses.filter(expense => expense.date >= startDate);
+    }
+    
+    // Apply status filter
+    if (filters.status && filters.status !== 'all') {
+      const isSettled = filters.status === 'settled';
+      filteredExpenses = filteredExpenses.filter(expense => expense.isSettled === isSettled);
+    }
+    
+    // Apply sorting
+    const sortBy = filters.sortBy || 'date';
+    const sortOrder = filters.sortOrder || 'desc';
+    
+    filteredExpenses.sort((a, b) => {
+      let compareValue = 0;
+      
+      switch (sortBy) {
+        case 'date':
+          compareValue = a.date.getTime() - b.date.getTime();
+          break;
+        case 'amount':
+          compareValue = a.amount - b.amount;
+          break;
+        case 'category':
+          compareValue = a.category.localeCompare(b.category);
+          break;
+        case 'description':
+          compareValue = a.description.localeCompare(b.description);
+          break;
+        default:
+          compareValue = a.date.getTime() - b.date.getTime();
+      }
+      
+      return sortOrder === 'desc' ? -compareValue : compareValue;
+    });
+    
+    console.log(`Filtered ${allExpenses.length} expenses down to ${filteredExpenses.length}`);
+    return filteredExpenses;
+    
+  } catch (error) {
+    console.error('Get filtered expenses error:', error);
+    return [];
+  }
+}
+
+// Get expense statistics for the modal
+static async getExpenseStatistics(userId: string, expenses?: Expense[]): Promise<{
+  totalAmount: number;
+  pendingAmount: number;
+  settledAmount: number;
+  expenseCount: number;
+  categoryBreakdown: Array<{ category: string; amount: number; count: number; percentage: number }>;
+  monthlyTrend: Array<{ month: string; amount: number; count: number }>;
+}> {
+  try {
+    const expenseList = expenses || await this.getUserExpenses(userId, 1000);
+    
+    let totalAmount = 0;
+    let pendingAmount = 0;
+    let settledAmount = 0;
+    const categoryData: { [key: string]: { amount: number; count: number } } = {};
+    const monthlyData: { [key: string]: { amount: number; count: number } } = {};
+    
+    expenseList.forEach(expense => {
+      totalAmount += expense.amount;
+      
+      if (expense.isSettled) {
+        settledAmount += expense.amount;
+      } else {
+        pendingAmount += expense.amount;
+      }
+      
+      // Category breakdown
+      const category = expense.category || 'other';
+      if (!categoryData[category]) {
+        categoryData[category] = { amount: 0, count: 0 };
+      }
+      categoryData[category].amount += expense.amount;
+      categoryData[category].count += 1;
+      
+      // Monthly trend
+      const monthKey = expense.date.toISOString().substring(0, 7); // YYYY-MM
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { amount: 0, count: 0 };
+      }
+      monthlyData[monthKey].amount += expense.amount;
+      monthlyData[monthKey].count += 1;
+    });
+    
+    // Process category breakdown with percentages
+    const categoryBreakdown = Object.entries(categoryData)
+      .map(([category, data]) => ({
+        category,
+        amount: data.amount,
+        count: data.count,
+        percentage: totalAmount > 0 ? (data.amount / totalAmount) * 100 : 0
+      }))
+      .sort((a, b) => b.amount - a.amount);
+    
+    // Process monthly trend (last 6 months)
+    const monthlyTrend = Object.entries(monthlyData)
+      .map(([month, data]) => ({
+        month,
+        amount: data.amount,
+        count: data.count
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-6); // Last 6 months
+    
+    return {
+      totalAmount,
+      pendingAmount,
+      settledAmount,
+      expenseCount: expenseList.length,
+      categoryBreakdown,
+      monthlyTrend
+    };
+    
+  } catch (error) {
+    console.error('Get expense statistics error:', error);
+    return {
+      totalAmount: 0,
+      pendingAmount: 0,
+      settledAmount: 0,
+      expenseCount: 0,
+      categoryBreakdown: [],
+      monthlyTrend: []
+    };
+  }
+}
+
+// Search expenses with advanced options
+static async searchExpenses(userId: string, query: string, options: {
+  includeNotes?: boolean;
+  includeTags?: boolean;
+  includePeople?: boolean;
+  includeGroups?: boolean;
+  fuzzyMatch?: boolean;
+} = {}): Promise<Expense[]> {
+  try {
+    if (!query.trim()) return [];
+    
+    const expenses = await this.getUserExpenses(userId, 1000);
+    const searchTerm = query.toLowerCase();
+    
+    return expenses.filter(expense => {
+      const matches: boolean[] = [];
+      
+      // Always search description
+      matches.push(expense.description.toLowerCase().includes(searchTerm));
+      
+      // Search notes if enabled
+      if (options.includeNotes !== false && expense.notes) {
+        matches.push(expense.notes.toLowerCase().includes(searchTerm));
+      }
+      
+      // Search tags if enabled
+      if (options.includeTags !== false && expense.tags) {
+        matches.push(expense.tags.some(tag => tag.toLowerCase().includes(searchTerm)));
+      }
+      
+      // Search people if enabled
+      if (options.includePeople !== false) {
+        matches.push(expense.paidByData.fullName.toLowerCase().includes(searchTerm));
+      }
+      
+      // Search groups if enabled (we'd need to get group name)
+      if (options.includeGroups !== false) {
+        // This would require getting group data, but for now we can skip
+      }
+      
+      return matches.some(match => match);
+    });
+    
+  } catch (error) {
+    console.error('Search expenses error:', error);
+    return [];
+  }
+}
+
+// Get expenses by specific category with analytics
+static async getExpensesByCategory(userId: string, category: string): Promise<{
+  expenses: Expense[];
+  totalAmount: number;
+  averageAmount: number;
+  expenseCount: number;
+}> {
+  try {
+    const allExpenses = await this.getUserExpenses(userId, 1000);
+    const categoryExpenses = allExpenses.filter(expense => expense.category === category);
+    
+    const totalAmount = categoryExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const averageAmount = categoryExpenses.length > 0 ? totalAmount / categoryExpenses.length : 0;
+    
+    return {
+      expenses: categoryExpenses,
+      totalAmount,
+      averageAmount,
+      expenseCount: categoryExpenses.length
+    };
+    
+  } catch (error) {
+    console.error('Get expenses by category error:', error);
+    return {
+      expenses: [],
+      totalAmount: 0,
+      averageAmount: 0,
+      expenseCount: 0
+    };
+  }
+}
+
+// Get expenses for a specific friend across all groups
+static async getExpensesWithFriend(userId: string, friendId: string): Promise<{
+  expenses: Expense[];
+  totalAmount: number;
+  userOwes: number;
+  friendOwes: number;
+  netBalance: number;
+}> {
+  try {
+    const allExpenses = await this.getUserExpenses(userId, 1000);
+    const friendExpenses = allExpenses.filter(expense => 
+      expense.paidBy === friendId || 
+      expense.splitData.some(split => split.userId === friendId)
+    );
+    
+    let totalAmount = 0;
+    let userOwes = 0;
+    let friendOwes = 0;
+    
+    friendExpenses.forEach(expense => {
+      totalAmount += expense.amount;
+      
+      if (expense.paidBy === userId) {
+        // User paid, friend might owe
+        const friendSplit = expense.splitData.find(split => split.userId === friendId);
+        if (friendSplit) {
+          friendOwes += friendSplit.amount;
+        }
+      } else if (expense.paidBy === friendId) {
+        // Friend paid, user might owe
+        const userSplit = expense.splitData.find(split => split.userId === userId);
+        if (userSplit) {
+          userOwes += userSplit.amount;
+        }
+      }
+    });
+    
+    const netBalance = friendOwes - userOwes; // Positive means friend owes user
+    
+    return {
+      expenses: friendExpenses,
+      totalAmount,
+      userOwes,
+      friendOwes,
+      netBalance
+    };
+    
+  } catch (error) {
+    console.error('Get expenses with friend error:', error);
+    return {
+      expenses: [],
+      totalAmount: 0,
+      userOwes: 0,
+      friendOwes: 0,
+      netBalance: 0
+    };
+  }
+}
+
+// Get expense trends and insights
+static async getExpenseTrends(userId: string, timeframe: 'week' | 'month' | 'quarter' | 'year' = 'month'): Promise<{
+  currentPeriod: { amount: number; count: number };
+  previousPeriod: { amount: number; count: number };
+  percentageChange: number;
+  topCategories: Array<{ category: string; amount: number; change: number }>;
+  spendingPattern: Array<{ period: string; amount: number }>;
+}> {
+  try {
+    const expenses = await this.getUserExpenses(userId, 1000);
+    const now = new Date();
+    
+    // Calculate periods based on timeframe
+    let currentStart = new Date();
+    let previousStart = new Date();
+    
+    switch (timeframe) {
+      case 'week':
+        currentStart.setDate(now.getDate() - 7);
+        previousStart.setDate(now.getDate() - 14);
+        break;
+      case 'month':
+        currentStart.setMonth(now.getMonth() - 1);
+        previousStart.setMonth(now.getMonth() - 2);
+        break;
+      case 'quarter':
+        currentStart.setMonth(now.getMonth() - 3);
+        previousStart.setMonth(now.getMonth() - 6);
+        break;
+      case 'year':
+        currentStart.setFullYear(now.getFullYear() - 1);
+        previousStart.setFullYear(now.getFullYear() - 2);
+        break;
+    }
+    
+    const currentExpenses = expenses.filter(e => e.date >= currentStart);
+    const previousExpenses = expenses.filter(e => e.date >= previousStart && e.date < currentStart);
+    
+    const currentPeriod = {
+      amount: currentExpenses.reduce((sum, e) => sum + e.amount, 0),
+      count: currentExpenses.length
+    };
+    
+    const previousPeriod = {
+      amount: previousExpenses.reduce((sum, e) => sum + e.amount, 0),
+      count: previousExpenses.length
+    };
+    
+    const percentageChange = previousPeriod.amount > 0 
+      ? ((currentPeriod.amount - previousPeriod.amount) / previousPeriod.amount) * 100 
+      : 0;
+    
+    // Calculate top categories with changes
+    const currentCategories: { [key: string]: number } = {};
+    const previousCategories: { [key: string]: number } = {};
+    
+    currentExpenses.forEach(e => {
+      currentCategories[e.category] = (currentCategories[e.category] || 0) + e.amount;
+    });
+    
+    previousExpenses.forEach(e => {
+      previousCategories[e.category] = (previousCategories[e.category] || 0) + e.amount;
+    });
+    
+    const topCategories = Object.entries(currentCategories)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        change: previousCategories[category] 
+          ? ((amount - previousCategories[category]) / previousCategories[category]) * 100 
+          : 100
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+    
+    // Generate spending pattern (simplified)
+    const spendingPattern = expenses
+      .reduce((acc: { [key: string]: number }, expense) => {
+        const monthKey = expense.date.toISOString().substring(0, 7);
+        acc[monthKey] = (acc[monthKey] || 0) + expense.amount;
+        return acc;
+      }, {});
+    
+    const spendingPatternArray = Object.entries(spendingPattern)
+      .map(([period, amount]) => ({ period, amount }))
+      .sort((a, b) => a.period.localeCompare(b.period))
+      .slice(-12); // Last 12 periods
+    
+    return {
+      currentPeriod,
+      previousPeriod,
+      percentageChange,
+      topCategories,
+      spendingPattern: spendingPatternArray
+    };
+    
+  } catch (error) {
+    console.error('Get expense trends error:', error);
+    return {
+      currentPeriod: { amount: 0, count: 0 },
+      previousPeriod: { amount: 0, count: 0 },
+      percentageChange: 0,
+      topCategories: [],
+      spendingPattern: []
+    };
+  }
+}
+
 }
 
 // Export individual functions for testing
