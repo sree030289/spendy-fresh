@@ -644,6 +644,84 @@ useEffect(() => {
     setShowEditExpense(true);
   };
 
+  // New function for pending friend actions
+const showPendingFriendActionsMenu = (friend: Friend) => {
+  const actions: Array<{
+    text: string;
+    style?: 'cancel' | 'destructive' | 'default';
+    onPress?: () => void;
+  }> = [
+    {
+      text: 'Resend Invitation',
+      onPress: () => handleResendInvitation(friend)
+    },
+    {
+      text: 'Cancel Invitation',
+      style: 'destructive',
+      onPress: () => handleCancelInvitation(friend)
+    },
+    { text: 'Cancel', style: 'cancel' }
+  ];
+
+  Alert.alert(
+    `${friend.friendData.fullName}`,
+    'Invitation sent - waiting for response',
+    actions
+  );
+};
+
+// Function to handle resending invitations
+const handleResendInvitation = async (friend: Friend) => {
+  try {
+    if (!user?.id) return;
+    
+    await SplittingService.sendFriendRequest(
+      user.id,
+      friend.friendData.email,
+      `Hi! This is a reminder to connect on Spendy 💰`
+    );
+    
+    Alert.alert('Invitation Resent! 📤', `Reminder sent to ${friend.friendData.fullName}`);
+    
+    // Refresh friends data
+    notifyBalanceChange();
+    
+  } catch (error: any) {
+    Alert.alert('Error', error.message || 'Failed to resend invitation');
+  }
+};
+
+// Function to handle canceling invitations
+const handleCancelInvitation = async (friend: Friend) => {
+  try {
+    if (!user?.id || !friend.requestId) return;
+    
+    Alert.alert(
+      'Cancel Invitation',
+      `Are you sure you want to cancel the invitation to ${friend.friendData.fullName}?`,
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await SplittingService.removePendingFriendInvitation(user.id, friend.requestId!);
+              Alert.alert('Invitation Cancelled', `Invitation to ${friend.friendData.fullName} has been cancelled`);
+              notifyBalanceChange();
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to cancel invitation');
+            }
+          }
+        }
+      ]
+    );
+    
+  } catch (error: any) {
+    Alert.alert('Error', error.message || 'Failed to cancel invitation');
+  }
+};
+
   const handleGroupJoined = async (groupId: string, groupName: string) => {
     try {
       await loadGroups();
@@ -696,6 +774,7 @@ const renderOverviewTab = () => {
     isLoading: overviewBalances.isLoading,
     allBalances: overviewBalances.allBalances
   });
+
 
   return (
     <ScrollView 
@@ -1012,10 +1091,10 @@ const renderOverviewTab = () => {
   );
 };
 
-  // FIXED: Updated Friends tab with unified balance components
 const renderFriendsTab = () => {
-  // Add debug logging
-  console.log('👥 Friends tab rendering with unified balances:', {
+  // Debug logging for friends tab
+  console.log('👥 Friends tab rendering with data:', {
+    friendsLength: friends.length,
     friendBalances: friendsBalances.friendBalances,
     groupMemberBalances: friendsBalances.groupMemberBalances,
     allBalances: friendsBalances.allBalances,
@@ -1045,83 +1124,140 @@ const renderFriendsTab = () => {
         </View>
       </View>
 
-      {/* FIXED: Use unified balance system */}
-      {friendsBalances.isEmpty ? (
+      {friends.length === 0 ? (
         <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
           <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
           <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Friends Yet</Text>
           <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-            Add friends or join groups to start splitting expenses
+            Add friends to start splitting expenses
           </Text>
         </View>
       ) : (
         <>
-          {/* Friends Section */}
-          {friendsBalances.friendBalances.length > 0 && (
+          {/* Accepted Friends Section */}
+          {friends.filter(f => f.status === 'accepted').length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
-                Friends ({friendsBalances.friendBalances.length})
+                Friends ({friends.filter(f => f.status === 'accepted').length})
               </Text>
-              {friendsBalances.friendBalances.map((detail, index) => (
-                <TouchableOpacity
-                  key={`friend-${detail.userId}-${index}`}
-                  style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
-                  onPress={() => {
-                    const friend = friends.find(f => f.friendId === detail.userId);
-                    if (friend) {
-                      showFriendActionsMenu(friend);
-                    }
-                  }}
-                >
-                  <View style={styles.balanceItemLeft}>
-                    <View style={[styles.personAvatar, { backgroundColor: theme.colors.primary }]}>
-                      <Text style={styles.personAvatarText}>
-                        {detail.name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.personInfo}>
-                      <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
-                        {detail.name}
-                      </Text>
-                      <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                        {detail.email}
-                      </Text>
-                    </View>
-                  </View>
+              {friends
+                .filter(friend => friend.status === 'accepted')
+                .map((friend, index) => {
+                  // Get balance from unified balance system
+                  const balanceDetail = friendsBalances.allBalances.find(b => b.userId === friend.friendId);
+                  const balance = balanceDetail?.balance || 0;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={`friend-${friend.id}-${index}`}
+                      style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
+                      onPress={() => showFriendActionsMenu(friend)}
+                    >
+                      <View style={styles.balanceItemLeft}>
+                        <View style={[styles.personAvatar, { backgroundColor: theme.colors.primary }]}>
+                          <Text style={styles.personAvatarText}>
+                            {friend.friendData.fullName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.personInfo}>
+                          <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
+                            {friend.friendData.fullName}
+                          </Text>
+                          <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                            {friend.friendData.email}
+                          </Text>
+                        </View>
+                      </View>
 
-                  <View style={styles.balanceItemRight}>
-                    <View style={styles.balanceDisplay}>
-                      {Math.abs(detail.balance) < 0.01 ? (
-                        <>
-                          <Ionicons name="checkmark-circle" size={16} color={theme.colors.textSecondary} />
-                          <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-                            Settled up
-                          </Text>
-                        </>
-                      ) : detail.balance > 0 ? (
-                        <>
-                          <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
-                          <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                            Owes you {getCurrencySymbol(user?.currency || 'USD')}{detail.balance.toFixed(2)}
-                          </Text>
-                        </>
-                      ) : (
-                        <>
-                          <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
-                          <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                            You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(detail.balance).toFixed(2)}
-                          </Text>
-                        </>
-                      )}
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-                  </View>
-                </TouchableOpacity>
-              ))}
+                      <View style={styles.balanceItemRight}>
+                        <View style={styles.balanceDisplay}>
+                          {Math.abs(balance) < 0.01 ? (
+                            <>
+                              <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                                Settled up
+                              </Text>
+                            </>
+                          ) : balance > 0 ? (
+                            <>
+                              <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
+                              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                                Owes you {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
+                              </Text>
+                            </>
+                          ) : (
+                            <>
+                              <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
+                              <Text style={[styles.balanceText, { color: theme.colors.error }]}>
+                                You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
+                              </Text>
+                            </>
+                          )}
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
             </View>
           )}
 
-          {/* Group Members Section */}
+          {/* Pending Invitations Section */}
+          {friends.filter(f => f.status === 'pending' || f.status === 'invited').length > 0 && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
+                Pending Invitations ({friends.filter(f => f.status === 'pending' || f.status === 'invited').length})
+              </Text>
+              {friends
+                .filter(friend => friend.status === 'pending' || friend.status === 'invited')
+                .map((friend, index) => (
+                  <TouchableOpacity
+                    key={`pending-${friend.id}-${index}`}
+                    style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
+                    onPress={() => showPendingFriendActionsMenu(friend)}
+                  >
+                    <View style={styles.balanceItemLeft}>
+                      <View style={[styles.personAvatar, { backgroundColor: theme.colors.textSecondary }]}>
+                        <Text style={styles.personAvatarText}>
+                          {friend.friendData.fullName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.personInfo}>
+                        <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
+                          {friend.friendData.fullName}
+                        </Text>
+                        <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                          {friend.friendData.email}
+                        </Text>
+                        <View style={styles.pendingIndicator}>
+                          <Ionicons name="time" size={12} color={theme.colors.warning} />
+                          <Text style={[styles.pendingText, { color: theme.colors.warning }]}>
+                            Invitation Sent
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.balanceItemRight}>
+                      <TouchableOpacity
+                        style={[styles.resendButton, { backgroundColor: theme.colors.warning }]}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleResendInvitation(friend);
+                        }}
+                      >
+                        <Ionicons name="refresh" size={14} color="white" />
+                        <Text style={[styles.resendButtonText, { color: 'white' }]}>
+                          Remind
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          )}
+
+          {/* Group Members Section (Non-friends only) */}
           {friendsBalances.groupMemberBalances.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
@@ -1182,10 +1318,34 @@ const renderFriendsTab = () => {
                   </View>
 
                   <View style={styles.balanceItemRight}>
-                    {/* Show invite/resend button for group members who aren't friends */}
+                    <View style={styles.balanceDisplay}>
+                      {Math.abs(detail.balance) < 0.01 ? (
+                        <>
+                          <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                          <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                            Settled up
+                          </Text>
+                        </>
+                      ) : detail.balance > 0 ? (
+                        <>
+                          <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
+                          <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                            Owes you {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(detail.balance).toFixed(2)}
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
+                          <Text style={[styles.balanceText, { color: theme.colors.error }]}>
+                            You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(detail.balance).toFixed(2)}
+                          </Text>
+                        </>
+                      )}
+                    </View>
                     <TouchableOpacity
                       style={[styles.inviteButton, { backgroundColor: theme.colors.primary }]}
-                      onPress={async () => {
+                      onPress={async (e) => {
+                        e.stopPropagation();
                         try {
                           await SplittingService.sendFriendRequest(
                             user!.id,
@@ -1214,6 +1374,7 @@ const renderFriendsTab = () => {
     </ScrollView>
   );
 };
+  // FIXED: Groups tab with balance integration - using ONLY unified system
   const renderGroupsTab = () => (
     <ScrollView 
       contentContainerStyle={styles.tabContent}
@@ -1382,84 +1543,76 @@ groups.map((group) => {
     </ScrollView>
   );
 
-  // Enhanced friend actions menu with status display and more options
-  const showFriendActionsMenu = (friend: Friend) => {
-    const actions: Array<{
-      text: string;
-      style?: 'cancel' | 'destructive' | 'default';
-      onPress?: () => void;
-    }> = [
-      { text: 'Cancel', style: 'cancel' }
-    ];
+// Enhanced friend actions menu with payment and management options
+const showFriendActionsMenu = (friend: Friend) => {
+  const balanceDetail = friendsBalances.allBalances.find(b => b.userId === friend.friendId);
+  const balance = balanceDetail?.balance || 0;
+  const hasBalance = Math.abs(balance) > 0.01;
 
-    // Status-specific actions
-    if (friend.status === 'pending') {
-      // Friend request sent, show resend option
-      actions.unshift({
-        text: 'Resend Invitation',
-        onPress: async () => {
-          try {
-            await SplittingService.sendFriendRequest(
-              user!.id,
-              friend.friendData.email,
-              'Hi! This is a reminder to connect on Spendy 💰'
-            );
-            Alert.alert('Invitation Resent! 📤', `Reminder sent to ${friend.friendData.fullName}`);
-          } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to resend invitation');
-          }
+  const actions: Array<{
+    text: string;
+    style?: 'cancel' | 'destructive' | 'default';
+    onPress?: () => void;
+  }> = [];
+
+  // Payment actions if there's a balance
+  if (hasBalance) {
+    if (balance > 0) {
+      // Friend owes user
+      actions.push({
+        text: `Request Payment (${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)})`,
+        onPress: () => {
+          setSelectedFriend(friend);
+          setShowPayment(true);
         }
       });
-    } else if (friend.status === 'accepted') {
-      // Accepted friend - show payment/settlement options
-      if (friend.balance !== 0) {
-        actions.unshift({
-          text: 'Settle Up',
-          onPress: () => {
-            setSelectedFriend(friend);
-            setShowManualSettlement(true);
-          }
-        });
-        
-        actions.unshift({
-          text: friend.balance > 0 ? 'Request Payment' : 'Send Payment',
-          onPress: () => {
-            setSelectedFriend(friend);
-            setShowPayment(true);
-          }
-        });
-      }
+    } else {
+      // User owes friend
+      actions.push({
+        text: `Send Payment (${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)})`,
+        onPress: () => {
+          setSelectedFriend(friend);
+          setShowPayment(true);
+        }
+      });
     }
 
-    // Block/Unblock friend option
-    const isBlocked = friend.status === 'blocked';
-    actions.unshift({
-      text: isBlocked ? 'Unblock Friend' : 'Block Friend',
-      onPress: () => handleBlockUnblockFriend(friend, !isBlocked)
+    actions.push({
+      text: 'Mark as Paid',
+      onPress: () => {
+        setSelectedFriend(friend);
+        setShowManualSettlement(true);
+      }
     });
+  }
 
-    // Remove friend option (with balance check)
-    actions.unshift({
-      text: 'Remove Friend',
-      style: 'destructive',
-      onPress: () => handleRemoveFriend(friend)
-    });
+  // Management actions
+  actions.push({
+    text: friend.status === 'blocked' ? 'Unblock Friend' : 'Block Friend',
+    onPress: () => handleBlockUnblockFriend(friend, friend.status !== 'blocked')
+  });
 
-    // Show status in the alert title
-    const statusDisplay = {
-      'pending': '📤 Invitation Sent',
-      'accepted': '✅ Connected',
-      'blocked': '🚫 Blocked',
-      'declined': '❌ Declined',
-      'invited': '📤 Invitation Sent'
-    }[friend.status] || 'Unknown Status';
+  actions.push({
+    text: 'Remove Friend',
+    style: 'destructive',
+    onPress: () => handleRemoveFriend(friend)
+  });
 
-    Alert.alert(
-      `${friend.friendData.fullName}`,
-      `Status: ${statusDisplay}\n${friend.balance !== 0 ? `Balance: ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(friend.balance).toFixed(2)} ${friend.balance > 0 ? 'owed to you' : 'you owe'}` : 'All settled up'}`,
-      actions
-    );
-  };
+  actions.push({ text: 'Cancel', style: 'cancel' });
+
+  // Show status in the alert title
+  const statusDisplay = hasBalance 
+    ? balance > 0 
+      ? `Owes you ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`
+      : `You owe ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`
+    : 'All settled up';
+
+  Alert.alert(
+    friend.friendData.fullName,
+    statusDisplay,
+    actions
+  );
+};
 
   // Helper functions (keep existing but add balance notifications where needed)
   const handleRemoveFriend = (friend: Friend) => {
@@ -1478,37 +1631,6 @@ groups.map((group) => {
               notifyBalanceChange(); // FIXED: Notify balance system
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to remove friend');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleBlockUnblockFriend = (friend: Friend, shouldBlock: boolean) => {
-    const action = shouldBlock ? 'Block' : 'Unblock';
-    const actionText = shouldBlock ? 'block' : 'unblock';
-    
-    Alert.alert(
-      `${action} Friend`,
-      `Are you sure you want to ${actionText} ${friend.friendData.fullName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: action,
-          style: shouldBlock ? 'destructive' : 'default',
-          onPress: async () => {
-            try {
-              if (shouldBlock) {
-                await SplittingService.blockFriend(user!.id, friend.friendId);
-                Alert.alert('Friend Blocked', `${friend.friendData.fullName} has been blocked.`);
-              } else {
-                await SplittingService.unblockFriend(user!.id, friend.friendId);
-                Alert.alert('Friend Unblocked', `${friend.friendData.fullName} has been unblocked.`);
-              }
-              notifyBalanceChange(); // Notify balance system
-            } catch (error: any) {
-              Alert.alert('Error', error.message || `Failed to ${actionText} friend`);
             }
           }
         }
@@ -2195,6 +2317,56 @@ groups.map((group) => {
     </SafeAreaView>
   );
 }
+const additionalStyles = StyleSheet.create({
+  // Pending invitation styles
+  pendingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  pendingText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  
+  // Resend button styles
+  resendButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  resendButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  // Section styles
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  
+  // Source indicator for group members
+  sourceIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  sourceText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+});
 
 // FIXED: Keep existing styles but remove old balance-related styles
 const styles = StyleSheet.create({
@@ -2973,18 +3145,5 @@ addFriendCardText: {
   lineHeight: 16,
 },
 
-// Invite button styles for group members
-inviteButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 16,
-  gap: 4,
-},
-inviteButtonText: {
-  fontSize: 12,
-  fontWeight: '600',
-},
 
 });

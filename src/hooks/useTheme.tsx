@@ -6,6 +6,7 @@ import { LIGHT_THEME, DARK_THEME } from '@/constants/theme';
 
 interface ThemeContextType {
   theme: AppTheme;
+  colors: AppTheme['colors']; // Add colors property for direct access
   isDark: boolean;
   toggleTheme: () => void;
   setTheme: (isDark: boolean) => void;
@@ -61,6 +62,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const value: ThemeContextType = {
     theme,
+    colors: theme.colors, // Expose colors directly from the theme for easier access
     isDark,
     toggleTheme,
     setTheme,

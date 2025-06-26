@@ -1,10 +1,9 @@
-// src/hooks/useBalances.ts - UPDATED with UnifiedSettlementService
+// src/hooks/useBalances.ts - COMPLETE FIXED VERSION with proper friend categorization
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
-import { SplittingService } from '@/services/firebase/splitting';
+import { SplittingService, Friend } from '@/services/firebase/splitting';
 
-// First, let's add the UnifiedSettlementService interfaces here temporarily
-// (You can move this to a separate file later)
+// Interfaces for UnifiedSettlementService
 interface BalanceDetail {
   userId: string;
   name: string;
@@ -389,6 +388,7 @@ static async calculateGroupPairwiseBalance(
 export const useBalances = () => {
   const { user } = useAuth();
   const [balances, setBalances] = useState<BalanceSummary | null>(null);
+  const [friendsData, setFriendsData] = useState<Friend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -401,15 +401,21 @@ export const useBalances = () => {
       
       console.log('🔄 useBalances: Refreshing with UnifiedSettlementService');
       
-      // Use the unified calculation method
-      const freshBalances = await UnifiedSettlementService.calculateUserBalances(user.id);
+      // Load friends data and balances in parallel
+      const [freshBalances, friendsResult] = await Promise.all([
+        UnifiedSettlementService.calculateUserBalances(user.id),
+        SplittingService.getFriends(user.id)
+      ]);
+      
       setBalances(freshBalances);
+      setFriendsData(friendsResult);
       
       console.log('✅ useBalances: Refresh complete:', {
         totalOwed: freshBalances.totalOwed,
         totalOwing: freshBalances.totalOwing,
         netBalance: freshBalances.netBalance,
-        detailCount: freshBalances.details.length
+        detailCount: freshBalances.details.length,
+        friendsCount: friendsResult.length
       });
       
     } catch (err) {
@@ -430,6 +436,7 @@ export const useBalances = () => {
   useEffect(() => {
     if (!user?.id) {
       setBalances(null);
+      setFriendsData([]);
       setIsLoading(false);
       return;
     }
@@ -438,14 +445,22 @@ export const useBalances = () => {
     refresh();
   }, [user?.id, refresh]);
 
-  // Format balances for display - FIXED LOGIC for Friends tab
-  const friends = balances?.details.filter(detail => 
-    detail.source === 'friend'  // Only pure friends (not mixed)
-  ) || [];
+  // FIXED: Format balances for display with proper friend categorization
+  const friends = balances?.details.filter(detail => {
+    // Check if this person is actually a friend (not just a group member)
+    const isFriend = friendsData.some(friend => 
+      friend.friendId === detail.userId && friend.status === 'accepted'
+    );
+    return isFriend; // Only include actual friends, regardless of source
+  }) || [];
   
-  const groupMembers = balances?.details.filter(detail => 
-    detail.source === 'group' || detail.source === 'mixed'  // All group members (including mixed)
-  ) || [];
+  const groupMembers = balances?.details.filter(detail => {
+    // Check if this person is NOT a friend but is in groups
+    const isFriend = friendsData.some(friend => 
+      friend.friendId === detail.userId && friend.status === 'accepted'
+    );
+    return !isFriend && (detail.source === 'group' || detail.source === 'mixed');
+  }) || [];
   
   const allBalances = balances?.details.map(detail => ({
     userId: detail.userId,
@@ -459,17 +474,29 @@ export const useBalances = () => {
 
   // Debug log current state
   useEffect(() => {
-    if (balances) {
+    if (balances && friendsData.length > 0) {
       console.log('📊 useBalances: Current state:', {
         totalOwed: balances.totalOwed,
         totalOwing: balances.totalOwing,
         netBalance: balances.netBalance,
         friendCount: friends.length,
         groupMemberCount: groupMembers.length,
-        totalRelationships: allBalances.length
+        totalRelationships: allBalances.length,
+        friendsDataCount: friendsData.length
       });
+      console.log('📊 useBalances: Friends breakdown:', friends.map(f => ({
+        name: f.name,
+        balance: f.balance,
+        source: f.source
+      })));
+      console.log('📊 useBalances: Group members breakdown:', groupMembers.map(g => ({
+        name: g.name,
+        balance: g.balance,
+        source: g.source,
+        groupName: g.groupName
+      })));
     }
-  }, [balances, friends.length, groupMembers.length, allBalances.length]);
+  }, [balances, friends.length, groupMembers.length, allBalances.length, friendsData.length]);
 
   return {
     // Core balance data
@@ -482,10 +509,13 @@ export const useBalances = () => {
     totalOwing: balances?.totalOwing ?? 0,
     netBalance: balances?.netBalance ?? 0,
     
-    // Categorized balances
+    // Categorized balances - FIXED with proper friend categorization
     friendBalances: friends,
     groupMemberBalances: groupMembers,
     allBalances,
+    
+    // Additional data for components
+    friendsData, // So components can access friends data for proper categorization
     
     // Actions
     refresh: () => refresh(false),

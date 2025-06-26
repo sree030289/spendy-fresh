@@ -17,6 +17,7 @@ import {
   Platform,
   Share,
   Linking,
+  Image,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,27 +34,78 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-// Robinhood Green Color Palette
-const COLORS = {
-  primary: '#00C851',
-  primaryDark: '#00A843',
-  primaryLight: '#4FD66D',
-  background: '#0D0D0D',
-  surface: '#1A1A1A',
-  cardBg: '#1E1E1E',
-  textPrimary: '#FFFFFF',
-  textSecondary: '#B3B3B3',
-  textMuted: '#666666',
-  accent: '#00FF5F',
-  warning: '#FF6B35',
-  error: '#FF4757',
-  success: '#2ED573',
-};
+// Deal Sources Configuration
+const DEAL_SOURCES = [
+  {
+    id: 'all',
+    name: 'All',
+    logo: null,
+    color: '#6C7B7F',
+    apiEndpoint: null,
+  },
+  {
+    id: 'ozbargain',
+    name: 'OzBargain',
+    logo: 'https://files.ozbargain.com.au/n/71/538271.png',
+    color: '#FF6B35',
+    apiEndpoint: '/api/ozbargain',
+  },
+  {
+    id: 'coles',
+    name: 'Coles',
+    logo: 'https://logoeps.com/wp-content/uploads/2014/05/coles-vector-logo.png',
+    color: '#E31E24',
+    apiEndpoint: '/api/coles',
+  },
+  {
+    id: 'woolworths',
+    name: 'Woolworths',
+    logo: 'https://logos-world.net/wp-content/uploads/2021/02/Woolworths-Logo.png',
+    color: '#1BAA2F',
+    apiEndpoint: '/api/woolworths',
+  },
+  {
+    id: 'costco',
+    name: 'Costco',
+    logo: 'https://logos-world.net/wp-content/uploads/2020/09/Costco-Logo.png',
+    color: '#E31837',
+    apiEndpoint: '/api/costco',
+  },
+  {
+    id: 'bunnings',
+    name: 'Bunnings',
+    logo: 'https://logos-world.net/wp-content/uploads/2021/02/Bunnings-Logo.png',
+    color: '#007A33',
+    apiEndpoint: '/api/bunnings',
+  },
+  {
+    id: 'jbhifi',
+    name: 'JB Hi-Fi',
+    logo: 'https://logos-world.net/wp-content/uploads/2021/02/JB-Hi-Fi-Logo.png',
+    color: '#000000',
+    apiEndpoint: '/api/jbhifi',
+  },
+  {
+    id: 'goodguys',
+    name: 'Good Guys',
+    logo: 'https://logos-world.net/wp-content/uploads/2021/02/Good-Guys-Logo.png',
+    color: '#D4282D',
+    apiEndpoint: '/api/goodguys',
+  },
+  {
+    id: 'harveynorman',
+    name: 'Harvey Norman',
+    logo: 'https://logos-world.net/wp-content/uploads/2021/02/Harvey-Norman-Logo.png',
+    color: '#E4002B',
+    apiEndpoint: '/api/harveynorman',
+  },
+];
 
-const DEAL_CATEGORIES = ['All', 'OTT', 'Freebies', 'Group Buying', 'Local Deals', 'Partners'];
+const DEAL_CATEGORIES = ['All', 'Electronics', 'Groceries', 'Home & Garden', 'Fashion', 'Entertainment', 'Sports'];
 
 const DealsHubScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, colors } = useTheme();
+  const [selectedSource, setSelectedSource] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [showPostModal, setShowPostModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
@@ -63,6 +115,7 @@ const DealsHubScreen: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
   const [isManualRefresh, setIsManualRefresh] = useState(false);
+  const [filtersVisible, setFiltersVisible] = useState(true);
 
   // Use the custom hook for deals management
   const {
@@ -74,13 +127,13 @@ const DealsHubScreen: React.FC = () => {
     refreshDeals,
     loadMore,
     canLoadMore,
-  } = useDeals(selectedCategory);
+  } = useDeals(selectedCategory, selectedSource);
 
   // Post Deal Form State
   const [postForm, setPostForm] = useState({
     title: '',
     description: '',
-    category: 'OTT' as Deal['category'],
+    category: 'Electronics' as Deal['category'],
     originalPrice: '',
     discountedPrice: '',
     businessName: '',
@@ -88,6 +141,8 @@ const DealsHubScreen: React.FC = () => {
     isGroupDeal: false,
     maxParticipants: '',
     expiresAt: new Date(),
+    dealUrl: '',
+    source: selectedSource,
   });
 
   // Filter deals based on search query
@@ -104,13 +159,22 @@ const DealsHubScreen: React.FC = () => {
     }
   }, [deals, searchQuery]);
 
+  // Auto-hide filters during loading to save space
+  useEffect(() => {
+    if (loading && deals.length === 0) {
+      setFiltersVisible(false);
+    } else {
+      setFiltersVisible(true);
+    }
+  }, [loading, deals.length]);
+
   const handleManualRefresh = useCallback(async () => {
     setIsManualRefresh(true);
     try {
       await refreshDeals();
       Alert.alert(
         'Deals Updated! 🎉',
-        `Found ${pagination?.totalDeals || 0} deals. Swipe down anytime to refresh!`,
+        `Found ${pagination?.totalDeals || 0} deals from ${DEAL_SOURCES.find(s => s.id === selectedSource)?.name || 'All Sources'}`,
         [{ text: 'Great!', style: 'default' }]
       );
     } catch (error) {
@@ -118,7 +182,7 @@ const DealsHubScreen: React.FC = () => {
     } finally {
       setIsManualRefresh(false);
     }
-  }, [refreshDeals, pagination?.totalDeals]);
+  }, [refreshDeals, pagination?.totalDeals, selectedSource]);
 
   const handlePostDeal = async () => {
     if (!postForm.title || !postForm.description || !postForm.originalPrice) {
@@ -126,17 +190,36 @@ const DealsHubScreen: React.FC = () => {
       return;
     }
 
-    // This would integrate with your backend to post user-generated deals
-    Alert.alert('Coming Soon', 'User-generated deals will be available in the next update!');
-    setShowPostModal(false);
-    resetPostForm();
+    try {
+      // Here you would integrate with your backend to post user-generated deals
+      const newDeal = {
+        ...postForm,
+        id: Date.now().toString(),
+        originalPrice: parseFloat(postForm.originalPrice),
+        discountedPrice: parseFloat(postForm.discountedPrice),
+        discount: Math.round(((parseFloat(postForm.originalPrice) - parseFloat(postForm.discountedPrice)) / parseFloat(postForm.originalPrice)) * 100),
+        postedBy: 'You',
+        likes: 0,
+        dislikes: 0,
+        isGroupDeal: postForm.isGroupDeal,
+        chatEnabled: true,
+        isPartnership: false,
+        source: 'user',
+      };
+
+      Alert.alert('Deal Posted!', 'Your deal has been submitted and will be reviewed shortly.');
+      setShowPostModal(false);
+      resetPostForm();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to post deal. Please try again.');
+    }
   };
 
   const resetPostForm = () => {
     setPostForm({
       title: '',
       description: '',
-      category: 'OTT',
+      category: 'Electronics',
       originalPrice: '',
       discountedPrice: '',
       businessName: '',
@@ -144,6 +227,8 @@ const DealsHubScreen: React.FC = () => {
       isGroupDeal: false,
       maxParticipants: '',
       expiresAt: new Date(),
+      dealUrl: '',
+      source: selectedSource,
     });
   };
 
@@ -168,16 +253,6 @@ const DealsHubScreen: React.FC = () => {
     await DealsAPI.updateDealInteraction(deal.id, { 
       liked: newLikedState,
       disliked: false 
-    });
-  };
-
-  const handleDislike = async (deal: Deal) => {
-    const newDislikedState = !deal.userDisliked;
-    
-    // Update local cache
-    await DealsAPI.updateDealInteraction(deal.id, { 
-      disliked: newDislikedState,
-      liked: false 
     });
   };
 
@@ -213,26 +288,43 @@ const DealsHubScreen: React.FC = () => {
     ]);
   };
 
+  const generateDeepLink = (deal: Deal) => {
+    // Generate deep link for the app
+    return `spendy://deal/${deal.id}`;
+  };
+
+  const generateAppStoreLink = () => {
+    if (Platform.OS === 'ios') {
+      return 'https://apps.apple.com/au/app/spendy/id123456789'; // Replace with actual App Store ID
+    } else {
+      return 'https://play.google.com/store/apps/details?id=com.spendy.app'; // Replace with actual package name
+    }
+  };
+
   const handleShareDeal = async (deal: Deal) => {
     try {
+      const deepLink = generateDeepLink(deal);
+      const appStoreLink = generateAppStoreLink();
+      
       const shareMessage = `💚 DEAL ALERT from Spendy! 💚
 
 ${deal.title}
 
-💰 Was: ${deal.originalPrice}
-✨ Now: ${deal.discountedPrice}
+💰 Was: $${deal.originalPrice.toFixed(2)}
+✨ Now: $${deal.discountedPrice.toFixed(2)}
 🎯 Save ${deal.discount}% OFF!
 
 ${deal.description}
 
-${deal.dealUrl ? `\n🔗 ${deal.dealUrl}` : ''}
+📱 Open in Spendy: ${deepLink}
+📲 Get Spendy: ${appStoreLink}
 
 Found this amazing deal on Spendy app!`;
 
       await Share.share({
         message: shareMessage,
         title: `${deal.title} - ${deal.discount}% OFF`,
-        url: deal.dealUrl,
+        url: deepLink,
       });
     } catch (error) {
       Alert.alert('Error', 'Failed to share deal. Please try again.');
@@ -257,24 +349,61 @@ Found this amazing deal on Spendy app!`;
 
   const getCategoryIcon = (category: string) => {
     const icons = {
-      'OTT': 'tv',
-      'Freebies': 'gift',
-      'Group Buying': 'people',
-      'Local Deals': 'location',
-      'Partners': 'business',
+      'Electronics': 'phone-portrait',
+      'Groceries': 'basket',
+      'Home & Garden': 'home',
+      'Fashion': 'shirt',
+      'Entertainment': 'game-controller',
+      'Sports': 'fitness',
     };
     return icons[category as keyof typeof icons] || 'pricetag';
   };
 
   const getSourceBadge = (source?: string) => {
-    const badges = {
-      'ozbargain': { text: 'OzBargain', color: '#FF6B35' },
-      'groupon': { text: 'Groupon', color: '#53B83A' },
-      'catch': { text: 'Catch', color: '#E31E24' },
-      'partner': { text: 'Partner', color: COLORS.accent },
-      'user': { text: 'Community', color: COLORS.primary },
-    };
-    return badges[source as keyof typeof badges] || badges.user;
+    const sourceData = DEAL_SOURCES.find(s => s.id === source);
+    return sourceData ? { text: sourceData.name, color: sourceData.color } : { text: 'Community', color: colors.primary };
+  };
+
+  const renderSourceFilter = ({ item: source }: { item: typeof DEAL_SOURCES[0] }) => {
+    const isSelected = selectedSource === source.id;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.sourceFilter,
+          { 
+            backgroundColor: isSelected ? source.color : colors.surface,
+            borderColor: isSelected ? source.color : colors.border,
+          }
+        ]}
+        onPress={() => setSelectedSource(source.id)}
+      >
+        {source.logo && (
+          <Image 
+            source={{ uri: source.logo }} 
+            style={styles.sourceLogo}
+            resizeMode="contain"
+          />
+        )}
+        {!source.logo && (
+          <Ionicons 
+            name="apps" 
+            size={16} 
+            color={isSelected ? 'white' : colors.textSecondary} 
+          />
+        )}
+        <Text
+          style={[
+            styles.sourceFilterText,
+            { 
+              color: isSelected ? 'white' : colors.textSecondary 
+            }
+          ]}
+        >
+          {source.name}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   const renderDealCard = ({ item: deal }: { item: Deal }) => {
@@ -283,14 +412,14 @@ Found this amazing deal on Spendy app!`;
 
     return (
       <TouchableOpacity 
-        style={[styles.dealCard, { backgroundColor: COLORS.cardBg }]}
+        style={[styles.dealCard, { backgroundColor: colors.surface }]}
         onPress={() => openDealUrl(deal)}
         activeOpacity={0.9}
       >
         {/* Header */}
         <View style={styles.dealHeader}>
           <View style={styles.dealBadges}>
-            <View style={[styles.categoryBadge, { backgroundColor: COLORS.primary }]}>
+            <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
               <Ionicons 
                 name={getCategoryIcon(deal.category) as any} 
                 size={12} 
@@ -304,31 +433,31 @@ Found this amazing deal on Spendy app!`;
             </View>
             
             {isExpiringSoon && (
-              <View style={styles.urgentBadge}>
-                <Ionicons name="time" size={10} color={COLORS.warning} />
-                <Text style={[styles.urgentText, { color: COLORS.warning }]}>Expiring Soon</Text>
+              <View style={[styles.urgentBadge, { backgroundColor: `${colors.warning}20` }]}>
+                <Ionicons name="time" size={10} color={colors.warning} />
+                <Text style={[styles.urgentText, { color: colors.warning }]}>Expiring Soon</Text>
               </View>
             )}
           </View>
-          <View style={[styles.discountBadge, { backgroundColor: COLORS.success }]}>
+          <View style={[styles.discountBadge, { backgroundColor: colors.success }]}>
             <Text style={styles.discountText}>{deal.discount}%</Text>
             <Text style={styles.offText}>OFF</Text>
           </View>
         </View>
 
         {/* Title & Description */}
-        <Text style={[styles.dealTitle, { color: COLORS.textPrimary }]} numberOfLines={2}>
+        <Text style={[styles.dealTitle, { color: colors.text }]} numberOfLines={2}>
           {deal.title}
         </Text>
-        <Text style={[styles.dealDescription, { color: COLORS.textSecondary }]} numberOfLines={2}>
+        <Text style={[styles.dealDescription, { color: colors.textSecondary }]} numberOfLines={2}>
           {deal.description}
         </Text>
 
         {/* Business Info */}
         {deal.businessName && (
           <View style={styles.businessInfo}>
-            <Ionicons name="business" size={14} color={COLORS.textMuted} />
-            <Text style={[styles.businessName, { color: COLORS.textSecondary }]}>
+            <Ionicons name="business" size={14} color={colors.textMuted} />
+            <Text style={[styles.businessName, { color: colors.textSecondary }]}>
               {deal.businessName}
             </Text>
           </View>
@@ -337,8 +466,8 @@ Found this amazing deal on Spendy app!`;
         {/* Location */}
         {deal.location && (
           <View style={styles.locationInfo}>
-            <Ionicons name="location" size={14} color={COLORS.textMuted} />
-            <Text style={[styles.locationText, { color: COLORS.textMuted }]}>
+            <Ionicons name="location" size={14} color={colors.textMuted} />
+            <Text style={[styles.locationText, { color: colors.textMuted }]}>
               {deal.location}
             </Text>
           </View>
@@ -347,14 +476,14 @@ Found this amazing deal on Spendy app!`;
         {/* Pricing */}
         <View style={styles.pricingSection}>
           <View style={styles.priceContainer}>
-            <Text style={[styles.originalPrice, { color: COLORS.textMuted }]}>
+            <Text style={[styles.originalPrice, { color: colors.textMuted }]}>
               ${deal.originalPrice.toFixed(2)}
             </Text>
-            <Text style={[styles.discountedPrice, { color: COLORS.primary }]}>
+            <Text style={[styles.discountedPrice, { color: colors.primary }]}>
               ${deal.discountedPrice.toFixed(2)}
             </Text>
           </View>
-          <Text style={[styles.savedAmount, { color: COLORS.success }]}>
+          <Text style={[styles.savedAmount, { color: colors.success }]}>
             Save ${(deal.originalPrice - deal.discountedPrice).toFixed(2)}
           </Text>
         </View>
@@ -363,18 +492,18 @@ Found this amazing deal on Spendy app!`;
         {deal.isGroupDeal && (
           <View style={styles.groupSection}>
             <View style={styles.progressHeader}>
-              <Text style={[styles.groupTitle, { color: COLORS.textPrimary }]}>
+              <Text style={[styles.groupTitle, { color: colors.text }]}>
                 Group Progress
               </Text>
-              <Text style={[styles.participantCount, { color: COLORS.textSecondary }]}>
+              <Text style={[styles.participantCount, { color: colors.textSecondary }]}>
                 {deal.currentParticipants}/{deal.maxParticipants} joined
               </Text>
             </View>
-            <View style={[styles.progressBar, { backgroundColor: COLORS.surface }]}>
+            <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
               <View 
                 style={[
                   styles.progressFill, 
-                  { width: `${deal.groupProgress || 0}%`, backgroundColor: COLORS.primary }
+                  { width: `${deal.groupProgress || 0}%`, backgroundColor: colors.primary }
                 ]} 
               />
             </View>
@@ -391,9 +520,9 @@ Found this amazing deal on Spendy app!`;
               <Ionicons 
                 name={deal.userLiked ? "heart" : "heart-outline"} 
                 size={18} 
-                color={deal.userLiked ? COLORS.error : COLORS.textMuted} 
+                color={deal.userLiked ? colors.error : colors.textMuted} 
               />
-              <Text style={[styles.actionText, { color: COLORS.textMuted }]}>
+              <Text style={[styles.actionText, { color: colors.textMuted }]}>
                 {deal.likes}
               </Text>
             </TouchableOpacity>
@@ -402,21 +531,21 @@ Found this amazing deal on Spendy app!`;
               style={styles.actionButton}
               onPress={() => openChat(deal)}
             >
-              <Ionicons name="chatbubble-outline" size={18} color={COLORS.textMuted} />
-              <Text style={[styles.actionText, { color: COLORS.textMuted }]}>Chat</Text>
+              <Ionicons name="chatbubble-outline" size={18} color={colors.textMuted} />
+              <Text style={[styles.actionText, { color: colors.textMuted }]}>Chat</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => handleShareDeal(deal)}
             >
-              <Ionicons name="share-outline" size={18} color={COLORS.textMuted} />
-              <Text style={[styles.actionText, { color: COLORS.textMuted }]}>Share</Text>
+              <Ionicons name="share-outline" size={18} color={colors.textMuted} />
+              <Text style={[styles.actionText, { color: colors.textMuted }]}>Share</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity 
-            style={[styles.claimButton, { backgroundColor: COLORS.primary }]}
+            style={[styles.claimButton, { backgroundColor: colors.primary }]}
             onPress={() => openDealUrl(deal)}
           >
             <Text style={styles.claimText}>Get Deal</Text>
@@ -426,10 +555,10 @@ Found this amazing deal on Spendy app!`;
 
         {/* Footer */}
         <View style={styles.dealFooter}>
-          <Text style={[styles.postedBy, { color: COLORS.textMuted }]}>
+          <Text style={[styles.postedBy, { color: colors.textMuted }]}>
             by {deal.postedBy}
           </Text>
-          <Text style={[styles.timeRemaining, { color: COLORS.textMuted }]}>
+          <Text style={[styles.timeRemaining, { color: colors.textMuted }]}>
             {Math.max(1, Math.ceil((new Date(deal.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))} days left
           </Text>
         </View>
@@ -443,7 +572,7 @@ Found this amazing deal on Spendy app!`;
     return (
       <View style={styles.loadMoreContainer}>
         <TouchableOpacity
-          style={[styles.loadMoreButton, { backgroundColor: COLORS.primary }]}
+          style={[styles.loadMoreButton, { backgroundColor: colors.primary }]}
           onPress={loadMore}
           disabled={loading}
         >
@@ -462,23 +591,23 @@ Found this amazing deal on Spendy app!`;
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIconContainer, { backgroundColor: COLORS.surface }]}>
-        <Ionicons name="pricetag-outline" size={64} color={COLORS.textMuted} />
+      <View style={[styles.emptyIconContainer, { backgroundColor: colors.surface }]}>
+        <Ionicons name="pricetag-outline" size={64} color={colors.textMuted} />
       </View>
-      <Text style={[styles.emptyTitle, { color: COLORS.textPrimary }]}>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>
         {error ? 'Connection Error' : 'No deals found'}
       </Text>
-      <Text style={[styles.emptySubtitle, { color: COLORS.textSecondary }]}>
+      <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
         {error 
           ? 'Unable to load deals. Check your internet connection.' 
           : searchQuery 
-            ? 'Try adjusting your search or category filter'
-            : 'We\'re fetching the latest deals for you'
+            ? 'Try adjusting your search or filters'
+            : `We're fetching the latest deals from ${DEAL_SOURCES.find(s => s.id === selectedSource)?.name || 'all sources'}`
         }
       </Text>
       {error && (
         <TouchableOpacity
-          style={[styles.retryButton, { backgroundColor: COLORS.primary }]}
+          style={[styles.retryButton, { backgroundColor: colors.primary }]}
           onPress={handleManualRefresh}
         >
           <Text style={styles.retryText}>Retry</Text>
@@ -488,9 +617,9 @@ Found this amazing deal on Spendy app!`;
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Compact Header */}
-      <View style={[styles.header, { backgroundColor: COLORS.primary }]}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View style={styles.headerContent}>
           <View style={styles.headerTop}>
             <View style={styles.headerTextContainer}>
@@ -506,34 +635,34 @@ Found this amazing deal on Spendy app!`;
                 disabled={isManualRefresh}
               >
                 {isManualRefresh ? (
-                  <ActivityIndicator size={16} color={COLORS.primary} />
+                  <ActivityIndicator size={16} color={colors.primary} />
                 ) : (
-                  <Ionicons name="refresh" size={18} color={COLORS.primary} />
+                  <Ionicons name="refresh" size={18} color={colors.primary} />
                 )}
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.postButton}
                 onPress={() => setShowPostModal(true)}
               >
-                <Ionicons name="add" size={20} color={COLORS.primary} />
+                <Ionicons name="add" size={20} color={colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Search Bar */}
           <View style={styles.searchContainer}>
-            <View style={[styles.searchBar, { backgroundColor: COLORS.surface }]}>
-              <Ionicons name="search" size={20} color={COLORS.textMuted} />
+            <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
+              <Ionicons name="search" size={20} color={colors.textMuted} />
               <TextInput
-                style={[styles.searchInput, { color: COLORS.textPrimary }]}
+                style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Search deals..."
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={colors.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <Ionicons name="close-circle" size={20} color={COLORS.textMuted} />
+                  <Ionicons name="close-circle" size={20} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
@@ -554,45 +683,65 @@ Found this amazing deal on Spendy app!`;
         </View>
       </View>
 
-      {/* Categories */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoriesContainer}
-        contentContainerStyle={styles.categoriesContent}
-      >
-        {DEAL_CATEGORIES.map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.categoryButton,
-              { 
-                backgroundColor: selectedCategory === category ? COLORS.primary : COLORS.surface,
-                borderColor: selectedCategory === category ? COLORS.primary : COLORS.surface,
-              }
-            ]}
-            onPress={() => setSelectedCategory(category)}
-          >
-            <Text
-              style={[
-                styles.categoryButtonText,
-                { 
-                  color: selectedCategory === category ? 'white' : COLORS.textSecondary 
-                }
-              ]}
+      {/* Filters Section - Hidden during initial loading */}
+      {filtersVisible && (
+        <View style={[styles.filtersSection, { backgroundColor: colors.background }]}>
+          {/* Source Filters */}
+          <View style={styles.filterGroup}>
+            <Text style={[styles.filterLabel, { color: colors.text }]}>Sources</Text>
+            <FlatList
+              horizontal
+              data={DEAL_SOURCES}
+              renderItem={renderSourceFilter}
+              keyExtractor={(item) => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.sourceFiltersContainer}
+            />
+          </View>
+
+          {/* Category Filters */}
+          <View style={styles.filterGroup}>
+            <Text style={[styles.filterLabel, { color: colors.text }]}>Categories</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesContent}
             >
-              {category}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              {DEAL_CATEGORIES.map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryButton,
+                    { 
+                      backgroundColor: selectedCategory === category ? colors.primary : colors.surface,
+                      borderColor: selectedCategory === category ? colors.primary : colors.border,
+                    }
+                  ]}
+                  onPress={() => setSelectedCategory(category)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryButtonText,
+                      { 
+                        color: selectedCategory === category ? 'white' : colors.textSecondary 
+                      }
+                    ]}
+                  >
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      )}
 
       {/* Deals List */}
       {loading && filteredDeals.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={[styles.loadingText, { color: COLORS.textSecondary }]}>
-            Loading fresh deals...
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading deals from {DEAL_SOURCES.find(s => s.id === selectedSource)?.name || 'all sources'}...
           </Text>
         </View>
       ) : filteredDeals.length === 0 ? (
@@ -601,8 +750,8 @@ Found this amazing deal on Spendy app!`;
             <RefreshControl 
               refreshing={false} 
               onRefresh={handleManualRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
         >
@@ -617,8 +766,8 @@ Found this amazing deal on Spendy app!`;
             <RefreshControl 
               refreshing={false} 
               onRefresh={handleManualRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
           ListFooterComponent={renderFooter}
@@ -639,8 +788,8 @@ Found this amazing deal on Spendy app!`;
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <SafeAreaView style={[styles.modalContainer, { backgroundColor: COLORS.background }]}>
-            <View style={[styles.modalHeader, { backgroundColor: COLORS.primary }]}>
+          <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHeader, { backgroundColor: colors.primary }]}>
               <TouchableOpacity
                 onPress={() => setShowPostModal(false)}
                 style={styles.modalCloseButton}
@@ -661,14 +810,156 @@ Found this amazing deal on Spendy app!`;
               style={styles.modalContent}
               showsVerticalScrollIndicator={false}
             >
-              <View style={styles.comingSoonContainer}>
-                <Ionicons name="construct-outline" size={64} color={COLORS.textMuted} />
-                <Text style={[styles.comingSoonTitle, { color: COLORS.textPrimary }]}>
-                  Coming Soon!
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Deal Title *</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={postForm.title}
+                  onChangeText={(text) => setPostForm({...postForm, title: text})}
+                  placeholder="Enter deal title"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Description *</Text>
+                <TextInput
+                  style={[styles.textArea, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={postForm.description}
+                  onChangeText={(text) => setPostForm({...postForm, description: text})}
+                  placeholder="Describe the deal"
+                  placeholderTextColor={colors.textMuted}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Category *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorySelector}>
+                  {DEAL_CATEGORIES.filter(cat => cat !== 'All').map((category) => (
+                    <TouchableOpacity
+                      key={category}
+                      style={[
+                        styles.categoryOption,
+                        { 
+                          backgroundColor: postForm.category === category ? colors.primary : colors.surface,
+                          borderColor: postForm.category === category ? colors.primary : colors.border,
+                        }
+                      ]}
+                      onPress={() => setPostForm({...postForm, category: category as Deal['category']})}
+                    >
+                      <Text style={[
+                        styles.categoryOptionText,
+                        { color: postForm.category === category ? 'white' : colors.text }
+                      ]}>
+                        {category}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={styles.priceRow}>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={[styles.label, { color: colors.text }]}>Original Price *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                    value={postForm.originalPrice}
+                    onChangeText={(text) => setPostForm({...postForm, originalPrice: text})}
+                    placeholder="0.00"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={[styles.label, { color: colors.text }]}>Sale Price *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                    value={postForm.discountedPrice}
+                    onChangeText={(text) => setPostForm({...postForm, discountedPrice: text})}
+                    placeholder="0.00"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Business Name</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={postForm.businessName}
+                  onChangeText={(text) => setPostForm({...postForm, businessName: text})}
+                  placeholder="Store or business name"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Deal URL</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={postForm.dealUrl}
+                  onChangeText={(text) => setPostForm({...postForm, dealUrl: text})}
+                  placeholder="https://..."
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="url"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Location</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={postForm.location}
+                  onChangeText={(text) => setPostForm({...postForm, location: text})}
+                  placeholder="City, State or 'Online'"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.groupDealToggle}
+                onPress={() => setPostForm({...postForm, isGroupDeal: !postForm.isGroupDeal})}
+              >
+                <View style={styles.toggleRow}>
+                  <Text style={[styles.label, { color: colors.text }]}>Group Deal</Text>
+                  <View style={[
+                    styles.toggle,
+                    { backgroundColor: postForm.isGroupDeal ? colors.primary : colors.surface }
+                  ]}>
+                    <View style={[
+                      styles.toggleIndicator,
+                      { 
+                        backgroundColor: 'white',
+                        transform: [{ translateX: postForm.isGroupDeal ? 20 : 2 }]
+                      }
+                    ]} />
+                  </View>
+                </View>
+                <Text style={[styles.toggleDescription, { color: colors.textSecondary }]}>
+                  Enable if this deal requires multiple people to activate
                 </Text>
-                <Text style={[styles.comingSoonText, { color: COLORS.textSecondary }]}>
-                  User-generated deals will be available in the next update. 
-                  For now, enjoy thousands of curated deals from top Australian retailers!
+              </TouchableOpacity>
+
+              {postForm.isGroupDeal && (
+                <View style={styles.formGroup}>
+                  <Text style={[styles.label, { color: colors.text }]}>Max Participants</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                    value={postForm.maxParticipants}
+                    onChangeText={(text) => setPostForm({...postForm, maxParticipants: text})}
+                    placeholder="10"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                  />
+                </View>
+              )}
+
+              <View style={styles.formFooter}>
+                <Text style={[styles.formNote, { color: colors.textMuted }]}>
+                  Your deal will be reviewed before being published to ensure quality and accuracy.
                 </Text>
               </View>
             </ScrollView>
@@ -682,8 +973,8 @@ Found this amazing deal on Spendy app!`;
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: COLORS.background }]}>
-          <View style={[styles.modalHeader, { backgroundColor: COLORS.primary }]}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.primary }]}>
             <TouchableOpacity
               onPress={() => setShowChatModal(false)}
               style={styles.modalCloseButton}
@@ -699,14 +990,14 @@ Found this amazing deal on Spendy app!`;
               data={chatMessages}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <View style={[styles.chatMessage, { backgroundColor: COLORS.surface }]}>
-                  <Text style={[styles.chatUserName, { color: COLORS.primary }]}>
+                <View style={[styles.chatMessage, { backgroundColor: colors.surface }]}>
+                  <Text style={[styles.chatUserName, { color: colors.primary }]}>
                     {item.userName}
                   </Text>
-                  <Text style={[styles.chatMessageText, { color: COLORS.textPrimary }]}>
+                  <Text style={[styles.chatMessageText, { color: colors.text }]}>
                     {item.message}
                   </Text>
-                  <Text style={[styles.chatTimestamp, { color: COLORS.textMuted }]}>
+                  <Text style={[styles.chatTimestamp, { color: colors.textMuted }]}>
                     {item.timestamp.toLocaleTimeString()}
                   </Text>
                 </View>
@@ -715,24 +1006,24 @@ Found this amazing deal on Spendy app!`;
             />
             
             <View style={[styles.chatInputContainer, { 
-              backgroundColor: COLORS.background,
-              borderTopColor: COLORS.surface,
+              backgroundColor: colors.background,
+              borderTopColor: colors.border,
             }]}>
               <TextInput
                 style={[styles.chatInput, { 
-                  backgroundColor: COLORS.surface,
-                  borderColor: COLORS.surface,
-                  color: COLORS.textPrimary,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.text,
                 }]}
                 value={newMessage}
                 onChangeText={setNewMessage}
                 placeholder="Type your message..."
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={colors.textMuted}
                 multiline
                 maxLength={200}
               />
               <TouchableOpacity
-                style={[styles.chatSendButton, { backgroundColor: COLORS.primary }]}
+                style={[styles.chatSendButton, { backgroundColor: colors.primary }]}
                 onPress={sendMessage}
               >
                 <Ionicons name="send" size={20} color="white" />
@@ -834,9 +1125,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.7)',
   },
-  categoriesContainer: {
-    backgroundColor: COLORS.background,
-    paddingTop: 16,
+  filtersSection: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  filterGroup: {
+    marginBottom: 16,
+  },
+  filterLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginHorizontal: 20,
+    marginBottom: 8,
+  },
+  sourceFiltersContainer: {
+    paddingHorizontal: 20,
+  },
+  sourceFilter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  sourceLogo: {
+    width: 16,
+    height: 16,
+  },
+  sourceFilterText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   categoriesContent: {
     paddingHorizontal: 20,
@@ -861,6 +1183,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+    textAlign: 'center',
   },
   emptyContainer: {
     flex: 1,
@@ -951,7 +1274,6 @@ const styles = StyleSheet.create({
   urgentBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,107,107,0.1)',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1153,22 +1475,83 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  comingSoonContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
+  formGroup: {
+    marginBottom: 16,
   },
-  comingSoonTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginTop: 16,
-    marginBottom: 12,
-  },
-  comingSoonText: {
+  label: {
     fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  textArea: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  categorySelector: {
+    flexDirection: 'row',
+  },
+  categoryOption: {
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 12,
+    borderWidth: 1,
+  },
+  categoryOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  groupDealToggle: {
+    marginBottom: 16,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  toggle: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  toggleDescription: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  formFooter: {
+    marginTop: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  formNote: {
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
-    lineHeight: 24,
   },
   chatContainer: {
     flex: 1,
