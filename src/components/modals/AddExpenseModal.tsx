@@ -71,14 +71,11 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
   useEffect(() => {
     if (visible) {
       resetForm();
-      if (user) {
-        setPaidBy(user.id);
-      }
       if (preSelectedGroup) {
         setSelectedGroup(preSelectedGroup);
       }
     }
-  }, [visible, user, preSelectedGroup]);
+  }, [visible, preSelectedGroup]);
 
   useEffect(() => {
     if (selectedGroup) {
@@ -86,7 +83,13 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
     }
   }, [selectedGroup, amount]);
 
+  // Debug logging for paidBy changes
+  useEffect(() => {
+    console.log('🔍 PAID BY CHANGED:', paidBy);
+  }, [paidBy]);
+
   const resetForm = () => {
+    console.log('🔍 RESET FORM called, setting paidBy to:', user?.id || '');
     setDescription('');
     setAmount('');
     setSelectedCategory(EXPENSE_CATEGORIES[0]);
@@ -203,6 +206,7 @@ const initializeSplitData = () => {
      if (!validateStep('split')) return;
 
   console.log('🔍 SUBMITTING EXPENSE');
+  console.log('🔍 Paid by:', paidBy);
   console.log('🔍 Split data being submitted:', splitData.filter(split => split.isIncluded).map(split => ({
     userId: split.userId,
     name: split.userData.fullName,
@@ -699,7 +703,10 @@ const initializeSplitData = () => {
                       { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary }
                     ]
                   ]}
-                  onPress={() => setPaidBy(member.userId)}
+                  onPress={() => {
+                    console.log('🔍 PAYER SELECTED:', member.userId, member.userData.fullName);
+                    setPaidBy(member.userId);
+                  }}
                 >
                   <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
                     <Text style={styles.memberAvatarText}>

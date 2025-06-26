@@ -1193,6 +1193,8 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
 static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   try {
     console.log('Adding expense:', expenseData.description, 'for group:', expenseData.groupId);
+    console.log('🔍 SplittingService - Received paidBy:', expenseData.paidBy);
+    console.log('🔍 SplittingService - Split data:', expenseData.splitData.map(s => `${s.userId}: ${s.amount}`));
     
     const batch = writeBatch(db);
     
@@ -1249,8 +1251,11 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     console.log('Chat message prepared');
     
     // Update member balances in the group
+    console.log('🔍 SplittingService - Starting balance updates with paidBy:', expenseData.paidBy);
     for (const split of expenseData.splitData) {
+      console.log(`🔍 Processing split for ${split.userId}, amount: ${split.amount}`);
       if (split.userId !== expenseData.paidBy) {
+        console.log(`🔍 ${split.userId} != ${expenseData.paidBy}, updating balances`);
         await this.updateGroupMemberBalance(expenseData.groupId, split.userId, split.amount);
         await this.updateGroupMemberBalance(expenseData.groupId, expenseData.paidBy, -split.amount);
         
@@ -1261,6 +1266,8 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
         } catch (error) {
           console.log(`No friendship found between ${expenseData.paidBy} and ${split.userId}, skipping friend balance update`);
         }
+      } else {
+        console.log(`🔍 ${split.userId} === ${expenseData.paidBy}, skipping (payer doesn't owe themselves)`);
       }
     }
     console.log('Group member balances updated');

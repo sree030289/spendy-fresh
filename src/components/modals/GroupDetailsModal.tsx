@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import useBalances from '@/hooks/useBalances';
 import { Button } from '@/components/common/Button';
 import { Group, Expense, SplittingService, Friend } from '@/services/firebase/splitting';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -61,6 +62,7 @@ export default function GroupDetailsModal({
   friends = []
 }: GroupDetailsModalProps) {
   const { theme } = useTheme();
+  const { calculateGroupBalance } = useBalances();
   const [groupExpenses, setGroupExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'expenses' | 'members' | 'settings'>('expenses');
@@ -76,6 +78,10 @@ export default function GroupDetailsModal({
   const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
   const [expenseListGroupId, setExpenseListGroupId] = useState<string | undefined>(undefined);
   const [expenseListTitle, setExpenseListTitle] = useState('All Expenses');
+  
+  // Member balances state
+  const [memberBalances, setMemberBalances] = useState<Map<string, number>>(new Map());
+  const [renderKey, setRenderKey] = useState(0);
   
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -122,6 +128,55 @@ export default function GroupDetailsModal({
     }
   }, [group]);
 
+  // Calculate member balances from current user's perspective
+  const calculateMemberBalances = useCallback(async () => {
+    if (!localGroupData || !currentUser?.id || !calculateGroupBalance) {
+      console.log('❌ calculateMemberBalances: Missing prerequisites');
+      console.log('  localGroupData:', !!localGroupData);
+      console.log('  currentUser.id:', !!currentUser?.id);
+      console.log('  calculateGroupBalance:', !!calculateGroupBalance);
+      return;
+    }
+    
+    console.log('🔄 Calculating member balances for group:', localGroupData.name);
+    console.log('👥 Group has', localGroupData.members.length, 'members');
+    
+    const newBalances = new Map<string, number>();
+    
+    for (const member of localGroupData.members) {
+      if (member.userId === currentUser.id) {
+        // Current user's balance is always 0 from their own perspective
+        newBalances.set(member.userId, 0);
+        console.log(`⏭️  Current user (${member.userData.fullName}): 0`);
+        continue;
+      }
+      
+      try {
+        console.log(`🔍 Calculating balance with ${member.userData.fullName} (${member.userId})`);
+        const balance = await calculateGroupBalance(currentUser.id, member.userId, localGroupData.id);
+        newBalances.set(member.userId, balance);
+        console.log(`💰 Balance with ${member.userData.fullName}: ${balance}`);
+      } catch (error) {
+        console.error(`❌ Error calculating balance with ${member.userData.fullName}:`, error);
+        newBalances.set(member.userId, 0);
+        console.log(`⚠️  Defaulting balance with ${member.userData.fullName} to 0`);
+      }
+    }
+    
+    console.log('🔄 Setting new member balances...');
+    setMemberBalances(newBalances);
+    console.log('✅ Member balances calculated');
+    console.log('🔍 Final calculated balances:');
+    for (const [userId, balance] of newBalances.entries()) {
+      const member = localGroupData.members.find(m => m.userId === userId);
+      const name = member?.userData.fullName || userId;
+      console.log(`   ${name}: ${balance}`);
+    }
+    
+    // Force a re-render by updating a dummy state to ensure UI updates
+    setRenderKey(prev => prev + 1);
+  }, [localGroupData, currentUser?.id, calculateGroupBalance]);
+
   // Animation effects
   useEffect(() => {
     if (visible) {
@@ -164,17 +219,19 @@ export default function GroupDetailsModal({
     }
     
     loadGroupExpenses();
+    calculateMemberBalances(); // Add balance calculation
     
     const refreshInterval = setInterval(() => {
       if (visible && localGroupData) {
         loadGroupExpenses();
+        calculateMemberBalances();
       }
     }, 5000);
     
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [visible, localGroupData?.id, loadGroupExpenses]);
+  }, [visible, localGroupData?.id, loadGroupExpenses, calculateMemberBalances]);
 
   useEffect(() => {
     if (!visible) {
@@ -452,62 +509,68 @@ export default function GroupDetailsModal({
     );
   };
 
-  const renderMemberCard = (member: any, index: number) => (
-    <TouchableOpacity
-      key={member.userId}
-      style={[styles.card, { backgroundColor: theme.colors.surface }]}
-      onPress={() => isUserAdmin && member.userId !== currentUser?.id ? setSelectedMemberForAction(member.userId) : null}
-      activeOpacity={isUserAdmin && member.userId !== currentUser?.id ? 0.7 : 1}
-    >
-      <View style={styles.memberRow}>
-        <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
-          <Text style={styles.memberAvatarText}>
-            {member.userData.fullName.charAt(0).toUpperCase()}
-          </Text>
-        </View>
-        <View style={styles.memberInfo}>
-          <Text style={[styles.memberName, { color: theme.colors.text }]}>
-            {member.userId === currentUser?.id ? 'You' : member.userData.fullName}
-          </Text>
-          <View style={styles.memberRole}>
-            <Text style={[styles.memberRoleText, { color: theme.colors.textSecondary }]}>
-              {member.role === 'admin' ? '👑 Admin' : '👤 Member'}
+  const renderMemberCard = (member: any, index: number) => {
+    // Get calculated balance from our state instead of member.balance
+    const calculatedBalance = memberBalances.get(member.userId) || 0;
+    console.log(`🎨 Rendering member card for ${member.userData.fullName}: balance = ${calculatedBalance}`);
+    
+    return (
+      <TouchableOpacity
+        key={member.userId}
+        style={[styles.card, { backgroundColor: theme.colors.surface }]}
+        onPress={() => isUserAdmin && member.userId !== currentUser?.id ? setSelectedMemberForAction(member.userId) : null}
+        activeOpacity={isUserAdmin && member.userId !== currentUser?.id ? 0.7 : 1}
+      >
+        <View style={styles.memberRow}>
+          <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
+            <Text style={styles.memberAvatarText}>
+              {member.userData.fullName.charAt(0).toUpperCase()}
             </Text>
           </View>
+          <View style={styles.memberInfo}>
+            <Text style={[styles.memberName, { color: theme.colors.text }]}>
+              {member.userId === currentUser?.id ? 'You' : member.userData.fullName}
+            </Text>
+            <View style={styles.memberRole}>
+              <Text style={[styles.memberRoleText, { color: theme.colors.textSecondary }]}>
+                {member.role === 'admin' ? '👑 Admin' : '👤 Member'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.memberBalance}>
+            {Math.abs(calculatedBalance) < 0.01 ? (
+              <>
+                <Text style={[styles.balanceAmount, { color: theme.colors.textSecondary }]}>
+                  $0.00
+                </Text>
+                <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
+                  Settled
+                </Text>
+              </>
+            ) : calculatedBalance > 0 ? (
+              <>
+                <Text style={[styles.balanceAmount, styles.balancePositive]}>
+                  +{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
+                </Text>
+                <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
+                  Owed to you
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.balanceAmount, styles.balanceNegative]}>
+                  -{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
+                </Text>
+                <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
+                  Owes
+                </Text>
+              </>
+            )}
+          </View>
         </View>
-        <View style={styles.memberBalance}>
-          {member.balance === 0 ? (
-            <>
-              <Text style={[styles.balanceAmount, { color: theme.colors.textSecondary }]}>
-                $0.00
-              </Text>
-              <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
-                Settled
-              </Text>
-            </>
-          ) : member.balance > 0 ? (
-            <>
-              <Text style={[styles.balanceAmount, styles.balancePositive]}>
-                +{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(member.balance).toFixed(2)}
-              </Text>
-              <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
-                Owed to you
-              </Text>
-            </>
-          ) : (
-            <>
-              <Text style={[styles.balanceAmount, styles.balanceNegative]}>
-                -{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(member.balance).toFixed(2)}
-              </Text>
-              <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
-                Owes
-              </Text>
-            </>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   // Show loading state if modal is visible but no data yet
   if (visible && !localGroupData) {

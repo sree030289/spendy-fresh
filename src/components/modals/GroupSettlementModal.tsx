@@ -50,10 +50,12 @@ export default function GroupSettlementModal({
   const [settlements, setSettlements] = useState<{
     youWillReceive: DirectSettlement[];
     youWillPay: DirectSettlement[];
+    allSettlements?: DirectSettlement[]; // Add this for showing all settlements between all members
     summary: { totalToReceive: number; totalToPay: number; netPosition: number };
   }>({
     youWillReceive: [],
     youWillPay: [],
+    allSettlements: [],
     summary: { totalToReceive: 0, totalToPay: 0, netPosition: 0 }
   });
   const [loading, setLoading] = useState(false);
@@ -99,55 +101,57 @@ export default function GroupSettlementModal({
     }
     setGroupData(group);
 
+    // Calculate ALL settlements between ALL group members
+    const allSettlements: DirectSettlement[] = [];
     const youWillReceive: DirectSettlement[] = [];
     const youWillPay: DirectSettlement[] = [];
     let totalToReceive = 0;
     let totalToPay = 0;
 
-    // Calculate pairwise balances with each group member
-    for (const member of group.members) {
-      if (member.userId === currentUserId) continue;
+    // For each pair of group members, calculate their pairwise balance
+    for (let i = 0; i < group.members.length; i++) {
+      for (let j = i + 1; j < group.members.length; j++) {
+        const member1 = group.members[i];
+        const member2 = group.members[j];
+        
+        const pairwiseBalance = await calculateGroupBalance(member1.userId, member2.userId, groupId);
+        
+        console.log(`🔍 GroupSettlement: ${member1.userData.fullName} vs ${member2.userData.fullName} = ${pairwiseBalance}`);
 
-      const pairwiseBalance = await calculateGroupBalance(currentUserId, member.userId, groupId);
-      
-      console.log(`Group balance: ${currentUserId} vs ${member.userId} = ${pairwiseBalance}`);
-
-      if (Math.abs(pairwiseBalance) > 0.01) {
-        if (pairwiseBalance > 0) {
-          // They owe you
-          youWillReceive.push({
-            fromUserId: member.userId,
-            fromUserName: member.userData.fullName,
-            toUserId: currentUserId,
-            toUserName: 'You',
-            amount: pairwiseBalance,
-            type: 'group_settlement',
-            description: `Group expenses from: ${group.name}`
-          });
-          totalToReceive += pairwiseBalance;
-        } else {
-          // You owe them
-          youWillPay.push({
-            fromUserId: currentUserId,
-            fromUserName: 'You',
-            toUserId: member.userId,
-            toUserName: member.userData.fullName,
+        if (Math.abs(pairwiseBalance) > 0.01) {
+          const settlement: DirectSettlement = {
+            fromUserId: pairwiseBalance > 0 ? member2.userId : member1.userId,
+            fromUserName: pairwiseBalance > 0 ? member2.userData.fullName : member1.userData.fullName,
+            toUserId: pairwiseBalance > 0 ? member1.userId : member2.userId,
+            toUserName: pairwiseBalance > 0 ? member1.userData.fullName : member2.userData.fullName,
             amount: Math.abs(pairwiseBalance),
             type: 'group_settlement',
             description: `Group expenses from: ${group.name}`
-          });
-          totalToPay += Math.abs(pairwiseBalance);
+          };
+
+          allSettlements.push(settlement);
+
+          // Also categorize for current user's perspective
+          if (settlement.fromUserId === currentUserId) {
+            youWillPay.push(settlement);
+            totalToPay += settlement.amount;
+          } else if (settlement.toUserId === currentUserId) {
+            youWillReceive.push(settlement);
+            totalToReceive += settlement.amount;
+          }
         }
       }
     }
 
     // Sort by amount (largest first)
+    allSettlements.sort((a, b) => b.amount - a.amount);
     youWillReceive.sort((a, b) => b.amount - a.amount);
     youWillPay.sort((a, b) => b.amount - a.amount);
 
     setSettlements({
       youWillReceive,
       youWillPay,
+      allSettlements, // Include all settlements between all members
       summary: {
         totalToReceive: parseFloat(totalToReceive.toFixed(2)),
         totalToPay: parseFloat(totalToPay.toFixed(2)),
@@ -157,9 +161,15 @@ export default function GroupSettlementModal({
 
     console.log('✅ Group-specific settlements loaded:', {
       groupName: group.name,
+      allSettlements: allSettlements.length,
       toReceive: youWillReceive.length,
       toPay: youWillPay.length,
-      netPosition: (totalToReceive - totalToPay).toFixed(2)
+      totalToReceive: totalToReceive.toFixed(2),
+      totalToPay: totalToPay.toFixed(2),
+      netPosition: (totalToReceive - totalToPay).toFixed(2),
+      allSettlementsDetails: allSettlements.map(s => `${s.fromUserName} → ${s.toUserName}: ${s.amount}`),
+      youWillReceiveDetails: youWillReceive.map(s => `${s.fromUserName}: ${s.amount}`),
+      youWillPayDetails: youWillPay.map(s => `${s.toUserName}: ${s.amount}`)
     });
   };
 
@@ -283,7 +293,7 @@ export default function GroupSettlementModal({
     ]);
   };
 
-  const renderSettlement = (settlement: DirectSettlement, index: number, isReceiving: boolean) => {
+  const renderSettlement = (settlement: DirectSettlement, index: number, isReceiving: boolean, isAllSettlements = false) => {
     const settlementKey = `${settlement.fromUserId}-${settlement.toUserId}`;
     const isProcessing = processingSettlement === settlementKey;
     const isCurrentUserInvolved = settlement.fromUserId === currentUserId || settlement.toUserId === currentUserId;
@@ -292,7 +302,8 @@ export default function GroupSettlementModal({
       <View key={index} style={[styles.settlementCard, { 
         backgroundColor: theme.colors.surface,
         borderColor: isCurrentUserInvolved ? theme.colors.primary : theme.colors.border,
-        borderWidth: 1
+        borderWidth: 1,
+        opacity: isAllSettlements && !isCurrentUserInvolved ? 0.7 : 1  // Slightly fade non-user settlements
       }]}>
         <View style={styles.settlementHeader}>
           <View style={styles.userInfo}>
@@ -474,6 +485,21 @@ export default function GroupSettlementModal({
                   )}
                 </>
               )}
+
+              {/* All Group Settlements (only for group-specific view) */}
+              {isGroupSpecific && settlements.allSettlements && settlements.allSettlements.length > 0 && (
+                <>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 20 }]}>
+                    All Group Settlements ({settlements.allSettlements.length})
+                  </Text>
+                  <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary, marginBottom: 12 }]}>
+                    Complete overview of who owes whom in {groupData?.name || 'this group'}
+                  </Text>
+                  {settlements.allSettlements.map((settlement, index) => 
+                    renderSettlement(settlement, index, settlement.toUserId === currentUserId, true)
+                  )}
+                </>
+              )}
             </>
           )}
 
@@ -584,6 +610,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
     marginTop: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginBottom: 8,
   },
   settlementCard: {
     borderRadius: 16,

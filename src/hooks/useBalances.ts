@@ -78,8 +78,32 @@ class UnifiedSettlementService {
 
       // PHASE 2: Process group relationships
       const friendUserIds = new Set(friends.map(f => f.friendId));
+      const allGroupMembersMap = new Map<string, { name: string; email: string; avatar?: string; groups: Array<{id: string; name: string}> }>();
+      
       console.log(`Processing ${userGroups.length} groups`);
 
+      // First pass: collect all group members
+      for (const group of userGroups) {
+        for (const member of group.members) {
+          if (member.userId === userId) continue;
+          
+          if (!allGroupMembersMap.has(member.userId)) {
+            allGroupMembersMap.set(member.userId, {
+              name: member.userData.fullName,
+              email: member.userData.email,
+              avatar: member.userData.avatar,
+              groups: []
+            });
+          }
+          
+          allGroupMembersMap.get(member.userId)!.groups.push({
+            id: group.id,
+            name: group.name
+          });
+        }
+      }
+
+      // Second pass: calculate balances for each group member
       for (const group of userGroups) {
         console.log(`Processing group: ${group.name} with ${group.members.length} members`);
         
@@ -95,33 +119,60 @@ class UnifiedSettlementService {
 
           console.log(`Balance between ${userId} and ${member.userId} in ${group.name}: ${groupBalance}`);
 
-          if (Math.abs(groupBalance) > 0.01) {
-            const existingBalance = balanceMap.get(member.userId);
+          const existingBalance = balanceMap.get(member.userId);
 
-            if (existingBalance) {
-              // User is both friend AND group member - combine balances
-              const oldNetBalance = existingBalance.balance;
-              existingBalance.balance += groupBalance;
-              existingBalance.source = 'mixed';
-              existingBalance.breakdown!.fromGroups[group.id] = {
+          if (existingBalance) {
+            // User is both friend AND group member - combine balances
+            const oldNetBalance = existingBalance.balance;
+            existingBalance.balance += groupBalance;
+            existingBalance.source = 'mixed';
+            existingBalance.breakdown!.fromGroups[group.id] = {
+              groupName: group.name,
+              balance: groupBalance
+            };
+
+            // Update totals (remove old, add new)
+            if (Math.abs(oldNetBalance) > 0.01) {
+              if (oldNetBalance > 0) totalOwed -= oldNetBalance;
+              else totalOwing -= Math.abs(oldNetBalance);
+            }
+
+            if (Math.abs(existingBalance.balance) > 0.01) {
+              if (existingBalance.balance > 0) totalOwed += existingBalance.balance;
+              else totalOwing += Math.abs(existingBalance.balance);
+            }
+
+          } else {
+            // User is ONLY in groups (not a direct friend)
+            const memberInfo = allGroupMembersMap.get(member.userId)!;
+            const existingGroupBalance = balanceMap.get(member.userId);
+            
+            if (existingGroupBalance) {
+              // Member already exists from another group, update balance
+              const oldBalance = existingGroupBalance.balance;
+              existingGroupBalance.balance += groupBalance;
+              existingGroupBalance.breakdown!.fromGroups[group.id] = {
                 groupName: group.name,
                 balance: groupBalance
               };
+              
+              // Update totals
+              if (Math.abs(oldBalance) > 0.01) {
+                if (oldBalance > 0) totalOwed -= oldBalance;
+                else totalOwing -= Math.abs(oldBalance);
+              }
 
-              // Update totals (remove old, add new)
-              if (oldNetBalance > 0) totalOwed -= oldNetBalance;
-              else totalOwing -= Math.abs(oldNetBalance);
-
-              if (existingBalance.balance > 0) totalOwed += existingBalance.balance;
-              else totalOwing += Math.abs(existingBalance.balance);
-
-            } else if (!friendUserIds.has(member.userId)) {
-              // User is ONLY in groups (not a direct friend)
+              if (Math.abs(existingGroupBalance.balance) > 0.01) {
+                if (existingGroupBalance.balance > 0) totalOwed += existingGroupBalance.balance;
+                else totalOwing += Math.abs(existingGroupBalance.balance);
+              }
+            } else {
+              // New group-only member
               const balance: BalanceDetail = {
                 userId: member.userId,
-                name: member.userData.fullName,
-                email: member.userData.email,
-                avatar: member.userData.avatar,
+                name: memberInfo.name,
+                email: memberInfo.email,
+                avatar: memberInfo.avatar,
                 balance: groupBalance,
                 source: 'group',
                 groupName: group.name,
@@ -140,11 +191,13 @@ class UnifiedSettlementService {
 
               balanceMap.set(member.userId, balance);
 
-              // Update totals for new group balances
-              if (groupBalance > 0) {
-                totalOwed += groupBalance;
-              } else {
-                totalOwing += Math.abs(groupBalance);
+              // Update totals for new group balances (only if significant)
+              if (Math.abs(groupBalance) > 0.01) {
+                if (groupBalance > 0) {
+                  totalOwed += groupBalance;
+                } else {
+                  totalOwing += Math.abs(groupBalance);
+                }
               }
             }
           }
@@ -385,13 +438,13 @@ export const useBalances = () => {
     refresh();
   }, [user?.id, refresh]);
 
-  // Format balances for display - IMPROVED LOGIC
+  // Format balances for display - FIXED LOGIC for Friends tab
   const friends = balances?.details.filter(detail => 
-    detail.source === 'friend' || detail.source === 'mixed'
+    detail.source === 'friend'  // Only pure friends (not mixed)
   ) || [];
   
   const groupMembers = balances?.details.filter(detail => 
-    detail.source === 'group'
+    detail.source === 'group' || detail.source === 'mixed'  // All group members (including mixed)
   ) || [];
   
   const allBalances = balances?.details.map(detail => ({

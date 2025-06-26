@@ -404,11 +404,6 @@ useEffect(() => {
       
       const expenseId = await SplittingService.addExpense({
         ...expenseData,
-        paidBy: user.id,
-        paidByData: {
-          fullName: user.fullName,
-          email: user.email
-        },
         isSettled: false,
         date: new Date()
       });
@@ -1187,31 +1182,28 @@ const renderFriendsTab = () => {
                   </View>
 
                   <View style={styles.balanceItemRight}>
-                    <View style={styles.balanceDisplay}>
-                      {Math.abs(detail.balance) < 0.01 ? (
-                        <>
-                          <Ionicons name="checkmark-circle" size={16} color={theme.colors.textSecondary} />
-                          <Text style={[styles.balanceText, { color: theme.colors.textSecondary }]}>
-                            Settled up
-                          </Text>
-                        </>
-                      ) : detail.balance > 0 ? (
-                        <>
-                          <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
-                          <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                            Owes you {getCurrencySymbol(user?.currency || 'USD')}{detail.balance.toFixed(2)}
-                          </Text>
-                        </>
-                      ) : (
-                        <>
-                          <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
-                          <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                            You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(detail.balance).toFixed(2)}
-                          </Text>
-                        </>
-                      )}
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                    {/* Show invite/resend button for group members who aren't friends */}
+                    <TouchableOpacity
+                      style={[styles.inviteButton, { backgroundColor: theme.colors.primary }]}
+                      onPress={async () => {
+                        try {
+                          await SplittingService.sendFriendRequest(
+                            user!.id,
+                            detail.email,
+                            `Hi! We're both in the group "${detail.groupName}". Let's connect! 💰`
+                          );
+                          Alert.alert('Friend Request Sent! 📤', `Request sent to ${detail.name}`);
+                          friendsBalances.notifyChange();
+                        } catch (error: any) {
+                          Alert.alert('Error', error.message || 'Failed to send friend request');
+                        }
+                      }}
+                    >
+                      <Ionicons name="person-add" size={16} color="white" />
+                      <Text style={[styles.inviteButtonText, { color: 'white' }]}>
+                        Invite
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -1222,7 +1214,6 @@ const renderFriendsTab = () => {
     </ScrollView>
   );
 };
-  // FIXED: Groups tab with balance integration - using ONLY unified system
   const renderGroupsTab = () => (
     <ScrollView 
       contentContainerStyle={styles.tabContent}
@@ -1391,7 +1382,7 @@ groups.map((group) => {
     </ScrollView>
   );
 
-  // Friend actions menu
+  // Enhanced friend actions menu with status display and more options
   const showFriendActionsMenu = (friend: Friend) => {
     const actions: Array<{
       text: string;
@@ -1401,31 +1392,73 @@ groups.map((group) => {
       { text: 'Cancel', style: 'cancel' }
     ];
 
-    if (friend.balance !== 0 && friend.status === 'accepted') {
+    // Status-specific actions
+    if (friend.status === 'pending') {
+      // Friend request sent, show resend option
       actions.unshift({
-        text: 'Mark as Paid',
-        onPress: () => {
-          setSelectedFriend(friend);
-          setShowManualSettlement(true);
+        text: 'Resend Invitation',
+        onPress: async () => {
+          try {
+            await SplittingService.sendFriendRequest(
+              user!.id,
+              friend.friendData.email,
+              'Hi! This is a reminder to connect on Spendy 💰'
+            );
+            Alert.alert('Invitation Resent! 📤', `Reminder sent to ${friend.friendData.fullName}`);
+          } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to resend invitation');
+          }
         }
       });
-      
-      actions.unshift({
-        text: friend.balance > 0 ? 'Request Payment' : 'Send Payment',
-        onPress: () => {
-          setSelectedFriend(friend);
-          setShowPayment(true);
-        }
-      });
+    } else if (friend.status === 'accepted') {
+      // Accepted friend - show payment/settlement options
+      if (friend.balance !== 0) {
+        actions.unshift({
+          text: 'Settle Up',
+          onPress: () => {
+            setSelectedFriend(friend);
+            setShowManualSettlement(true);
+          }
+        });
+        
+        actions.unshift({
+          text: friend.balance > 0 ? 'Request Payment' : 'Send Payment',
+          onPress: () => {
+            setSelectedFriend(friend);
+            setShowPayment(true);
+          }
+        });
+      }
     }
 
+    // Block/Unblock friend option
+    const isBlocked = friend.status === 'blocked';
+    actions.unshift({
+      text: isBlocked ? 'Unblock Friend' : 'Block Friend',
+      onPress: () => handleBlockUnblockFriend(friend, !isBlocked)
+    });
+
+    // Remove friend option (with balance check)
     actions.unshift({
       text: 'Remove Friend',
       style: 'destructive',
       onPress: () => handleRemoveFriend(friend)
     });
 
-    Alert.alert(friend.friendData.fullName, 'Choose an action:', actions);
+    // Show status in the alert title
+    const statusDisplay = {
+      'pending': '📤 Invitation Sent',
+      'accepted': '✅ Connected',
+      'blocked': '🚫 Blocked',
+      'declined': '❌ Declined',
+      'invited': '📤 Invitation Sent'
+    }[friend.status] || 'Unknown Status';
+
+    Alert.alert(
+      `${friend.friendData.fullName}`,
+      `Status: ${statusDisplay}\n${friend.balance !== 0 ? `Balance: ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(friend.balance).toFixed(2)} ${friend.balance > 0 ? 'owed to you' : 'you owe'}` : 'All settled up'}`,
+      actions
+    );
   };
 
   // Helper functions (keep existing but add balance notifications where needed)
@@ -1445,6 +1478,37 @@ groups.map((group) => {
               notifyBalanceChange(); // FIXED: Notify balance system
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to remove friend');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleBlockUnblockFriend = (friend: Friend, shouldBlock: boolean) => {
+    const action = shouldBlock ? 'Block' : 'Unblock';
+    const actionText = shouldBlock ? 'block' : 'unblock';
+    
+    Alert.alert(
+      `${action} Friend`,
+      `Are you sure you want to ${actionText} ${friend.friendData.fullName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: action,
+          style: shouldBlock ? 'destructive' : 'default',
+          onPress: async () => {
+            try {
+              if (shouldBlock) {
+                await SplittingService.blockFriend(user!.id, friend.friendId);
+                Alert.alert('Friend Blocked', `${friend.friendData.fullName} has been blocked.`);
+              } else {
+                await SplittingService.unblockFriend(user!.id, friend.friendId);
+                Alert.alert('Friend Unblocked', `${friend.friendData.fullName} has been unblocked.`);
+              }
+              notifyBalanceChange(); // Notify balance system
+            } catch (error: any) {
+              Alert.alert('Error', error.message || `Failed to ${actionText} friend`);
             }
           }
         }
@@ -2907,6 +2971,20 @@ addFriendCardText: {
   fontWeight: '500',
   textAlign: 'center',
   lineHeight: 16,
+},
+
+// Invite button styles for group members
+inviteButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 16,
+  gap: 4,
+},
+inviteButtonText: {
+  fontSize: 12,
+  fontWeight: '600',
 },
 
 });
