@@ -1,7 +1,9 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getMessaging } from 'firebase/messaging';
 import { getStorage } from 'firebase/storage';
+import { Platform } from 'react-native/Libraries/Utilities/Platform';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA3PwHVfgqpxizujlimha-xTjsh_-5Tsc0",
@@ -26,3 +28,5 @@ if (__DEV__) {
   // Configure Firestore settings to reduce connection warnings
   console.log('🔧 Firebase initialized in development mode');
 }
+// Initialize messaging for web only
+export const messaging = Platform.OS === 'web' ? getMessaging(app) : null;
