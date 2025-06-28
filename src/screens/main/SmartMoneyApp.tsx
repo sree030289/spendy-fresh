@@ -118,20 +118,22 @@ const SmartMoneyScreen: React.FC = () => {
 
   useEffect(() => {
     initializeApp();
-  }, []);
+  }, [user?.id]);
 
   const initializeApp = async () => {
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     
     try {
-      // Clear any existing demo data to ensure a fresh start
-      await clearStoredDemoData();
-      
       // Initialize notification service
       const notificationService = FirebaseNotificationService.getInstance();
       await notificationService.initialize();
       
-      // Load data - only real data, no sample data
+      // Load real data from Firebase - no demo data
       await loadData();
       
     } catch (error) {
@@ -142,76 +144,50 @@ const SmartMoneyScreen: React.FC = () => {
     }
   };
 
-  const addSampleData = async () => {
-    try {
-      console.log('Adding sample data for demonstration');
-      const dataService = DataService.getInstance();
-      
-      // Sample expense
-      const sampleExpense: Expense = {
-        id: 'sample-expense-1',
-        title: 'Groceries',
-        amount: 120.50,
-        category: 'Food',
-        date: new Date().toISOString().split('T')[0],
-        type: 'expense'
-      };
-      await dataService.saveExpense(sampleExpense);
-      
-      // Sample income
-      const sampleIncome: Income = {
-        id: 'sample-income-1',
-        title: 'Salary',
-        amount: 2500,
-        category: 'Salary',
-        date: new Date().toISOString().split('T')[0],
-        type: 'income'
-      };
-      await dataService.saveIncome(sampleIncome);
-      
-      // Sample reminder
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      const sampleReminder: Reminder = {
-        id: 'sample-reminder-1',
-        title: 'Rent Payment',
-        amount: 1200,
-        dueDate: nextWeek.toISOString().split('T')[0],
-        status: 'pending',
-        category: 'Rent',
-        recurring: 'monthly',
-        autoDetected: false,
-        priority: 'high'
-      };
-      await dataService.saveReminder(sampleReminder);
-      
-      console.log('Sample data added successfully!');
-    } catch (error) {
-      console.error('Failed to add sample data:', error);
-    }
-  };
-
   const loadData = async () => {
+    if (!user?.id) return;
+    
     try {
       const dataService = DataService.getInstance();
-      let [expensesData, incomeData, remindersData] = await Promise.all([
+      
+      // Load real data from Firebase/storage
+      const [expensesData, incomeData, remindersData] = await Promise.all([
         dataService.getExpenses(),
         dataService.getIncome(),
         dataService.getReminders()
       ]);
       
-      // Set the data directly from what was loaded (no sample data)
-      setExpenses(expensesData);
-      setIncome(incomeData);
-      setReminders(remindersData);
+      console.log('📊 Loaded data:', {
+        expenses: expensesData.length,
+        income: incomeData.length,
+        reminders: remindersData.length
+      });
       
-      // Generate analytics
+      // Set the real data
+      setExpenses(expensesData || []);
+      setIncome(incomeData || []);
+      setReminders(remindersData || []);
+      
+      // Generate analytics from real data
       const analyticsService = AnalyticsService.getInstance();
-      const monthlyAnalytics = analyticsService.generateAnalytics(expensesData, incomeData, 'monthly');
-      setAnalytics(monthlyAnalytics);
+      if (expensesData.length > 0 || incomeData.length > 0) {
+        const monthlyAnalytics = analyticsService.generateAnalytics(
+          expensesData || [], 
+          incomeData || [], 
+          'monthly'
+        );
+        setAnalytics(monthlyAnalytics);
+      } else {
+        setAnalytics(null);
+      }
       
     } catch (error) {
       console.error('Failed to load data:', error);
+      // Set empty arrays on error
+      setExpenses([]);
+      setIncome([]);
+      setReminders([]);
+      setAnalytics(null);
     }
   };
 
@@ -219,18 +195,6 @@ const SmartMoneyScreen: React.FC = () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
-  };
-  
-  // Function to clear all stored demo data
-  const clearStoredDemoData = async () => {
-    try {
-      await AsyncStorage.removeItem('smart_money_expenses');
-      await AsyncStorage.removeItem('smart_money_income');
-      await AsyncStorage.removeItem('smart_money_reminders');
-      console.log('All demo data cleared');
-    } catch (error) {
-      console.error('Failed to clear demo data:', error);
-    }
   };
 
   const connectGmail = async () => {
@@ -274,34 +238,47 @@ const SmartMoneyScreen: React.FC = () => {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
     try {
       const dataService = DataService.getInstance();
       
+      let savedExpense: Expense | null = null;
+      let savedIncome: Income | null = null;
+      let savedReminder: Reminder | null = null;
+
       if (formType === 'expense') {
         const expense: Expense = {
-          id: Date.now().toString(),
+          id: '', // Will be set by service
           title: formData.title,
           amount: parseFloat(formData.amount),
           category: formData.category as ExpenseCategory,
           date: formData.date,
           type: 'expense'
         };
-        const savedExpense = await dataService.saveExpense(expense);
-        setExpenses([savedExpense, ...expenses]);
+        
+        savedExpense = await dataService.saveExpense(expense);
+        setExpenses(prev => [savedExpense!, ...prev]);
+        
       } else if (formType === 'income') {
         const incomeItem: Income = {
-          id: Date.now().toString(),
+          id: '', // Will be set by service
           title: formData.title,
           amount: parseFloat(formData.amount),
           category: formData.category as IncomeCategory,
           date: formData.date,
           type: 'income'
         };
-        const savedIncome = await dataService.saveIncome(incomeItem);
-        setIncome([savedIncome, ...income]);
+        
+        savedIncome = await dataService.saveIncome(incomeItem);
+        setIncome(prev => [savedIncome!, ...prev]);
+        
       } else if (formType === 'reminder') {
         const reminder: Reminder = {
-          id: Date.now().toString(),
+          id: '', // Will be set by service
           title: formData.title,
           amount: parseFloat(formData.amount),
           dueDate: formData.dueDate,
@@ -311,8 +288,9 @@ const SmartMoneyScreen: React.FC = () => {
           autoDetected: false,
           priority: 'medium'
         };
-        const savedReminder = await dataService.saveReminder(reminder);
-        setReminders([savedReminder, ...reminders]);
+        
+        savedReminder = await dataService.saveReminder(reminder);
+        setReminders(prev => [savedReminder!, ...prev]);
       }
 
       // Reset form
@@ -325,21 +303,30 @@ const SmartMoneyScreen: React.FC = () => {
       });
       setShowAddForm(false);
       
-      // Refresh analytics
-      if (analytics) {
-        const analyticsService = AnalyticsService.getInstance();
-        const newAnalytics = analyticsService.generateAnalytics(
-          formType === 'expense' ? [expenses[0], ...expenses] : expenses,
-          formType === 'income' ? [income[0], ...income] : income,
-          'monthly'
-        );
-        setAnalytics(newAnalytics);
-      }
+      // Refresh analytics with the newly saved item
+      const analyticsService = AnalyticsService.getInstance();
+      
+      // Create updated arrays with the new item (since React state updates are async)
+      const updatedExpenses = formType === 'expense' && savedExpense 
+        ? [savedExpense, ...expenses]
+        : expenses;
+        
+      const updatedIncome = formType === 'income' && savedIncome
+        ? [savedIncome, ...income]
+        : income;
+      
+      const newAnalytics = analyticsService.generateAnalytics(
+        updatedExpenses,
+        updatedIncome,
+        'monthly'
+      );
+      setAnalytics(newAnalytics);
 
       Alert.alert('Success', `${formType.charAt(0).toUpperCase() + formType.slice(1)} added successfully!`);
+      
     } catch (error) {
       console.error('Failed to add item:', error);
-      Alert.alert('Error', 'Failed to add item');
+      Alert.alert('Error', 'Failed to add item. Please try again.');
     }
   };
 
@@ -358,16 +345,22 @@ const SmartMoneyScreen: React.FC = () => {
               
               if (type === 'expense') {
                 await dataService.deleteExpense(id);
-                setExpenses(expenses.filter(e => e.id !== id));
+                setExpenses(prev => prev.filter(e => e.id !== id));
               } else if (type === 'income') {
                 await dataService.deleteIncome(id);
-                setIncome(income.filter(i => i.id !== id));
+                setIncome(prev => prev.filter(i => i.id !== id));
               } else if (type === 'reminder') {
                 await dataService.deleteReminder(id);
-                setReminders(reminders.filter(r => r.id !== id));
+                setReminders(prev => prev.filter(r => r.id !== id));
               }
               
+              // Refresh analytics
+              const analyticsService = AnalyticsService.getInstance();
+              const newAnalytics = analyticsService.generateAnalytics(expenses, income, 'monthly');
+              setAnalytics(newAnalytics);
+              
               Alert.alert('Success', `${type.charAt(0).toUpperCase() + type.slice(1)} deleted successfully!`);
+              
             } catch (error) {
               console.error('Failed to delete item:', error);
               Alert.alert('Error', 'Failed to delete item');
@@ -382,10 +375,11 @@ const SmartMoneyScreen: React.FC = () => {
     try {
       const dataService = DataService.getInstance();
       const reminder = reminders.find(r => r.id === id);
+      
       if (reminder) {
         const updatedReminder = { ...reminder, status: 'paid' as const };
         await dataService.updateReminder(updatedReminder);
-        setReminders(reminders.map(r => r.id === id ? updatedReminder : r));
+        setReminders(prev => prev.map(r => r.id === id ? updatedReminder : r));
         Alert.alert('Success', 'Reminder marked as paid!');
       }
     } catch (error) {
@@ -394,65 +388,79 @@ const SmartMoneyScreen: React.FC = () => {
     }
   };
 
-  const renderHeader = () => (
-    <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
-      <SafeAreaView>
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Smart Money</Text>
-            <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-              Manage your finances with AI
+  const renderAnalyticsSection = () => {
+    if (!analytics || (expenses.length === 0 && income.length === 0)) {
+      return (
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Analytics</Text>
+          <View style={styles.emptyAnalytics}>
+            <Ionicons name="analytics-outline" size={48} color={theme.colors.textSecondary} />
+            <Text style={[styles.emptyAnalyticsText, { color: theme.colors.text }]}>
+              No data for analytics
+            </Text>
+            <Text style={[styles.emptyAnalyticsSubtext, { color: theme.colors.textSecondary }]}>
+              Add some expenses and income to see insights
             </Text>
           </View>
-          
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerAction}>
-              <Ionicons name="pie-chart" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerAction}>
-              <Ionicons name="cloud-download-outline" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerAction}>
-              <Ionicons name="notifications" size={24} color={theme.colors.text} />
-              {reminders.filter(r => r.status === 'pending').length > 0 && (
-                <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
-                  <Text style={styles.notificationBadgeText}>
-                    {reminders.filter(r => r.status === 'pending').length}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+        </View>
+      );
+    }
+
+    const chartData = {
+      datasets: [{
+        data: analytics.categoryBreakdown.slice(0, 5).map(cat => cat.amount)
+      }],
+      labels: analytics.categoryBreakdown.slice(0, 5).map(cat => cat.category)
+    };
+
+    return (
+      <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Analytics</Text>
+        
+        {/* Top Categories */}
+        <View style={styles.analyticsContainer}>
+          <Text style={[styles.analyticsSubtitle, { color: theme.colors.text }]}>Top Spending Categories</Text>
+          {analytics.categoryBreakdown.slice(0, 3).map((category, index) => (
+            <View key={index} style={styles.categoryItem}>
+              <View style={styles.categoryInfo}>
+                <View style={[styles.categoryDot, { backgroundColor: category.color }]} />
+                <Text style={[styles.categoryName, { color: theme.colors.text }]}>
+                  {category.category}
+                </Text>
+              </View>
+              <View style={styles.categoryAmounts}>
+                <Text style={[styles.categoryAmount, { color: theme.colors.text }]}>
+                  ${category.amount.toFixed(2)}
+                </Text>
+                <Text style={[styles.categoryPercentage, { color: theme.colors.textSecondary }]}>
+                  {category.percentage.toFixed(1)}%
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Savings Rate */}
+        <View style={styles.savingsContainer}>
+          <Text style={[styles.analyticsSubtitle, { color: theme.colors.text }]}>Savings Rate</Text>
+          <View style={styles.savingsDisplay}>
+            <Text style={[styles.savingsPercentage, { 
+              color: analytics.netFlow >= 0 ? theme.colors.success : theme.colors.error 
+            }]}>
+              {((analytics.netFlow / (analytics.totalIncome || 1)) * 100).toFixed(1)}%
+            </Text>
+            <Text style={[styles.savingsLabel, { color: theme.colors.textSecondary }]}>
+              of income saved
+            </Text>
           </View>
         </View>
-      </SafeAreaView>
-    </View>
-  );
-
-  const renderTabs = () => (
-    <View style={[styles.tabNavigation, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.segmentedControl, { backgroundColor: theme.colors.surface }]}>
-        {tabs.map((tab, index) => (
-          <TabButton
-            key={tab.id}
-            title={tab.title}
-            icon={tab.icon}
-            isActive={activeTab === tab.id}
-            onPress={() => setActiveTab(tab.id)}
-            isFirst={index === 0}
-            isLast={index === tabs.length - 1}
-          />
-        ))}
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderOverview = () => {
-    // Ensure we're working with arrays even if undefined
-    const safeIncome = Array.isArray(income) ? income : [];
-    const safeExpenses = Array.isArray(expenses) ? expenses : [];
-    
-    const totalIncome = safeIncome.reduce((sum, item) => sum + item.amount, 0);
-    const totalExpenses = safeExpenses.reduce((sum, item) => sum + item.amount, 0);
+    const totalIncome = income.reduce((sum, item) => sum + item.amount, 0);
+    const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
     const netFlow = totalIncome - totalExpenses;
     
     return (
@@ -460,7 +468,7 @@ const SmartMoneyScreen: React.FC = () => {
         contentContainerStyle={styles.tabContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Financial Summary Card - Styled like BalanceCard from Splitting */}
+        {/* Financial Summary Card */}
         <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
           <View style={styles.balanceHeader}>
             <Text style={styles.balanceTitle}>Your Balance</Text>
@@ -504,15 +512,10 @@ const SmartMoneyScreen: React.FC = () => {
           <Text style={styles.balanceSubtext}>Your balance summary</Text>
         </View>
 
-        {/* Quick Actions - Card-based layout matching Splitting */}
+        {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={{
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            marginHorizontal: -4,
-           }}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Actions</Text>
+          <View style={styles.quickActionsGrid}>
             <TouchableOpacity
               style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
               onPress={() => {
@@ -571,18 +574,19 @@ const SmartMoneyScreen: React.FC = () => {
           </View>
         </View>
 
-
+        {/* Analytics Section */}
+        {renderAnalyticsSection()}
 
         {/* Upcoming Reminders */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Upcoming This Week</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Upcoming This Week</Text>
             <TouchableOpacity style={styles.sectionLink} onPress={() => setActiveTab('reminders')}>
               <Text style={{ color: theme.colors.primary }}>View All</Text>
             </TouchableOpacity>
           </View>
           
-          {Array.isArray(reminders) && reminders.filter(reminder => {
+          {reminders.filter(reminder => {
             const dueDate = new Date(reminder.dueDate);
             const nextWeek = new Date();
             nextWeek.setDate(nextWeek.getDate() + 7);
@@ -669,7 +673,7 @@ const SmartMoneyScreen: React.FC = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Ionicons name="trending-down" color="#EF4444" size={24} />
-          <Text style={styles.sectionTitle}>Expenses</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Expenses</Text>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: '#EF4444' }]}
             onPress={() => {
@@ -681,18 +685,20 @@ const SmartMoneyScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         
-        {!Array.isArray(expenses) || expenses.length === 0 ? (
+        {expenses.length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <Ionicons name="trending-down" color="#D1D5DB" size={40} />
-            <Text style={styles.emptyStateText}>No expenses yet</Text>
-            <Text style={styles.emptyStateSubtext}>Track your spending by adding expenses</Text>
+            <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No expenses yet</Text>
+            <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+              Track your spending by adding expenses
+            </Text>
           </View>
         ) : (
           expenses.slice(0, 5).map(expense => (
-            <View key={expense.id} style={styles.transactionCard}>
+            <View key={expense.id} style={[styles.transactionCard, { backgroundColor: theme.colors.surface }]}>
               <View style={styles.transactionContent}>
-                <Text style={styles.transactionTitle}>{expense.title}</Text>
-                <Text style={styles.transactionCategory}>
+                <Text style={[styles.transactionTitle, { color: theme.colors.text }]}>{expense.title}</Text>
+                <Text style={[styles.transactionCategory, { color: theme.colors.textSecondary }]}>
                   {expense.category} • {new Date(expense.date).toLocaleDateString()}
                 </Text>
               </View>
@@ -716,7 +722,7 @@ const SmartMoneyScreen: React.FC = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Ionicons name="trending-up" color="#10B981" size={24} />
-          <Text style={styles.sectionTitle}>Income</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Income</Text>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: '#10B981' }]}
             onPress={() => {
@@ -728,18 +734,20 @@ const SmartMoneyScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         
-        {!Array.isArray(income) || income.length === 0 ? (
+        {income.length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <Ionicons name="trending-up" color="#D1D5DB" size={40} />
-            <Text style={styles.emptyStateText}>No income yet</Text>
-            <Text style={styles.emptyStateSubtext}>Add income sources to track your earnings</Text>
+            <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No income yet</Text>
+            <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+              Add income sources to track your earnings
+            </Text>
           </View>
         ) : (
           income.slice(0, 5).map(incomeItem => (
-            <View key={incomeItem.id} style={styles.transactionCard}>
+            <View key={incomeItem.id} style={[styles.transactionCard, { backgroundColor: theme.colors.surface }]}>
               <View style={styles.transactionContent}>
-                <Text style={styles.transactionTitle}>{incomeItem.title}</Text>
-                <Text style={styles.transactionCategory}>
+                <Text style={[styles.transactionTitle, { color: theme.colors.text }]}>{incomeItem.title}</Text>
+                <Text style={[styles.transactionCategory, { color: theme.colors.textSecondary }]}>
                   {incomeItem.category} • {new Date(incomeItem.date).toLocaleDateString()}
                 </Text>
               </View>
@@ -789,7 +797,7 @@ const SmartMoneyScreen: React.FC = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Ionicons name="notifications" color="#3B82F6" size={24} />
-          <Text style={styles.sectionTitle}>Payment Reminders</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Payment Reminders</Text>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: '#3B82F6' }]}
             onPress={() => {
@@ -801,11 +809,13 @@ const SmartMoneyScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         
-        {!Array.isArray(reminders) || reminders.length === 0 ? (
+        {reminders.length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <Ionicons name="notifications" color="#D1D5DB" size={40} />
-            <Text style={styles.emptyStateText}>No payment reminders</Text>
-            <Text style={styles.emptyStateSubtext}>Stay on top of your bills by adding reminders</Text>
+            <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No payment reminders</Text>
+            <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+              Stay on top of your bills by adding reminders
+            </Text>
           </View>
         ) : (
           reminders.slice(0, 10).map(reminder => (
@@ -813,6 +823,7 @@ const SmartMoneyScreen: React.FC = () => {
               key={reminder.id}
               style={[
                 styles.reminderCard,
+                { backgroundColor: theme.colors.surface },
                 reminder.status === 'paid' && styles.paidReminderCard,
                 new Date(reminder.dueDate) < new Date() && reminder.status === 'pending' && styles.overdueReminderCard
               ]}
@@ -865,8 +876,6 @@ const SmartMoneyScreen: React.FC = () => {
     </ScrollView>
   );
 
-
-
   const renderAddForm = () => (
     <Modal visible={showAddForm} animationType="slide" transparent>
       <KeyboardAvoidingView
@@ -875,9 +884,9 @@ const SmartMoneyScreen: React.FC = () => {
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                   Add {formType.charAt(0).toUpperCase() + formType.slice(1)}
                 </Text>
                 <TouchableOpacity
@@ -894,34 +903,41 @@ const SmartMoneyScreen: React.FC = () => {
                     setShowAddForm(false);
                   }}
                 >
-                  <Ionicons name="close" color="#6B7280" size={24} />
+                  <Ionicons name="close" color={theme.colors.textSecondary} size={24} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.formContainer} keyboardShouldPersistTaps="handled">
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Title *</Text>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Title *</Text>
                   <TextInput
-                    style={styles.textInput}
+                    style={[styles.textInput, { 
+                      backgroundColor: theme.colors.background,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text
+                    }]}
                     value={formData.title}
                     onChangeText={(text) => setFormData({ ...formData, title: text })}
                     placeholder="Enter title"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={theme.colors.textSecondary}
                     autoCapitalize="sentences"
                     returnKeyType="next"
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Amount *</Text>
-                  <View style={styles.amountInputContainer}>
-                    <Text style={styles.currencySymbol}>$</Text>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount *</Text>
+                  <View style={[styles.amountInputContainer, { 
+                    backgroundColor: theme.colors.background,
+                    borderColor: theme.colors.border
+                  }]}>
+                    <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>$</Text>
                     <TextInput
-                      style={styles.amountInput}
+                      style={[styles.amountInput, { color: theme.colors.text }]}
                       value={formData.amount}
                       onChangeText={(text) => setFormData({ ...formData, amount: text.replace(/[^0-9.]/g, '') })}
                       placeholder="0.00"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={theme.colors.textSecondary}
                       keyboardType="decimal-pad"
                       returnKeyType="next"
                     />
@@ -929,21 +945,26 @@ const SmartMoneyScreen: React.FC = () => {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Category *</Text>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Category *</Text>
                   <View style={styles.categoryGrid}>
                     {categories[formType].map((category) => (
                       <TouchableOpacity
                         key={category}
                         style={[
                           styles.categoryOption,
-                          formData.category === category && styles.selectedCategory
+                          { 
+                            backgroundColor: formData.category === category ? theme.colors.primary : theme.colors.background,
+                            borderColor: formData.category === category ? theme.colors.primary : theme.colors.border
+                          }
                         ]}
                         onPress={() => setFormData({ ...formData, category })}
                       >
                         <Text
                           style={[
                             styles.categoryOptionText,
-                            formData.category === category && styles.selectedCategoryText
+                            { 
+                              color: formData.category === category ? 'white' : theme.colors.text
+                            }
                           ]}
                         >
                           {category}
@@ -955,28 +976,34 @@ const SmartMoneyScreen: React.FC = () => {
 
                 {formType === 'reminder' ? (
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Due Date *</Text>
+                    <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Due Date *</Text>
                     <TouchableOpacity 
-                      style={styles.datePickerButton}
+                      style={[styles.datePickerButton, { 
+                        backgroundColor: theme.colors.background,
+                        borderColor: theme.colors.border
+                      }]}
                       onPress={() => openDatePicker('dueDate')}
                     >
-                      <Text style={styles.dateText}>
+                      <Text style={[styles.dateText, { color: theme.colors.text }]}>
                         {new Date(formData.dueDate).toLocaleDateString()}
                       </Text>
-                      <Ionicons name="calendar-outline" color="#6B7280" size={20} />
+                      <Ionicons name="calendar-outline" color={theme.colors.textSecondary} size={20} />
                     </TouchableOpacity>
                   </View>
                 ) : (
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Date *</Text>
+                    <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Date *</Text>
                     <TouchableOpacity 
-                      style={styles.datePickerButton}
+                      style={[styles.datePickerButton, { 
+                        backgroundColor: theme.colors.background,
+                        borderColor: theme.colors.border
+                      }]}
                       onPress={() => openDatePicker('date')}
                     >
-                      <Text style={styles.dateText}>
+                      <Text style={[styles.dateText, { color: theme.colors.text }]}>
                         {new Date(formData.date).toLocaleDateString()}
                       </Text>
-                      <Ionicons name="calendar-outline" color="#6B7280" size={20} />
+                      <Ionicons name="calendar-outline" color={theme.colors.textSecondary} size={20} />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -996,13 +1023,17 @@ const SmartMoneyScreen: React.FC = () => {
 
               <View style={styles.modalActions}>
                 <TouchableOpacity
-                  style={styles.cancelButton}
+                  style={[styles.cancelButton, { backgroundColor: theme.colors.background }]}
                   onPress={() => setShowAddForm(false)}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.saveButton, (!formData.title || !formData.amount || !formData.category) && styles.disabledButton]}
+                  style={[
+                    styles.saveButton, 
+                    { backgroundColor: theme.colors.primary },
+                    (!formData.title || !formData.amount || !formData.category) && styles.disabledButton
+                  ]}
                   onPress={handleAddItem}
                   disabled={!formData.title || !formData.amount || !formData.category}
                 >
@@ -1029,41 +1060,35 @@ const SmartMoneyScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Smart Money</Text>
-          <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-            Track your finances
-          </Text>
-        </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerAction}
-            onPress={() => {
-              // No insights tab anymore
-            }}
-          >
-            <Ionicons name="analytics" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerAction}
-            onPress={connectGmail}
-          >
-            <Ionicons name="cloud-download" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.headerAction}
-          >
-            <Ionicons name="notifications" size={24} color={theme.colors.text} />
-            {reminders.filter(r => r.status === 'pending').length > 0 && (
-              <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
-                <Text style={styles.notificationBadgeText}>
-                  {reminders.filter(r => r.status === 'pending').length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+      {/* Fixed Header */}
+      <View style={[styles.header, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.border }]}>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Smart Money</Text>
+            <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
+              Track your finances
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerAction}
+              onPress={connectGmail}
+            >
+              <Ionicons name="cloud-download" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.headerAction}
+            >
+              <Ionicons name="notifications" size={24} color={theme.colors.text} />
+              {reminders.filter(r => r.status === 'pending').length > 0 && (
+                <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
+                  <Text style={styles.notificationBadgeText}>
+                    {reminders.filter(r => r.status === 'pending').length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -1120,12 +1145,11 @@ const SmartMoneyScreen: React.FC = () => {
   );
 };
 
-// Define the new styles for SmartMoneyApp to match RealSplittingScreen's modern design
+// Updated styles with improvements
 const styles = StyleSheet.create({
   // Main Container Styles
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   loadingContainer: {
     flex: 1,
@@ -1137,47 +1161,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   
-  // Card Base Style
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  
-  // Section Styles
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  sectionLink: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
+  // Header Styles - Fixed alignment
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 24,
@@ -1190,17 +1183,10 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
   headerAction: {
     position: 'relative',
-    marginLeft: 16,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
   },
   notificationBadge: {
     position: 'absolute',
@@ -1217,15 +1203,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  tabContainer: {
-    flex: 1,
-  },
-  tabContent: {
-    flexGrow: 1,
-    padding: 20,
-  },
+
+  // Tab Navigation
   tabNavigation: {
-    borderBottomWidth: 0,
     paddingVertical: 8,
   },
   segmentedControl: {
@@ -1263,8 +1243,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  
-  // Balance Card Styles
+
+  // Content
+  tabContainer: {
+    flex: 1,
+  },
+  tabContent: {
+    flexGrow: 1,
+    padding: 20,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+
+  // Balance Card
   balanceCard: {
     borderRadius: 16,
     padding: 20,
@@ -1276,29 +1269,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   balanceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
   },
   balanceTitle: {
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
-  },
-  importButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  importButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4,
   },
   balanceGrid: {
     flexDirection: 'row',
@@ -1311,7 +1287,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     paddingHorizontal: 4,
-    maxWidth: '33.33%',
   },
   balanceAmount: {
     color: 'white',
@@ -1327,295 +1302,17 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   balanceSubtext: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  
-  // Badge Styles
-  badge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  
-  // Insights Card Styles
-  insightCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  insightHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  insightCategory: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  insightPercentage: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  insightAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  categoryIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  insightCategoryContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  actionCard: {
-    width: '48%',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  actionSubtitle: {
+    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
-    marginTop: 4,
     textAlign: 'center',
+    marginTop: 12,
   },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  horizontalScroll: {
-    marginTop: 8,
-  },
-  horizontalScrollContent: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  // Legacy styles that might still be needed
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-  },
-  notificationIconContainer: {
-    position: 'relative',
-  },
-  notificationButton: {
-    padding: 8,
-  },
-  summaryContainer: {
-    marginBottom: 16,
-    flexDirection: 'row',
-  },
-  summaryCard: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 15,
-    marginHorizontal: 4,
-  },
-  summaryCardContent: {
-    flex: 1,
-  },
-  summaryLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginBottom: 4,
-    opacity: 0.8,
-  },
-  summaryAmount: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeTabButton: {
-    borderBottomWidth: 3,
-    borderBottomColor: '#4F46E5',
-  },
-  tabGradient: {
-    width: '100%',
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  activeTabText: {
-    color: '#4F46E5',
-    fontWeight: '700',
-  },
-  // Header Styles
-  header: {
-    paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1F2937',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerAction: {
-    position: 'relative',
-  },
-  
-  // Tab Navigation Styles
-  tabNavigation: {
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  segmentedControl: {
-    flexDirection: 'row',
-    margin: 16,
-    borderRadius: 12,
-    padding: 4,
-  },
-  segment: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  activeSegment: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  firstSegment: {
-    borderTopLeftRadius: 8,
-    borderBottomLeftRadius: 8,
-  },
-  lastSegment: {
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
-  },
-  segmentText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  summaryContainer: {
-    marginBottom: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  summaryCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-    width: '31%',
-  },
-  summaryCardContent: {
-    flex: 1,
-  },
-  summaryLabel: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    opacity: 0.9,
-    marginBottom: 2,
-  },
-  summaryAmount: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
+
+  // Sections
   section: {
     marginBottom: 24,
+    borderRadius: 12,
+    padding: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1624,103 +1321,163 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F2937',
+    fontWeight: '600',
     marginLeft: 8,
     flex: 1,
   },
-  addButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+  sectionLink: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
+
+  // Quick Actions
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 12,
   },
-  quickActionButton: {
-    flex: 1,
-    minWidth: '45%',
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  quickActionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  insightsContainer: {
-    gap: 12,
-  },
-  insightCard: {
-    backgroundColor: '#FFFFFF',
+  actionCard: {
+    width: '48%',
     padding: 16,
     borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 2,
   },
-  insightHeader: {
+  actionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  actionSubtitle: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  // Analytics Styles
+  analyticsContainer: {
+    marginBottom: 16,
+  },
+  analyticsSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  categoryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingVertical: 8,
   },
-  insightCategory: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+  categoryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
-  insightPercentage: {
+  categoryDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  categoryName: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  categoryAmounts: {
+    alignItems: 'flex-end',
+  },
+  categoryAmount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
   },
-  insightAmount: {
-    fontSize: 20,
+  categoryPercentage: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  savingsContainer: {
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  savingsDisplay: {
+    alignItems: 'center',
+  },
+  savingsPercentage: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 12,
   },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 3,
-    overflow: 'hidden',
+  savingsLabel: {
+    fontSize: 12,
+    marginTop: 4,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
+  emptyAnalytics: {
+    alignItems: 'center',
+    paddingVertical: 32,
   },
-  reminderCard: {
-    backgroundColor: '#FFFFFF',
+  emptyAnalyticsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  emptyAnalyticsSubtext: {
+    fontSize: 14,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  // Transaction Cards
+  transactionCard: {
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  transactionContent: {
+    flex: 1,
+  },
+  transactionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  transactionCategory: {
+    fontSize: 14,
+  },
+  transactionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
+  // Reminder Cards
+  reminderCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -1746,13 +1503,71 @@ const styles = StyleSheet.create({
   reminderTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
     flex: 1,
   },
   reminderBadges: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  reminderAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  reminderDate: {
+    fontSize: 14,
+  },
+  reminderDetails: {
+    fontSize: 14,
+  },
+  reminderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  // Buttons
+  addButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  markPaidButton: {
+    padding: 8,
+  },
+  deleteButton: {
+    padding: 8,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+
+  // Badges
+  badge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
   },
   aiBadge: {
     backgroundColor: '#8B5CF6',
@@ -1765,70 +1580,25 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
-  reminderAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  reminderDate: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  reminderDetails: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  reminderActions: {
-    flexDirection: 'row',
+
+  // Empty States
+  emptyStateContainer: {
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    paddingVertical: 32,
   },
-  
-  // Button Styles
-  markPaidButton: {
-    padding: 8,
-  },
-  deleteButton: {
-    padding: 8,
-  },
-  
-  // Transaction Card Styles
-  transactionCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  transactionContent: {
-    flex: 1,
-  },
-  transactionTitle: {
+  emptyStateText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
+    marginTop: 12,
   },
-  transactionCategory: {
+  emptyStateSubtext: {
     fontSize: 14,
-    color: '#6B7280',
+    marginTop: 4,
+    textAlign: 'center',
   },
-  transactionActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+
+  // Gmail Card
   gmailCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1866,98 +1636,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  emptyText: {
-    textAlign: 'center',
-    color: '#6B7280',
-    fontSize: 16,
-    marginVertical: 20,
-  },
-  emptyAnalytics: {
+
+  // Modal Styles
+  keyboardAvoidingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyAnalyticsText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  emptyAnalyticsSubtext: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  chartContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    alignItems: 'center',
-  },
-  chart: {
-    borderRadius: 16,
-  },
-  categoryCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  categoryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  categoryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  categoryColorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  categoryName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  categoryPercentage: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyAnalyticsText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 16,
-    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
-    alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 20,
     width: screenWidth - 40,
@@ -1977,7 +1669,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1F2937',
   },
   closeButton: {
     padding: 4,
@@ -1991,17 +1682,31 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
     marginBottom: 8,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#1F2937',
-    backgroundColor: '#FFFFFF',
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+  },
+  currencySymbol: {
+    fontSize: 16,
+    marginRight: 8,
+    fontWeight: '600',
+  },
+  amountInput: {
+    flex: 1,
+    padding: 16,
+    fontSize: 16,
+    paddingLeft: 0,
   },
   categoryGrid: {
     flexDirection: 'row',
@@ -2013,20 +1718,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
-  },
-  selectedCategory: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
   },
   categoryOptionText: {
     fontSize: 14,
-    color: '#6B7280',
     fontWeight: '500',
   },
-  selectedCategoryText: {
-    color: '#FFFFFF',
+  datePickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+  },
+  dateText: {
+    fontSize: 16,
   },
   modalActions: {
     flexDirection: 'row',
@@ -2037,19 +1743,16 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#F3F4F6',
     alignItems: 'center',
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6B7280',
   },
   saveButton: {
     flex: 1,
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#8B5CF6',
     alignItems: 'center',
   },
   saveButtonText: {
@@ -2057,67 +1760,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  emptyStateContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 30,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 12,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
-  // Modal form styles
-  keyboardAvoidingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  amountInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-  },
-  currencySymbol: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginRight: 8,
-    fontWeight: '600',
-  },
-  amountInput: {
-    flex: 1,
-    padding: 16,
-    fontSize: 16,
-    color: '#1F2937',
-    paddingLeft: 0,
-  },
-  datePickerButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-  },
-  dateText: {
-    fontSize: 16,
-    color: '#1F2937',
-  },
   disabledButton: {
     backgroundColor: '#D1D5DB',
     opacity: 0.7,
+  },
+
+  // Card base style
+  card: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
 });
 
