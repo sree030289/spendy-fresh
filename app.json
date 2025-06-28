@@ -52,17 +52,18 @@
         }
       ],
       "permissions": [
-        "android.permission.VIBRATE",
-        "android.permission.WAKE_LOCK",
-        "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.SCHEDULE_EXACT_ALARM"
-      ]
+              "android.permission.VIBRATE",
+              "android.permission.WAKE_LOCK",
+              "android.permission.RECEIVE_BOOT_COMPLETED",
+              "android.permission.SCHEDULE_EXACT_ALARM",
+              "android.permission.CAMERA"
+            ]
     },
     "notification": {
-      "icon": "./assets/notification-icon.png",
+      "icon": "./assets/notification-icon.png", 
       "color": "#10B981",
       "androidMode": "default",
-      "androidCollapsedTitle": "#{unread_notifications} new reminder(s)"
+      "androidCollapsedTitle": "#{unread_notifications} new Smart Money notification(s)"
     },
     "plugins": [
       [

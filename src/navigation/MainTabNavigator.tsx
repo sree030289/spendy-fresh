@@ -7,14 +7,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 
 // Import screens
-import SplittingScreen from '@/screens/main/SplittingScreen';
-import SmartMoneyScreen from '@/screens/main/SmartMoneyScreen';
+import SmartMoneyScreen from '@/screens/main/SmartMoneyApp';
 import DealsHubScreen from '@/screens/main/DealsHubScreen';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 
 // Import the new action modal
 import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
+// Removed Sparkles import that was causing errors
 
 const Tab = createBottomTabNavigator();
 
@@ -104,11 +104,14 @@ export default function MainTabNavigator() {
           }}
         />
         
-        <Tab.Screen 
-          name="SmartMoney" 
+        <Tab.Screen
+          name="SmartMoney"
           component={SmartMoneyScreen}
           options={{
             tabBarLabel: 'Smart Money',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="sparkles-outline" color={color} size={size} />
+            ),
           }}
         />
         

@@ -1,9 +1,10 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getMessaging } from 'firebase/messaging';
 import { getStorage } from 'firebase/storage';
-import { Platform } from 'react-native/Libraries/Utilities/Platform';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA3PwHVfgqpxizujlimha-xTjsh_-5Tsc0",
@@ -17,16 +18,29 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Auth
-export const auth = getAuth(app);
+// Initialize Firebase Auth with proper React Native persistence
+let auth;
+if (Platform.OS === 'web') {
+  auth = getAuth(app);
+} else {
+  try {
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
+  } catch (error) {
+    // If already initialized, use getAuth
+    auth = getAuth(app);
+  }
+}
 
+export { auth };
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// Optional: Reduce Firestore connection warnings in development
-if (__DEV__) {
-  // Configure Firestore settings to reduce connection warnings
-  console.log('🔧 Firebase initialized in development mode');
-}
 // Initialize messaging for web only
 export const messaging = Platform.OS === 'web' ? getMessaging(app) : null;
+
+// Optional: Reduce Firestore connection warnings in development
+if (__DEV__) {
+  console.log('🔧 Firebase initialized in development mode');
+}

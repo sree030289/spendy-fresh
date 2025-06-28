@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FirebaseNotificationService } from './src/services/smartMoney/firebaseNotificationService';
 
 // Import providers
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
@@ -25,6 +26,7 @@ import { QRCodeService } from '@/services/qr/QRCodeService';
 import { RealNotificationService } from './src/services/notifications/RealNotificationService';
 import { SplittingService } from '@/services/firebase/splitting';
 import { notificationManager } from '@/services/NotificationManager';
+import SmartMoneyScreen from '@/screens/main/SmartMoneyScreen';
 
 const Stack = createStackNavigator();
 
@@ -54,6 +56,31 @@ const AppNavigator = () => {
 
     checkTourStatus();
   }, []);
+
+  useEffect(() => {
+  // Initialize Smart Money notifications
+  const initializeSmartMoney = async () => {
+    if (user?.id) {
+      const notificationService = FirebaseNotificationService.getInstance();
+      const initialized = await notificationService.initialize();
+      
+      if (initialized) {
+        console.log('✅ Smart Money notifications initialized');
+        
+        // Schedule all Smart Money notifications
+        await notificationService.scheduleDailyExpenseReminder();
+        await notificationService.scheduleWeeklyAnalytics();
+        
+        // Save token for user
+        await notificationService.saveTokenToServer(user.id);
+      } else {
+        console.log('❌ Failed to initialize Smart Money notifications');
+      }
+    }
+  };
+
+  initializeSmartMoney();
+}, [user?.id]);
 
   useEffect(() => {
     // Add a small delay to ensure auth state is properly checked
