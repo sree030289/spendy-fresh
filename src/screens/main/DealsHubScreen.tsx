@@ -13,109 +13,24 @@ import {
   ActivityIndicator,
   FlatList,
   Dimensions,
-  KeyboardAvoidingView,
-  Platform,
   Share,
   Linking,
-  Image,
+  Platform,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
+import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { DealsAPI, useDeals, Deal } from '@/services/DealsAPI';
-
-interface ChatMessage {
-  id: string;
-  dealId: string;
-  userId: string;
-  userName: string;
-  message: string;
-  timestamp: Date;
-}
-
-// Deal Sources Configuration
-const DEAL_SOURCES = [
-  {
-    id: 'all',
-    name: 'All',
-    logo: null,
-    color: '#6C7B7F',
-    apiEndpoint: null,
-  },
-  {
-    id: 'ozbargain',
-    name: 'OzBargain',
-    logo: 'https://files.ozbargain.com.au/n/71/538271.png',
-    color: '#FF6B35',
-    apiEndpoint: '/api/ozbargain',
-  },
-  {
-    id: 'coles',
-    name: 'Coles',
-    logo: 'https://logoeps.com/wp-content/uploads/2014/05/coles-vector-logo.png',
-    color: '#E31E24',
-    apiEndpoint: '/api/coles',
-  },
-  {
-    id: 'woolworths',
-    name: 'Woolworths',
-    logo: 'https://logos-world.net/wp-content/uploads/2021/02/Woolworths-Logo.png',
-    color: '#1BAA2F',
-    apiEndpoint: '/api/woolworths',
-  },
-  {
-    id: 'costco',
-    name: 'Costco',
-    logo: 'https://logos-world.net/wp-content/uploads/2020/09/Costco-Logo.png',
-    color: '#E31837',
-    apiEndpoint: '/api/costco',
-  },
-  {
-    id: 'bunnings',
-    name: 'Bunnings',
-    logo: 'https://logos-world.net/wp-content/uploads/2021/02/Bunnings-Logo.png',
-    color: '#007A33',
-    apiEndpoint: '/api/bunnings',
-  },
-  {
-    id: 'jbhifi',
-    name: 'JB Hi-Fi',
-    logo: 'https://logos-world.net/wp-content/uploads/2021/02/JB-Hi-Fi-Logo.png',
-    color: '#000000',
-    apiEndpoint: '/api/jbhifi',
-  },
-  {
-    id: 'goodguys',
-    name: 'Good Guys',
-    logo: 'https://logos-world.net/wp-content/uploads/2021/02/Good-Guys-Logo.png',
-    color: '#D4282D',
-    apiEndpoint: '/api/goodguys',
-  },
-  {
-    id: 'harveynorman',
-    name: 'Harvey Norman',
-    logo: 'https://logos-world.net/wp-content/uploads/2021/02/Harvey-Norman-Logo.png',
-    color: '#E4002B',
-    apiEndpoint: '/api/harveynorman',
-  },
-];
-
-const DEAL_CATEGORIES = ['All', 'Electronics', 'Groceries', 'Home & Garden', 'Fashion', 'Entertainment', 'Sports'];
+import { DealsAPI, useDeals, Deal, OZBARGAIN_CATEGORIES } from '@/services/DealsAPI';
 
 const DealsHubScreen: React.FC = () => {
   const { theme, colors } = useTheme();
-  const [selectedSource, setSelectedSource] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [showPostModal, setShowPostModal] = useState(false);
-  const [showChatModal, setShowChatModal] = useState(false);
-  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All Deals');
   const [searchQuery, setSearchQuery] = useState('');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
   const [isManualRefresh, setIsManualRefresh] = useState(false);
-  const [filtersVisible, setFiltersVisible] = useState(true);
+  const [showWebView, setShowWebView] = useState(false);
+  const [currentDealUrl, setCurrentDealUrl] = useState('');
+  const [currentDealTitle, setCurrentDealTitle] = useState('');
 
   // Use the custom hook for deals management
   const {
@@ -127,23 +42,8 @@ const DealsHubScreen: React.FC = () => {
     refreshDeals,
     loadMore,
     canLoadMore,
-  } = useDeals(selectedCategory, selectedSource);
-
-  // Post Deal Form State
-  const [postForm, setPostForm] = useState({
-    title: '',
-    description: '',
-    category: 'Electronics' as Deal['category'],
-    originalPrice: '',
-    discountedPrice: '',
-    businessName: '',
-    location: '',
-    isGroupDeal: false,
-    maxParticipants: '',
-    expiresAt: new Date(),
-    dealUrl: '',
-    source: selectedSource,
-  });
+    availableCategories,
+  } = useDeals(selectedCategory);
 
   // Filter deals based on search query
   useEffect(() => {
@@ -159,22 +59,13 @@ const DealsHubScreen: React.FC = () => {
     }
   }, [deals, searchQuery]);
 
-  // Auto-hide filters during loading to save space
-  useEffect(() => {
-    if (loading && deals.length === 0) {
-      setFiltersVisible(false);
-    } else {
-      setFiltersVisible(true);
-    }
-  }, [loading, deals.length]);
-
   const handleManualRefresh = useCallback(async () => {
     setIsManualRefresh(true);
     try {
       await refreshDeals();
       Alert.alert(
         'Deals Updated! 🎉',
-        `Found ${pagination?.totalDeals || 0} deals from ${DEAL_SOURCES.find(s => s.id === selectedSource)?.name || 'All Sources'}`,
+        `Found ${pagination?.totalDeals || 0} deals in ${selectedCategory}`,
         [{ text: 'Great!', style: 'default' }]
       );
     } catch (error) {
@@ -182,123 +73,26 @@ const DealsHubScreen: React.FC = () => {
     } finally {
       setIsManualRefresh(false);
     }
-  }, [refreshDeals, pagination?.totalDeals, selectedSource]);
+  }, [refreshDeals, pagination?.totalDeals, selectedCategory]);
 
-  const handlePostDeal = async () => {
-    if (!postForm.title || !postForm.description || !postForm.originalPrice) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
-
-    try {
-      // Here you would integrate with your backend to post user-generated deals
-      const newDeal = {
-        ...postForm,
-        id: Date.now().toString(),
-        originalPrice: parseFloat(postForm.originalPrice),
-        discountedPrice: parseFloat(postForm.discountedPrice),
-        discount: Math.round(((parseFloat(postForm.originalPrice) - parseFloat(postForm.discountedPrice)) / parseFloat(postForm.originalPrice)) * 100),
-        postedBy: 'You',
-        likes: 0,
-        dislikes: 0,
-        isGroupDeal: postForm.isGroupDeal,
-        chatEnabled: true,
-        isPartnership: false,
-        source: 'user',
-      };
-
-      Alert.alert('Deal Posted!', 'Your deal has been submitted and will be reviewed shortly.');
-      setShowPostModal(false);
-      resetPostForm();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to post deal. Please try again.');
-    }
-  };
-
-  const resetPostForm = () => {
-    setPostForm({
-      title: '',
-      description: '',
-      category: 'Electronics',
-      originalPrice: '',
-      discountedPrice: '',
-      businessName: '',
-      location: '',
-      isGroupDeal: false,
-      maxParticipants: '',
-      expiresAt: new Date(),
-      dealUrl: '',
-      source: selectedSource,
-    });
-  };
-
-  const handleLike = async (deal: Deal) => {
-    const newLikedState = !deal.userLiked;
-    
-    // Optimistic update
-    const updatedDeals = deals.map(d => {
-      if (d.id === deal.id) {
-        return {
-          ...d,
-          likes: newLikedState ? d.likes + 1 : d.likes - 1,
-          dislikes: d.userDisliked ? d.dislikes - 1 : d.dislikes,
-          userLiked: newLikedState,
-          userDisliked: false,
-        };
-      }
-      return d;
-    });
-
-    // Update local cache
-    await DealsAPI.updateDealInteraction(deal.id, { 
-      liked: newLikedState,
-      disliked: false 
-    });
-  };
-
-  const openDealUrl = async (deal: Deal) => {
+  const openDeal = (deal: Deal) => {
     if (deal.dealUrl) {
-      try {
-        const supported = await Linking.canOpenURL(deal.dealUrl);
-        if (supported) {
-          await Linking.openURL(deal.dealUrl);
-        } else {
-          Alert.alert('Error', 'Cannot open deal link');
-        }
-      } catch (error) {
-        Alert.alert('Error', 'Failed to open deal link');
-      }
+      setCurrentDealUrl(deal.dealUrl);
+      setCurrentDealTitle(deal.title);
+      setShowWebView(true);
     } else {
       Alert.alert('No Link', 'This deal does not have a direct link available');
     }
   };
 
-  const openChat = (deal: Deal) => {
-    setSelectedDeal(deal);
-    setShowChatModal(true);
-    setChatMessages([
-      {
-        id: '1',
-        dealId: deal.id,
-        userId: 'system',
-        userName: 'System',
-        message: `Welcome to the chat for "${deal.title}". Ask questions or share your experience!`,
-        timestamp: new Date(),
-      }
-    ]);
-  };
-
   const generateDeepLink = (deal: Deal) => {
-    // Generate deep link for the app
     return `spendy://deal/${deal.id}`;
   };
 
   const generateAppStoreLink = () => {
-    if (Platform.OS === 'ios') {
-      return 'https://apps.apple.com/au/app/spendy/id123456789'; // Replace with actual App Store ID
-    } else {
-      return 'https://play.google.com/store/apps/details?id=com.spendy.app'; // Replace with actual package name
-    }
+    return Platform.OS === 'ios' 
+      ? 'https://apps.apple.com/au/app/spendy/id123456789'
+      : 'https://play.google.com/store/apps/details?id=com.spendy.app';
   };
 
   const handleShareDeal = async (deal: Deal) => {
@@ -310,20 +104,14 @@ const DealsHubScreen: React.FC = () => {
 
 ${deal.title}
 
-💰 Was: $${deal.originalPrice.toFixed(2)}
-✨ Now: $${deal.discountedPrice.toFixed(2)}
-🎯 Save ${deal.discount}% OFF!
-
-${deal.description}
+Found this great deal on OzBargain via Spendy app!
 
 📱 Open in Spendy: ${deepLink}
-📲 Get Spendy: ${appStoreLink}
-
-Found this amazing deal on Spendy app!`;
+📲 Get Spendy: ${appStoreLink}`;
 
       await Share.share({
         message: shareMessage,
-        title: `${deal.title} - ${deal.discount}% OFF`,
+        title: deal.title,
         url: deepLink,
       });
     } catch (error) {
@@ -331,236 +119,95 @@ Found this amazing deal on Spendy app!`;
     }
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedDeal) return;
-
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      dealId: selectedDeal.id,
-      userId: 'current-user',
-      userName: 'You',
-      message: newMessage,
-      timestamp: new Date(),
-    };
-
-    setChatMessages(prev => [...prev, message]);
-    setNewMessage('');
-  };
-
-  const getCategoryIcon = (category: string) => {
-    const icons = {
-      'Electronics': 'phone-portrait',
-      'Groceries': 'basket',
-      'Home & Garden': 'home',
-      'Fashion': 'shirt',
-      'Entertainment': 'game-controller',
-      'Sports': 'fitness',
-    };
-    return icons[category as keyof typeof icons] || 'pricetag';
-  };
-
-  const getSourceBadge = (source?: string) => {
-    const sourceData = DEAL_SOURCES.find(s => s.id === source);
-    return sourceData ? { text: sourceData.name, color: sourceData.color } : { text: 'Community', color: colors.primary };
-  };
-
-  const renderSourceFilter = ({ item: source }: { item: typeof DEAL_SOURCES[0] }) => {
-    const isSelected = selectedSource === source.id;
-    
-    return (
-      <TouchableOpacity
-        style={[
-          styles.sourceFilter,
-          { 
-            backgroundColor: isSelected ? source.color : colors.surface,
-            borderColor: isSelected ? source.color : colors.border,
-          }
-        ]}
-        onPress={() => setSelectedSource(source.id)}
-      >
-        {source.logo && (
-          <Image 
-            source={{ uri: source.logo }} 
-            style={styles.sourceLogo}
-            resizeMode="contain"
-          />
-        )}
-        {!source.logo && (
-          <Ionicons 
-            name="apps" 
-            size={16} 
-            color={isSelected ? 'white' : colors.textSecondary} 
-          />
-        )}
-        <Text
-          style={[
-            styles.sourceFilterText,
-            { 
-              color: isSelected ? 'white' : colors.textSecondary 
-            }
-          ]}
-        >
-          {source.name}
-        </Text>
-      </TouchableOpacity>
-    );
+  const getCategoryIcon = (iconName?: string) => {
+    return iconName || 'pricetag';
   };
 
   const renderDealCard = ({ item: deal }: { item: Deal }) => {
-    const isExpiringSoon = new Date(deal.expiresAt).getTime() - Date.now() < 24 * 60 * 60 * 1000;
-    const sourceBadge = getSourceBadge(deal.source);
-
+    const hasPrice = deal.originalPrice > 0 && deal.discountedPrice > 0;
+    
     return (
       <TouchableOpacity 
         style={[styles.dealCard, { backgroundColor: colors.surface }]}
-        onPress={() => openDealUrl(deal)}
-        activeOpacity={0.9}
+        onPress={() => openDeal(deal)}
+        activeOpacity={0.7}
       >
-        {/* Header */}
+        {/* Header Row */}
         <View style={styles.dealHeader}>
-          <View style={styles.dealBadges}>
+          <View style={styles.leftHeader}>
             <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
               <Ionicons 
-                name={getCategoryIcon(deal.category) as any} 
+                name={getCategoryIcon(deal.categoryIcon) as any} 
                 size={12} 
                 color="white" 
               />
               <Text style={styles.categoryText}>{deal.category}</Text>
             </View>
-            
-            <View style={[styles.sourceBadge, { backgroundColor: sourceBadge.color }]}>
-              <Text style={styles.sourceText}>{sourceBadge.text}</Text>
+            <View style={[styles.sourceBadge, { backgroundColor: '#FF6B35' }]}>
+              <Text style={styles.sourceText}>OzBargain</Text>
             </View>
-            
-            {isExpiringSoon && (
-              <View style={[styles.urgentBadge, { backgroundColor: `${colors.warning}20` }]}>
-                <Ionicons name="time" size={10} color={colors.warning} />
-                <Text style={[styles.urgentText, { color: colors.warning }]}>Expiring Soon</Text>
-              </View>
-            )}
           </View>
-          <View style={[styles.discountBadge, { backgroundColor: colors.success }]}>
-            <Text style={styles.discountText}>{deal.discount}%</Text>
-            <Text style={styles.offText}>OFF</Text>
+          <View style={styles.voteContainer}>
+            <Ionicons name="chevron-up" size={12} color={colors.success} />
+            <Text style={[styles.voteText, { color: colors.success }]}>
+              {deal.likes}
+            </Text>
           </View>
         </View>
 
-        {/* Title & Description */}
+        {/* Title */}
         <Text style={[styles.dealTitle, { color: colors.text }]} numberOfLines={2}>
           {deal.title}
         </Text>
-        <Text style={[styles.dealDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-          {deal.description}
-        </Text>
 
-        {/* Business Info */}
-        {deal.businessName && (
-          <View style={styles.businessInfo}>
-            <Ionicons name="business" size={14} color={colors.textMuted} />
-            <Text style={[styles.businessName, { color: colors.textSecondary }]}>
-              {deal.businessName}
-            </Text>
-          </View>
-        )}
-
-        {/* Location */}
-        {deal.location && (
-          <View style={styles.locationInfo}>
-            <Ionicons name="location" size={14} color={colors.textMuted} />
-            <Text style={[styles.locationText, { color: colors.textMuted }]}>
-              {deal.location}
-            </Text>
-          </View>
-        )}
-
-        {/* Pricing */}
-        <View style={styles.pricingSection}>
-          <View style={styles.priceContainer}>
-            <Text style={[styles.originalPrice, { color: colors.textMuted }]}>
-              ${deal.originalPrice.toFixed(2)}
-            </Text>
+        {/* Price Row - Only show if prices are available and meaningful */}
+        {hasPrice && (
+          <View style={styles.priceRow}>
+            {deal.originalPrice !== deal.discountedPrice && (
+              <Text style={[styles.originalPrice, { color: colors.textMuted }]}>
+                ${deal.originalPrice.toFixed(2)}
+              </Text>
+            )}
             <Text style={[styles.discountedPrice, { color: colors.primary }]}>
               ${deal.discountedPrice.toFixed(2)}
             </Text>
-          </View>
-          <Text style={[styles.savedAmount, { color: colors.success }]}>
-            Save ${(deal.originalPrice - deal.discountedPrice).toFixed(2)}
-          </Text>
-        </View>
-
-        {/* Group Deal Progress */}
-        {deal.isGroupDeal && (
-          <View style={styles.groupSection}>
-            <View style={styles.progressHeader}>
-              <Text style={[styles.groupTitle, { color: colors.text }]}>
-                Group Progress
-              </Text>
-              <Text style={[styles.participantCount, { color: colors.textSecondary }]}>
-                {deal.currentParticipants}/{deal.maxParticipants} joined
-              </Text>
-            </View>
-            <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-              <View 
-                style={[
-                  styles.progressFill, 
-                  { width: `${deal.groupProgress || 0}%`, backgroundColor: colors.primary }
-                ]} 
-              />
-            </View>
+            {deal.discount > 0 && (
+              <View style={[styles.discountBadge, { backgroundColor: colors.success }]}>
+                <Text style={styles.discountText}>{deal.discount}% OFF</Text>
+              </View>
+            )}
           </View>
         )}
 
-        {/* Actions */}
-        <View style={styles.actionsContainer}>
-          <View style={styles.leftActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleLike(deal)}
-            >
-              <Ionicons 
-                name={deal.userLiked ? "heart" : "heart-outline"} 
-                size={18} 
-                color={deal.userLiked ? colors.error : colors.textMuted} 
-              />
-              <Text style={[styles.actionText, { color: colors.textMuted }]}>
-                {deal.likes}
+        {/* Footer Row */}
+        <View style={styles.dealFooter}>
+          <View style={styles.dealMeta}>
+            <Text style={[styles.postedBy, { color: colors.textMuted }]}>
+              by {deal.postedBy}
+            </Text>
+            {deal.timePosted && (
+              <Text style={[styles.timePosted, { color: colors.textMuted }]}>
+                • {deal.timePosted}
               </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => openChat(deal)}
-            >
-              <Ionicons name="chatbubble-outline" size={18} color={colors.textMuted} />
-              <Text style={[styles.actionText, { color: colors.textMuted }]}>Chat</Text>
-            </TouchableOpacity>
-            
+            )}
+          </View>
+          
+          <View style={styles.actionsRow}>
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => handleShareDeal(deal)}
             >
-              <Ionicons name="share-outline" size={18} color={colors.textMuted} />
-              <Text style={[styles.actionText, { color: colors.textMuted }]}>Share</Text>
+              <Ionicons name="share-outline" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.getDealButton, { backgroundColor: colors.primary }]}
+              onPress={() => openDeal(deal)}
+            >
+              <Text style={styles.getDealText}>Get Deal</Text>
+              <Ionicons name="open-outline" size={14} color="white" />
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity 
-            style={[styles.claimButton, { backgroundColor: colors.primary }]}
-            onPress={() => openDealUrl(deal)}
-          >
-            <Text style={styles.claimText}>Get Deal</Text>
-            <Ionicons name="open-outline" size={16} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Footer */}
-        <View style={styles.dealFooter}>
-          <Text style={[styles.postedBy, { color: colors.textMuted }]}>
-            by {deal.postedBy}
-          </Text>
-          <Text style={[styles.timeRemaining, { color: colors.textMuted }]}>
-            {Math.max(1, Math.ceil((new Date(deal.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))} days left
-          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -577,11 +224,11 @@ Found this amazing deal on Spendy app!`;
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color="white" size="small" />
           ) : (
             <>
-              <Text style={styles.loadMoreText}>Load More Deals</Text>
-              <Ionicons name="chevron-down" size={20} color="white" />
+              <Text style={styles.loadMoreText}>Load More</Text>
+              <Ionicons name="chevron-down" size={16} color="white" />
             </>
           )}
         </TouchableOpacity>
@@ -592,7 +239,7 @@ Found this amazing deal on Spendy app!`;
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <View style={[styles.emptyIconContainer, { backgroundColor: colors.surface }]}>
-        <Ionicons name="pricetag-outline" size={64} color={colors.textMuted} />
+        <Ionicons name="pricetag-outline" size={48} color={colors.textMuted} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
         {error ? 'Connection Error' : 'No deals found'}
@@ -601,8 +248,8 @@ Found this amazing deal on Spendy app!`;
         {error 
           ? 'Unable to load deals. Check your internet connection.' 
           : searchQuery 
-            ? 'Try adjusting your search or filters'
-            : `We're fetching the latest deals from ${DEAL_SOURCES.find(s => s.id === selectedSource)?.name || 'all sources'}`
+            ? 'Try adjusting your search'
+            : `We're fetching the latest deals from ${selectedCategory}`
         }
       </Text>
       {error && (
@@ -618,41 +265,33 @@ Found this amazing deal on Spendy app!`;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Compact Header */}
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View style={styles.headerContent}>
           <View style={styles.headerTop}>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle}>Deals Hub</Text>
+              <Text style={styles.headerTitle}>OzBargain Deals</Text>
               <Text style={styles.headerSubtitle}>
                 {pagination ? `${pagination.totalDeals} live deals` : 'Loading deals...'}
               </Text>
             </View>
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                style={styles.refreshButton}
-                onPress={handleManualRefresh}
-                disabled={isManualRefresh}
-              >
-                {isManualRefresh ? (
-                  <ActivityIndicator size={16} color={colors.primary} />
-                ) : (
-                  <Ionicons name="refresh" size={18} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.postButton}
-                onPress={() => setShowPostModal(true)}
-              >
-                <Ionicons name="add" size={20} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={handleManualRefresh}
+              disabled={isManualRefresh}
+            >
+              {isManualRefresh ? (
+                <ActivityIndicator size={16} color={colors.primary} />
+              ) : (
+                <Ionicons name="refresh" size={18} color={colors.primary} />
+              )}
+            </TouchableOpacity>
           </View>
 
           {/* Search Bar */}
           <View style={styles.searchContainer}>
             <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
-              <Ionicons name="search" size={20} color={colors.textMuted} />
+              <Ionicons name="search" size={18} color={colors.textMuted} />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Search deals..."
@@ -662,13 +301,13 @@ Found this amazing deal on Spendy app!`;
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+                  <Ionicons name="close-circle" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
           </View>
 
-          {/* Last Updated Indicator */}
+          {/* Last Updated */}
           {lastUpdated && (
             <View style={styles.lastUpdatedContainer}>
               <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.7)" />
@@ -683,65 +322,46 @@ Found this amazing deal on Spendy app!`;
         </View>
       </View>
 
-      {/* Filters Section - Hidden during initial loading */}
-      {filtersVisible && (
-        <View style={[styles.filtersSection, { backgroundColor: colors.background }]}>
-          {/* Source Filters */}
-          <View style={styles.filterGroup}>
-            <Text style={[styles.filterLabel, { color: colors.text }]}>Sources</Text>
-            <FlatList
-              horizontal
-              data={DEAL_SOURCES}
-              renderItem={renderSourceFilter}
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.sourceFiltersContainer}
-            />
-          </View>
-
-          {/* Category Filters */}
-          <View style={styles.filterGroup}>
-            <Text style={[styles.filterLabel, { color: colors.text }]}>Categories</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesContent}
+      {/* Category Filters */}
+      <View style={[styles.categoriesSection, { backgroundColor: colors.background }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesContent}
+        >
+          {OZBARGAIN_CATEGORIES.map((category) => (
+            <TouchableOpacity
+              key={category}
+              style={[
+                styles.categoryChip,
+                { 
+                  backgroundColor: selectedCategory === category ? colors.primary : colors.surface,
+                  borderColor: selectedCategory === category ? colors.primary : colors.border,
+                }
+              ]}
+              onPress={() => setSelectedCategory(category)}
             >
-              {DEAL_CATEGORIES.map((category) => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.categoryButton,
-                    { 
-                      backgroundColor: selectedCategory === category ? colors.primary : colors.surface,
-                      borderColor: selectedCategory === category ? colors.primary : colors.border,
-                    }
-                  ]}
-                  onPress={() => setSelectedCategory(category)}
-                >
-                  <Text
-                    style={[
-                      styles.categoryButtonText,
-                      { 
-                        color: selectedCategory === category ? 'white' : colors.textSecondary 
-                      }
-                    ]}
-                  >
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      )}
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  { 
+                    color: selectedCategory === category ? 'white' : colors.textSecondary 
+                  }
+                ]}
+              >
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Deals List */}
       {loading && filteredDeals.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Loading deals from {DEAL_SOURCES.find(s => s.id === selectedSource)?.name || 'all sources'}...
+            Loading {selectedCategory} deals...
           </Text>
         </View>
       ) : filteredDeals.length === 0 ? (
@@ -778,258 +398,80 @@ Found this amazing deal on Spendy app!`;
         />
       )}
 
-      {/* Post Deal Modal */}
+      {/* WebView Modal */}
       <Modal
-        visible={showPostModal}
+        visible={showWebView}
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <KeyboardAvoidingView 
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-            <View style={[styles.modalHeader, { backgroundColor: colors.primary }]}>
-              <TouchableOpacity
-                onPress={() => setShowPostModal(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Post New Deal</Text>
-              <TouchableOpacity
-                onPress={handlePostDeal}
-                style={styles.modalSaveButton}
-                disabled={loading}
-              >
-                <Text style={styles.modalSaveText}>Post</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView 
-              style={styles.modalContent}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Deal Title *</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                  value={postForm.title}
-                  onChangeText={(text) => setPostForm({...postForm, title: text})}
-                  placeholder="Enter deal title"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Description *</Text>
-                <TextInput
-                  style={[styles.textArea, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                  value={postForm.description}
-                  onChangeText={(text) => setPostForm({...postForm, description: text})}
-                  placeholder="Describe the deal"
-                  placeholderTextColor={colors.textMuted}
-                  multiline
-                  numberOfLines={4}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Category *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorySelector}>
-                  {DEAL_CATEGORIES.filter(cat => cat !== 'All').map((category) => (
-                    <TouchableOpacity
-                      key={category}
-                      style={[
-                        styles.categoryOption,
-                        { 
-                          backgroundColor: postForm.category === category ? colors.primary : colors.surface,
-                          borderColor: postForm.category === category ? colors.primary : colors.border,
-                        }
-                      ]}
-                      onPress={() => setPostForm({...postForm, category: category as Deal['category']})}
-                    >
-                      <Text style={[
-                        styles.categoryOptionText,
-                        { color: postForm.category === category ? 'white' : colors.text }
-                      ]}>
-                        {category}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              <View style={styles.priceRow}>
-                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={[styles.label, { color: colors.text }]}>Original Price *</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                    value={postForm.originalPrice}
-                    onChangeText={(text) => setPostForm({...postForm, originalPrice: text})}
-                    placeholder="0.00"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={[styles.label, { color: colors.text }]}>Sale Price *</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                    value={postForm.discountedPrice}
-                    onChangeText={(text) => setPostForm({...postForm, discountedPrice: text})}
-                    placeholder="0.00"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Business Name</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                  value={postForm.businessName}
-                  onChangeText={(text) => setPostForm({...postForm, businessName: text})}
-                  placeholder="Store or business name"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Deal URL</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                  value={postForm.dealUrl}
-                  onChangeText={(text) => setPostForm({...postForm, dealUrl: text})}
-                  placeholder="https://..."
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="url"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Location</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                  value={postForm.location}
-                  onChangeText={(text) => setPostForm({...postForm, location: text})}
-                  placeholder="City, State or 'Online'"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.groupDealToggle}
-                onPress={() => setPostForm({...postForm, isGroupDeal: !postForm.isGroupDeal})}
-              >
-                <View style={styles.toggleRow}>
-                  <Text style={[styles.label, { color: colors.text }]}>Group Deal</Text>
-                  <View style={[
-                    styles.toggle,
-                    { backgroundColor: postForm.isGroupDeal ? colors.primary : colors.surface }
-                  ]}>
-                    <View style={[
-                      styles.toggleIndicator,
-                      { 
-                        backgroundColor: 'white',
-                        transform: [{ translateX: postForm.isGroupDeal ? 20 : 2 }]
-                      }
-                    ]} />
-                  </View>
-                </View>
-                <Text style={[styles.toggleDescription, { color: colors.textSecondary }]}>
-                  Enable if this deal requires multiple people to activate
-                </Text>
-              </TouchableOpacity>
-
-              {postForm.isGroupDeal && (
-                <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: colors.text }]}>Max Participants</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                    value={postForm.maxParticipants}
-                    onChangeText={(text) => setPostForm({...postForm, maxParticipants: text})}
-                    placeholder="10"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="numeric"
-                  />
-                </View>
-              )}
-
-              <View style={styles.formFooter}>
-                <Text style={[styles.formNote, { color: colors.textMuted }]}>
-                  Your deal will be reviewed before being published to ensure quality and accuracy.
-                </Text>
-              </View>
-            </ScrollView>
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Chat Modal */}
-      <Modal
-        visible={showChatModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalHeader, { backgroundColor: colors.primary }]}>
+        <SafeAreaView style={styles.webViewContainer}>
+          <View style={[styles.webViewHeader, { backgroundColor: colors.primary }]}>
             <TouchableOpacity
-              onPress={() => setShowChatModal(false)}
-              style={styles.modalCloseButton}
+              onPress={() => setShowWebView(false)}
+              style={styles.webViewCloseButton}
             >
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Deal Discussion</Text>
-            <View style={styles.modalSaveButton} />
+            <Text style={styles.webViewTitle} numberOfLines={1}>
+              {currentDealTitle}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                if (currentDealUrl) {
+                  Linking.openURL(currentDealUrl);
+                }
+              }}
+              style={styles.webViewOpenButton}
+            >
+              <Ionicons name="open-outline" size={20} color="white" />
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.chatContainer}>
-            <FlatList
-              data={chatMessages}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={[styles.chatMessage, { backgroundColor: colors.surface }]}>
-                  <Text style={[styles.chatUserName, { color: colors.primary }]}>
-                    {item.userName}
-                  </Text>
-                  <Text style={[styles.chatMessageText, { color: colors.text }]}>
-                    {item.message}
-                  </Text>
-                  <Text style={[styles.chatTimestamp, { color: colors.textMuted }]}>
-                    {item.timestamp.toLocaleTimeString()}
+          
+          {currentDealUrl ? (
+            <WebView
+              source={{ uri: currentDealUrl }}
+              style={styles.webView}
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View style={styles.webViewLoading}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={[styles.webViewLoadingText, { color: colors.textSecondary }]}>
+                    Loading deal...
                   </Text>
                 </View>
               )}
-              style={styles.chatMessages}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.warn('WebView error: ', nativeEvent);
+                Alert.alert(
+                  'Error Loading Deal',
+                  'Unable to load the deal page. Would you like to open it in your browser?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Open in Browser', 
+                      onPress: () => {
+                        setShowWebView(false);
+                        Linking.openURL(currentDealUrl);
+                      }
+                    }
+                  ]
+                );
+              }}
+              onHttpError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.warn('WebView HTTP error: ', nativeEvent);
+              }}
+              userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
             />
-            
-            <View style={[styles.chatInputContainer, { 
-              backgroundColor: colors.background,
-              borderTopColor: colors.border,
-            }]}>
-              <TextInput
-                style={[styles.chatInput, { 
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  color: colors.text,
-                }]}
-                value={newMessage}
-                onChangeText={setNewMessage}
-                placeholder="Type your message..."
-                placeholderTextColor={colors.textMuted}
-                multiline
-                maxLength={200}
-              />
-              <TouchableOpacity
-                style={[styles.chatSendButton, { backgroundColor: colors.primary }]}
-                onPress={sendMessage}
-              >
-                <Ionicons name="send" size={20} color="white" />
-              </TouchableOpacity>
+          ) : (
+            <View style={styles.webViewError}>
+              <Ionicons name="alert-circle-outline" size={48} color={colors.textMuted} />
+              <Text style={[styles.webViewErrorText, { color: colors.text }]}>
+                No URL available for this deal
+              </Text>
             </View>
-          </View>
+          )}
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -1059,7 +501,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: 'white',
     letterSpacing: -0.5,
@@ -1069,28 +511,11 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
   },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
   refreshButton: {
     backgroundColor: 'white',
     borderRadius: 12,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  postButton: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1107,7 +532,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   searchInput: {
     flex: 1,
@@ -1125,53 +550,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.7)',
   },
-  filtersSection: {
-    paddingVertical: 16,
+  categoriesSection: {
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.1)',
-  },
-  filterGroup: {
-    marginBottom: 16,
-  },
-  filterLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginHorizontal: 20,
-    marginBottom: 8,
-  },
-  sourceFiltersContainer: {
-    paddingHorizontal: 20,
-  },
-  sourceFilter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
-    borderWidth: 1,
-    gap: 8,
-  },
-  sourceLogo: {
-    width: 16,
-    height: 16,
-  },
-  sourceFilterText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   categoriesContent: {
     paddingHorizontal: 20,
   },
-  categoryButton: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
+  categoryChip: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginRight: 10,
     borderWidth: 1,
   },
-  categoryButtonText: {
-    fontSize: 14,
+  categoryChipText: {
+    fontSize: 13,
     fontWeight: '600',
   },
   loadingContainer: {
@@ -1190,225 +585,123 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
-    paddingVertical: 100,
+    paddingVertical: 80,
   },
   emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
+    marginBottom: 24,
+    lineHeight: 20,
   },
   retryButton: {
-    borderRadius: 16,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
   },
   retryText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   dealsContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 100,
   },
   dealCard: {
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    padding: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 2,
   },
   dealHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  dealBadges: {
+  leftHeader: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     flex: 1,
-    flexWrap: 'wrap',
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    gap: 4,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    gap: 3,
   },
   categoryText: {
     color: 'white',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
   sourceBadge: {
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
   sourceText: {
     color: 'white',
     fontSize: 10,
     fontWeight: '600',
   },
-  urgentBadge: {
+  voteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 4,
+    gap: 2,
   },
-  urgentText: {
-    fontSize: 10,
+  voteText: {
+    fontSize: 12,
     fontWeight: '600',
-  },
-  discountBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    alignItems: 'center',
-    minWidth: 50,
-  },
-  discountText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  offText: {
-    color: 'white',
-    fontSize: 9,
-    fontWeight: '600',
-    marginTop: -2,
   },
   dealTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 6,
-    lineHeight: 24,
-  },
-  dealDescription: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 8,
     lineHeight: 20,
-    marginBottom: 12,
   },
-  businessInfo: {
+  priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-    gap: 6,
-  },
-  businessName: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  locationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 6,
-  },
-  locationText: {
-    fontSize: 13,
-  },
-  pricingSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    marginBottom: 8,
+    gap: 8,
   },
   originalPrice: {
-    fontSize: 16,
+    fontSize: 13,
     textDecorationLine: 'line-through',
   },
   discountedPrice: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
   },
-  savedAmount: {
-    fontSize: 14,
-    fontWeight: '600',
+  discountBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  groupSection: {
-    marginBottom: 12,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  groupTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  participantCount: {
-    fontSize: 12,
-  },
-  progressBar: {
-    height: 4,
-    borderRadius: 2,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  leftActions: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  claimButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 6,
-  },
-  claimText: {
+  discountText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '600',
   },
   dealFooter: {
@@ -1416,190 +709,117 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  postedBy: {
-    fontSize: 12,
+  dealMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
-  timeRemaining: {
+  postedBy: {
+    fontSize: 11,
+  },
+  timePosted: {
+    fontSize: 11,
+    marginLeft: 4,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionButton: {
+    padding: 4,
+  },
+  getDealButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 4,
+  },
+  getDealText: {
+    color: 'white',
     fontSize: 12,
+    fontWeight: '600',
   },
   loadMoreContainer: {
-    padding: 20,
+    padding: 16,
     alignItems: 'center',
   },
   loadMoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 16,
-    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 6,
   },
   loadMoreText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
-  modalContainer: {
+  // WebView Modal Styles
+  webViewContainer: {
     flex: 1,
+    backgroundColor: 'white',
   },
-  modalHeader: {
+  webViewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
-  modalCloseButton: {
+  webViewCloseButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
-  modalSaveButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalSaveText: {
-    color: 'white',
+  webViewTitle: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  modalContent: {
+    color: 'white',
     flex: 1,
-    padding: 20,
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  textArea: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  categorySelector: {
-    flexDirection: 'row',
-  },
-  categoryOption: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
-    borderWidth: 1,
-  },
-  categoryOptionText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  groupDealToggle: {
-    marginBottom: 16,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  toggle: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  toggleIndicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  toggleDescription: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  formFooter: {
-    marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-  },
-  formNote: {
-    fontSize: 14,
-    lineHeight: 20,
     textAlign: 'center',
+    paddingHorizontal: 8,
   },
-  chatContainer: {
-    flex: 1,
-  },
-  chatMessages: {
-    flex: 1,
-    padding: 20,
-  },
-  chatMessage: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  chatUserName: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  chatMessageText: {
-    fontSize: 16,
-    marginBottom: 6,
-    lineHeight: 22,
-  },
-  chatTimestamp: {
-    fontSize: 12,
-  },
-  chatInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 20,
-    borderTopWidth: 1,
-    gap: 12,
-  },
-  chatInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    maxHeight: 100,
-    fontSize: 16,
-  },
-  chatSendButton: {
+  webViewOpenButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  webView: {
+    flex: 1,
+  },
+  webViewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  webViewLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
+  webViewError: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  webViewErrorText: {
+    marginTop: 16,
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
 

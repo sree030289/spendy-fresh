@@ -43,7 +43,9 @@ export interface Friend {
   createdAt: Date;
   invitedAt?: Date;
   requestId?: string;
-  invitationMethod?: 'email' | 'sms' | 'whatsapp' | 'qr'; // Add this field
+  inviteMethod?: 'email' | 'sms' | 'whatsapp' | 'qr'; // Add this field
+  isNewUser?: boolean; // Add this to distinguish existing vs new users
+  requestType?: 'sent' | 'received'; // Add this to distinguish sent vs received requests
 }
 
 export interface Group {
@@ -439,8 +441,18 @@ export class SplittingService {
     
     const docRef = await addDoc(collection(db, 'friendRequests'), friendRequest);
     console.log('✅ Friend request created:', docRef.id);
+    console.log('🔍 Friend request details:', {
+      fromUserId: fromUserId,
+      fromUserName: fromUserData?.fullName,
+      fromUserEmail: fromUserData?.email,
+      toUserId: toUserId,
+      toUserName: toUserData?.fullName,
+      toUserEmail: toEmail
+    });
     
     // Create notification for the recipient
+    console.log('📝 Creating in-app notification for friend request...');
+    console.log('🎯 Notification will be sent to userId:', toUserId, '(', toUserData?.fullName, ')');
     await this.createNotification({
       userId: toUserId,
       type: 'friend_request',
@@ -457,6 +469,26 @@ export class SplittingService {
       isRead: false,
       createdAt: new Date()
     });
+    console.log('✅ In-app notification created');
+
+    // Send push notification to the recipient
+    try {
+      console.log('📲 Sending push notification for friend request...');
+      console.log('🎯 Push notification will be sent to userId:', toUserId, '(', toUserData?.fullName, ')');
+      const { RealNotificationService } = await import('../notifications/RealNotificationService');
+      await RealNotificationService.sendFriendRequestNotification(
+        toUserId,
+        fromUserData?.fullName || 'Someone',
+        fromUserId,
+        docRef.id,
+        fromUserData?.email || '',
+        fromUserData?.profilePicture || ''
+      );
+      console.log('✅ Push notification sent successfully');
+    } catch (notificationError) {
+      console.warn('Failed to send push notification for friend request:', notificationError);
+      // Don't fail the whole request if notification fails
+    }
 
     return {
       success: true,
@@ -1708,19 +1740,32 @@ static async getNotifications(userId: string): Promise<Notification[]> {
     });
   }
   
-  // GET PENDING FRIEND INVITATIONS
+  // GET PENDING FRIEND INVITATIONS (EMAIL + SMS/WHATSAPP + EMAIL TO NON-USERS)
 static async getPendingFriendInvitations(userId: string): Promise<Friend[]> {
   try {
-    const requestsQuery = query(
+    console.log('🔍 Fetching pending invitations for user:', userId);
+    
+    // 1. Get email-based friend requests SENT BY the user (for existing Spendy users)
+    const sentEmailRequestsQuery = query(
       collection(db, 'friendRequests'),
       where('fromUserId', '==', userId),
       where('status', '==', 'pending'),
       orderBy('createdAt', 'desc')
     );
     
-    const snapshot = await getDocs(requestsQuery);
-    return snapshot.docs.map(doc => {
+    const sentEmailSnapshot = await getDocs(sentEmailRequestsQuery);
+    console.log('📧 Found', sentEmailSnapshot.docs.length, 'sent email friend requests (existing users)');
+    
+    const sentEmailInvitations = sentEmailSnapshot.docs.map(doc => {
       const data = doc.data();
+      console.log('📋 Email pending invitation SENT (existing user):', {
+        id: doc.id,
+        fromUserId: data.fromUserId,
+        toUserId: data.toUserId,
+        toUserData: data.toUserData,
+        status: data.status
+      });
+      
       return {
         id: doc.id,
         userId: data.fromUserId,
@@ -1731,9 +1776,139 @@ static async getPendingFriendInvitations(userId: string): Promise<Friend[]> {
         lastActivity: data.createdAt?.toDate() || new Date(),
         createdAt: data.createdAt?.toDate() || new Date(),
         invitedAt: data.createdAt?.toDate() || new Date(),
-        requestId: doc.id
+        requestId: doc.id,
+        inviteMethod: 'email',
+        isNewUser: false, // Existing Spendy user
+        requestType: 'sent' // Mark as sent request
       };
     }) as Friend[];
+
+    // 2. Get email-based friend requests RECEIVED BY the user (for existing Spendy users)
+    const receivedEmailRequestsQuery = query(
+      collection(db, 'friendRequests'),
+      where('toUserId', '==', userId),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const receivedEmailSnapshot = await getDocs(receivedEmailRequestsQuery);
+    console.log('📧 Found', receivedEmailSnapshot.docs.length, 'received email friend requests (existing users)');
+    
+    const receivedEmailInvitations = receivedEmailSnapshot.docs.map(doc => {
+      const data = doc.data();
+      console.log('📋 Email pending invitation RECEIVED (existing user):', {
+        id: doc.id,
+        fromUserId: data.fromUserId,
+        toUserId: data.toUserId,
+        fromUserData: data.fromUserData,
+        status: data.status
+      });
+      
+      return {
+        id: doc.id,
+        userId: data.toUserId, // The current user is the recipient
+        friendId: data.fromUserId, // The sender is the friend
+        friendData: data.fromUserData, // Display sender's data
+        status: 'pending' as const, // Use 'pending' to distinguish from 'invited'
+        balance: 0,
+        lastActivity: data.createdAt?.toDate() || new Date(),
+        createdAt: data.createdAt?.toDate() || new Date(),
+        invitedAt: data.createdAt?.toDate() || new Date(),
+        requestId: doc.id,
+        inviteMethod: 'email',
+        isNewUser: false, // Existing Spendy user
+        requestType: 'received' // Mark as received request
+      };
+    }) as Friend[];
+
+    // 2. Get email invitations for non-existing users
+    const emailInvitationsQuery = query(
+      collection(db, 'emailInvitations'),
+      where('fromUserId', '==', userId),
+      where('status', '==', 'sent'),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const emailInvitationsSnapshot = await getDocs(emailInvitationsQuery);
+    console.log('📧 Found', emailInvitationsSnapshot.docs.length, 'email invitations (new users)');
+    
+    const emailNewUserInvitations = emailInvitationsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      console.log('📋 Email invitation (new user):', {
+        id: doc.id,
+        fromUserId: data.fromUserId,
+        toEmail: data.toEmail,
+        status: data.status
+      });
+      
+      return {
+        id: doc.id,
+        userId: data.fromUserId,
+        friendId: `temp_email_${doc.id}`, // Temporary ID for non-registered users
+        friendData: {
+          id: `temp_email_${doc.id}`,
+          fullName: data.toEmail.split('@')[0], // Use email prefix as name
+          email: data.toEmail,
+          avatar: ''
+        },
+        status: 'invited' as const,
+        balance: 0,
+        lastActivity: data.createdAt?.toDate() || new Date(),
+        createdAt: data.createdAt?.toDate() || new Date(),
+        invitedAt: data.createdAt?.toDate() || new Date(),
+        requestId: doc.id,
+        inviteMethod: 'email',
+        isNewUser: true, // New user (not yet on Spendy)
+        requestType: 'sent' // Mark as sent request
+      };
+    }) as Friend[];
+
+    // 3. Get SMS/WhatsApp-based pending invitations
+    const smsRequestsQuery = query(
+      collection(db, 'pendingInvitations'),
+      where('fromUserId', '==', userId),
+      where('status', '==', 'invited'),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const smsSnapshot = await getDocs(smsRequestsQuery);
+    console.log('📱 Found', smsSnapshot.docs.length, 'pending SMS/WhatsApp invitations');
+    
+    const smsInvitations = smsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      console.log('📋 SMS/WhatsApp pending invitation:', {
+        id: doc.id,
+        fromUserId: data.fromUserId,
+        toUserData: data.toUserData,
+        contactMethod: data.contactMethod,
+        status: data.status
+      });
+      
+      return {
+        id: doc.id,
+        userId: data.fromUserId,
+        friendId: `temp_${doc.id}`, // Temporary ID for non-registered users
+        friendData: data.toUserData,
+        status: 'invited' as const,
+        balance: 0,
+        lastActivity: data.createdAt?.toDate() || new Date(),
+        createdAt: data.createdAt?.toDate() || new Date(),
+        invitedAt: data.createdAt?.toDate() || new Date(),
+        requestId: doc.id,
+        inviteMethod: data.contactMethod || 'sms',
+        isNewUser: true, // SMS/WhatsApp invites are always to new users
+        requestType: 'sent' // Mark as sent request
+      };
+    }) as Friend[];
+    
+    const allInvitations = [...sentEmailInvitations, ...receivedEmailInvitations, ...emailNewUserInvitations, ...smsInvitations];
+    console.log('✅ Returning', allInvitations.length, 'total pending invitations:', {
+      sentExistingUsers: sentEmailInvitations.length,
+      receivedExistingUsers: receivedEmailInvitations.length,
+      newEmailUsers: emailNewUserInvitations.length, 
+      smsWhatsApp: smsInvitations.length
+    });
+    return allInvitations;
   } catch (error) {
     console.error('Get pending invitations error:', error);
     return [];

@@ -9,6 +9,7 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -646,28 +647,55 @@ useEffect(() => {
 
   // New function for pending friend actions
 const showPendingFriendActionsMenu = (friend: Friend) => {
-  const actions: Array<{
-    text: string;
-    style?: 'cancel' | 'destructive' | 'default';
-    onPress?: () => void;
-  }> = [
-    {
-      text: 'Resend Invitation',
-      onPress: () => handleResendInvitation(friend)
-    },
-    {
-      text: 'Cancel Invitation',
-      style: 'destructive',
-      onPress: () => handleCancelInvitation(friend)
-    },
-    { text: 'Cancel', style: 'cancel' }
-  ];
+  // Check if this is a received friend request (user can accept/decline)
+  if (friend.requestType === 'received' && friend.status === 'pending') {
+    const actions: Array<{
+      text: string;
+      style?: 'cancel' | 'destructive' | 'default';
+      onPress?: () => void;
+    }> = [
+      {
+        text: 'Accept Friend Request',
+        onPress: () => friend.requestId && handleAcceptFriendRequest(friend.requestId)
+      },
+      {
+        text: 'Decline Request',
+        style: 'destructive',
+        onPress: () => friend.requestId && handleDeclineFriendRequest(friend.requestId)
+      },
+      { text: 'Cancel', style: 'cancel' }
+    ];
 
-  Alert.alert(
-    `${friend.friendData.fullName}`,
-    'Invitation sent - waiting for response',
-    actions
-  );
+    Alert.alert(
+      `Friend Request from ${friend.friendData.fullName}`,
+      'Would you like to accept or decline this friend request?',
+      actions
+    );
+  } else {
+    // This is a sent invitation (user can resend/cancel)
+    const actions: Array<{
+      text: string;
+      style?: 'cancel' | 'destructive' | 'default';
+      onPress?: () => void;
+    }> = [
+      {
+        text: 'Resend Invitation',
+        onPress: () => handleResendInvitation(friend)
+      },
+      {
+        text: 'Cancel Invitation',
+        style: 'destructive',
+        onPress: () => handleCancelInvitation(friend)
+      },
+      { text: 'Cancel', style: 'cancel' }
+    ];
+
+    Alert.alert(
+      `${friend.friendData.fullName}`,
+      'Invitation sent - waiting for response',
+      actions
+    );
+  }
 };
 
 // Function to handle resending invitations
@@ -675,18 +703,114 @@ const handleResendInvitation = async (friend: Friend) => {
   try {
     if (!user?.id) return;
     
-    await SplittingService.sendFriendRequest(
-      user.id,
-      friend.friendData.email,
-      `Hi! This is a reminder to connect on Spendy 💰`
-    );
+    console.log('🔄 Resending invitation:', {
+      friendId: friend.id,
+      friendName: friend.friendData.fullName,
+      inviteMethod: friend.inviteMethod,
+      requestId: friend.requestId,
+      isNewUser: friend.isNewUser
+    });
     
-    Alert.alert('Invitation Resent! 📤', `Reminder sent to ${friend.friendData.fullName}`);
+    if (friend.isNewUser) {
+      // For new users (not on Spendy yet)
+      if (friend.inviteMethod === 'email') {
+        // Resend email invitation to non-Spendy user
+        const message = encodeURIComponent('Hi! Join me on Spendy - the best app for splitting expenses with friends! Download it now and let\'s start tracking our shared costs.');
+        const subject = encodeURIComponent('Join me on Spendy!');
+        const mailtoUrl = `mailto:${friend.friendData.email}?subject=${subject}&body=${message}`;
+        
+        Alert.alert(
+          'Resend Email Invitation',
+          `${friend.friendData.fullName} hasn't joined Spendy yet. Would you like to send them another email?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Send Email',
+              onPress: () => {
+                Linking.openURL(mailtoUrl).catch(() => {
+                  Alert.alert('Error', 'Could not open email app. Please send them a message manually.');
+                });
+              }
+            }
+          ]
+        );
+      } else if (friend.inviteMethod === 'sms' || friend.inviteMethod === 'whatsapp') {
+        // For SMS/WhatsApp to new users
+        const methodName = friend.inviteMethod === 'whatsapp' ? 'WhatsApp' : 'SMS';
+        Alert.alert(
+          `Resend ${methodName} Invitation`, 
+          `${friend.friendData.fullName} hasn't joined Spendy yet. You can send them another ${methodName.toLowerCase()} message to remind them to download the app.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: `Open ${methodName}`,
+              onPress: () => {
+                const phoneNumber = friend.friendData.mobile || friend.friendData.email;
+                if (phoneNumber) {
+                  const message = encodeURIComponent('Hi! Join me on Spendy - the best app for splitting expenses with friends! Download it now and let\'s start tracking our shared costs.');
+                  const url = friend.inviteMethod === 'whatsapp' 
+                    ? `whatsapp://send?phone=${phoneNumber}&text=${message}`
+                    : `sms:${phoneNumber}?body=${message}`;
+                  Linking.openURL(url).catch(() => {
+                    Alert.alert('Error', `Could not open ${methodName}`);
+                  });
+                }
+              }
+            }
+          ]
+        );
+      }
+    } else {
+      // For existing Spendy users
+      if (friend.inviteMethod === 'email') {
+        // Resend email invitation to existing user
+        await SplittingService.sendFriendRequest(
+          user.id,
+          friend.friendData.email,
+          `Hi! This is a reminder to connect on Spendy 💰`
+        );
+        Alert.alert('Reminder Sent! 📧', `Email reminder sent to ${friend.friendData.fullName}`);
+      } else if (friend.inviteMethod === 'sms' || friend.inviteMethod === 'whatsapp') {
+        // For SMS/WhatsApp to existing users (rare case)
+        const methodName = friend.inviteMethod === 'whatsapp' ? 'WhatsApp' : 'SMS';
+        Alert.alert(
+          `${methodName} Reminder`, 
+          `You can send ${friend.friendData.fullName} another ${methodName.toLowerCase()} message to remind them to accept your friend request on Spendy.`,
+          [
+            { text: 'OK', style: 'default' },
+            {
+              text: `Open ${methodName}`,
+              onPress: () => {
+                const phoneNumber = friend.friendData.mobile;
+                if (phoneNumber) {
+                  const message = encodeURIComponent('Hi! Don\'t forget to accept my friend request on Spendy so we can start splitting expenses! 💰');
+                  const url = friend.inviteMethod === 'whatsapp' 
+                    ? `whatsapp://send?phone=${phoneNumber}&text=${message}`
+                    : `sms:${phoneNumber}?body=${message}`;
+                  Linking.openURL(url).catch(() => {
+                    Alert.alert('Error', `Could not open ${methodName}`);
+                  });
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        // Default fallback
+        await SplittingService.sendFriendRequest(
+          user.id,
+          friend.friendData.email,
+          `Hi! This is a reminder to connect on Spendy 💰`
+        );
+        Alert.alert('Reminder Sent! 📤', `Reminder sent to ${friend.friendData.fullName}`);
+      }
+    }
     
     // Refresh friends data
     notifyBalanceChange();
     
   } catch (error: any) {
+    console.error('Failed to resend invitation:', error);
     Alert.alert('Error', error.message || 'Failed to resend invitation');
   }
 };
@@ -882,91 +1006,86 @@ const renderOverviewTab = () => {
       <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
   <View style={styles.sectionHeader}>
     <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Expenses</Text>
-    <TouchableOpacity onPress={navigateToExpenses}>
-      <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>View All</Text>
-    </TouchableOpacity>
+    <View style={styles.sectionActions}>
+      <TouchableOpacity onPress={() => setShowAddExpense(true)} style={styles.addButton}>
+        <Ionicons name="add" size={16} color={theme.colors.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={navigateToExpenses} style={styles.viewAllButton}>
+        <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
+        <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+      </TouchableOpacity>
+    </View>
   </View>
  
   {expenses.length === 0 ? (
-    <View style={styles.emptyExpenses}>
-      <Text style={[styles.emptyExpensesText, { color: theme.colors.textSecondary }]}>
-        No expenses yet. Add your first expense!
+    <TouchableOpacity 
+      style={styles.emptyStateContainer}
+      onPress={() => setShowAddExpense(true)}
+      activeOpacity={0.7}
+    >
+      <Ionicons name="receipt-outline" size={40} color={theme.colors.textSecondary} />
+      <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+        No expenses yet
       </Text>
-    </View>
+      <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+        Tap to add your first expense
+      </Text>
+    </TouchableOpacity>
   ) : (
     <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.horizontalScrollContent}
-      style={styles.horizontalScroll}
+      showsVerticalScrollIndicator={false}
+      style={styles.expenseCardsList}
     >
-      {expenses.slice(0, 10).map((expense, index) => (
+      {expenses.slice(0, 5).map((expense) => (
         <TouchableOpacity
           key={expense.id}
-          style={[styles.expenseCard, { backgroundColor: theme.colors.background }]}
+          style={[styles.expenseCardRow, { backgroundColor: theme.colors.background }]}
           onPress={() => handleEditExpenseFromDetails(expense)}
+          activeOpacity={0.7}
         >
-          <View style={styles.expenseCardHeader}>
-            <Text style={styles.expenseCardIcon}>{expense.categoryIcon}</Text>
-            <View style={styles.expenseCardAmount}>
-              <Text style={[styles.expenseCardAmountText, { color: theme.colors.text }]}>
-                {getCurrencySymbol(user?.currency || 'USD')}{expense.amount.toFixed(2)}
-              </Text>
-            </View>
-          </View>
-          
-          <View style={styles.expenseCardContent}>
-            <Text 
-              style={[styles.expenseCardTitle, { color: theme.colors.text }]} 
-              numberOfLines={2}
-            >
-              {expense.description}
-            </Text>
-            <Text 
-              style={[styles.expenseCardDate, { color: theme.colors.textSecondary }]}
-              numberOfLines={1}
-            >
-              {expense.date.toLocaleDateString()}
-            </Text>
-            <Text 
-              style={[styles.expenseCardPaidBy, { color: theme.colors.textSecondary }]}
-              numberOfLines={1}
-            >
-              Paid by {expense.paidByData?.fullName || 'Unknown'}
+          {/* Left: Category Icon */}
+          <View style={[styles.categoryIconContainer, { backgroundColor: theme.colors.primary + '20' }]}>
+            <Text style={styles.categoryIconText}>
+              {expense.categoryIcon}
             </Text>
           </View>
 
-          <View style={styles.expenseCardFooter}>
-            {(() => {
-              const hasUpdated = expense.updatedAt && expense.createdAt;
-              const timeDiff = hasUpdated ? Math.abs(expense.updatedAt.getTime() - expense.createdAt.getTime()) : 0;
-              const isEdited = hasUpdated && timeDiff > 1000;
-              
-              return isEdited ? (
-                <View style={[styles.editedBadgeSmall, { backgroundColor: theme.colors.primary + '20' }]}>
-                  <Ionicons name="create" size={10} color={theme.colors.primary} />
-                  <Text style={[styles.editedTextSmall, { color: theme.colors.primary }]}>Edited</Text>
-                </View>
-              ) : (
-                <View style={styles.expenseCardSpacer} />
-              );
-            })()}
+          {/* Center: Expense Details */}
+          <View style={styles.expenseCardDetails}>
+            <Text style={[styles.expenseCardTitle, { color: theme.colors.text }]} numberOfLines={1}>
+              {expense.description}
+            </Text>
+            <View style={styles.expenseCardMeta}>
+              <Text style={[styles.expenseCardPaidBy, { color: theme.colors.textSecondary }]}>
+                Paid by {expense.paidByData?.fullName || 'Unknown'}
+              </Text>
+              <Text style={[styles.metaSeparator, { color: theme.colors.textSecondary }]}>•</Text>
+              <Text style={[styles.expenseCardDate, { color: theme.colors.textSecondary }]}>
+                {expense.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </Text>
+              {(() => {
+                const hasUpdated = expense.updatedAt && expense.createdAt;
+                const timeDiff = hasUpdated ? Math.abs(expense.updatedAt.getTime() - expense.createdAt.getTime()) : 0;
+                const isEdited = hasUpdated && timeDiff > 1000;
+                
+                return isEdited ? (
+                  <>
+                    <Text style={[styles.metaSeparator, { color: theme.colors.textSecondary }]}>•</Text>
+                    <Text style={[styles.editedTextInline, { color: theme.colors.primary }]}>Edited</Text>
+                  </>
+                ) : null;
+              })()}
+            </View>
+          </View>
+
+          {/* Right: Amount */}
+          <View style={styles.expenseCardAmount}>
+            <Text style={[styles.expenseCardAmountText, { color: theme.colors.error }]}>
+              -{getCurrencySymbol(user?.currency || 'USD')}{expense.amount.toFixed(2)}
+            </Text>
           </View>
         </TouchableOpacity>
       ))}
-      
-      {/* Add Expense Card */}
-      <TouchableOpacity
-        style={[styles.addExpenseCard, { backgroundColor: theme.colors.primary + '10', borderColor: theme.colors.primary }]}
-        onPress={() => setShowAddExpense(true)}
-      >
-        <View style={styles.addExpenseCardContent}>
-          <Ionicons name="add-circle" size={32} color={theme.colors.primary} />
-          <Text style={[styles.addExpenseCardText, { color: theme.colors.primary }]}>
-            Add New{'\n'}Expense
-          </Text>
-        </View>
-      </TouchableOpacity>
     </ScrollView>
   )}
 </View>
@@ -980,29 +1099,39 @@ const renderOverviewTab = () => {
       <TouchableOpacity onPress={overviewBalances.refresh} style={styles.refreshButton}>
         <Ionicons name="refresh" size={16} color={theme.colors.primary} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => setActiveTab('friends')}>
-        <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>View All</Text>
+      <TouchableOpacity onPress={() => setShowAddFriend(true)} style={styles.addButton}>
+        <Ionicons name="person-add" size={16} color={theme.colors.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setActiveTab('friends')} style={styles.viewAllButton}>
+        <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
+        <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
       </TouchableOpacity>
     </View>
   </View>
   
   {overviewBalances.isEmpty ? (
-    <View style={styles.emptyExpenses}>
-      <Text style={[styles.emptyExpensesText, { color: theme.colors.textSecondary }]}>
-        No friends yet. Add your first friend!
+    <TouchableOpacity 
+      style={styles.emptyStateContainer}
+      onPress={() => setShowAddFriend(true)}
+      activeOpacity={0.7}
+    >
+      <Ionicons name="people-outline" size={40} color={theme.colors.textSecondary} />
+      <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+        No friends yet
       </Text>
-    </View>
+      <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+        Tap to add your first friend
+      </Text>
+    </TouchableOpacity>
   ) : (
     <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.horizontalScrollContent}
-      style={styles.horizontalScroll}
+      showsVerticalScrollIndicator={false}
+      style={styles.friendCardsList}
     >
-      {overviewBalances.allBalances.slice(0, 10).map((detail, index) => (
+      {overviewBalances.allBalances.slice(0, 5).map((detail, index) => (
         <TouchableOpacity
           key={`balance-${detail.userId}-${index}`}
-          style={[styles.friendCard, { backgroundColor: theme.colors.background }]}
+          style={[styles.friendCardRow, { backgroundColor: theme.colors.background }]}
           onPress={() => {
             if (detail.source === 'friend') {
               const friend = friends.find(f => f.friendId === detail.userId);
@@ -1014,76 +1143,59 @@ const renderOverviewTab = () => {
               setActiveTab('friends');
             }
           }}
+          activeOpacity={0.7}
         >
-          <View style={styles.friendCardHeader}>
-            <View style={[styles.friendCardAvatar, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.friendCardAvatarText}>
-                {detail.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
+          {/* Left: Friend Avatar */}
+          <View style={[styles.friendIconContainer, { backgroundColor: theme.colors.primary }]}>
+            <Text style={styles.friendIconText}>
+              {detail.name.charAt(0).toUpperCase()}
+            </Text>
             {detail.source === 'group' && (
               <View style={[styles.groupIndicator, { backgroundColor: theme.colors.primary + '20' }]}>
                 <Ionicons name="people" size={10} color={theme.colors.primary} />
               </View>
             )}
           </View>
-          
-          <View style={styles.friendCardContent}>
-            <Text 
-              style={[styles.friendCardName, { color: theme.colors.text }]} 
-              numberOfLines={1}
-            >
+
+          {/* Center: Friend Details */}
+          <View style={styles.friendCardRowDetails}>
+            <Text style={[styles.friendCardRowName, { color: theme.colors.text }]} numberOfLines={1}>
               {detail.name}
             </Text>
-            {detail.source === 'group' && detail.groupName && (
-              <Text 
-                style={[styles.friendCardGroup, { color: theme.colors.textSecondary }]}
-                numberOfLines={1}
-              >
-                {detail.groupName}
+            <View style={styles.friendCardRowMeta}>
+              <Text style={[styles.friendCardRowSource, { color: theme.colors.textSecondary }]}>
+                {detail.source === 'group' ? `Group: ${detail.groupName}` : 'Friend'}
               </Text>
-            )}
+            </View>
           </View>
 
-          <View style={styles.friendCardBalance}>
+          {/* Right: Balance */}
+          <View style={styles.friendCardRowBalance}>
             {Math.abs(detail.balance) < 0.01 ? (
               <>
                 <Ionicons name="checkmark-circle" size={16} color={theme.colors.textSecondary} />
-                <Text style={[styles.friendCardBalanceText, { color: theme.colors.textSecondary }]}>
+                <Text style={[styles.friendCardRowBalanceText, { color: theme.colors.textSecondary }]}>
                   Settled
                 </Text>
               </>
             ) : detail.balance > 0 ? (
               <>
-                <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
-                <Text style={[styles.friendCardBalanceText, { color: theme.colors.success }]}>
+                <Text style={[styles.friendCardRowBalanceText, { color: theme.colors.success }]}>
                   +{getCurrencySymbol(user?.currency || 'USD')}{detail.balance.toFixed(2)}
                 </Text>
+                <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
               </>
             ) : (
               <>
-                <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
-                <Text style={[styles.friendCardBalanceText, { color: theme.colors.error }]}>
+                <Text style={[styles.friendCardRowBalanceText, { color: theme.colors.error }]}>
                   -{getCurrencySymbol(user?.currency || 'USD')}{Math.abs(detail.balance).toFixed(2)}
                 </Text>
+                <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
               </>
             )}
           </View>
         </TouchableOpacity>
       ))}
-      
-      {/* Add Friend Card */}
-      <TouchableOpacity
-        style={[styles.addFriendCard, { backgroundColor: theme.colors.primary + '10', borderColor: theme.colors.primary }]}
-        onPress={() => setShowAddFriend(true)}
-      >
-        <View style={styles.addFriendCardContent}>
-          <Ionicons name="person-add" size={32} color={theme.colors.primary} />
-          <Text style={[styles.addFriendCardText, { color: theme.colors.primary }]}>
-            Add New{'\n'}Friend
-          </Text>
-        </View>
-      </TouchableOpacity>
     </ScrollView>
   )}
 </View>
@@ -1202,17 +1314,129 @@ const renderFriendsTab = () => {
             </View>
           )}
 
-          {/* Pending Invitations Section */}
-          {friends.filter(f => f.status === 'pending' || f.status === 'invited').length > 0 && (
+          {/* Pending Invitations Section - Existing Spendy Users */}
+          {(() => {
+            const existingUserInvitations = friends.filter(f => (f.status === 'pending' || f.status === 'invited') && !f.isNewUser);
+            console.log('🔍 Checking existing user invitations:', {
+              totalFriends: friends.length,
+              existingUserInvitations: existingUserInvitations.length,
+              received: existingUserInvitations.filter(f => f.requestType === 'received').length,
+              sent: existingUserInvitations.filter(f => f.requestType === 'sent').length
+            });
+            return existingUserInvitations.length > 0;
+          })() && (
             <View style={styles.section}>
               <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
-                Pending Invitations ({friends.filter(f => f.status === 'pending' || f.status === 'invited').length})
+                Pending Invitations ({friends.filter(f => (f.status === 'pending' || f.status === 'invited') && !f.isNewUser).length})
               </Text>
               {friends
-                .filter(friend => friend.status === 'pending' || friend.status === 'invited')
+                .filter(friend => (friend.status === 'pending' || friend.status === 'invited') && !friend.isNewUser)
+                .map((friend, index) => {
+                  const isReceivedRequest = friend.requestType === 'received' && friend.status === 'pending';
+                  return (
+                    <TouchableOpacity
+                      key={`pending-existing-${friend.id}-${index}`}
+                      style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
+                      onPress={() => showPendingFriendActionsMenu(friend)}
+                    >
+                      <View style={styles.balanceItemLeft}>
+                        <View style={[styles.personAvatar, { backgroundColor: theme.colors.textSecondary }]}>
+                          <Text style={styles.personAvatarText}>
+                            {friend.friendData.fullName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.personInfo}>
+                          <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
+                            {friend.friendData.fullName}
+                          </Text>
+                          <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                            {friend.friendData.email}
+                          </Text>
+                          <View style={styles.pendingIndicator}>
+                            <Ionicons 
+                              name={isReceivedRequest ? "person-add" : "time"} 
+                              size={12} 
+                              color={isReceivedRequest ? theme.colors.success : theme.colors.warning} 
+                            />
+                            <Text style={[styles.pendingText, { 
+                              color: isReceivedRequest ? theme.colors.success : theme.colors.warning 
+                            }]}>
+                              {isReceivedRequest ? 'Friend Request Received' : 
+                               friend.inviteMethod === 'email' ? 'Email Sent' : 
+                               friend.inviteMethod === 'whatsapp' ? 'WhatsApp Sent' : 
+                               friend.inviteMethod === 'sms' ? 'SMS Sent' : 'Invitation Sent'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={styles.balanceItemRight}>
+                        {isReceivedRequest ? (
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity
+                              style={[styles.resendButton, { backgroundColor: theme.colors.success }]}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                friend.requestId && handleAcceptFriendRequest(friend.requestId);
+                              }}
+                            >
+                              <Ionicons name="checkmark" size={14} color="white" />
+                              <Text style={[styles.resendButtonText, { color: 'white' }]}>
+                                Accept
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.resendButton, { backgroundColor: theme.colors.error }]}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                friend.requestId && handleDeclineFriendRequest(friend.requestId);
+                              }}
+                            >
+                              <Ionicons name="close" size={14} color="white" />
+                              <Text style={[styles.resendButtonText, { color: 'white' }]}>
+                                Decline
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={[styles.resendButton, { backgroundColor: theme.colors.warning }]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              handleResendInvitation(friend);
+                            }}
+                          >
+                            <Ionicons name="refresh" size={14} color="white" />
+                            <Text style={[styles.resendButtonText, { color: 'white' }]}>
+                              Remind
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+            </View>
+          )}
+
+          {/* Yet to Join Section - New Users */}
+          {(() => {
+            const newUserInvitations = friends.filter(f => (f.status === 'pending' || f.status === 'invited') && f.isNewUser);
+            console.log('🔍 Checking new user invitations:', {
+              totalFriends: friends.length,
+              newUserInvitations: newUserInvitations.length
+            });
+            return newUserInvitations.length > 0;
+          })() && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
+                Yet to Join ({friends.filter(f => (f.status === 'pending' || f.status === 'invited') && f.isNewUser).length})
+              </Text>
+              {friends
+                .filter(friend => (friend.status === 'pending' || friend.status === 'invited') && friend.isNewUser)
                 .map((friend, index) => (
                   <TouchableOpacity
-                    key={`pending-${friend.id}-${index}`}
+                    key={`pending-new-${friend.id}-${index}`}
                     style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
                     onPress={() => showPendingFriendActionsMenu(friend)}
                   >
@@ -1227,12 +1451,14 @@ const renderFriendsTab = () => {
                           {friend.friendData.fullName}
                         </Text>
                         <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                          {friend.friendData.email}
+                          {friend.friendData.email || friend.friendData.mobile || 'Contact'}
                         </Text>
                         <View style={styles.pendingIndicator}>
-                          <Ionicons name="time" size={12} color={theme.colors.warning} />
-                          <Text style={[styles.pendingText, { color: theme.colors.warning }]}>
-                            Invitation Sent
+                          <Ionicons name="person-add" size={12} color={theme.colors.primary} />
+                          <Text style={[styles.pendingText, { color: theme.colors.primary }]}>
+                            {friend.inviteMethod === 'email' ? 'Email Sent - Not on Spendy yet' : 
+                             friend.inviteMethod === 'whatsapp' ? 'WhatsApp Sent - Not on Spendy yet' : 
+                             friend.inviteMethod === 'sms' ? 'SMS Sent - Not on Spendy yet' : 'Invitation Sent - Not on Spendy yet'}
                           </Text>
                         </View>
                       </View>
@@ -1240,15 +1466,15 @@ const renderFriendsTab = () => {
 
                     <View style={styles.balanceItemRight}>
                       <TouchableOpacity
-                        style={[styles.resendButton, { backgroundColor: theme.colors.warning }]}
+                        style={[styles.resendButton, { backgroundColor: theme.colors.primary }]}
                         onPress={(e) => {
                           e.stopPropagation();
                           handleResendInvitation(friend);
                         }}
                       >
-                        <Ionicons name="refresh" size={14} color="white" />
+                        <Ionicons name="send" size={14} color="white" />
                         <Text style={[styles.resendButtonText, { color: 'white' }]}>
-                          Remind
+                          Resend
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -1589,7 +1815,9 @@ const showFriendActionsMenu = (friend: Friend) => {
   // Management actions
   actions.push({
     text: friend.status === 'blocked' ? 'Unblock Friend' : 'Block Friend',
-    onPress: () => handleBlockUnblockFriend(friend, friend.status !== 'blocked')
+    // TODO: Implement block/unblock functionality
+    // onPress: () => handleBlockUnblockFriend(friend, friend.status !== 'blocked')
+    onPress: () => Alert.alert('Feature Coming Soon', 'Block/Unblock functionality will be available in a future update.')
   });
 
   actions.push({
@@ -1738,9 +1966,12 @@ const showFriendActionsMenu = (friend: Friend) => {
           break;
 
         case 'friend_request':
+          console.log('🤝 Handling friend_request navigation intent:', intent);
           setActiveTab('friends');
           if (intent.friendRequestId) {
+            console.log('📋 Refreshing friends for friend request:', intent.friendRequestId);
             await friendsManager.refreshFriends();
+            await loadNotifications(); // Also refresh notifications
             notifyBalanceChange(); // FIXED: Notify balance system
           }
           break;
@@ -1770,21 +2001,43 @@ const showFriendActionsMenu = (friend: Friend) => {
       
       switch (type) {
         case 'friend_request':
+          console.log('🤝 Processing friend request notification:', data);
           setActiveTab('friends');
+          
+          // Refresh friends list to show the received friend request
+          try {
+            await friendsManager.forceRefresh();
+            console.log('✅ Friends list refreshed for new friend request');
+          } catch (error) {
+            console.error('❌ Failed to refresh friends list:', error);
+          }
+          
           if (data.friendRequestId && data.senderName) {
+            console.log('📋 Friend request data:', {
+              friendRequestId: data.friendRequestId,
+              senderName: data.senderName,
+              senderEmail: data.senderEmail,
+              fromUserId: data.fromUserId
+            });
+            
             const friendRequestData = {
               id: data.friendRequestId,
+              fromUserId: data.fromUserId || '',
               fromUserData: {
                 fullName: data.senderName,
                 email: data.senderEmail || '',
                 avatar: data.senderAvatar
               },
               message: data.message || `${data.senderName} wants to be your friend`,
-              status: 'pending' as const
+              status: 'pending' as const,
+              createdAt: new Date() // Add the required createdAt field
             };
             
+            console.log('🎯 Opening friend request modal with data:', friendRequestData);
             setSelectedFriendRequest(friendRequestData);
             setShowFriendRequest(true);
+          } else {
+            console.warn('⚠️ Missing required friend request data:', data);
           }
           break;
 
@@ -1850,6 +2103,15 @@ const showFriendActionsMenu = (friend: Friend) => {
     try {
       await SplittingService.acceptFriendRequest(requestId);
       notifyBalanceChange(); // FIXED: Notify balance system
+      
+      // Refresh friends list to update UI
+      try {
+        await friendsManager.forceRefresh();
+        console.log('✅ Friends list refreshed after accepting friend request');
+      } catch (refreshError) {
+        console.error('❌ Failed to refresh friends list:', refreshError);
+      }
+      
       setShowFriendRequest(false);
       setSelectedFriendRequest(null);
       Alert.alert('Success', 'Friend request accepted!');
@@ -1863,6 +2125,15 @@ const showFriendActionsMenu = (friend: Friend) => {
   const handleDeclineFriendRequest = async (requestId: string) => {
     try {
       await SplittingService.declineFriendRequest(requestId);
+      
+      // Refresh friends list to update UI
+      try {
+        await friendsManager.forceRefresh();
+        console.log('✅ Friends list refreshed after declining friend request');
+      } catch (refreshError) {
+        console.error('❌ Failed to refresh friends list:', refreshError);
+      }
+      
       setShowFriendRequest(false);
       setSelectedFriendRequest(null);
       Alert.alert('Success', 'Friend request declined');
@@ -2191,7 +2462,6 @@ const showFriendActionsMenu = (friend: Friend) => {
       <SimpleExpenseListModal
         visible={showSimpleExpenseList}
         onClose={() => setShowSimpleExpenseList(false)}
-        groupId={expenseListGroupId}
         title={expenseListTitle}
         onExpensePress={(expense) => {
           setShowSimpleExpenseList(false);
@@ -2957,6 +3227,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  // Pending invitation styles
+  pendingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  pendingText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  resendButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  resendButtonText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  // Invite button styles
+  inviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  inviteButtonText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
   // Refresh button
   refreshButton: {
     flexDirection: 'row',
@@ -3143,6 +3449,130 @@ addFriendCardText: {
   fontWeight: '500',
   textAlign: 'center',
   lineHeight: 16,
+},
+
+// New vertical card row styles (similar to SmartMoneyApp)
+viewAllButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+},
+viewAllText: {
+  fontSize: 14,
+  fontWeight: '500',
+},
+addButton: {
+  padding: 4,
+  marginRight: 8,
+},
+emptyStateContainer: {
+  alignItems: 'center',
+  paddingVertical: 40,
+  paddingHorizontal: 20,
+},
+emptyStateText: {
+  fontSize: 16,
+  fontWeight: '600',
+  marginTop: 12,
+  textAlign: 'center',
+},
+emptyStateSubtext: {
+  fontSize: 14,
+  marginTop: 4,
+  textAlign: 'center',
+},
+
+// Expense Card Rows (New Layout)
+expenseCardsList: {
+  maxHeight: 300,
+},
+expenseCardRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  marginVertical: 4,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+},
+categoryIconContainer: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 12,
+},
+categoryIconText: {
+  fontSize: 18,
+},
+expenseCardDetails: {
+  flex: 1,
+},
+expenseCardMeta: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 4,
+},
+metaSeparator: {
+  fontSize: 13,
+  marginHorizontal: 6,
+},
+editedTextInline: {
+  fontSize: 13,
+  fontWeight: '500',
+},
+
+// Friend Card Rows (New Layout)
+friendCardsList: {
+  maxHeight: 300,
+},
+friendCardRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  marginVertical: 4,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+},
+friendIconContainer: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 12,
+},
+friendIconText: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: 'white',
+},
+friendCardRowDetails: {
+  flex: 1,
+},
+friendCardRowName: {
+  fontSize: 16,
+  fontWeight: '600',
+  marginBottom: 4,
+},
+friendCardRowMeta: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+friendCardRowSource: {
+  fontSize: 13,
+  fontWeight: '400',
+},
+friendCardRowBalance: {
+  alignItems: 'flex-end',
+},
+friendCardRowBalanceText: {
+  fontSize: 16,
+  fontWeight: 'bold',
 },
 
 

@@ -1,53 +1,54 @@
-// services/DealsAPI.ts - Updated for Multi-Source Support
+// services/DealsAPI.ts - Fixed with correct Firebase URLs
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Configuration for different serverless providers
-const SERVERLESS_CONFIGS = {
-  firebase: {
-    baseUrl: 'https://us-central1-spendy-97913.cloudfunctions.net',
-    endpoints: {
-      deals: '/getDeals',
-      refresh: '/refreshDeals',
-      health: '/healthCheck',
-      // TODO: Implement these source-specific endpoints in Firebase Functions
-      // For now, all requests go through the main /getDeals endpoint with source parameter
-      // ozbargain: '/getOzBargainDeals',
-      // coles: '/getColesDeals',
-      // woolworths: '/getWoolworthsDeals',
-      // costco: '/getCostcoDeals',
-      // bunnings: '/getBunningsDeals',
-      // jbhifi: '/getJBHiFiDeals',
-      // goodguys: '/getGoodGuysDeals',
-      // harveynorman: '/getHarveyNormanDeals',
-    }
+// Firebase Functions Configuration - CORRECTED URLs
+const CONFIG = {
+  baseUrl: 'https://us-central1-spendy-97913.cloudfunctions.net',
+  endpoints: {
+    deals: '/getDeals',
+    refresh: '/refreshDeals',
+    health: '/healthCheck',
+    categories: '/getCategories',
+    debug: '/debugScrape', // New debug endpoint
   }
 };
 
-// Choose your provider here
-const PROVIDER = 'firebase';
-const CONFIG = SERVERLESS_CONFIGS[PROVIDER];
+const CACHE_KEY = '@ozbargain_deals_cache_';
+const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
-const CACHE_KEY = '@deals_cache';
-const SOURCE_CACHE_KEY = '@source_cache_';
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-
-// Source-specific cache durations (some sources update more frequently)
-const SOURCE_CACHE_DURATIONS = {
-  ozbargain: 15 * 60 * 1000, // 15 minutes
-  coles: 60 * 60 * 1000, // 1 hour
-  woolworths: 60 * 60 * 1000, // 1 hour
-  costco: 2 * 60 * 60 * 1000, // 2 hours
-  bunnings: 4 * 60 * 60 * 1000, // 4 hours
-  jbhifi: 2 * 60 * 60 * 1000, // 2 hours
-  goodguys: 2 * 60 * 60 * 1000, // 2 hours
-  harveynorman: 2 * 60 * 60 * 1000, // 2 hours
-};
+// OzBargain Categories
+export const OZBARGAIN_CATEGORIES = [
+  'All Deals',
+  'Long Running', 
+  'Freebies',
+  'Alcohol',
+  'Automotive',
+  'Books & Magazines',
+  'Computing',
+  'Dining & Takeaway',
+  'Education',
+  'Electrical & Electronics',
+  'Entertainment',
+  'Fashion & Apparel',
+  'Financial',
+  'Gaming',
+  'Groceries',
+  'Health & Beauty',
+  'Home & Garden',
+  'Internet',
+  'Mobile',
+  'Pets',
+  'Sports & Outdoors',
+  'Toys & Kids',
+  'Travel',
+  'Other'
+];
 
 export interface Deal {
   id: string;
   title: string;
   description: string;
-  category: 'Electronics' | 'Groceries' | 'Home & Garden' | 'Fashion' | 'Entertainment' | 'Sports';
+  category: string;
   originalPrice: number;
   discountedPrice: number;
   discount: number;
@@ -58,19 +59,17 @@ export interface Deal {
   userLiked?: boolean;
   userDisliked?: boolean;
   isGroupDeal: boolean;
-  groupProgress?: number;
-  maxParticipants?: number;
-  currentParticipants?: number;
   chatEnabled: boolean;
   isPartnership: boolean;
   businessName?: string;
   location?: string;
-  source: 'user' | 'ozbargain' | 'coles' | 'woolworths' | 'costco' | 'bunnings' | 'jbhifi' | 'goodguys' | 'harveynorman';
-  dealUrl?: string;
-  imageUrl?: string;
+  source: 'ozbargain';
+  dealUrl: string;
+  ozBargainUrl?: string;
   tags?: string[];
-  validUntil?: string;
   stockLevel?: 'high' | 'medium' | 'low' | 'out';
+  categoryIcon?: string;
+  timePosted?: string;
 }
 
 export interface DealsResponse {
@@ -84,21 +83,16 @@ export interface DealsResponse {
     dealsPerPage: number;
   };
   lastUpdated: string;
-  sources?: {
-    [key: string]: number;
-  };
-  sourceStats?: {
-    totalSources: number;
-    activeSources: string[];
-    lastRefresh: { [key: string]: string };
-  };
+  category: string;
+  availableCategories: string[];
+  source: 'ozbargain';
 }
 
 interface CachedData {
   data: Deal[];
   timestamp: number;
   lastUpdated: string;
-  source?: string;
+  category: string;
 }
 
 export class DealsAPI {
@@ -119,10 +113,8 @@ export class DealsAPI {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'User-Agent': 'Spendy-App/1.0',
+          'User-Agent': 'Spendy-App/2.0',
         },
-        // Increase timeout for serverless cold starts
-        ...(global as any).fetch && { timeout: 45000 },
       });
 
       if (!response.ok) {
@@ -134,7 +126,7 @@ export class DealsAPI {
         endpoint, 
         dealsCount: data.deals?.length || 0, 
         totalDeals: data.pagination?.totalDeals || 0,
-        source: params?.source || 'all'
+        category: data.category || params?.category || 'unknown'
       });
       
       return data;
@@ -146,46 +138,34 @@ export class DealsAPI {
 
   static async fetchDeals(
     page: number = 1,
-    category?: string,
-    source: string = 'all',
+    category: string = 'All Deals',
     forceRefresh: boolean = false
   ): Promise<DealsResponse> {
     try {
       // Check cache first if not forcing refresh
       if (!forceRefresh) {
-        const cachedData = await this.getCachedDeals(source);
+        const cachedData = await this.getCachedDeals(category);
         if (cachedData) {
-          return this.paginateDeals(cachedData.data, page, category, cachedData.lastUpdated, source);
+          return this.paginateDeals(cachedData.data, page, category, cachedData.lastUpdated);
         }
       }
 
       // Prepare query parameters
       const params: Record<string, string> = {
         page: page.toString(),
-        limit: '20',
+        limit: '50',
+        category: category
       };
-      
-      if (category && category !== 'All') {
-        params.category = category;
-      }
-
-      if (source && source !== 'all') {
-        params.source = source;
-      }
       
       if (forceRefresh) {
         params.refresh = 'true';
       }
 
-      // For now, always use the main deals endpoint since source-specific endpoints don't exist yet
-      // TODO: Implement source-specific endpoints in Firebase Functions
-      const endpoint: keyof typeof CONFIG.endpoints = 'deals';
-      
-      const response = await this.makeRequest(endpoint, params);
+      const response = await this.makeRequest('deals', params);
       
       // Cache the data
       if (response.deals) {
-        await this.cacheDeals(response.deals, response.lastUpdated, source);
+        await this.cacheDeals(response.deals, response.lastUpdated, category);
       }
 
       return response;
@@ -193,10 +173,10 @@ export class DealsAPI {
       console.error('Failed to fetch deals:', error);
       
       // Fallback to cache if available
-      const cachedData = await this.getCachedDeals(source);
+      const cachedData = await this.getCachedDeals(category);
       if (cachedData) {
         console.log('Using cached data as fallback');
-        return this.paginateDeals(cachedData.data, page, category, cachedData.lastUpdated, source);
+        return this.paginateDeals(cachedData.data, page, category, cachedData.lastUpdated);
       }
 
       // Return empty response as last resort
@@ -211,51 +191,53 @@ export class DealsAPI {
           dealsPerPage: 20,
         },
         lastUpdated: new Date().toISOString(),
-        sources: {},
+        category: category,
+        availableCategories: OZBARGAIN_CATEGORIES,
+        source: 'ozbargain',
       };
     }
   }
 
-  static async refreshDeals(source: string = 'all'): Promise<{ success: boolean; message: string; totalDeals?: number }> {
+  static async refreshDeals(category: string = 'All Deals'): Promise<{ success: boolean; message: string; totalDeals?: number }> {
     try {
-      console.log(`Triggering manual deals refresh for source: ${source}...`);
+      console.log(`Triggering manual deals refresh for category: ${category}...`);
       
-      // For now, refresh using the main endpoint since source-specific endpoints don't exist
-      // The backend should filter by source parameter
       const params: Record<string, string> = { 
-        refresh: 'true', 
-        page: '1', 
-        limit: '50' 
+        category: category
       };
-      
-      if (source !== 'all') {
-        params.source = source;
-      }
 
-      const response = await this.makeRequest('deals', params);
+      const response = await this.makeRequest('refresh', params);
       
       // Clear cache to force fresh data on next fetch
-      await AsyncStorage.removeItem(CACHE_KEY);
-      if (source !== 'all') {
-        await AsyncStorage.removeItem(`${SOURCE_CACHE_KEY}${source}`);
-      }
-      
-      // Cache the new data
-      if (response.deals) {
-        await this.cacheDeals(response.deals, response.lastUpdated, source);
-      }
+      await AsyncStorage.removeItem(`${CACHE_KEY}${category.toLowerCase().replace(/\s+/g, '_')}`);
       
       return {
         success: true,
-        message: `Successfully refreshed ${response.pagination?.totalDeals || response.deals?.length || 0} deals from ${source}`,
-        totalDeals: response.pagination?.totalDeals || response.deals?.length || 0,
+        message: response.message || `Successfully refreshed ${response.totalDeals || 0} deals for ${category}`,
+        totalDeals: response.totalDeals || 0,
       };
     } catch (error) {
       console.error('Failed to refresh deals:', error);
       return {
         success: false,
-        message: `Failed to refresh deals from ${source}. Please check your connection.`,
+        message: `Failed to refresh deals for ${category}. Please check your connection.`,
       };
+    }
+  }
+
+  static async debugScrape(category: string = 'All Deals'): Promise<any> {
+    try {
+      console.log(`Running debug scrape for category: ${category}...`);
+      
+      const params: Record<string, string> = { 
+        category: category
+      };
+
+      const response = await this.makeRequest('debug', params);
+      return response;
+    } catch (error) {
+      console.error('Debug scrape failed:', error);
+      throw error;
     }
   }
 
@@ -263,7 +245,8 @@ export class DealsAPI {
     status: string; 
     cachedDeals: number; 
     platform?: string;
-    sources?: { [key: string]: { status: string; lastUpdate: string; count: number } };
+    availableCategories?: string[];
+    categoryHealth?: { [key: string]: any };
   }> {
     try {
       const response = await this.makeRequest('health');
@@ -274,23 +257,32 @@ export class DealsAPI {
     }
   }
 
-  private static async getCachedDeals(source: string = 'all'): Promise<CachedData | null> {
+  static async getAvailableCategories(): Promise<string[]> {
     try {
-      const cacheKey = source === 'all' ? CACHE_KEY : `${SOURCE_CACHE_KEY}${source}`;
+      const response = await this.makeRequest('categories');
+      return response.categories || OZBARGAIN_CATEGORIES;
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+      return OZBARGAIN_CATEGORIES;
+    }
+  }
+
+  private static async getCachedDeals(category: string): Promise<CachedData | null> {
+    try {
+      const cacheKey = `${CACHE_KEY}${category.toLowerCase().replace(/\s+/g, '_')}`;
       const cached = await AsyncStorage.getItem(cacheKey);
       if (!cached) return null;
 
       const cachedData: CachedData = JSON.parse(cached);
-      const cacheDuration = source === 'all' ? CACHE_DURATION : (SOURCE_CACHE_DURATIONS[source as keyof typeof SOURCE_CACHE_DURATIONS] || CACHE_DURATION);
-      const isExpired = Date.now() - cachedData.timestamp > cacheDuration;
+      const isExpired = Date.now() - cachedData.timestamp > CACHE_DURATION;
       
       if (isExpired) {
-        console.log(`Cache expired for ${source}, removing...`);
+        console.log(`Cache expired for ${category}, removing...`);
         await AsyncStorage.removeItem(cacheKey);
         return null;
       }
       
-      console.log(`Using cached data for ${source}: ${cachedData.data.length} deals`);
+      console.log(`Using cached data for ${category}: ${cachedData.data.length} deals`);
       return cachedData;
     } catch (error) {
       console.error('Cache read error:', error);
@@ -298,17 +290,17 @@ export class DealsAPI {
     }
   }
 
-  private static async cacheDeals(deals: Deal[], lastUpdated: string, source: string = 'all'): Promise<void> {
+  private static async cacheDeals(deals: Deal[], lastUpdated: string, category: string): Promise<void> {
     try {
-      const cacheKey = source === 'all' ? CACHE_KEY : `${SOURCE_CACHE_KEY}${source}`;
+      const cacheKey = `${CACHE_KEY}${category.toLowerCase().replace(/\s+/g, '_')}`;
       const cacheData: CachedData = {
         data: deals,
         timestamp: Date.now(),
         lastUpdated,
-        source,
+        category,
       };
       await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheData));
-      console.log(`Cached ${deals.length} deals for ${source}`);
+      console.log(`Cached ${deals.length} deals for ${category}`);
     } catch (error) {
       console.error('Cache write error:', error);
     }
@@ -317,22 +309,11 @@ export class DealsAPI {
   private static paginateDeals(
     deals: Deal[], 
     page: number, 
-    category?: string, 
-    lastUpdated?: string,
-    source?: string
+    category: string,
+    lastUpdated?: string
   ): DealsResponse {
-    let filteredDeals = deals;
-    
-    // Filter by category
-    if (category && category !== 'All') {
-      filteredDeals = deals.filter(deal => deal.category === category);
-    }
-
-    // Sort deals by relevance and freshness
-    filteredDeals.sort((a, b) => {
-      // Priority: Partnership deals, then by likes, then by recency
-      if (a.isPartnership && !b.isPartnership) return -1;
-      if (!a.isPartnership && b.isPartnership) return 1;
+    // Sort deals by relevance (likes first, then by recency)
+    const sortedDeals = deals.sort((a, b) => {
       if (a.likes !== b.likes) return b.likes - a.likes;
       return new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime();
     });
@@ -341,61 +322,37 @@ export class DealsAPI {
     const dealsPerPage = 20;
     const startIndex = (page - 1) * dealsPerPage;
     const endIndex = startIndex + dealsPerPage;
-    const paginatedDeals = filteredDeals.slice(startIndex, endIndex);
+    const paginatedDeals = sortedDeals.slice(startIndex, endIndex);
 
-    const totalPages = Math.ceil(filteredDeals.length / dealsPerPage);
-
-    // Calculate source statistics
-    const sourceStats = deals.reduce((acc, deal) => {
-      acc[deal.source] = (acc[deal.source] || 0) + 1;
-      return acc;
-    }, {} as { [key: string]: number });
+    const totalPages = Math.ceil(sortedDeals.length / dealsPerPage);
 
     return {
       deals: paginatedDeals,
       pagination: {
         currentPage: page,
         totalPages,
-        totalDeals: filteredDeals.length,
+        totalDeals: sortedDeals.length,
         hasNextPage: page < totalPages,
         hasPreviousPage: page > 1,
         dealsPerPage,
       },
       lastUpdated: lastUpdated || new Date().toISOString(),
-      sources: sourceStats,
-      sourceStats: {
-        totalSources: Object.keys(sourceStats).length,
-        activeSources: Object.keys(sourceStats),
-        lastRefresh: { [source || 'all']: lastUpdated || new Date().toISOString() },
-      },
+      category: category,
+      availableCategories: OZBARGAIN_CATEGORIES,
+      source: 'ozbargain',
     };
   }
 
-  // Enhanced method to get deals by source with better filtering
-  static async getDealsBySource(source: string, category?: string, page: number = 1): Promise<DealsResponse> {
-    return this.fetchDeals(page, category, source, false);
+  // Get deals by category
+  static async getDealsByCategory(category: string, page: number = 1): Promise<DealsResponse> {
+    return this.fetchDeals(page, category, false);
   }
 
-  // Method to get trending deals across all sources
-  static async getTrendingDeals(limit: number = 10): Promise<Deal[]> {
+  // Search deals within a category
+  static async searchDeals(query: string, category?: string): Promise<Deal[]> {
     try {
-      const cachedData = await this.getCachedDeals('all');
-      if (cachedData) {
-        return cachedData.data
-          .sort((a, b) => (b.likes + b.discount * 0.1) - (a.likes + a.discount * 0.1))
-          .slice(0, limit);
-      }
-      return [];
-    } catch (error) {
-      console.error('Error getting trending deals:', error);
-      return [];
-    }
-  }
-
-  // Method to search deals across all sources
-  static async searchDeals(query: string, source?: string): Promise<Deal[]> {
-    try {
-      const cachedData = await this.getCachedDeals(source || 'all');
+      const searchCategory = category || 'All Deals';
+      const cachedData = await this.getCachedDeals(searchCategory);
       if (cachedData) {
         const searchTerms = query.toLowerCase().split(' ');
         return cachedData.data.filter(deal => {
@@ -410,13 +367,11 @@ export class DealsAPI {
     }
   }
 
-  // Utility method to get deal by ID (for chat, details, etc.)
+  // Get deal by ID
   static async getDealById(dealId: string): Promise<Deal | null> {
     try {
-      const allSources = ['all', 'ozbargain', 'coles', 'woolworths', 'costco', 'bunnings', 'jbhifi', 'goodguys', 'harveynorman'];
-      
-      for (const source of allSources) {
-        const cachedData = await this.getCachedDeals(source);
+      for (const category of OZBARGAIN_CATEGORIES) {
+        const cachedData = await this.getCachedDeals(category);
         if (cachedData) {
           const deal = cachedData.data.find(d => d.id === dealId);
           if (deal) return deal;
@@ -429,16 +384,14 @@ export class DealsAPI {
     }
   }
 
-  // Enhanced interaction tracking with source consideration
+  // Update deal interaction (likes/dislikes)
   static async updateDealInteraction(
     dealId: string, 
     interaction: { liked?: boolean; disliked?: boolean }
   ): Promise<void> {
     try {
-      const allSources = ['all', 'ozbargain', 'coles', 'woolworths', 'costco', 'bunnings', 'jbhifi', 'goodguys', 'harveynorman'];
-      
-      for (const source of allSources) {
-        const cachedData = await this.getCachedDeals(source);
+      for (const category of OZBARGAIN_CATEGORIES) {
+        const cachedData = await this.getCachedDeals(category);
         if (cachedData) {
           const dealIndex = cachedData.data.findIndex(deal => deal.id === dealId);
           if (dealIndex !== -1) {
@@ -470,7 +423,8 @@ export class DealsAPI {
               deal.userDisliked = interaction.disliked;
             }
 
-            await this.cacheDeals(cachedData.data, cachedData.lastUpdated, source);
+            await this.cacheDeals(cachedData.data, cachedData.lastUpdated, category);
+            break;
           }
         }
       }
@@ -479,18 +433,17 @@ export class DealsAPI {
     }
   }
 
-  // Method to clear cache for specific source or all
-  static async clearCache(source?: string): Promise<void> {
+  // Clear cache for specific category or all
+  static async clearCache(category?: string): Promise<void> {
     try {
-      if (source) {
-        const cacheKey = source === 'all' ? CACHE_KEY : `${SOURCE_CACHE_KEY}${source}`;
+      if (category) {
+        const cacheKey = `${CACHE_KEY}${category.toLowerCase().replace(/\s+/g, '_')}`;
         await AsyncStorage.removeItem(cacheKey);
-        console.log(`Cache cleared for ${source}`);
+        console.log(`Cache cleared for ${category}`);
       } else {
-        // Clear all caches
-        const allSources = ['all', 'ozbargain', 'coles', 'woolworths', 'costco', 'bunnings', 'jbhifi', 'goodguys', 'harveynorman'];
-        for (const src of allSources) {
-          const cacheKey = src === 'all' ? CACHE_KEY : `${SOURCE_CACHE_KEY}${src}`;
+        // Clear all category caches
+        for (const cat of OZBARGAIN_CATEGORIES) {
+          const cacheKey = `${CACHE_KEY}${cat.toLowerCase().replace(/\s+/g, '_')}`;
           await AsyncStorage.removeItem(cacheKey);
         }
         console.log('All caches cleared');
@@ -500,21 +453,19 @@ export class DealsAPI {
     }
   }
 
-  // Enhanced cache info with source-specific details
+  // Get cache information
   static async getCacheInfo(): Promise<{
     total: { size: number; age: number; lastUpdated: string | null };
-    sources: { [key: string]: { size: number; age: number; lastUpdated: string | null } };
+    categories: { [key: string]: { size: number; age: number; lastUpdated: string | null } };
   }> {
     try {
       const result = {
         total: { size: 0, age: 0, lastUpdated: null as string | null },
-        sources: {} as { [key: string]: { size: number; age: number; lastUpdated: string | null } },
+        categories: {} as { [key: string]: { size: number; age: number; lastUpdated: string | null } },
       };
 
-      const allSources = ['all', 'ozbargain', 'coles', 'woolworths', 'costco', 'bunnings', 'jbhifi', 'goodguys', 'harveynorman'];
-      
-      for (const source of allSources) {
-        const cachedData = await this.getCachedDeals(source);
+      for (const category of OZBARGAIN_CATEGORIES) {
+        const cachedData = await this.getCachedDeals(category);
         if (cachedData) {
           const info = {
             size: cachedData.data.length,
@@ -522,13 +473,16 @@ export class DealsAPI {
             lastUpdated: cachedData.lastUpdated,
           };
           
-          result.sources[source] = info;
+          result.categories[category] = info;
+          result.total.size += info.size;
           
-          if (source === 'all') {
-            result.total = info;
+          if (!result.total.lastUpdated || 
+              (cachedData.lastUpdated && new Date(cachedData.lastUpdated) > new Date(result.total.lastUpdated))) {
+            result.total.lastUpdated = cachedData.lastUpdated;
+            result.total.age = info.age;
           }
         } else {
-          result.sources[source] = { size: 0, age: 0, lastUpdated: null };
+          result.categories[category] = { size: 0, age: 0, lastUpdated: null };
         }
       }
 
@@ -536,7 +490,7 @@ export class DealsAPI {
     } catch (error) {
       return {
         total: { size: 0, age: 0, lastUpdated: null },
-        sources: {},
+        categories: {},
       };
     }
   }
@@ -544,17 +498,18 @@ export class DealsAPI {
   // Configuration helper
   static getConfig() {
     return {
-      provider: PROVIDER,
       baseUrl: CONFIG.baseUrl,
       endpoints: CONFIG.endpoints,
-      supportedSources: Object.keys(CONFIG.endpoints).filter(key => 
-        !['deals', 'refresh', 'health'].includes(key)
-      ),
+      supportedCategories: OZBARGAIN_CATEGORIES,
+      cacheConfig: {
+        duration: CACHE_DURATION,
+        keyPrefix: CACHE_KEY,
+      },
     };
   }
 }
 
-// Enhanced hook for multi-source deals management
+// Enhanced hook for OzBargain deals management
 import { useState, useEffect, useCallback } from 'react';
 
 export interface UseDealsResult {
@@ -568,12 +523,12 @@ export interface UseDealsResult {
   canLoadMore: boolean;
   cacheInfo: {
     total: { size: number; age: number; lastUpdated: string | null };
-    sources: { [key: string]: { size: number; age: number; lastUpdated: string | null } };
+    categories: { [key: string]: { size: number; age: number; lastUpdated: string | null } };
   };
-  sourceStats: DealsResponse['sourceStats'] | null;
+  availableCategories: string[];
 }
 
-export const useDeals = (category: string = 'All', source: string = 'all'): UseDealsResult => {
+export const useDeals = (category: string = 'All Deals'): UseDealsResult => {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -581,10 +536,10 @@ export const useDeals = (category: string = 'All', source: string = 'all'): UseD
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [sourceStats, setSourceStats] = useState<DealsResponse['sourceStats'] | null>(null);
+  const [availableCategories, setAvailableCategories] = useState<string[]>(OZBARGAIN_CATEGORIES);
   const [cacheInfo, setCacheInfo] = useState({
     total: { size: 0, age: 0, lastUpdated: null as string | null },
-    sources: {} as { [key: string]: { size: number; age: number; lastUpdated: string | null } },
+    categories: {} as { [key: string]: { size: number; age: number; lastUpdated: string | null } },
   });
 
   const updateCacheInfo = useCallback(async () => {
@@ -597,9 +552,9 @@ export const useDeals = (category: string = 'All', source: string = 'all'): UseD
       if (!append) setLoading(true);
       setError(null);
 
-      console.log(`Loading deals: page=${page}, category=${category}, source=${source}, forceRefresh=${forceRefresh}, append=${append}`);
+      console.log(`Loading OzBargain deals: page=${page}, category=${category}, forceRefresh=${forceRefresh}, append=${append}`);
 
-      const response = await DealsAPI.fetchDeals(page, category, source, forceRefresh);
+      const response = await DealsAPI.fetchDeals(page, category, forceRefresh);
       
       if (append) {
         setDeals(prev => {
@@ -614,7 +569,7 @@ export const useDeals = (category: string = 'All', source: string = 'all'): UseD
       
       setPagination(response.pagination);
       setLastUpdated(response.lastUpdated);
-      setSourceStats(response.sourceStats || null);
+      setAvailableCategories(response.availableCategories);
       setCurrentPage(page);
       
       await updateCacheInfo();
@@ -627,14 +582,14 @@ export const useDeals = (category: string = 'All', source: string = 'all'): UseD
       if (!append && page === 1) {
         try {
           const cacheInfo = await DealsAPI.getCacheInfo();
-          const sourceCache = cacheInfo.sources[source];
-          if (sourceCache && sourceCache.size > 0) {
+          const categoryCache = cacheInfo.categories[category];
+          if (categoryCache && categoryCache.size > 0) {
             console.log('Attempting to use cached data after error');
-            const cachedResponse = await DealsAPI.fetchDeals(1, category, source, false);
+            const cachedResponse = await DealsAPI.fetchDeals(1, category, false);
             setDeals(cachedResponse.deals);
             setPagination(cachedResponse.pagination);
             setLastUpdated(cachedResponse.lastUpdated);
-            setSourceStats(cachedResponse.sourceStats || null);
+            setAvailableCategories(cachedResponse.availableCategories);
             setError('Using cached data - some deals may be outdated');
           }
         } catch (cacheError) {
@@ -645,14 +600,14 @@ export const useDeals = (category: string = 'All', source: string = 'all'): UseD
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [category, source, updateCacheInfo]);
+  }, [category, updateCacheInfo]);
 
   const refreshDeals = useCallback(async () => {
     setIsRefreshing(true);
     setError(null);
     try {
-      console.log(`Manual refresh triggered for source: ${source}`);
-      const refreshResult = await DealsAPI.refreshDeals(source);
+      console.log(`Manual refresh triggered for category: ${category}`);
+      const refreshResult = await DealsAPI.refreshDeals(category);
       if (refreshResult.success) {
         await loadDeals(1, true, false);
         setCurrentPage(1);
@@ -667,22 +622,22 @@ export const useDeals = (category: string = 'All', source: string = 'all'): UseD
     } finally {
       setIsRefreshing(false);
     }
-  }, [loadDeals, source]);
+  }, [loadDeals, category]);
 
   const loadMore = useCallback(async () => {
     if (pagination && pagination.hasNextPage && !loading && !isRefreshing) {
-      console.log(`Loading more deals: page ${currentPage + 1} for source ${source}`);
+      console.log(`Loading more deals: page ${currentPage + 1} for category ${category}`);
       await loadDeals(currentPage + 1, false, true);
     }
-  }, [pagination, currentPage, loading, isRefreshing, loadDeals, source]);
+  }, [pagination, currentPage, loading, isRefreshing, loadDeals, category]);
 
-  // Initial load and dependency change effect
+  // Initial load and category change effect
   useEffect(() => {
-    console.log(`useDeals effect triggered: category=${category}, source=${source}`);
+    console.log(`useDeals effect triggered: category=${category}`);
     setCurrentPage(1);
     setDeals([]);
     loadDeals(1);
-  }, [category, source]); // Depend on both category and source
+  }, [category]);
 
   // Update cache info on mount
   useEffect(() => {
@@ -699,11 +654,11 @@ export const useDeals = (category: string = 'All', source: string = 'all'): UseD
     loadMore,
     canLoadMore: pagination?.hasNextPage || false,
     cacheInfo,
-    sourceStats,
+    availableCategories,
   };
 };
 
-// Debug helper hook with enhanced source tracking
+// Debug helper hook
 export const useDealsDebug = () => {
   const [debugInfo, setDebugInfo] = useState<any>(null);
 
@@ -720,13 +675,19 @@ export const useDealsDebug = () => {
     });
   }, []);
 
-  const clearCache = useCallback(async (source?: string) => {
-    await DealsAPI.clearCache(source);
+  const clearCache = useCallback(async (category?: string) => {
+    await DealsAPI.clearCache(category);
     await getDebugInfo();
   }, [getDebugInfo]);
 
-  const refreshSource = useCallback(async (source: string) => {
-    const result = await DealsAPI.refreshDeals(source);
+  const refreshCategory = useCallback(async (category: string) => {
+    const result = await DealsAPI.refreshDeals(category);
+    await getDebugInfo();
+    return result;
+  }, [getDebugInfo]);
+
+  const debugScrape = useCallback(async (category: string) => {
+    const result = await DealsAPI.debugScrape(category);
     await getDebugInfo();
     return result;
   }, [getDebugInfo]);
@@ -735,6 +696,7 @@ export const useDealsDebug = () => {
     debugInfo,
     getDebugInfo,
     clearCache,
-    refreshSource,
+    refreshCategory,
+    debugScrape,
   };
 };

@@ -428,30 +428,37 @@ export default function GroupDetailsModal({
     }
   };
 
-  const handleInviteFromContacts = async () => {
-    try {
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'Please allow access to contacts to invite friends.'
-        );
-        return;
-      }
-
-      const { data } = await Contacts.getContactsAsync({
-        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
-      });
-
-      if (data.length > 0) {
-        await handleShareInviteCode();
-      } else {
-        Alert.alert('No Contacts', 'No contacts found on your device.');
-      }
-    } catch (error) {
-      console.error('Error accessing contacts:', error);
-      Alert.alert('Error', 'Failed to access contacts. Please try again.');
-    }
+  const handleAddPendingFriendToGroup = async (friend: Friend) => {
+    if (!localGroupData || !currentUser) return;
+    
+    Alert.alert(
+      'Add Pending Friend',
+      `${friend.friendData.fullName} hasn't accepted your friend request yet. They will be added to the group once they accept the friend request.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add Anyway',
+          onPress: async () => {
+            try {
+              // Add them to the group even though they're pending
+              await SplittingService.addGroupMember(localGroupData.id, friend.friendId);
+              Alert.alert('Success', `${friend.friendData.fullName} has been added to the group. They'll see it once they accept your friend request.`);
+              setShowAddMember(false);
+              await loadGroupData();
+              onRefresh?.();
+              await loadGroupExpenses();
+              
+              const refreshService = ExpenseRefreshService.getInstance();
+              refreshService.notifyExpenseAdded();
+              
+            } catch (error: any) {
+              console.error('Add pending friend to group error:', error);
+              Alert.alert('Error', error.message || 'Failed to add friend to group');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleEditExpense = (expense: Expense) => {
@@ -962,62 +969,125 @@ export default function GroupDetailsModal({
                 
                 <TouchableOpacity
                   style={[styles.inviteContactsBtn, { backgroundColor: theme.colors.primary }]}
-                  onPress={handleInviteFromContacts}
+                  onPress={handleShareInviteCode}
                 >
                   <Ionicons name="person-add" size={20} color="white" />
                   <Text style={styles.inviteContactsBtnText}>
-                    Invite from Contacts
+                    Share Group Invite
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 24 }]}>
-                Your Friends
-              </Text>
-              
+              {/* Accepted Friends Section */}
               {friends.filter(friend => 
                 friend.status === 'accepted' && 
                 !localGroupData?.members.some(member => member.userId === friend.friendId)
-              ).length === 0 ? (
+              ).length > 0 && (
+                <>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 24 }]}>
+                    Your Friends
+                  </Text>
+                  
+                  {friends
+                    .filter(friend => 
+                      friend.status === 'accepted' && 
+                      !localGroupData?.members.some(member => member.userId === friend.friendId)
+                    )
+                    .map((friend) => (
+                      <TouchableOpacity
+                        key={friend.id}
+                        style={[styles.card, { backgroundColor: theme.colors.surface }]}
+                        onPress={() => handleAddFriendToGroup(friend.friendId)}
+                      >
+                        <View style={styles.friendRow}>
+                          <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
+                            <Text style={styles.memberAvatarText}>
+                              {friend.friendData.fullName.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={styles.memberInfo}>
+                            <Text style={[styles.memberName, { color: theme.colors.text }]}>
+                              {friend.friendData.fullName}
+                            </Text>
+                            <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                              {friend.friendData.email}
+                            </Text>
+                          </View>
+                          <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                </>
+              )}
+
+              {/* Pending Friends Section - Only users already on Spendy */}
+              {friends.filter(friend => 
+                (friend.status === 'pending' || friend.status === 'invited') && 
+                !friend.isNewUser &&
+                !localGroupData?.members.some(member => member.userId === friend.friendId)
+              ).length > 0 && (
+                <>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 24 }]}>
+                    Pending Friend Requests
+                  </Text>
+                  <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary, marginBottom: 12 }]}>
+                    Friends on Spendy who haven't accepted your request yet
+                  </Text>
+                  
+                  {friends
+                    .filter(friend => 
+                      (friend.status === 'pending' || friend.status === 'invited') && 
+                      !friend.isNewUser &&
+                      !localGroupData?.members.some(member => member.userId === friend.friendId)
+                    )
+                    .map((friend) => (
+                      <TouchableOpacity
+                        key={friend.id}
+                        style={[styles.card, { backgroundColor: theme.colors.surface }]}
+                        onPress={() => handleAddPendingFriendToGroup(friend)}
+                      >
+                        <View style={styles.friendRow}>
+                          <View style={[styles.memberAvatar, { backgroundColor: theme.colors.warning }]}>
+                            <Text style={styles.memberAvatarText}>
+                              {friend.friendData.fullName.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={styles.memberInfo}>
+                            <Text style={[styles.memberName, { color: theme.colors.text }]}>
+                              {friend.friendData.fullName}
+                            </Text>
+                            <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                              {friend.friendData.email}
+                            </Text>
+                            <View style={styles.statusIndicator}>
+                              <Ionicons name="time" size={12} color={theme.colors.warning} />
+                              <Text style={[styles.statusText, { color: theme.colors.warning }]}>
+                                Friend request pending
+                              </Text>
+                            </View>
+                          </View>
+                          <Ionicons name="add-circle" size={24} color={theme.colors.warning} />
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                </>
+              )}
+
+              {/* Empty State */}
+              {friends.filter(friend => 
+                (friend.status === 'accepted' || 
+                 (friend.status === 'pending' || friend.status === 'invited') && !friend.isNewUser) &&
+                !localGroupData?.members.some(member => member.userId === friend.friendId)
+              ).length === 0 && (
                 <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
                   <Text style={styles.emptyIcon}>👥</Text>
                   <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                    No friends to add
+                    No friends available to add
                   </Text>
                   <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                    All your friends are already in this group
+                    Invite new users to Spendy or accept pending friend requests to add them to groups
                   </Text>
                 </View>
-              ) : (
-                friends
-                  .filter(friend => 
-                    friend.status === 'accepted' && 
-                    !localGroupData?.members.some(member => member.userId === friend.friendId)
-                  )
-                  .map((friend) => (
-                    <TouchableOpacity
-                      key={friend.id}
-                      style={[styles.card, { backgroundColor: theme.colors.surface }]}
-                      onPress={() => handleAddFriendToGroup(friend.friendId)}
-                    >
-                      <View style={styles.friendRow}>
-                        <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
-                          <Text style={styles.memberAvatarText}>
-                            {friend.friendData.fullName.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                        <View style={styles.memberInfo}>
-                          <Text style={[styles.memberName, { color: theme.colors.text }]}>
-                            {friend.friendData.fullName}
-                          </Text>
-                          <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                            {friend.friendData.email}
-                          </Text>
-                        </View>
-                        <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
-                      </View>
-                    </TouchableOpacity>
-                  ))
               )}
             </ScrollView>
           </SafeAreaView>
@@ -1058,7 +1128,7 @@ export default function GroupDetailsModal({
       <SimpleExpenseListModal
         visible={showSimpleExpenseList}
         onClose={() => setShowSimpleExpenseList(false)}
-        groupId={expenseListGroupId}
+        initialGroupId={expenseListGroupId}
         title={expenseListTitle}
         onExpensePress={(expense) => {
           setShowSimpleExpenseList(false);
@@ -1607,5 +1677,15 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

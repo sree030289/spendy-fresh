@@ -394,7 +394,13 @@ export class RealNotificationService {
   private static handleNotificationReceived(notification: Notifications.Notification): void {
     const { data } = notification.request.content;
     this.updateBadgeCount();
-    console.log('Notification received in foreground:', data);
+    console.log('📩 Notification received in foreground:', data);
+    
+    // For friend requests, immediately trigger the navigation
+    if (data && data.type === 'friend_request') {
+      console.log('🤝 Friend request notification received - triggering modal');
+      this.triggerAppNavigation(data);
+    }
   }
 
   // Handle notification response (tapped/action)
@@ -772,33 +778,50 @@ export class RealNotificationService {
     targetUserId: string,
     senderName: string,
     senderUserId: string,
-    friendRequestId: string
+    friendRequestId: string,
+    senderEmail?: string,
+    senderAvatar?: string
   ): Promise<void> {
     try {
-      console.log('Sending friend request notification to:', targetUserId);
+      console.log('🔔 RealNotificationService - Sending friend request notification');
+      console.log('🎯 Target User ID:', targetUserId);
+      console.log('👤 Sender Name:', senderName);
+      console.log('👤 Sender User ID:', senderUserId);
+      console.log('📋 Friend Request ID:', friendRequestId);
       
       // In production, this would send a push notification via your backend
       // For demo purposes, we'll schedule a local notification
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'New Friend Request',
-          body: `${senderName} wants to be your friend on Spendy`,
-          data: {
-            type: 'friend_request',
-            friendRequestId,
-            senderUserId,
-            senderName,
-          },
-          sound: 'default',
-          categoryIdentifier: 'friend_request',
-          badge: 1,
+      const notificationContent = {
+        title: 'New Friend Request',
+        body: `${senderName} wants to be your friend on Spendy`,
+        data: {
+          type: 'friend_request',
+          friendRequestId,
+          fromUserId: senderUserId,
+          senderUserId,
+          senderName,
+          senderEmail: senderEmail || '',
+          senderAvatar: senderAvatar || '',
+          message: `${senderName} wants to be your friend on Spendy`
         },
+        sound: 'default',
+        categoryIdentifier: 'friend_request',
+        badge: 1,
+      };
+      
+      console.log('📱 Scheduling local notification with content:', notificationContent);
+      
+      await Notifications.scheduleNotificationAsync({
+        content: notificationContent,
         trigger: null, // Immediate notification
       });
       
-      console.log('✅ Friend request notification sent');
+      console.log('✅ Friend request notification sent successfully!');
+      console.log('⚠️  NOTE: This is a LOCAL notification - it will appear on THIS device only.');
+      console.log('⚠️  In production, this should be sent via FCM/APNS to the target user\'s device.');
+      
     } catch (error) {
-      console.error('Failed to send friend request notification:', error);
+      console.error('❌ Failed to send friend request notification:', error);
     }
   }
 

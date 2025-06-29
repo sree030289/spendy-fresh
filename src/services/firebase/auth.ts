@@ -300,6 +300,17 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
       // Clear all stored session data first
       await this.clearUserSession();
       
+      // Clear Smart Money data for the current user
+      try {
+        const { DataService } = await import('../smartMoney/dataService');
+        const dataService = DataService.getInstance();
+        // Note: We don't pass userId here because we want to clear the current user's cached data
+        await dataService.clearAllData();
+        console.log('✅ Smart Money data cleared');
+      } catch (smartMoneyError) {
+        console.log('⚠️ Failed to clear Smart Money data:', smartMoneyError);
+      }
+      
       // Then logout from Firebase
       if (firebaseAuth) {
         const { signOut } = await import('firebase/auth');

@@ -28,10 +28,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { FirebaseNotificationService } from '@/services/smartMoney/firebaseNotificationService';
 import { AnalyticsService } from '@/services/smartMoney/analyticsService';
 import { DataService } from '@/services/smartMoney/dataService';
+import { MigrationService } from '@/services/smartMoney/migrationService';
 import { Analytics, Expense, Income, Reminder, ExpenseCategory, IncomeCategory, ReminderCategory } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import TransactionListModal from '@/components/modals/TransactionListModal';
+import SmartMoneyCalendarModal from '@/components/modals/SmartMoneyCalendarModal';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -599,6 +601,20 @@ const SmartMoneyScreen: React.FC = () => {
     setIsLoading(true);
     
     try {
+      // Check if migration is needed for this user
+      const migrationService = MigrationService.getInstance();
+      const needsMigration = await migrationService.isMigrationNeeded(user.id);
+      
+      if (needsMigration) {
+        console.log('🔄 Migration needed for user:', user.id);
+        const migrationSuccess = await migrationService.migrateToUserSpecificData(user.id);
+        if (migrationSuccess) {
+          console.log('✅ Migration completed successfully');
+        } else {
+          console.log('⚠️ Migration failed, but continuing with app initialization');
+        }
+      }
+
       const notificationService = FirebaseNotificationService.getInstance();
       await notificationService.initialize();
       await loadData();
@@ -617,9 +633,9 @@ const SmartMoneyScreen: React.FC = () => {
       const dataService = DataService.getInstance();
       
       const [expensesData, incomeData, remindersData] = await Promise.all([
-        dataService.getExpenses(),
-        dataService.getIncome(),
-        dataService.getReminders()
+        dataService.getExpenses(user.id),
+        dataService.getIncome(user.id),
+        dataService.getReminders(user.id)
       ]);
       
       setExpenses(expensesData || []);
@@ -716,7 +732,7 @@ const SmartMoneyScreen: React.FC = () => {
           type: 'expense'
         };
         
-        savedExpense = await dataService.saveExpense(expense);
+        savedExpense = await dataService.saveExpense(expense, user.id);
         setExpenses(prev => [savedExpense!, ...prev]);
         
       } else if (formType === 'income') {
@@ -729,7 +745,7 @@ const SmartMoneyScreen: React.FC = () => {
           type: 'income'
         };
         
-        savedIncome = await dataService.saveIncome(incomeItem);
+        savedIncome = await dataService.saveIncome(incomeItem, user.id);
         setIncome(prev => [savedIncome!, ...prev]);
         
       } else if (formType === 'reminder') {
@@ -745,7 +761,7 @@ const SmartMoneyScreen: React.FC = () => {
           priority: 'medium'
         };
         
-        savedReminder = await dataService.saveReminder(reminder);
+        savedReminder = await dataService.saveReminder(reminder, user.id);
         setReminders(prev => [savedReminder!, ...prev]);
       }
 
@@ -795,13 +811,13 @@ const SmartMoneyScreen: React.FC = () => {
               const dataService = DataService.getInstance();
               
               if (type === 'expense') {
-                await dataService.deleteExpense(id);
+                await dataService.deleteExpense(id, user?.id);
                 setExpenses(prev => prev.filter(e => e.id !== id));
               } else if (type === 'income') {
-                await dataService.deleteIncome(id);
+                await dataService.deleteIncome(id, user?.id);
                 setIncome(prev => prev.filter(i => i.id !== id));
               } else if (type === 'reminder') {
-                await dataService.deleteReminder(id);
+                await dataService.deleteReminder(id, user?.id);
                 setReminders(prev => prev.filter(r => r.id !== id));
               }
               
@@ -828,7 +844,7 @@ const SmartMoneyScreen: React.FC = () => {
       
       if (reminder) {
         const updatedReminder = { ...reminder, status: 'paid' as const };
-        await dataService.updateReminder(updatedReminder);
+        await dataService.updateReminder(updatedReminder, user?.id);
         setReminders(prev => prev.map(r => r.id === id ? updatedReminder : r));
         Alert.alert('Success', 'Reminder marked as paid!');
       }
@@ -1542,13 +1558,75 @@ const SmartMoneyScreen: React.FC = () => {
         onDelete={(id) => deleteItem(id, 'reminder')}
       />
 
-      {/* Full Screen Calendar Modal */}
-      <FullScreenCalendarModal
+      <SmartMoneyCalendarModal
         visible={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
         expenses={expenses}
+        income={income}
         reminders={reminders}
         theme={theme}
+        onExpensePress={(expense) => {
+          Alert.alert(
+            expense.title,
+            `Amount: ${expense.amount.toFixed(2)}\nCategory: ${expense.category}\nDate: ${new Date(expense.date).toLocaleDateString()}`,
+            [
+              { text: 'Edit', onPress: () => {
+                // Navigate to edit expense
+                setShowCalendarModal(false);
+                // Add edit functionality here
+              }},
+              { text: 'Delete', style: 'destructive', onPress: () => {
+                setShowCalendarModal(false);
+                deleteItem(expense.id, 'expense');
+              }},
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+        }}
+        onReminderPress={(reminder) => {
+          Alert.alert(
+            reminder.title,
+            `Amount: ${reminder.amount.toFixed(2)}\nDue: ${new Date(reminder.dueDate).toLocaleDateString()}\nStatus: ${reminder.status}`,
+            [
+              { text: 'Mark Paid', onPress: () => {
+                setShowCalendarModal(false);
+                markReminderPaid(reminder.id);
+              }},
+              { text: 'Delete', style: 'destructive', onPress: () => {
+                setShowCalendarModal(false);
+                deleteItem(reminder.id, 'reminder');
+              }},
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+        }}
+        onAddExpense={() => {
+          setShowCalendarModal(false);
+          setFormType('expense');
+          setShowAddForm(true);
+        }}
+        onAddReminder={() => {
+          setShowCalendarModal(false);
+          setFormType('reminder');
+          setShowAddForm(true);
+        }}
+      />
+
+      {/* Keep all your existing modals */}
+      <SimpleExpenseListModal
+        visible={showExpenseListModal}
+        onClose={() => setShowExpenseListModal(false)}
+        title="All Expenses"
+        onExpensePress={(expense) => {
+          Alert.alert(
+            expense.title,
+            `Amount: ${expense.amount.toFixed(2)}\nCategory: ${expense.category}\nDate: ${new Date(expense.date).toLocaleDateString()}`,
+            [
+              { text: 'Delete', style: 'destructive', onPress: () => deleteItem(expense.id, 'expense') },
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+        }}
       />
 
       {/* Transaction List Modal */}

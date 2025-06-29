@@ -27,11 +27,23 @@ export class DataService {
   }
 
   // EXPENSES METHODS
-  async getExpenses(): Promise<Expense[]> {
+  async getExpenses(userId?: string): Promise<Expense[]> {
     try {
       console.log('📊 Fetching expenses from Firebase...');
       const expensesRef = collection(db, 'smartMoneyExpenses');
-      const snapshot = await getDocs(query(expensesRef, orderBy('date', 'desc')));
+      let expensesQuery;
+      
+      if (userId) {
+        expensesQuery = query(
+          expensesRef, 
+          where('userId', '==', userId),
+          orderBy('date', 'desc')
+        );
+      } else {
+        expensesQuery = query(expensesRef, orderBy('date', 'desc'));
+      }
+      
+      const snapshot = await getDocs(expensesQuery);
       
       const expenses = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -45,18 +57,18 @@ export class DataService {
         } as Expense;
       });
       
-      console.log('✅ Fetched', expenses.length, 'expenses from Firebase');
+      console.log('✅ Fetched', expenses.length, 'expenses from Firebase for user:', userId || 'all users');
       return expenses;
     } catch (error) {
       console.log('❌ Firebase not available, using local storage for expenses');
-      const stored = await AsyncStorage.getItem('smart_money_expenses');
+      const stored = await AsyncStorage.getItem(`smart_money_expenses_${userId || 'default'}`);
       const expenses = stored ? JSON.parse(stored) : [];
-      console.log('📱 Loaded', expenses.length, 'expenses from local storage');
+      console.log('📱 Loaded', expenses.length, 'expenses from local storage for user:', userId || 'default');
       return expenses;
     }
   }
 
-  async saveExpense(expense: Expense): Promise<Expense> {
+  async saveExpense(expense: Expense, userId?: string): Promise<Expense> {
     try {
       console.log('💾 Saving expense to Firebase:', expense.title);
       const expensesRef = collection(db, 'smartMoneyExpenses');
@@ -66,6 +78,7 @@ export class DataService {
         category: expense.category,
         date: expense.date,
         type: 'expense',
+        userId: userId, // Add user ID to the expense
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -75,16 +88,16 @@ export class DataService {
       return savedExpense;
     } catch (error) {
       console.log('❌ Firebase not available, saving to local storage');
-      const expenses = await this.getExpenses();
+      const expenses = await this.getExpenses(userId);
       const newExpense = { ...expense, id: Date.now().toString() };
       expenses.unshift(newExpense);
-      await AsyncStorage.setItem('smart_money_expenses', JSON.stringify(expenses));
+      await AsyncStorage.setItem(`smart_money_expenses_${userId || 'default'}`, JSON.stringify(expenses));
       console.log('📱 Expense saved to local storage');
       return newExpense;
     }
   }
 
-  async updateExpense(expense: Expense): Promise<Expense> {
+  async updateExpense(expense: Expense, userId?: string): Promise<Expense> {
     try {
       console.log('🔄 Updating expense in Firebase:', expense.id);
       const expenseRef = doc(db, 'smartMoneyExpenses', expense.id);
@@ -99,18 +112,18 @@ export class DataService {
       return expense;
     } catch (error) {
       console.log('❌ Firebase not available, updating in local storage');
-      const expenses = await this.getExpenses();
+      const expenses = await this.getExpenses(userId);
       const index = expenses.findIndex(e => e.id === expense.id);
       if (index !== -1) {
         expenses[index] = expense;
-        await AsyncStorage.setItem('smart_money_expenses', JSON.stringify(expenses));
+        await AsyncStorage.setItem(`smart_money_expenses_${userId || 'default'}`, JSON.stringify(expenses));
         console.log('📱 Expense updated in local storage');
       }
       return expense;
     }
   }
 
-  async deleteExpense(id: string): Promise<void> {
+  async deleteExpense(id: string, userId?: string): Promise<void> {
     try {
       console.log('🗑️ Deleting expense from Firebase:', id);
       const expenseRef = doc(db, 'smartMoneyExpenses', id);
@@ -118,19 +131,31 @@ export class DataService {
       console.log('✅ Expense deleted from Firebase');
     } catch (error) {
       console.log('❌ Firebase not available, deleting from local storage');
-      const expenses = await this.getExpenses();
+      const expenses = await this.getExpenses(userId);
       const filtered = expenses.filter(e => e.id !== id);
-      await AsyncStorage.setItem('smart_money_expenses', JSON.stringify(filtered));
+      await AsyncStorage.setItem(`smart_money_expenses_${userId || 'default'}`, JSON.stringify(filtered));
       console.log('📱 Expense deleted from local storage');
     }
   }
 
   // INCOME METHODS
-  async getIncome(): Promise<Income[]> {
+  async getIncome(userId?: string): Promise<Income[]> {
     try {
       console.log('📊 Fetching income from Firebase...');
       const incomeRef = collection(db, 'smartMoneyIncome');
-      const snapshot = await getDocs(query(incomeRef, orderBy('date', 'desc')));
+      let incomeQuery;
+      
+      if (userId) {
+        incomeQuery = query(
+          incomeRef, 
+          where('userId', '==', userId),
+          orderBy('date', 'desc')
+        );
+      } else {
+        incomeQuery = query(incomeRef, orderBy('date', 'desc'));
+      }
+      
+      const snapshot = await getDocs(incomeQuery);
       
       const income = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -144,18 +169,18 @@ export class DataService {
         } as Income;
       });
       
-      console.log('✅ Fetched', income.length, 'income entries from Firebase');
+      console.log('✅ Fetched', income.length, 'income entries from Firebase for user:', userId || 'all users');
       return income;
     } catch (error) {
       console.log('❌ Firebase not available, using local storage for income');
-      const stored = await AsyncStorage.getItem('smart_money_income');
+      const stored = await AsyncStorage.getItem(`smart_money_income_${userId || 'default'}`);
       const income = stored ? JSON.parse(stored) : [];
-      console.log('📱 Loaded', income.length, 'income entries from local storage');
+      console.log('📱 Loaded', income.length, 'income entries from local storage for user:', userId || 'default');
       return income;
     }
   }
 
-  async saveIncome(income: Income): Promise<Income> {
+  async saveIncome(income: Income, userId?: string): Promise<Income> {
     try {
       console.log('💾 Saving income to Firebase:', income.title);
       const incomeRef = collection(db, 'smartMoneyIncome');
@@ -165,6 +190,7 @@ export class DataService {
         category: income.category,
         date: income.date,
         type: 'income',
+        userId: userId, // Add user ID to the income
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -174,16 +200,16 @@ export class DataService {
       return savedIncome;
     } catch (error) {
       console.log('❌ Firebase not available, saving to local storage');
-      const incomes = await this.getIncome();
+      const incomes = await this.getIncome(userId);
       const newIncome = { ...income, id: Date.now().toString() };
       incomes.unshift(newIncome);
-      await AsyncStorage.setItem('smart_money_income', JSON.stringify(incomes));
+      await AsyncStorage.setItem(`smart_money_income_${userId || 'default'}`, JSON.stringify(incomes));
       console.log('📱 Income saved to local storage');
       return newIncome;
     }
   }
 
-  async updateIncome(income: Income): Promise<Income> {
+  async updateIncome(income: Income, userId?: string): Promise<Income> {
     try {
       console.log('🔄 Updating income in Firebase:', income.id);
       const incomeRef = doc(db, 'smartMoneyIncome', income.id);
@@ -198,18 +224,18 @@ export class DataService {
       return income;
     } catch (error) {
       console.log('❌ Firebase not available, updating in local storage');
-      const incomes = await this.getIncome();
+      const incomes = await this.getIncome(userId);
       const index = incomes.findIndex(i => i.id === income.id);
       if (index !== -1) {
         incomes[index] = income;
-        await AsyncStorage.setItem('smart_money_income', JSON.stringify(incomes));
+        await AsyncStorage.setItem(`smart_money_income_${userId || 'default'}`, JSON.stringify(incomes));
         console.log('📱 Income updated in local storage');
       }
       return income;
     }
   }
 
-  async deleteIncome(id: string): Promise<void> {
+  async deleteIncome(id: string, userId?: string): Promise<void> {
     try {
       console.log('🗑️ Deleting income from Firebase:', id);
       const incomeRef = doc(db, 'smartMoneyIncome', id);
@@ -217,19 +243,31 @@ export class DataService {
       console.log('✅ Income deleted from Firebase');
     } catch (error) {
       console.log('❌ Firebase not available, deleting from local storage');
-      const incomes = await this.getIncome();
+      const incomes = await this.getIncome(userId);
       const filtered = incomes.filter(i => i.id !== id);
-      await AsyncStorage.setItem('smart_money_income', JSON.stringify(filtered));
+      await AsyncStorage.setItem(`smart_money_income_${userId || 'default'}`, JSON.stringify(filtered));
       console.log('📱 Income deleted from local storage');
     }
   }
 
   // REMINDERS METHODS
-  async getReminders(): Promise<Reminder[]> {
+  async getReminders(userId?: string): Promise<Reminder[]> {
     try {
       console.log('📊 Fetching reminders from Firebase...');
       const remindersRef = collection(db, 'smartMoneyReminders');
-      const snapshot = await getDocs(query(remindersRef, orderBy('dueDate', 'asc')));
+      let remindersQuery;
+      
+      if (userId) {
+        remindersQuery = query(
+          remindersRef, 
+          where('userId', '==', userId),
+          orderBy('dueDate', 'asc')
+        );
+      } else {
+        remindersQuery = query(remindersRef, orderBy('dueDate', 'asc'));
+      }
+      
+      const snapshot = await getDocs(remindersQuery);
       
       const reminders = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -246,18 +284,18 @@ export class DataService {
         } as Reminder;
       });
       
-      console.log('✅ Fetched', reminders.length, 'reminders from Firebase');
+      console.log('✅ Fetched', reminders.length, 'reminders from Firebase for user:', userId || 'all users');
       return reminders;
     } catch (error) {
       console.log('❌ Firebase not available, using local storage for reminders');
-      const stored = await AsyncStorage.getItem('smart_money_reminders');
+      const stored = await AsyncStorage.getItem(`smart_money_reminders_${userId || 'default'}`);
       const reminders = stored ? JSON.parse(stored) : [];
-      console.log('📱 Loaded', reminders.length, 'reminders from local storage');
+      console.log('📱 Loaded', reminders.length, 'reminders from local storage for user:', userId || 'default');
       return reminders;
     }
   }
 
-  async saveReminder(reminder: Reminder): Promise<Reminder> {
+  async saveReminder(reminder: Reminder, userId?: string): Promise<Reminder> {
     try {
       console.log('💾 Saving reminder to Firebase:', reminder.title);
       const remindersRef = collection(db, 'smartMoneyReminders');
@@ -270,6 +308,7 @@ export class DataService {
         recurring: reminder.recurring,
         autoDetected: reminder.autoDetected,
         priority: reminder.priority,
+        userId: userId, // Add user ID to the reminder
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -289,12 +328,12 @@ export class DataService {
       return savedReminder;
     } catch (error) {
       console.log('❌ Firebase not available, saving to local storage');
-      const reminders = await this.getReminders();
+      const reminders = await this.getReminders(userId);
       const newReminder = { ...reminder, id: Date.now().toString() };
       reminders.push(newReminder);
       // Sort by due date
       reminders.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-      await AsyncStorage.setItem('smart_money_reminders', JSON.stringify(reminders));
+      await AsyncStorage.setItem(`smart_money_reminders_${userId || 'default'}`, JSON.stringify(reminders));
       
       // Schedule notification
       try {
@@ -310,7 +349,7 @@ export class DataService {
     }
   }
 
-  async updateReminder(reminder: Reminder): Promise<Reminder> {
+  async updateReminder(reminder: Reminder, userId?: string): Promise<Reminder> {
     try {
       console.log('🔄 Updating reminder in Firebase:', reminder.id);
       const reminderRef = doc(db, 'smartMoneyReminders', reminder.id);
@@ -329,18 +368,18 @@ export class DataService {
       return reminder;
     } catch (error) {
       console.log('❌ Firebase not available, updating in local storage');
-      const reminders = await this.getReminders();
+      const reminders = await this.getReminders(userId);
       const index = reminders.findIndex(r => r.id === reminder.id);
       if (index !== -1) {
         reminders[index] = reminder;
-        await AsyncStorage.setItem('smart_money_reminders', JSON.stringify(reminders));
+        await AsyncStorage.setItem(`smart_money_reminders_${userId || 'default'}`, JSON.stringify(reminders));
         console.log('📱 Reminder updated in local storage');
       }
       return reminder;
     }
   }
 
-  async deleteReminder(id: string): Promise<void> {
+  async deleteReminder(id: string, userId?: string): Promise<void> {
     try {
       console.log('🗑️ Deleting reminder from Firebase:', id);
       const reminderRef = doc(db, 'smartMoneyReminders', id);
@@ -348,38 +387,39 @@ export class DataService {
       console.log('✅ Reminder deleted from Firebase');
     } catch (error) {
       console.log('❌ Firebase not available, deleting from local storage');
-      const reminders = await this.getReminders();
+      const reminders = await this.getReminders(userId);
       const filtered = reminders.filter(r => r.id !== id);
-      await AsyncStorage.setItem('smart_money_reminders', JSON.stringify(filtered));
+      await AsyncStorage.setItem(`smart_money_reminders_${userId || 'default'}`, JSON.stringify(filtered));
       console.log('📱 Reminder deleted from local storage');
     }
   }
 
   // UTILITY METHODS
-  async clearAllData(): Promise<void> {
+  async clearAllData(userId?: string): Promise<void> {
     try {
-      console.log('🧹 Clearing all Smart Money data...');
+      console.log('🧹 Clearing all Smart Money data for user:', userId || 'default');
+      const userSuffix = userId || 'default';
       await Promise.all([
-        AsyncStorage.removeItem('smart_money_expenses'),
-        AsyncStorage.removeItem('smart_money_income'),
-        AsyncStorage.removeItem('smart_money_reminders')
+        AsyncStorage.removeItem(`smart_money_expenses_${userSuffix}`),
+        AsyncStorage.removeItem(`smart_money_income_${userSuffix}`),
+        AsyncStorage.removeItem(`smart_money_reminders_${userSuffix}`)
       ]);
-      console.log('✅ All local data cleared');
+      console.log('✅ All local data cleared for user');
     } catch (error) {
       console.error('❌ Failed to clear data:', error);
     }
   }
 
-  async exportData(): Promise<{
+  async exportData(userId?: string): Promise<{
     expenses: Expense[];
     income: Income[];
     reminders: Reminder[];
   }> {
     try {
       const [expenses, income, reminders] = await Promise.all([
-        this.getExpenses(),
-        this.getIncome(),
-        this.getReminders()
+        this.getExpenses(userId),
+        this.getIncome(userId),
+        this.getReminders(userId)
       ]);
 
       return { expenses, income, reminders };
@@ -393,27 +433,27 @@ export class DataService {
     expenses?: Expense[];
     income?: Income[];
     reminders?: Reminder[];
-  }): Promise<boolean> {
+  }, userId?: string): Promise<boolean> {
     try {
-      console.log('📥 Importing data...');
+      console.log('📥 Importing data for user:', userId || 'default');
       
       if (data.expenses && data.expenses.length > 0) {
         for (const expense of data.expenses) {
-          await this.saveExpense(expense);
+          await this.saveExpense(expense, userId);
         }
         console.log('✅ Imported', data.expenses.length, 'expenses');
       }
 
       if (data.income && data.income.length > 0) {
         for (const incomeItem of data.income) {
-          await this.saveIncome(incomeItem);
+          await this.saveIncome(incomeItem, userId);
         }
         console.log('✅ Imported', data.income.length, 'income entries');
       }
 
       if (data.reminders && data.reminders.length > 0) {
         for (const reminder of data.reminders) {
-          await this.saveReminder(reminder);
+          await this.saveReminder(reminder, userId);
         }
         console.log('✅ Imported', data.reminders.length, 'reminders');
       }
