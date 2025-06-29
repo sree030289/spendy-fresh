@@ -19,17 +19,10 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Animated,
-  ImageBackground,
-  PanGestureHandler,
-  State,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { LineChart, PieChart as RNPieChart } from 'react-native-chart-kit';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { Calendar } from 'react-native-calendars';
 
 // Import your services
 import { FirebaseNotificationService } from '@/services/smartMoney/firebaseNotificationService';
@@ -38,19 +31,50 @@ import { DataService } from '@/services/smartMoney/dataService';
 import { Analytics, Expense, Income, Reminder, ExpenseCategory, IncomeCategory, ReminderCategory } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
+import TransactionListModal from '@/components/modals/TransactionListModal';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Placeholder for SimpleExpenseListModal until it's properly implemented
+const SimpleExpenseListModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  onExpensePress: (expense: Expense) => void;
+}> = ({ visible, onClose, title, onExpensePress }) => {
+  const { theme } = useTheme();
+  
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+      <SafeAreaView style={[styles.fullScreenModal, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.fullScreenHeader, { borderBottomColor: theme.colors.border }]}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.fullScreenTitle, { color: theme.colors.text }]}>{title}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.calendarContent}>
+          <Text style={[styles.comingSoonText, { color: theme.colors.textSecondary }]}>
+            Full Expense List - Coming Soon
+          </Text>
+          <Text style={[styles.comingSoonSubtext, { color: theme.colors.textSecondary }]}>
+            This will show a complete expense list with advanced filtering capabilities
+          </Text>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+};
 
 interface TabButtonProps {
   title: string;
   icon: string;
   isActive: boolean;
   onPress: () => void;
-  isFirst?: boolean;
-  isLast?: boolean;
 }
 
-const TabButton: React.FC<TabButtonProps> = ({ title, icon, isActive, onPress, isFirst, isLast }) => {
+const TabButton: React.FC<TabButtonProps> = ({ title, icon, isActive, onPress }) => {
   const { theme } = useTheme();
   
   return (
@@ -59,8 +83,6 @@ const TabButton: React.FC<TabButtonProps> = ({ title, icon, isActive, onPress, i
       style={[
         styles.segment,
         isActive && [styles.activeSegment, { backgroundColor: theme.colors.primary }],
-        isFirst && styles.firstSegment,
-        isLast && styles.lastSegment,
       ]}
     >
       <Ionicons
@@ -78,93 +100,445 @@ const TabButton: React.FC<TabButtonProps> = ({ title, icon, isActive, onPress, i
   );
 };
 
-// Calendar Item Component
-const CalendarItem: React.FC<{
-  item: Expense | Reminder;
-  type: 'expense' | 'reminder';
+// Enhanced Recent Transactions View Component - Card Rows Layout
+const RecentTransactionsView: React.FC<{
+  expenses: Expense[];
   theme: any;
-  onPress: () => void;
-}> = ({ item, type, theme, onPress }) => {
-  const isExpense = type === 'expense';
-  const isReminder = type === 'reminder';
-  const isOverdue = isReminder && new Date((item as Reminder).dueDate) < new Date() && (item as Reminder).status === 'pending';
-  
+  onViewAll: () => void;
+  onExpensePress: (expense: Expense) => void;
+}> = ({ expenses, theme, onViewAll, onExpensePress }) => {
   return (
-    <TouchableOpacity 
-      style={[
-        styles.calendarItemBlock,
-        {
-          backgroundColor: isExpense ? theme.colors.error + '20' : 
-                          isOverdue ? theme.colors.error + '40' :
-                          theme.colors.warning + '20',
-          borderLeftColor: isExpense ? theme.colors.error : 
-                          isOverdue ? theme.colors.error :
-                          theme.colors.warning,
-        }
-      ]}
-      onPress={onPress}
-    >
-      <Text style={[styles.calendarItemTitle, { color: theme.colors.text }]} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text style={[styles.calendarItemAmount, { color: theme.colors.textSecondary }]}>
-        ${item.amount.toFixed(2)}
-      </Text>
-      {isReminder && (item as Reminder).status === 'paid' && (
-        <Ionicons name="checkmark-circle" size={12} color={theme.colors.success} />
+    <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Transactions</Text>
+        <TouchableOpacity onPress={onViewAll} style={styles.viewAllButton}>
+          <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+        </TouchableOpacity>
+      </View>
+      
+      {expenses.length === 0 ? (
+        <View style={styles.emptyStateContainer}>
+          <Ionicons name="card-outline" size={40} color={theme.colors.textSecondary} />
+          <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+            No transactions yet
+          </Text>
+          <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+            Add your first expense to get started
+          </Text>
+        </View>
+      ) : (
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          style={styles.transactionCardsList}
+        >
+          {expenses.slice(0, 5).map((expense, index) => (
+            <TouchableOpacity
+              key={expense.id}
+              style={[styles.transactionCardRow, { backgroundColor: theme.colors.background }]}
+              onPress={() => onExpensePress(expense)}
+              activeOpacity={0.7}
+            >
+              {/* Left: Category Icon */}
+              <View style={[styles.categoryIconContainer, { backgroundColor: getCategoryColor(expense.category) }]}>
+                <Text style={styles.categoryIconText}>
+                  {getCategoryEmoji(expense.category)}
+                </Text>
+              </View>
+
+              {/* Center: Transaction Details */}
+              <View style={styles.transactionCardDetails}>
+                <Text style={[styles.transactionCardTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                  {expense.title}
+                </Text>
+                <View style={styles.transactionCardMeta}>
+                  <Text style={[styles.transactionCardCategory, { color: theme.colors.textSecondary }]}>
+                    {expense.category}
+                  </Text>
+                  <Text style={[styles.metaSeparator, { color: theme.colors.textSecondary }]}>•</Text>
+                  <Text style={[styles.transactionCardDate, { color: theme.colors.textSecondary }]}>
+                    {new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Right: Amount */}
+              <View style={styles.transactionCardAmount}>
+                <Text style={[styles.transactionCardAmountText, { color: theme.colors.error }]}>
+                  -${expense.amount.toFixed(2)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       )}
-    </TouchableOpacity>
+    </View>
   );
 };
 
-// View Type Buttons Component
-const ViewTypeButtons: React.FC<{
-  viewType: 'list' | 'calendar';
-  onViewChange: (type: 'list' | 'calendar') => void;
+// Enhanced Upcoming Reminders View Component - Card Rows Layout
+const UpcomingRemindersView: React.FC<{
+  reminders: Reminder[];
   theme: any;
-}> = ({ viewType, onViewChange, theme }) => (
-  <View style={[styles.viewTypeContainer, { backgroundColor: theme.colors.surface }]}>
-    <TouchableOpacity
-      style={[
-        styles.viewTypeButton,
-        viewType === 'list' && { backgroundColor: theme.colors.primary }
-      ]}
-      onPress={() => onViewChange('list')}
-    >
-      <Ionicons 
-        name="list" 
-        size={16} 
-        color={viewType === 'list' ? 'white' : theme.colors.textSecondary} 
-      />
-      <Text style={[
-        styles.viewTypeText,
-        { color: viewType === 'list' ? 'white' : theme.colors.textSecondary }
-      ]}>
-        List
-      </Text>
-    </TouchableOpacity>
-    
-    <TouchableOpacity
-      style={[
-        styles.viewTypeButton,
-        viewType === 'calendar' && { backgroundColor: theme.colors.primary }
-      ]}
-      onPress={() => onViewChange('calendar')}
-    >
-      <Ionicons 
-        name="calendar" 
-        size={16} 
-        color={viewType === 'calendar' ? 'white' : theme.colors.textSecondary} 
-      />
-      <Text style={[
-        styles.viewTypeText,
-        { color: viewType === 'calendar' ? 'white' : theme.colors.textSecondary }
-      ]}>
-        Calendar
-      </Text>
-    </TouchableOpacity>
-  </View>
-);
+  onViewAll: () => void;
+  onReminderPress: (reminder: Reminder) => void;
+  onMarkPaid: (id: string) => void;
+}> = ({ reminders, theme, onViewAll, onReminderPress, onMarkPaid }) => {
+  const upcomingReminders = reminders
+    .filter(r => r.status === 'pending')
+    .slice(0, 5);
+
+  return (
+    <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Upcoming Reminders</Text>
+        <TouchableOpacity onPress={onViewAll} style={styles.viewAllButton}>
+          <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+        </TouchableOpacity>
+      </View>
+      
+      {upcomingReminders.length === 0 ? (
+        <View style={styles.emptyStateContainer}>
+          <Ionicons name="calendar-outline" size={40} color={theme.colors.textSecondary} />
+          <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+            No upcoming reminders
+          </Text>
+          <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+            Add a reminder to stay on top of bills
+          </Text>
+        </View>
+      ) : (
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          style={styles.reminderCardsList}
+        >
+          {upcomingReminders.map((reminder) => {
+            const dueDate = new Date(reminder.dueDate);
+            const today = new Date();
+            const isOverdue = dueDate < today;
+            const daysDiff = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            
+            return (
+              <TouchableOpacity
+                key={reminder.id}
+                style={[
+                  styles.reminderCardRow, 
+                  { 
+                    backgroundColor: theme.colors.background,
+                    borderLeftColor: isOverdue ? theme.colors.error : theme.colors.warning,
+                  }
+                ]}
+                onPress={() => onReminderPress(reminder)}
+                activeOpacity={0.7}
+              >
+                {/* Left: Priority Icon */}
+                <View style={[
+                  styles.priorityIconContainer, 
+                  { backgroundColor: isOverdue ? theme.colors.error : theme.colors.warning }
+                ]}>
+                  <Text style={styles.priorityIconText}>
+                    {getReminderEmoji(reminder.category)}
+                  </Text>
+                </View>
+
+                {/* Center: Reminder Details */}
+                <View style={styles.reminderCardDetails}>
+                  <Text style={[styles.reminderCardTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                    {reminder.title}
+                  </Text>
+                  <View style={styles.reminderCardMeta}>
+                    <Text style={[styles.reminderCardCategory, { color: theme.colors.textSecondary }]}>
+                      {reminder.category}
+                    </Text>
+                    <Text style={[styles.metaSeparator, { color: theme.colors.textSecondary }]}>•</Text>
+                    <Text style={[
+                      styles.reminderCardDue, 
+                      { 
+                        color: isOverdue ? theme.colors.error : 
+                               daysDiff <= 1 ? theme.colors.warning : 
+                               theme.colors.textSecondary 
+                      }
+                    ]}>
+                      {isOverdue ? 'Overdue' : 
+                       daysDiff === 0 ? 'Due Today' : 
+                       daysDiff === 1 ? 'Due Tomorrow' : 
+                       `${daysDiff} days`}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Right: Amount & Action */}
+                <View style={styles.reminderCardRight}>
+                  <Text style={[styles.reminderCardAmount, { color: theme.colors.text }]}>
+                    ${reminder.amount.toFixed(2)}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      onMarkPaid(reminder.id);
+                    }}
+                    style={styles.quickMarkPaidButton}
+                  >
+                    <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
+  );
+};
+
+// Full Screen Reminder List Modal Component
+const FullScreenReminderModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  reminders: Reminder[];
+  theme: any;
+  onMarkPaid: (id: string) => void;
+  onDelete: (id: string) => void;
+}> = ({ visible, onClose, reminders, theme, onMarkPaid, onDelete }) => {
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const getRemindersForDate = (date: string) => {
+    return reminders.filter(r => r.dueDate === date);
+  };
+
+  const renderReminderItem = (reminder: Reminder) => {
+    const dueDate = new Date(reminder.dueDate);
+    const today = new Date();
+    const isOverdue = dueDate < today && reminder.status === 'pending';
+    const daysDiff = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    return (
+      <View
+        key={reminder.id}
+        style={[
+          styles.fullScreenReminderCard,
+          { 
+            backgroundColor: theme.colors.surface,
+            borderLeftColor: isOverdue ? theme.colors.error : 
+                            reminder.status === 'paid' ? theme.colors.success :
+                            theme.colors.warning,
+          }
+        ]}
+      >
+        <View style={styles.fullScreenReminderHeader}>
+          <View style={[
+            styles.fullScreenReminderIcon,
+            { 
+              backgroundColor: isOverdue ? theme.colors.error : 
+                              reminder.status === 'paid' ? theme.colors.success :
+                              theme.colors.warning 
+            }
+          ]}>
+            <Text style={styles.fullScreenReminderIconText}>
+              {getReminderEmoji(reminder.category)}
+            </Text>
+          </View>
+          
+          <View style={styles.fullScreenReminderContent}>
+            <Text style={[styles.fullScreenReminderTitle, { color: theme.colors.text }]}>
+              {reminder.title}
+            </Text>
+            <Text style={[styles.fullScreenReminderAmount, { color: theme.colors.text }]}>
+              ${reminder.amount.toFixed(2)}
+            </Text>
+            <View style={styles.fullScreenReminderMeta}>
+              <Text style={[styles.fullScreenReminderCategory, { color: theme.colors.textSecondary }]}>
+                {reminder.category}
+              </Text>
+              <Text style={[styles.metaSeparator, { color: theme.colors.textSecondary }]}>•</Text>
+              <Text style={[
+                styles.fullScreenReminderStatus,
+                { 
+                  color: isOverdue ? theme.colors.error : 
+                         reminder.status === 'paid' ? theme.colors.success :
+                         daysDiff <= 1 ? theme.colors.warning : 
+                         theme.colors.textSecondary 
+                }
+              ]}>
+                {reminder.status === 'paid' ? 'Paid' :
+                 isOverdue ? 'Overdue' : 
+                 daysDiff === 0 ? 'Due Today' : 
+                 daysDiff === 1 ? 'Due Tomorrow' : 
+                 `Due in ${daysDiff} days`}
+              </Text>
+              <Text style={[styles.metaSeparator, { color: theme.colors.textSecondary }]}>•</Text>
+              <Text style={[styles.fullScreenReminderDate, { color: theme.colors.textSecondary }]}>
+                {new Date(reminder.dueDate).toLocaleDateString()}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.fullScreenReminderActions}>
+            {reminder.status === 'pending' && (
+              <TouchableOpacity
+                onPress={() => onMarkPaid(reminder.id)}
+                style={[styles.fullScreenActionButton, { backgroundColor: theme.colors.success }]}
+              >
+                <Ionicons name="checkmark" size={16} color="white" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => onDelete(reminder.id)}
+              style={[styles.fullScreenActionButton, { backgroundColor: theme.colors.error }]}
+            >
+              <Ionicons name="trash" size={16} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+      <SafeAreaView style={[styles.fullScreenModal, { backgroundColor: theme.colors.background }]}>
+        {/* Header */}
+        <View style={[styles.fullScreenHeader, { borderBottomColor: theme.colors.border }]}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.fullScreenTitle, { color: theme.colors.text }]}>All Reminders</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        {/* View Mode Selector */}
+        <View style={[styles.viewModeSelector, { backgroundColor: theme.colors.surface }]}>
+          <TouchableOpacity
+            style={[
+              styles.viewModeButton,
+              viewMode === 'list' && { backgroundColor: theme.colors.primary }
+            ]}
+            onPress={() => setViewMode('list')}
+          >
+            <Text style={[
+              styles.viewModeText,
+              { color: viewMode === 'list' ? 'white' : theme.colors.textSecondary }
+            ]}>
+              List
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.viewModeButton,
+              viewMode === 'calendar' && { backgroundColor: theme.colors.primary }
+            ]}
+            onPress={() => setViewMode('calendar')}
+          >
+            <Text style={[
+              styles.viewModeText,
+              { color: viewMode === 'calendar' ? 'white' : theme.colors.textSecondary }
+            ]}>
+              Calendar
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Content */}
+        <ScrollView style={styles.fullScreenContent}>
+          {viewMode === 'list' ? (
+            <View style={styles.fullScreenRemindersList}>
+              {reminders.length === 0 ? (
+                <View style={styles.fullScreenEmptyState}>
+                  <Ionicons name="calendar-outline" size={64} color={theme.colors.textSecondary} />
+                  <Text style={[styles.fullScreenEmptyTitle, { color: theme.colors.text }]}>
+                    No reminders yet
+                  </Text>
+                  <Text style={[styles.fullScreenEmptySubtitle, { color: theme.colors.textSecondary }]}>
+                    Add your first reminder to get started
+                  </Text>
+                </View>
+              ) : (
+                reminders
+                  .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+                  .map(renderReminderItem)
+              )}
+            </View>
+          ) : (
+            <View style={styles.fullScreenCalendarView}>
+              <Text style={[styles.comingSoonText, { color: theme.colors.textSecondary }]}>
+                Calendar View - Coming Soon
+              </Text>
+              <Text style={[styles.comingSoonSubtext, { color: theme.colors.textSecondary }]}>
+                This will show a full calendar with all your reminders marked by date
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+};
+
+// Full Screen Calendar Modal Component
+const FullScreenCalendarModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  expenses: Expense[];
+  reminders: Reminder[];
+  theme: any;
+}> = ({ visible, onClose, expenses, reminders, theme }) => {
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'year'>('month');
+
+  const getItemsForDate = (date: string) => {
+    const dateExpenses = expenses.filter(e => e.date === date);
+    const dateReminders = reminders.filter(r => r.dueDate === date);
+    return [...dateExpenses, ...dateReminders];
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+      <SafeAreaView style={[styles.fullScreenModal, { backgroundColor: theme.colors.background }]}>
+        {/* Header */}
+        <View style={[styles.fullScreenHeader, { borderBottomColor: theme.colors.border }]}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.fullScreenTitle, { color: theme.colors.text }]}>Calendar View</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        {/* View Mode Selector */}
+        <View style={[styles.viewModeSelector, { backgroundColor: theme.colors.surface }]}>
+          {['month', 'week', 'day', 'year'].map((mode) => (
+            <TouchableOpacity
+              key={mode}
+              style={[
+                styles.viewModeButton,
+                viewMode === mode && { backgroundColor: theme.colors.primary }
+              ]}
+              onPress={() => setViewMode(mode as any)}
+            >
+              <Text style={[
+                styles.viewModeText,
+                { color: viewMode === mode ? 'white' : theme.colors.textSecondary }
+              ]}>
+                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Calendar Content */}
+        <ScrollView style={styles.calendarContent}>
+          <Text style={[styles.comingSoonText, { color: theme.colors.textSecondary }]}>
+            Full Calendar View - Coming Soon
+          </Text>
+          <Text style={[styles.comingSoonSubtext, { color: theme.colors.textSecondary }]}>
+            This will show a complete calendar with monthly, weekly, daily, and yearly views
+          </Text>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+};
 
 const SmartMoneyScreen: React.FC = () => {
   const { user = null } = useAuth() || {};
@@ -181,16 +555,13 @@ const SmartMoneyScreen: React.FC = () => {
   const [formType, setFormType] = useState<'expense' | 'income' | 'reminder'>('expense');
   const [gmailConnected, setGmailConnected] = useState(false);
   
-  // View type states
-  const [transactionViewType, setTransactionViewType] = useState<'list' | 'calendar'>('list');
-  const [reminderViewType, setReminderViewType] = useState<'list' | 'calendar'>('list');
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedCalendarItem, setSelectedCalendarItem] = useState<{
-    item: Expense | Reminder;
-    type: 'expense' | 'reminder';
-  } | null>(null);
+  // Modal states
+  const [showExpenseListModal, setShowExpenseListModal] = useState(false);
+  const [showReminderListModal, setShowReminderListModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showTransactionListModal, setShowTransactionListModal] = useState(false);
   
-  // Define tabs configuration for the segmented control
+  // Define tabs configuration
   const tabs = [
     { id: 'overview', title: 'Overview', icon: 'analytics-outline' },
     { id: 'transactions', title: 'Transactions', icon: 'card-outline' },
@@ -228,13 +599,9 @@ const SmartMoneyScreen: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Initialize notification service
       const notificationService = FirebaseNotificationService.getInstance();
       await notificationService.initialize();
-      
-      // Load real data from Firebase - no demo data
       await loadData();
-      
     } catch (error) {
       console.error('Failed to initialize Smart Money:', error);
       Alert.alert('Error', 'Failed to initialize Smart Money features');
@@ -249,25 +616,16 @@ const SmartMoneyScreen: React.FC = () => {
     try {
       const dataService = DataService.getInstance();
       
-      // Load real data from Firebase/storage
       const [expensesData, incomeData, remindersData] = await Promise.all([
         dataService.getExpenses(),
         dataService.getIncome(),
         dataService.getReminders()
       ]);
       
-      console.log('📊 Loaded data:', {
-        expenses: expensesData.length,
-        income: incomeData.length,
-        reminders: remindersData.length
-      });
-      
-      // Set the real data
       setExpenses(expensesData || []);
       setIncome(incomeData || []);
       setReminders(remindersData || []);
       
-      // Generate analytics from real data
       const analyticsService = AnalyticsService.getInstance();
       if (expensesData.length > 0 || incomeData.length > 0) {
         const monthlyAnalytics = analyticsService.generateAnalytics(
@@ -282,7 +640,6 @@ const SmartMoneyScreen: React.FC = () => {
       
     } catch (error) {
       console.error('Failed to load data:', error);
-      // Set empty arrays on error
       setExpenses([]);
       setIncome([]);
       setReminders([]);
@@ -329,80 +686,6 @@ const SmartMoneyScreen: React.FC = () => {
       setSelectedDate(new Date(formData.dueDate));
     }
     setShowDatePicker(true);
-  };
-
-  // Generate calendar marked dates
-  const getCalendarMarkedDates = () => {
-    const markedDates: any = {};
-    
-    // Mark today
-    const today = new Date().toISOString().split('T')[0];
-    markedDates[today] = {
-      selected: selectedCalendarDate === today,
-      selectedColor: theme.colors.primary,
-      marked: true,
-      dotColor: theme.colors.primary
-    };
-    
-    // Mark dates with expenses
-    expenses.forEach(expense => {
-      const date = expense.date;
-      if (!markedDates[date]) {
-        markedDates[date] = {
-          marked: true,
-          dots: []
-        };
-      } else if (!markedDates[date].dots) {
-        markedDates[date].dots = [];
-      }
-      markedDates[date].dots.push({
-        color: theme.colors.error,
-        selectedDotColor: 'white'
-      });
-    });
-    
-    // Mark dates with reminders
-    reminders.forEach(reminder => {
-      const date = reminder.dueDate;
-      const isOverdue = new Date(date) < new Date() && reminder.status === 'pending';
-      
-      if (!markedDates[date]) {
-        markedDates[date] = {
-          marked: true,
-          dots: []
-        };
-      } else if (!markedDates[date].dots) {
-        markedDates[date].dots = [];
-      }
-      markedDates[date].dots.push({
-        color: isOverdue ? theme.colors.error : theme.colors.warning,
-        selectedDotColor: 'white'
-      });
-    });
-    
-    // Mark selected date
-    if (selectedCalendarDate && markedDates[selectedCalendarDate]) {
-      markedDates[selectedCalendarDate].selected = true;
-      markedDates[selectedCalendarDate].selectedColor = theme.colors.primary;
-    } else if (selectedCalendarDate) {
-      markedDates[selectedCalendarDate] = {
-        selected: true,
-        selectedColor: theme.colors.primary
-      };
-    }
-    
-    return markedDates;
-  };
-
-  // Get items for selected calendar date
-  const getCalendarDateItems = (date: string) => {
-    const dateExpenses = expenses.filter(expense => expense.date === date);
-    const dateReminders = reminders.filter(reminder => reminder.dueDate === date);
-    
-    return [
-      ...dateExpenses.map(expense => ({ item: expense, type: 'expense' as const })),
-      ...dateReminders.map(reminder => ({ item: reminder, type: 'reminder' as const }))
-    ];
   };
 
   const handleAddItem = async () => {
@@ -466,7 +749,6 @@ const SmartMoneyScreen: React.FC = () => {
         setReminders(prev => [savedReminder!, ...prev]);
       }
 
-      // Reset form
       setFormData({
         title: '',
         amount: '',
@@ -476,7 +758,6 @@ const SmartMoneyScreen: React.FC = () => {
       });
       setShowAddForm(false);
       
-      // Refresh analytics
       const analyticsService = AnalyticsService.getInstance();
       const updatedExpenses = formType === 'expense' && savedExpense 
         ? [savedExpense, ...expenses]
@@ -618,71 +899,6 @@ const SmartMoneyScreen: React.FC = () => {
     );
   };
 
-  // Render Calendar View
-  const renderCalendarView = (items: any[], type: 'expenses' | 'reminders') => (
-    <View style={styles.calendarContainer}>
-      <Calendar
-        markingType={'multi-dot'}
-        markedDates={getCalendarMarkedDates()}
-        onDayPress={(day: any) => setSelectedCalendarDate(day.dateString)}
-        theme={{
-          backgroundColor: theme.colors.background,
-          calendarBackground: theme.colors.surface,
-          textSectionTitleColor: theme.colors.text,
-          dayTextColor: theme.colors.text,
-          todayTextColor: theme.colors.primary,
-          selectedDayTextColor: 'white',
-          monthTextColor: theme.colors.text,
-          indicatorColor: theme.colors.primary,
-          selectedDayBackgroundColor: theme.colors.primary,
-          arrowColor: theme.colors.primary,
-          textDisabledColor: theme.colors.textSecondary + '50',
-          textDayFontFamily: 'System',
-          textMonthFontFamily: 'System',
-          textDayHeaderFontFamily: 'System',
-          textDayFontWeight: '500',
-          textMonthFontWeight: '600',
-          textDayHeaderFontWeight: '600',
-          textDayFontSize: 16,
-          textMonthFontSize: 18,
-          textDayHeaderFontSize: 14
-        }}
-      />
-      
-      {/* Selected Date Items */}
-      <View style={[styles.calendarDateItems, { backgroundColor: theme.colors.background }]}>
-        <Text style={[styles.calendarDateTitle, { color: theme.colors.text }]}>
-          {new Date(selectedCalendarDate).toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
-        </Text>
-        
-        <ScrollView style={styles.calendarItemsList}>
-          {getCalendarDateItems(selectedCalendarDate).map((entry, index) => (
-            <CalendarItem
-              key={`${entry.type}-${entry.item.id}-${index}`}
-              item={entry.item}
-              type={entry.type}
-              theme={theme}
-              onPress={() => setSelectedCalendarItem(entry)}
-            />
-          ))}
-          
-          {getCalendarDateItems(selectedCalendarDate).length === 0 && (
-            <View style={styles.emptyCalendarDate}>
-              <Text style={[styles.emptyCalendarDateText, { color: theme.colors.textSecondary }]}>
-                No {type} on this date
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    </View>
-  );
-
   const renderOverview = () => {
     const totalIncome = income.reduce((sum, item) => sum + item.amount, 0);
     const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
@@ -693,7 +909,7 @@ const SmartMoneyScreen: React.FC = () => {
         contentContainerStyle={styles.tabContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Improved Balance Card */}
+        {/* Balance Card */}
         <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
           <View style={styles.balanceHeader}>
             <Text style={styles.balanceTitle}>Your Balance</Text>
@@ -783,15 +999,12 @@ const SmartMoneyScreen: React.FC = () => {
             
             <TouchableOpacity
               style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
-              onPress={connectGmail}
-              disabled={gmailConnected}
+              onPress={() => setShowCalendarModal(true)}
             >
-              <Ionicons name="mail-outline" size={24} color={theme.colors.primary} />
-              <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
-                {gmailConnected ? 'Gmail Connected' : 'Connect Gmail'}
-              </Text>
+              <Ionicons name="calendar" size={24} color={theme.colors.primary} />
+              <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Calendar View</Text>
               <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-                Import bills
+                See timeline
               </Text>
             </TouchableOpacity>
           </View>
@@ -800,204 +1013,41 @@ const SmartMoneyScreen: React.FC = () => {
         {/* Analytics Section */}
         {renderAnalyticsSection()}
 
-        {/* Recent Transactions with List/Calendar View */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Transactions</Text>
-            <ViewTypeButtons 
-              viewType={transactionViewType}
-              onViewChange={setTransactionViewType}
-              theme={theme}
-            />
-          </View>
-          
-          {expenses.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="card-outline" size={40} color={theme.colors.textSecondary} />
-              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                No transactions yet
-              </Text>
-              <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-                Add your first expense to get started
-              </Text>
-            </View>
-          ) : (
-            <>
-              {transactionViewType === 'list' ? (
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalScrollContent}
-                  style={styles.horizontalScroll}
-                >
-                  {expenses.slice(0, 10).map((expense, index) => (
-                    <TouchableOpacity
-                      key={expense.id}
-                      style={[styles.expenseCard, { backgroundColor: theme.colors.background }]}
-                      onPress={() => {
-                        Alert.alert(
-                          expense.title,
-                          `Amount: ${expense.amount.toFixed(2)}\nCategory: ${expense.category}\nDate: ${new Date(expense.date).toLocaleDateString()}`,
-                          [
-                            { text: 'Delete', style: 'destructive', onPress: () => deleteItem(expense.id, 'expense') },
-                            { text: 'Cancel', style: 'cancel' }
-                          ]
-                        );
-                      }}
-                    >
-                      <View style={styles.expenseCardHeader}>
-                        <Text style={styles.expenseCardIcon}>💳</Text>
-                        <View style={styles.expenseCardAmount}>
-                          <Text style={[styles.expenseCardAmountText, { color: theme.colors.text }]}>
-                            ${expense.amount.toFixed(2)}
-                          </Text>
-                        </View>
-                      </View>
-                      
-                      <View style={styles.expenseCardContent}>
-                        <Text 
-                          style={[styles.expenseCardTitle, { color: theme.colors.text }]} 
-                          numberOfLines={2}
-                        >
-                          {expense.title}
-                        </Text>
-                        <Text 
-                          style={[styles.expenseCardDate, { color: theme.colors.textSecondary }]}
-                          numberOfLines={1}
-                        >
-                          {new Date(expense.date).toLocaleDateString()}
-                        </Text>
-                        <Text 
-                          style={[styles.expenseCardCategory, { color: theme.colors.textSecondary }]}
-                          numberOfLines={1}
-                        >
-                          {expense.category}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                  
-                  <TouchableOpacity
-                    style={[styles.addExpenseCard, { backgroundColor: theme.colors.primary + '10', borderColor: theme.colors.primary }]}
-                    onPress={() => {
-                      setFormType('expense');
-                      setShowAddForm(true);
-                    }}
-                  >
-                    <View style={styles.addExpenseCardContent}>
-                      <Ionicons name="add-circle" size={32} color={theme.colors.primary} />
-                      <Text style={[styles.addExpenseCardText, { color: theme.colors.primary }]}>
-                        Add New{'\n'}Transaction
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </ScrollView>
-              ) : (
-                renderCalendarView(expenses, 'expenses')
-              )}
-            </>
-          )}
-        </View>
+        {/* Recent Transactions - Enhanced Card Rows */}
+        <RecentTransactionsView
+          expenses={expenses}
+          theme={theme}
+          onViewAll={() => setShowTransactionListModal(true)}
+          onExpensePress={(expense) => {
+            Alert.alert(
+              expense.title,
+              `Amount: ${expense.amount.toFixed(2)}\nCategory: ${expense.category}\nDate: ${new Date(expense.date).toLocaleDateString()}`,
+              [
+                { text: 'Delete', style: 'destructive', onPress: () => deleteItem(expense.id, 'expense') },
+                { text: 'Cancel', style: 'cancel' }
+              ]
+            );
+          }}
+        />
 
-        {/* Upcoming Reminders with List/Calendar View */}
-        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Upcoming Reminders</Text>
-            <ViewTypeButtons 
-              viewType={reminderViewType}
-              onViewChange={setReminderViewType}
-              theme={theme}
-            />
-          </View>
-          
-          {reminders.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="calendar-outline" size={40} color={theme.colors.textSecondary} />
-              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                No reminders yet
-              </Text>
-              <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-                Add a reminder to stay on top of bills
-              </Text>
-            </View>
-          ) : (
-            <>
-              {reminderViewType === 'list' ? (
-                reminders
-                  .filter(reminder => {
-                    const dueDate = new Date(reminder.dueDate);
-                    const nextWeek = new Date();
-                    nextWeek.setDate(nextWeek.getDate() + 7);
-                    return dueDate <= nextWeek && reminder.status === 'pending';
-                  })
-                  .slice(0, 3)
-                  .map(reminder => (
-                    <View key={reminder.id} style={[styles.card, styles.reminderCard]}>
-                      <View style={styles.reminderContent}>
-                        <View style={styles.reminderHeader}>
-                          <Text style={[styles.reminderTitle, { color: theme.colors.text }]}>
-                            {reminder.title}
-                          </Text>
-                          {reminder.autoDetected && (
-                            <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
-                              <Text style={styles.badgeText}>AI</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={[styles.reminderAmount, { color: theme.colors.text }]}>
-                          ${reminder.amount.toFixed(2)}
-                        </Text>
-                        <Text style={[styles.reminderDate, { color: theme.colors.textSecondary }]}>
-                          Due: {new Date(reminder.dueDate).toLocaleDateString()}
-                        </Text>
-                      </View>
-                      
-                      <TouchableOpacity
-                        style={styles.markPaidButton}
-                        onPress={() => markReminderPaid(reminder.id)}
-                      >
-                        <Ionicons name="checkmark-circle" color="#10B981" size={24} />
-                      </TouchableOpacity>
-                    </View>
-                  ))
-              ) : (
-                renderCalendarView(reminders, 'reminders')
-              )}
-              
-              {reminderViewType === 'list' && reminders.filter(reminder => {
-                const dueDate = new Date(reminder.dueDate);
-                const nextWeek = new Date();
-                nextWeek.setDate(nextWeek.getDate() + 7);
-                return dueDate <= nextWeek && reminder.status === 'pending';
-              }).length === 0 && (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                    No upcoming reminders this week
-                  </Text>
-                  <TouchableOpacity 
-                    style={{
-                      backgroundColor: theme.colors.primary,
-                      paddingVertical: 8,
-                      paddingHorizontal: 16,
-                      borderRadius: 8,
-                      marginTop: 16,
-                    }}
-                    onPress={() => {
-                      setFormType('reminder');
-                      setShowAddForm(true);
-                    }}
-                  >
-                    <Text style={{
-                      color: 'white',
-                      fontWeight: '500',
-                      fontSize: 14,
-                    }}>Add Reminder</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </>
-          )}
-        </View>
+        {/* Upcoming Reminders - Enhanced Card Rows */}
+        <UpcomingRemindersView
+          reminders={reminders}
+          theme={theme}
+          onViewAll={() => setActiveTab('reminders')}
+          onReminderPress={(reminder) => {
+            Alert.alert(
+              reminder.title,
+              `Amount: ${reminder.amount.toFixed(2)}\nDue: ${new Date(reminder.dueDate).toLocaleDateString()}\nStatus: ${reminder.status}`,
+              [
+                { text: 'Mark Paid', onPress: () => markReminderPaid(reminder.id) },
+                { text: 'Delete', style: 'destructive', onPress: () => deleteItem(reminder.id, 'reminder') },
+                { text: 'Cancel', style: 'cancel' }
+              ]
+            );
+          }}
+          onMarkPaid={markReminderPaid}
+        />
       </ScrollView>
     );
   };
@@ -1384,86 +1434,6 @@ const SmartMoneyScreen: React.FC = () => {
     </Modal>
   );
 
-  // Calendar Item Detail Modal
-  const renderCalendarItemModal = () => (
-    <Modal visible={!!selectedCalendarItem} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
-          {selectedCalendarItem && (
-            <>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                  {selectedCalendarItem.type === 'expense' ? 'Expense Details' : 'Reminder Details'}
-                </Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => setSelectedCalendarItem(null)}
-                >
-                  <Ionicons name="close" color={theme.colors.textSecondary} size={24} />
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.calendarItemDetail}>
-                <Text style={[styles.calendarItemDetailTitle, { color: theme.colors.text }]}>
-                  {selectedCalendarItem.item.title}
-                </Text>
-                <Text style={[styles.calendarItemDetailAmount, { color: theme.colors.primary }]}>
-                  ${selectedCalendarItem.item.amount.toFixed(2)}
-                </Text>
-                
-                {selectedCalendarItem.type === 'expense' ? (
-                  <>
-                    <Text style={[styles.calendarItemDetailLabel, { color: theme.colors.textSecondary }]}>
-                      Category: {(selectedCalendarItem.item as Expense).category}
-                    </Text>
-                    <Text style={[styles.calendarItemDetailLabel, { color: theme.colors.textSecondary }]}>
-                      Date: {new Date((selectedCalendarItem.item as Expense).date).toLocaleDateString()}
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={[styles.calendarItemDetailLabel, { color: theme.colors.textSecondary }]}>
-                      Category: {(selectedCalendarItem.item as Reminder).category}
-                    </Text>
-                    <Text style={[styles.calendarItemDetailLabel, { color: theme.colors.textSecondary }]}>
-                      Due Date: {new Date((selectedCalendarItem.item as Reminder).dueDate).toLocaleDateString()}
-                    </Text>
-                    <Text style={[styles.calendarItemDetailLabel, { color: theme.colors.textSecondary }]}>
-                      Status: {(selectedCalendarItem.item as Reminder).status}
-                    </Text>
-                  </>
-                )}
-              </View>
-              
-              <View style={styles.modalActions}>
-                {selectedCalendarItem.type === 'reminder' && (selectedCalendarItem.item as Reminder).status === 'pending' && (
-                  <TouchableOpacity
-                    style={[styles.saveButton, { backgroundColor: theme.colors.success }]}
-                    onPress={() => {
-                      markReminderPaid(selectedCalendarItem.item.id);
-                      setSelectedCalendarItem(null);
-                    }}
-                  >
-                    <Text style={styles.saveButtonText}>Mark as Paid</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[styles.cancelButton, { backgroundColor: theme.colors.error }]}
-                  onPress={() => {
-                    deleteItem(selectedCalendarItem.item.id, selectedCalendarItem.type);
-                    setSelectedCalendarItem(null);
-                  }}
-                >
-                  <Text style={[styles.cancelButtonText, { color: 'white' }]}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -1513,28 +1483,13 @@ const SmartMoneyScreen: React.FC = () => {
       <View style={[styles.tabNavigation, { backgroundColor: theme.colors.background }]}>
         <View style={[styles.segmentedControl, { backgroundColor: theme.colors.surface }]}>
           {tabs.map((tab, index) => (
-            <TouchableOpacity
+            <TabButton
               key={tab.id}
-              style={[
-                styles.segment,
-                activeTab === tab.id && [styles.activeSegment, { backgroundColor: theme.colors.primary }],
-                index === 0 && styles.firstSegment,
-                index === tabs.length - 1 && styles.lastSegment,
-              ]}
+              title={tab.title}
+              icon={tab.icon}
+              isActive={activeTab === tab.id}
               onPress={() => setActiveTab(tab.id)}
-            >
-              <Ionicons
-                name={tab.icon as any}
-                size={18}
-                color={activeTab === tab.id ? 'white' : theme.colors.textSecondary}
-              />
-              <Text style={[
-                styles.segmentText,
-                { color: activeTab === tab.id ? 'white' : theme.colors.textSecondary }
-              ]}>
-                {tab.title}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
         </View>
       </View>
@@ -1557,13 +1512,112 @@ const SmartMoneyScreen: React.FC = () => {
         <Ionicons name="add" size={28} color="white" />
       </TouchableOpacity>
       
+      {/* Modals */}
       {renderAddForm()}
-      {renderCalendarItemModal()}
+      
+      {/* Full Screen Expense List Modal */}
+      <SimpleExpenseListModal
+        visible={showExpenseListModal}
+        onClose={() => setShowExpenseListModal(false)}
+        title="All Expenses"
+        onExpensePress={(expense) => {
+          Alert.alert(
+            expense.title,
+            `Amount: ${expense.amount.toFixed(2)}\nCategory: ${expense.category}\nDate: ${new Date(expense.date).toLocaleDateString()}`,
+            [
+              { text: 'Delete', style: 'destructive', onPress: () => deleteItem(expense.id, 'expense') },
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+        }}
+      />
+
+      {/* Full Screen Reminder List Modal */}
+      <FullScreenReminderModal
+        visible={showReminderListModal}
+        onClose={() => setShowReminderListModal(false)}
+        reminders={reminders}
+        theme={theme}
+        onMarkPaid={markReminderPaid}
+        onDelete={(id) => deleteItem(id, 'reminder')}
+      />
+
+      {/* Full Screen Calendar Modal */}
+      <FullScreenCalendarModal
+        visible={showCalendarModal}
+        onClose={() => setShowCalendarModal(false)}
+        expenses={expenses}
+        reminders={reminders}
+        theme={theme}
+      />
+
+      {/* Transaction List Modal */}
+      <TransactionListModal
+        visible={showTransactionListModal}
+        onClose={() => setShowTransactionListModal(false)}
+        title="All Transactions"
+        onTransactionPress={(transaction) => {
+          Alert.alert(
+            transaction.description,
+            `Amount: ${transaction.amount.toFixed(2)}\nCategory: ${transaction.category}\nMerchant: ${transaction.merchant}\nDate: ${transaction.date.toLocaleDateString()}`,
+            [{ text: 'OK' }]
+          );
+        }}
+      />
     </SafeAreaView>
   );
 };
 
-// Enhanced styles with consistent fonts and new components
+// Helper functions
+const getCategoryColor = (category: string): string => {
+  const colors: Record<string, string> = {
+    'Housing': '#FF6B6B',
+    'Transportation': '#4ECDC4',
+    'Food': '#45B7D1',
+    'Utilities': '#96CEB4',
+    'Healthcare': '#FFEAA7',
+    'Entertainment': '#DDA0DD',
+    'Shopping': '#98D8C8',
+    'Education': '#F7DC6F',
+    'Insurance': '#BB8FCE',
+    'Loans': '#F1948A',
+    'Other': '#85C1E9'
+  };
+  return colors[category] || '#95A5A6';
+};
+
+const getCategoryEmoji = (category: string): string => {
+  const emojis: Record<string, string> = {
+    'Housing': '🏠',
+    'Transportation': '🚗',
+    'Food': '🍽️',
+    'Utilities': '💡',
+    'Healthcare': '🏥',
+    'Entertainment': '🎬',
+    'Shopping': '🛍️',
+    'Education': '📚',
+    'Insurance': '🛡️',
+    'Loans': '💳',
+    'Other': '📊'
+  };
+  return emojis[category] || '📊';
+};
+
+const getReminderEmoji = (category: string): string => {
+  const emojis: Record<string, string> = {
+    'Bills': '📄',
+    'Subscriptions': '📱',
+    'Insurance': '🛡️',
+    'Loans': '🏦',
+    'Taxes': '🧾',
+    'Rent': '🏠',
+    'Utilities': '⚡',
+    'Other': '📝'
+  };
+  return emojis[category] || '📝';
+};
+
+// Enhanced styles with new components
 const styles = StyleSheet.create({
   // Main Container Styles
   container: {
@@ -1577,10 +1631,10 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    fontWeight: '500', // Consistent with RealSplittingScreen
+    fontWeight: '500',
   },
   
-  // Header Styles - Consistent with RealSplittingScreen
+  // Header Styles
   header: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -1593,12 +1647,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold', // Consistent with RealSplittingScreen
+    fontWeight: 'bold',
   },
   headerSubtitle: {
     fontSize: 14,
     marginTop: 2,
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
   headerActions: {
     flexDirection: 'row',
@@ -1651,17 +1705,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  firstSegment: {
-    borderTopLeftRadius: 8,
-    borderBottomLeftRadius: 8,
-  },
-  lastSegment: {
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
-  },
   segmentText: {
     fontSize: 13,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
   },
 
   // Content
@@ -1677,7 +1723,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  // Balance Card - Improved without summary text
+  // Balance Card
   balanceCard: {
     borderRadius: 16,
     padding: 20,
@@ -1694,7 +1740,7 @@ const styles = StyleSheet.create({
   balanceTitle: {
     color: 'white',
     fontSize: 18,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
   },
   balanceGrid: {
     flexDirection: 'row',
@@ -1719,91 +1765,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 14,
-    fontWeight: '500', // Consistent with RealSplittingScreen
-  },
-
-  // View Type Buttons
-  viewTypeContainer: {
-    flexDirection: 'row',
-    borderRadius: 8,
-    padding: 2,
-  },
-  viewTypeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 4,
-  },
-  viewTypeText: {
-    fontSize: 12,
-    fontWeight: '500', // Consistent with RealSplittingScreen
-  },
-
-  // Calendar Styles
-  calendarContainer: {
-    marginTop: 16,
-  },
-  calendarDateItems: {
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 16,
-  },
-  calendarDateTitle: {
-    fontSize: 16,
-    fontWeight: '600', // Consistent with RealSplittingScreen
-    marginBottom: 12,
-  },
-  calendarItemsList: {
-    maxHeight: 200,
-  },
-  calendarItemBlock: {
-    padding: 8,
-    marginVertical: 2,
-    borderRadius: 6,
-    borderLeftWidth: 3,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  calendarItemTitle: {
-    fontSize: 12,
-    fontWeight: '500', // Consistent with RealSplittingScreen
-    flex: 1,
-  },
-  calendarItemAmount: {
-    fontSize: 11,
-    fontWeight: '600', // Consistent with RealSplittingScreen
-    marginLeft: 8,
-  },
-  emptyCalendarDate: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  emptyCalendarDateText: {
-    fontSize: 14,
-    fontWeight: '500', // Consistent with RealSplittingScreen
-  },
-
-  // Calendar Item Detail Modal
-  calendarItemDetail: {
-    paddingVertical: 16,
-  },
-  calendarItemDetailTitle: {
-    fontSize: 20,
-    fontWeight: '600', // Consistent with RealSplittingScreen
-    marginBottom: 8,
-  },
-  calendarItemDetailAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  calendarItemDetailLabel: {
-    fontSize: 14,
-    marginBottom: 8,
-    fontWeight: '500', // Consistent with RealSplittingScreen
+    fontWeight: '500',
   },
 
   // Sections
@@ -1820,13 +1782,280 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
     marginLeft: 8,
     flex: 1,
   },
-  sectionLink: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Transaction Card Rows (New Layout)
+  transactionCardsList: {
+    maxHeight: 300,
+  },
+  transactionCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  categoryIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  categoryIconText: {
+    fontSize: 18,
+  },
+  transactionCardDetails: {
+    flex: 1,
+  },
+  transactionCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  transactionCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  transactionCardCategory: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  metaSeparator: {
+    fontSize: 13,
+    marginHorizontal: 6,
+  },
+  transactionCardDate: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  transactionCardAmount: {
+    alignItems: 'flex-end',
+  },
+  transactionCardAmountText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
+  // Reminder Card Rows (New Layout)
+  reminderCardsList: {
+    maxHeight: 300,
+  },
+  reminderCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderLeftWidth: 4,
+  },
+  priorityIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  priorityIconText: {
+    fontSize: 18,
+  },
+  reminderCardDetails: {
+    flex: 1,
+  },
+  reminderCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  reminderCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reminderCardCategory: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  reminderCardDue: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  reminderCardRight: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  reminderCardAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  quickMarkPaidButton: {
+    padding: 4,
+  },
+
+  // Full Screen Modal Styles
+  fullScreenModal: {
+    flex: 1,
+  },
+  fullScreenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  fullScreenTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  viewModeSelector: {
+    flexDirection: 'row',
+    margin: 16,
+    borderRadius: 8,
+    padding: 4,
+  },
+  viewModeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  viewModeText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  calendarContent: {
+    flex: 1,
+    padding: 20,
+  },
+  comingSoonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 100,
+  },
+  comingSoonSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+
+  // Full Screen Reminder Modal Styles
+  fullScreenRemindersList: {
+    padding: 16,
+  },
+  fullScreenReminderCard: {
+    marginBottom: 12,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  fullScreenReminderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  fullScreenReminderIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  fullScreenReminderIconText: {
+    fontSize: 20,
+  },
+  fullScreenReminderContent: {
+    flex: 1,
+  },
+  fullScreenReminderTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  fullScreenReminderAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  fullScreenReminderMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  fullScreenReminderCategory: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  fullScreenReminderStatus: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  fullScreenReminderDate: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  fullScreenReminderActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  fullScreenActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullScreenContent: {
+    flex: 1,
+  },
+  fullScreenCalendarView: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  fullScreenEmptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  fullScreenEmptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  fullScreenEmptySubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 
   // Quick Actions
@@ -1850,7 +2079,7 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 14,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
     marginTop: 8,
     textAlign: 'center',
   },
@@ -1858,7 +2087,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     textAlign: 'center',
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
 
   // Analytics Styles
@@ -1867,7 +2096,7 @@ const styles = StyleSheet.create({
   },
   analyticsSubtitle: {
     fontSize: 16,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
     marginBottom: 12,
   },
   categoryItem: {
@@ -1889,19 +2118,19 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     fontSize: 14,
-    fontWeight: '500', // Consistent with RealSplittingScreen
+    fontWeight: '500',
   },
   categoryAmounts: {
     alignItems: 'flex-end',
   },
   categoryAmount: {
     fontSize: 14,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
   },
   categoryPercentage: {
     fontSize: 12,
     marginTop: 2,
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
   savingsContainer: {
     alignItems: 'center',
@@ -1919,7 +2148,7 @@ const styles = StyleSheet.create({
   savingsLabel: {
     fontSize: 12,
     marginTop: 4,
-    fontWeight: '500', // Consistent with RealSplittingScreen
+    fontWeight: '500',
   },
   emptyAnalytics: {
     alignItems: 'center',
@@ -1927,89 +2156,14 @@ const styles = StyleSheet.create({
   },
   emptyAnalyticsText: {
     fontSize: 16,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
     marginTop: 12,
   },
   emptyAnalyticsSubtext: {
     fontSize: 14,
     marginTop: 4,
     textAlign: 'center',
-    fontWeight: '400', // Consistent with RealSplittingScreen
-  },
-
-  // Horizontal scrolling styles for transaction cards
-  horizontalScroll: {
-    marginTop: 8,
-  },
-  horizontalScrollContent: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-
-  // Expense card styles - consistent with RealSplittingScreen
-  expenseCard: {
-    width: 160,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  expenseCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  expenseCardIcon: {
-    fontSize: 24,
-  },
-  expenseCardAmount: {
-    alignItems: 'flex-end',
-  },
-  expenseCardAmountText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  expenseCardContent: {
-    flex: 1,
-    marginBottom: 8,
-  },
-  expenseCardTitle: {
-    fontSize: 14,
-    fontWeight: '500', // Consistent with RealSplittingScreen
-    marginBottom: 4,
-    minHeight: 32,
-  },
-  expenseCardDate: {
-    fontSize: 12,
-    marginBottom: 2,
-    fontWeight: '400', // Consistent with RealSplittingScreen
-  },
-  expenseCardCategory: {
-    fontSize: 11,
-    fontWeight: '400', // Consistent with RealSplittingScreen
-  },
-
-  // Add expense card styles
-  addExpenseCard: {
-    width: 160,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    padding: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 140,
-  },
-  addExpenseCardContent: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  addExpenseCardText: {
-    fontSize: 12,
-    fontWeight: '500', // Consistent with RealSplittingScreen
-    textAlign: 'center',
-    lineHeight: 16,
+    fontWeight: '400',
   },
 
   // Transaction Cards
@@ -2030,12 +2184,12 @@ const styles = StyleSheet.create({
   },
   transactionTitle: {
     fontSize: 16,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
     marginBottom: 4,
   },
   transactionCategory: {
     fontSize: 14,
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
   transactionActions: {
     flexDirection: 'row',
@@ -2081,7 +2235,7 @@ const styles = StyleSheet.create({
   },
   reminderTitle: {
     fontSize: 16,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
     flex: 1,
   },
   reminderBadges: {
@@ -2094,13 +2248,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  reminderDate: {
-    fontSize: 14,
-    fontWeight: '400', // Consistent with RealSplittingScreen
-  },
   reminderDetails: {
     fontSize: 14,
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
   reminderActions: {
     flexDirection: 'row',
@@ -2139,17 +2289,6 @@ const styles = StyleSheet.create({
   },
 
   // Badges
-  badge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600', // Consistent with RealSplittingScreen
-  },
   aiBadge: {
     backgroundColor: '#8B5CF6',
     paddingHorizontal: 8,
@@ -2170,14 +2309,14 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 16,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
     marginTop: 12,
   },
   emptyStateSubtext: {
     fontSize: 14,
     marginTop: 4,
     textAlign: 'center',
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
 
   // Gmail Card
@@ -2207,7 +2346,7 @@ const styles = StyleSheet.create({
   gmailSubtitle: {
     fontSize: 14,
     color: '#E0E7FF',
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
   gmailButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -2217,7 +2356,7 @@ const styles = StyleSheet.create({
   },
   gmailButtonText: {
     color: '#FFFFFF',
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
   },
 
   // Modal Styles
@@ -2264,7 +2403,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 16,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
     marginBottom: 8,
   },
   textInput: {
@@ -2272,7 +2411,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
   amountInputContainer: {
     flexDirection: 'row',
@@ -2284,14 +2423,14 @@ const styles = StyleSheet.create({
   currencySymbol: {
     fontSize: 16,
     marginRight: 8,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
   },
   amountInput: {
     flex: 1,
     padding: 16,
     fontSize: 16,
     paddingLeft: 0,
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
   categoryGrid: {
     flexDirection: 'row',
@@ -2306,7 +2445,7 @@ const styles = StyleSheet.create({
   },
   categoryOptionText: {
     fontSize: 14,
-    fontWeight: '500', // Consistent with RealSplittingScreen
+    fontWeight: '500',
   },
   datePickerButton: {
     flexDirection: 'row',
@@ -2318,7 +2457,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 16,
-    fontWeight: '400', // Consistent with RealSplittingScreen
+    fontWeight: '400',
   },
   modalActions: {
     flexDirection: 'row',
@@ -2333,7 +2472,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: 16,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
   },
   saveButton: {
     flex: 1,
@@ -2343,28 +2482,15 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontSize: 16,
-    fontWeight: '600', // Consistent with RealSplittingScreen
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   disabledButton: {
     backgroundColor: '#D1D5DB',
     opacity: 0.7,
   },
-
-  // Card base style
-  card: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
 });
 
-// Export as SmartMoneyApp to match the file name
 export default function SmartMoneyApp() {
   return <SmartMoneyScreen />;
-};
+}

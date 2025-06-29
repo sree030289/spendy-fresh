@@ -393,28 +393,40 @@ const initializeSplitData = () => {
     ));
   };
 
-  const handleReceiptData = (receiptData: any) => {
-    if (receiptData.merchant) {
-      setDescription(receiptData.merchant);
+ const handleReceiptData = (receiptData: ReceiptData) => {
+  // Set merchant/description
+  if (receiptData.merchant) {
+    setDescription(receiptData.merchant);
+  }
+  
+  // Set amount
+  if (receiptData.total) {
+    setAmount(receiptData.total.toString());
+  }
+  
+  // Set date
+  if (receiptData.date) {
+    setExpenseDate(new Date(receiptData.date));
+  }
+  
+  // Set category based on inferred category
+  if (receiptData.category) {
+    const matchedCategory = EXPENSE_CATEGORIES.find(cat => cat.id === receiptData.category);
+    if (matchedCategory) {
+      setSelectedCategory(matchedCategory);
     }
-    if (receiptData.total) {
-      setAmount(receiptData.total.toString());
-    }
-    if (receiptData.date) {
-      setExpenseDate(new Date(receiptData.date));
-    }
-    if (receiptData.merchant) {
-      const merchantLower = receiptData.merchant.toLowerCase();
-      if (merchantLower.includes('restaurant') || merchantLower.includes('cafe') || merchantLower.includes('food')) {
-        setSelectedCategory(EXPENSE_CATEGORIES.find(cat => cat.id === 'food') || EXPENSE_CATEGORIES[0]);
-      } else if (merchantLower.includes('gas') || merchantLower.includes('fuel') || merchantLower.includes('uber') || merchantLower.includes('taxi')) {
-        setSelectedCategory(EXPENSE_CATEGORIES.find(cat => cat.id === 'transport') || EXPENSE_CATEGORIES[0]);
-      } else if (merchantLower.includes('store') || merchantLower.includes('market') || merchantLower.includes('shop')) {
-        setSelectedCategory(EXPENSE_CATEGORIES.find(cat => cat.id === 'shopping') || EXPENSE_CATEGORIES[0]);
-      }
-    }
-    setShowReceiptScanner(false);
-  };
+  }
+  
+  // Close scanner
+  setShowReceiptScanner(false);
+  
+  // Show success message
+  Alert.alert(
+    'Receipt Processed',
+    `Successfully extracted data with ${((receiptData.confidence || 0) * 100).toFixed(1)}% confidence.`,
+    [{ text: 'OK' }]
+  );
+};
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>

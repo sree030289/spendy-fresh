@@ -1,19 +1,18 @@
 // src/navigation/MainTabNavigator.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, TouchableOpacity, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Animated, Dimensions, Text } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 
 // Import screens
 import SmartMoneyScreen from '@/screens/main/SmartMoneyApp';
 import DealsHubScreen from '@/screens/main/DealsHubScreen';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
-import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
 
 const Tab = createBottomTabNavigator();
 const { width: screenWidth } = Dimensions.get('window');
@@ -36,155 +35,158 @@ function PlusTabButton({ children, onPress }: any) {
   );
 }
 
-// Custom Tab Navigator with Swipe Support
+// Tab routes configuration (excluding the center action button)
+const TAB_ROUTES = [
+  { name: 'Split', component: RealSplittingScreen, index: 0 },
+  { name: 'SmartMoney', component: SmartMoneyScreen, index: 1 },
+  { name: 'DealsHub', component: DealsHubScreen, index: 3 }, // Skip index 2 (AddAction)
+  { name: 'Profile', component: ProfileScreen, index: 4 }
+];
+
+// Custom Tab Navigator with Working Swipe Support
 function SwipeableTabNavigator() {
   const { theme } = useTheme();
   const [showActionModal, setShowActionModal] = useState(false);
-  const [currentTabIndex, setCurrentTabIndex] = useState(0);
   const navigation = useNavigation();
   
   // Pan gesture handler for swipe navigation
-  const panGestureRef = useRef<PanGestureHandler>(null);
   const translateX = useRef(new Animated.Value(0)).current;
   
-  // Tab routes in order (excluding the center action button)
-  const tabRoutes = [
-    { name: 'Split', index: 0 },
-    { name: 'SmartMoney', index: 1 },
-    { name: 'DealsHub', index: 3 }, // Skip index 2 (AddAction)
-    { name: 'Profile', index: 4 }
-  ];
-
   const handleSwipeGesture = (event: any) => {
     const { translationX, velocityX, state } = event.nativeEvent;
     
-    if (state === State.END) {
-      const swipeThreshold = screenWidth * 0.25; // 25% of screen width
-      const velocityThreshold = 500;
+    if (state === State.ACTIVE) {
+      // Update translation during gesture with damping
+      translateX.setValue(translationX * 0.3);
+    } else if (state === State.END) {
+      const swipeThreshold = screenWidth * 0.2; // 20% of screen width
+      const velocityThreshold = 800;
       
-      let targetIndex = currentTabIndex;
+      // Get current navigation state
+      const currentState = navigation.getState();
+      const currentIndex = currentState.index;
+      
+      // Find current tab in our routes
+      const currentTabRouteIndex = TAB_ROUTES.findIndex(route => {
+        const tabIndex = currentState.routes.findIndex(r => r.name === route.name);
+        return tabIndex === currentIndex;
+      });
+      
+      let targetTabIndex = currentTabRouteIndex;
       
       // Determine swipe direction and target tab
-      if (translationX > swipeThreshold || velocityX > velocityThreshold) {
+      if ((translationX > swipeThreshold || velocityX > velocityThreshold) && currentTabRouteIndex > 0) {
         // Swipe right - go to previous tab
-        const currentRouteIndex = tabRoutes.findIndex(route => route.index === currentTabIndex);
-        if (currentRouteIndex > 0) {
-          targetIndex = tabRoutes[currentRouteIndex - 1].index;
-        }
-      } else if (translationX < -swipeThreshold || velocityX < -velocityThreshold) {
+        targetTabIndex = currentTabRouteIndex - 1;
+      } else if ((translationX < -swipeThreshold || velocityX < -velocityThreshold) && currentTabRouteIndex < TAB_ROUTES.length - 1) {
         // Swipe left - go to next tab
-        const currentRouteIndex = tabRoutes.findIndex(route => route.index === currentTabIndex);
-        if (currentRouteIndex < tabRoutes.length - 1) {
-          targetIndex = tabRoutes[currentRouteIndex + 1].index;
-        }
+        targetTabIndex = currentTabRouteIndex + 1;
       }
       
       // Navigate to target tab if it's different from current
-      if (targetIndex !== currentTabIndex) {
-        // Using the setCurrentTabIndex will automatically update the tab
-        // through the TabNavigator's state listener
-        setCurrentTabIndex(targetIndex);
+      if (targetTabIndex !== currentTabRouteIndex && targetTabIndex >= 0 && targetTabIndex < TAB_ROUTES.length) {
+        const targetRoute = TAB_ROUTES[targetTabIndex];
+        console.log(`🔄 Swiping to: ${targetRoute.name}`);
+        
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: targetRoute.name
+          })
+        );
       }
       
-      // Reset translation
+      // Reset translation with animation
       Animated.spring(translateX, {
         toValue: 0,
         useNativeDriver: true,
+        tension: 100,
+        friction: 8,
       }).start();
-    } else if (state === State.ACTIVE) {
-      // Update translation during gesture
-      translateX.setValue(translationX * 0.5); // Dampen the movement
     }
   };
 
-  // Update current tab index when navigation state changes
-  useEffect(() => {
-    // Listen for tab changes
-    const unsubscribe = navigation.addListener('state', (e) => {
-      const state = e.data.state;
-      if (state && state.index !== undefined) {
-        // This updates our local tracking of which tab is active
-        setCurrentTabIndex(state.index);
-      }
-    });
-
-    return unsubscribe;
-  }, [navigation]);
-  
-  // This effect changes the actual tab when currentTabIndex changes
-  useEffect(() => {
-    // Find the tab that matches the current index
-    const tabIndex = Object.values(tabRoutes)
-      .filter(route => route.index === currentTabIndex)
-      [0]?.index;
+  // Simple Action Modal Component
+  const ActionModal = () => {
+    if (!showActionModal) return null;
     
-    // The bottom tab navigator has its own internal state
-    // we don't need to manually navigate when it's already on the right tab
-  }, [currentTabIndex]);
-
-  // Simple Action Modal Component (since UnifiedActionModal might not exist)
-  const ActionModal = () => (
-    <View style={{ 
-      position: 'absolute', 
-      top: 0, 
-      left: 0, 
-      right: 0, 
-      bottom: 0, 
-      backgroundColor: 'rgba(0,0,0,0.5)', 
-      justifyContent: 'center', 
-      alignItems: 'center',
-      display: showActionModal ? 'flex' : 'none'
-    }}>
+    return (
       <View style={{ 
-        backgroundColor: theme.colors.surface, 
-        padding: 20, 
-        borderRadius: 16, 
-        margin: 20 
+        position: 'absolute', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0, 
+        backgroundColor: 'rgba(0,0,0,0.5)', 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        zIndex: 1000,
       }}>
-        <TouchableOpacity 
-          style={{ padding: 16, backgroundColor: theme.colors.primary, borderRadius: 8, marginBottom: 12 }}
-          onPress={() => {
-            setShowActionModal(false);
-            // Change to direct tab index instead of name-based navigation
-            const smartMoneyIndex = tabRoutes.findIndex(route => route.name === 'SmartMoney');
-            if (smartMoneyIndex !== -1) {
-              setCurrentTabIndex(tabRoutes[smartMoneyIndex].index);
-            }
-          }}
-        >
-          <Ionicons name="wallet" size={24} color="white" style={{ textAlign: 'center' }} />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={{ padding: 16, backgroundColor: theme.colors.secondary, borderRadius: 8, marginBottom: 12 }}
-          onPress={() => {
-            setShowActionModal(false);
-            // Change to direct tab index instead of name-based navigation
-            const splitIndex = tabRoutes.findIndex(route => route.name === 'Split');
-            if (splitIndex !== -1) {
-              setCurrentTabIndex(tabRoutes[splitIndex].index);
-            }
-          }}
-        >
-          <Ionicons name="people" size={24} color="white" style={{ textAlign: 'center' }} />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={{ padding: 8 }}
-          onPress={() => setShowActionModal(false)}
-        >
-          <Ionicons name="close" size={24} color={theme.colors.text} style={{ textAlign: 'center' }} />
-        </TouchableOpacity>
+        <View style={{ 
+          backgroundColor: theme.colors.surface, 
+          padding: 20, 
+          borderRadius: 16, 
+          margin: 20,
+          minWidth: 200,
+        }}>
+          <TouchableOpacity 
+            style={{ 
+              padding: 16, 
+              backgroundColor: theme.colors.primary, 
+              borderRadius: 8, 
+              marginBottom: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+            onPress={() => {
+              setShowActionModal(false);
+              navigation.dispatch(CommonActions.navigate({ name: 'SmartMoney' }));
+            }}
+          >
+            <Ionicons name="wallet" size={24} color="white" />
+            <Text style={{ color: 'white', fontWeight: '600' }}>Add Expense</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={{ 
+              padding: 16, 
+              backgroundColor: theme.colors.secondary, 
+              borderRadius: 8, 
+              marginBottom: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+            onPress={() => {
+              setShowActionModal(false);
+              navigation.dispatch(CommonActions.navigate({ name: 'Split' }));
+            }}
+          >
+            <Ionicons name="people" size={24} color="white" />
+            <Text style={{ color: 'white', fontWeight: '600' }}>Split Bill</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={{ padding: 16, alignItems: 'center' }}
+            onPress={() => setShowActionModal(false)}
+          >
+            <Ionicons name="close" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <>
       <PanGestureHandler
-        ref={panGestureRef}
         onGestureEvent={handleSwipeGesture}
         onHandlerStateChange={handleSwipeGesture}
-        activeOffsetX={[-10, 10]}
+        activeOffsetX={[-20, 20]}
         failOffsetY={[-50, 50]}
+        shouldCancelWhenOutside={true}
       >
         <Animated.View 
           style={[
@@ -226,7 +228,7 @@ function SwipeableTabNavigator() {
 
                 return <Ionicons name={iconName} size={size} color={color} />;
               },
-              tabBarActiveTintColor: '#10B981', // Robinhood green theme
+              tabBarActiveTintColor: '#10B981',
               tabBarInactiveTintColor: theme.colors.textSecondary,
               tabBarStyle: {
                 backgroundColor: theme.colors.background,
@@ -247,15 +249,6 @@ function SwipeableTabNavigator() {
               },
               headerShown: false,
             })}
-            screenListeners={{
-              state: (e) => {
-                // Update current tab index when tab changes
-                const index = e.data.state?.index;
-                if (index !== undefined) {
-                  setCurrentTabIndex(index);
-                }
-              },
-            }}
           >
             <Tab.Screen 
               name="Split" 
@@ -275,7 +268,7 @@ function SwipeableTabNavigator() {
             
             <Tab.Screen 
               name="AddAction" 
-              component={View} // Dummy component since this will just trigger modal
+              component={View}
               options={{
                 tabBarLabel: '',
                 tabBarButton: (props) => (
@@ -306,15 +299,8 @@ function SwipeableTabNavigator() {
         </Animated.View>
       </PanGestureHandler>
 
-      {/* Action Modal - Use the simple built-in version instead of importing the component
-          This avoids potential issues with the imported component */}
+      {/* Action Modal */}
       <ActionModal />
-      
-      {/* Or use UnifiedActionModal but only if it's correctly set up */}
-      {/* <UnifiedActionModal
-        visible={showActionModal}
-        onClose={() => setShowActionModal(false)}
-      /> */}
     </>
   );
 }
@@ -328,7 +314,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   plusButton: {
-    top: 5, // Bring it down into the tab bar area
+    top: 5,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#10B981',
@@ -343,16 +329,5 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    display: 'flex', // Explicitly set flex display
-  },
-  plusIcon: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  plusIconContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: '100%',
   },
 });
