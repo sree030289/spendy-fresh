@@ -26,7 +26,7 @@ import { QRCodeService } from '@/services/qr/QRCodeService';
 import { RealNotificationService } from './src/services/notifications/RealNotificationService';
 import { SplittingService } from '@/services/firebase/splitting';
 import { notificationManager } from '@/services/NotificationManager';
-import SmartMoneyScreen from '@/screens/main/SmartMoneyScreen';
+import SmartMoneyApp from '@/screens/main/SmartMoneyApp';
 
 const Stack = createStackNavigator();
 
