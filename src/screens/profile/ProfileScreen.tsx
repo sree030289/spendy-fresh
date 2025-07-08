@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// ProfileScreen.tsx - Updated with subscription management
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,7 +17,9 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import CurrencyModal from '@/components/modals/CurrencyModal';
+import SubscriptionModal from '@/components/modals/SubscriptionModal';
 import { useTour } from '@/components/tour/TourProvider';
+import { SubscriptionService, UserSubscription, SubscriptionPlan } from '@/services/SubscriptionService';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
@@ -24,7 +27,45 @@ export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const { startTour, resetTour } = useTour();
+
+  // Subscription states
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+  const [subscriptionPlan, setSubscriptionPlan] = useState<SubscriptionPlan | null>(null);
+  const [usageStats, setUsageStats] = useState<{
+    groups: { current: number; limit: number };
+    transactions: { current: number; limit: number };
+    daysUntilRenewal?: number;
+  } | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+
+  // Load subscription data
+  useEffect(() => {
+    const loadSubscriptionData = async () => {
+      if (!user?.id) return;
+
+      try {
+        setSubscriptionLoading(true);
+        const subscriptionService = SubscriptionService.getInstance();
+        const summary = await subscriptionService.getSubscriptionSummary(user.id);
+        
+        setSubscription(summary.subscription);
+        setSubscriptionPlan(summary.plan);
+        setUsageStats({
+          groups: summary.usage.groups,
+          transactions: summary.usage.transactions,
+          daysUntilRenewal: summary.daysUntilRenewal
+        });
+      } catch (error) {
+        console.error('Error loading subscription data:', error);
+      } finally {
+        setSubscriptionLoading(false);
+      }
+    };
+
+    loadSubscriptionData();
+  }, [user?.id]);
 
   const ProfileItem = ({ 
     icon, 
@@ -32,7 +73,9 @@ export default function ProfileScreen() {
     value, 
     onPress, 
     showChevron = true,
-    valueColor 
+    valueColor,
+    badge,
+    badgeColor = '#10B981'
   }: {
     icon: string;
     title: string;
@@ -40,6 +83,8 @@ export default function ProfileScreen() {
     onPress: () => void;
     showChevron?: boolean;
     valueColor?: string;
+    badge?: string;
+    badgeColor?: string;
   }) => (
     <TouchableOpacity
       style={[styles.profileItem, { backgroundColor: theme.colors.surface }]}
@@ -47,9 +92,16 @@ export default function ProfileScreen() {
     >
       <View style={styles.profileItemLeft}>
         <Ionicons name={icon as any} size={24} color={theme.colors.text} />
-        <Text style={[styles.profileItemTitle, { color: theme.colors.text }]}>
-          {title}
-        </Text>
+        <View style={styles.profileItemTextContainer}>
+          <Text style={[styles.profileItemTitle, { color: theme.colors.text }]}>
+            {title}
+          </Text>
+          {badge && (
+            <View style={[styles.badge, { backgroundColor: badgeColor }]}>
+              <Text style={styles.badgeText}>{badge}</Text>
+            </View>
+          )}
+        </View>
       </View>
       <View style={styles.profileItemRight}>
         {value && (
@@ -129,6 +181,126 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleSubscriptionPurchase = async (plan: 'monthly' | 'yearly', promoCode?: string) => {
+    try {
+      if (!user?.id) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      const subscriptionService = SubscriptionService.getInstance();
+      const result = await subscriptionService.processSubscription(user.id, plan, promoCode);
+
+      if (result.success) {
+        setShowSubscriptionModal(false);
+        Alert.alert('Success! 🎉', result.message, [
+          {
+            text: 'Awesome!',
+            onPress: () => {
+              // Reload subscription data
+              loadSubscriptionData();
+            }
+          }
+        ]);
+      } else {
+        Alert.alert('Error', result.message);
+      }
+    } catch (error) {
+      console.error('Subscription purchase error:', error);
+      Alert.alert('Error', 'Failed to process subscription. Please try again.');
+    }
+  };
+
+  const handleManageSubscription = () => {
+    if (subscription?.plan === 'premium') {
+      Alert.alert(
+        'Manage Subscription',
+        'What would you like to do with your subscription?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Cancel Subscription',
+            style: 'destructive',
+            onPress: handleCancelSubscription
+          },
+          {
+            text: 'View Details',
+            onPress: () => setShowSubscriptionModal(true)
+          }
+        ]
+      );
+    } else {
+      setShowSubscriptionModal(true);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    try {
+      if (!user?.id) return;
+
+      Alert.alert(
+        'Cancel Subscription',
+        'Are you sure you want to cancel your premium subscription? You will lose access to premium features at the end of your current billing period.',
+        [
+          { text: 'Keep Subscription', style: 'cancel' },
+          {
+            text: 'Cancel Subscription',
+            style: 'destructive',
+            onPress: async () => {
+              const subscriptionService = SubscriptionService.getInstance();
+              const result = await subscriptionService.cancelSubscription(user.id);
+              
+              if (result.success) {
+                Alert.alert('Subscription Cancelled', result.message);
+                // Reload subscription data
+                loadSubscriptionData();
+              } else {
+                Alert.alert('Error', result.message);
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to cancel subscription');
+    }
+  };
+
+  const loadSubscriptionData = async () => {
+    if (!user?.id) return;
+
+    try {
+      setSubscriptionLoading(true);
+      const subscriptionService = SubscriptionService.getInstance();
+      const summary = await subscriptionService.getSubscriptionSummary(user.id);
+      
+      setSubscription(summary.subscription);
+      setSubscriptionPlan(summary.plan);
+      setUsageStats({
+        groups: summary.usage.groups,
+        transactions: summary.usage.transactions,
+        daysUntilRenewal: summary.daysUntilRenewal
+      });
+    } catch (error) {
+      console.error('Error loading subscription data:', error);
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  const formatUsageText = (current: number, limit: number) => {
+    if (limit === -1) return `${current} (Unlimited)`;
+    return `${current}/${limit}`;
+  };
+
+  const getUsageColor = (current: number, limit: number) => {
+    if (limit === -1) return theme.colors.success;
+    const percentage = current / limit;
+    if (percentage >= 0.9) return theme.colors.error;
+    if (percentage >= 0.7) return theme.colors.warning;
+    return theme.colors.success;
+  };
+
   if (!user) return null;
 
   return (
@@ -200,6 +372,132 @@ export default function ProfileScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Subscription Status */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Subscription & Usage
+          </Text>
+          
+          {subscriptionLoading ? (
+            <View style={[styles.subscriptionCard, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.subscriptionTitle, { color: theme.colors.text }]}>
+                Loading subscription data...
+              </Text>
+            </View>
+          ) : (
+            <>
+              {/* Subscription Status Card */}
+              <View style={[
+                styles.subscriptionCard, 
+                { 
+                  backgroundColor: subscription?.plan === 'premium' ? '#667eea' : theme.colors.surface,
+                }
+              ]}>
+                <View style={styles.subscriptionHeader}>
+                  <View>
+                    <Text style={[
+                      styles.subscriptionTitle, 
+                      { color: subscription?.plan === 'premium' ? 'white' : theme.colors.text }
+                    ]}>
+                      {subscription?.plan === 'premium' ? '⭐ Premium' : '🆓 Free Plan'}
+                    </Text>
+                    {subscription?.plan === 'premium' && usageStats?.daysUntilRenewal && (
+                      <Text style={[styles.subscriptionSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>
+                        Renews in {usageStats.daysUntilRenewal} days
+                      </Text>
+                    )}
+                    {subscription?.plan === 'free' && (
+                      <Text style={[styles.subscriptionSubtitle, { color: theme.colors.textSecondary }]}>
+                        Upgrade to unlock all features
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.manageButton,
+                      { 
+                        backgroundColor: subscription?.plan === 'premium' ? 'rgba(255,255,255,0.2)' : theme.colors.primary,
+                      }
+                    ]}
+                    onPress={handleManageSubscription}
+                  >
+                    <Text style={[
+                      styles.manageButtonText,
+                      { color: subscription?.plan === 'premium' ? 'white' : 'white' }
+                    ]}>
+                      {subscription?.plan === 'premium' ? 'Manage' : 'Upgrade'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Usage Stats */}
+                {usageStats && (
+                  <View style={styles.usageStats}>
+                    <View style={styles.usageItem}>
+                      <Text style={[
+                        styles.usageLabel,
+                        { color: subscription?.plan === 'premium' ? 'rgba(255,255,255,0.8)' : theme.colors.textSecondary }
+                      ]}>
+                        Groups
+                      </Text>
+                      <Text style={[
+                        styles.usageValue,
+                        { 
+                          color: subscription?.plan === 'premium' ? 'white' : getUsageColor(usageStats.groups.current, usageStats.groups.limit)
+                        }
+                      ]}>
+                        {formatUsageText(usageStats.groups.current, usageStats.groups.limit)}
+                      </Text>
+                    </View>
+                    <View style={styles.usageItem}>
+                      <Text style={[
+                        styles.usageLabel,
+                        { color: subscription?.plan === 'premium' ? 'rgba(255,255,255,0.8)' : theme.colors.textSecondary }
+                      ]}>
+                        Daily Transactions
+                      </Text>
+                      <Text style={[
+                        styles.usageValue,
+                        { 
+                          color: subscription?.plan === 'premium' ? 'white' : getUsageColor(usageStats.transactions.current, usageStats.transactions.limit)
+                        }
+                      ]}>
+                        {formatUsageText(usageStats.transactions.current, usageStats.transactions.limit)}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Premium Features Preview (for free users) */}
+              {subscription?.plan === 'free' && (
+                <View style={[styles.premiumPreview, { backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.premiumTitle, { color: theme.colors.text }]}>
+                    🚀 Premium Features
+                  </Text>
+                  <View style={styles.premiumFeatures}>
+                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
+                      ✓ Unlimited groups & members
+                    </Text>
+                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
+                      ✓ Unlimited daily transactions
+                    </Text>
+                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
+                      ✓ Advanced analytics & insights
+                    </Text>
+                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
+                      ✓ Receipt scanning & QR codes
+                    </Text>
+                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
+                      ✓ Group chat & Gmail integration
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
         </View>
 
         {/* Account Settings */}
@@ -344,6 +642,16 @@ export default function ProfileScreen() {
         onClose={() => setShowCurrencyModal(false)}
         onUpdate={handleCurrencyUpdate}
       />
+
+      {/* Subscription Modal */}
+      <SubscriptionModal
+        visible={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        onSubscribe={handleSubscriptionPurchase}
+        reason="premium_feature"
+        featureName="Premium Subscription"
+        canClose={true}
+      />
     </SafeAreaView>
   );
 }
@@ -421,10 +729,10 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     alignItems: 'center',
-    minWidth: 0, // Allow shrinking
+    minWidth: 0,
   },
   mobileStatItem: {
-    flex: 1.2, // Give mobile section slightly more space
+    flex: 1.2,
   },
   statValue: {
     fontSize: 13,
@@ -457,10 +765,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  profileItemTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginLeft: 12,
+  },
   profileItemTitle: {
     fontSize: 16,
     fontWeight: '500',
-    marginLeft: 12,
+  },
+  badge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   profileItemRight: {
     flexDirection: 'row',
@@ -470,6 +794,65 @@ const styles = StyleSheet.create({
   profileItemValue: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  subscriptionCard: {
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 16,
+  },
+  subscriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  subscriptionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  subscriptionSubtitle: {
+    fontSize: 14,
+  },
+  manageButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  manageButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  usageStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  usageItem: {
+    alignItems: 'center',
+  },
+  usageLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  usageValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  premiumPreview: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  premiumTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  premiumFeatures: {
+    gap: 6,
+  },
+  premiumFeature: {
+    fontSize: 14,
   },
   accountInfo: {
     padding: 16,
