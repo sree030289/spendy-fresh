@@ -42,6 +42,7 @@ export const COMMON_COLORS = {
 };
 
 export const LIGHT_THEME: AppTheme = {
+  isDark: false,
   colors: {
     // Background colors
     background: COMMON_COLORS.white,
@@ -149,6 +150,7 @@ export const LIGHT_THEME: AppTheme = {
 };
 
 export const DARK_THEME: AppTheme = {
+  isDark: true,
   colors: {
     // Background colors
     background: COMMON_COLORS.gray900,

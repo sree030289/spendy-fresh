@@ -21,7 +21,6 @@ import AddReminderModal from '@/components/reminders/AddReminderModal';
 import ReminderDetailsModal from '@/components/reminders/ReminderDetailsModal';
 import EditReminderModal from '@/components/reminders/EditReminderModal';
 import ReminderStatsModal from '@/components/reminders/ReminderStatsModal';
-import { RealGmailService } from '@/services/gmail/RealGmailService';
 
 interface TabInfo {
   key: ReminderStatus | 'all';

@@ -32,12 +32,83 @@ export interface AppTheme {
     secondary: string;
     background: string;
     surface: string;
+    surfaceSecondary: string;
     text: string;
     textSecondary: string;
+    textTertiary: string;
+    textInverse: string;
     border: string;
+    borderLight: string;
+    divider: string;
     error: string;
     success: string;
-    warning: string; 
+    warning: string;
+    info: string;
+    hover: string;
+    pressed: string;
+    disabled: string;
+    gradientStart: string;
+    gradientEnd: string;
+    card: string;
+    cardElevated: string;
+    shadow: string;
+    inputBackground: string;
+    inputBorder: string;
+    inputPlaceholder: string;
+    overlay: string;
+    modalBackground: string;
+    tabActive: string;
+    tabInactive: string;
+    tabBackground: string;
+    primaryLight: string;
+    primaryDark: string;
+  };
+  spacing: {
+    xs: number;
+    sm: number;
+    md: number;
+    lg: number;
+    xl: number;
+    xxl: number;
+    xxxl: number;
+  };
+  borderRadius: {
+    sm: number;
+    md: number;
+    lg: number;
+    xl: number;
+    xxl: number;
+    full: number;
+  };
+  shadows: {
+    sm: {
+      shadowColor: string;
+      shadowOffset: { width: number; height: number };
+      shadowOpacity: number;
+      shadowRadius: number;
+      elevation: number;
+    };
+    md: {
+      shadowColor: string;
+      shadowOffset: { width: number; height: number };
+      shadowOpacity: number;
+      shadowRadius: number;
+      elevation: number;
+    };
+    lg: {
+      shadowColor: string;
+      shadowOffset: { width: number; height: number };
+      shadowOpacity: number;
+      shadowRadius: number;
+      elevation: number;
+    };
+    xl: {
+      shadowColor: string;
+      shadowOffset: { width: number; height: number };
+      shadowOpacity: number;
+      shadowRadius: number;
+      elevation: number;
+    };
   };
 }
 

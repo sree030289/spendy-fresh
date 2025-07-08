@@ -7,10 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 import { useNavigation, CommonActions } from '@react-navigation/native';
+import { GRADIENTS } from '@/constants/theme';
 
 // Import screens
 import SmartMoneyScreen from '@/screens/main/SmartMoneyApp';
-import DealsHubScreen from '@/screens/main/DealsHubScreen';
+import Reminders from '@/screens/main/RemindersScreen';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 
@@ -19,14 +20,18 @@ const { width: screenWidth } = Dimensions.get('window');
 
 // Custom Plus Button Component
 function PlusTabButton({ children, onPress }: any) {
+  const { theme } = useTheme();
+  
   return (
     <TouchableOpacity
-      style={styles.plusButton}
+      style={[styles.plusButton, { 
+        shadowColor: theme.colors.primary,
+      }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
       <LinearGradient
-        colors={['#10B981', '#059669']}
+        colors={[theme.colors.gradientStart, theme.colors.gradientEnd]}
         style={styles.plusGradient}
       >
         <Ionicons name="add" size={36} color="white" />
@@ -39,7 +44,7 @@ function PlusTabButton({ children, onPress }: any) {
 const TAB_ROUTES = [
   { name: 'Split', component: RealSplittingScreen, index: 0 },
   { name: 'SmartMoney', component: SmartMoneyScreen, index: 1 },
-  { name: 'DealsHub', component: DealsHubScreen, index: 3 }, // Skip index 2 (AddAction)
+  { name: 'Reminders', component: Reminders, index: 3 }, // Skip index 2 (AddAction)
   { name: 'Profile', component: ProfileScreen, index: 4 }
 ];
 
@@ -64,6 +69,8 @@ function SwipeableTabNavigator() {
       
       // Get current navigation state
       const currentState = navigation.getState();
+      if (!currentState) return;
+      
       const currentIndex = currentState.index;
       
       // Find current tab in our routes
@@ -131,19 +138,29 @@ function SwipeableTabNavigator() {
           <TouchableOpacity 
             style={{ 
               padding: 16, 
-              backgroundColor: theme.colors.primary, 
               borderRadius: 8, 
               marginBottom: 12,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
+              overflow: 'hidden',
             }}
             onPress={() => {
               setShowActionModal(false);
               navigation.dispatch(CommonActions.navigate({ name: 'SmartMoney' }));
             }}
           >
+            <LinearGradient
+              colors={[theme.colors.gradientStart, theme.colors.gradientEnd]}
+              style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0 
+              }}
+            />
             <Ionicons name="wallet" size={24} color="white" />
             <Text style={{ color: 'white', fontWeight: '600' }}>Add Expense</Text>
           </TouchableOpacity>
@@ -151,19 +168,29 @@ function SwipeableTabNavigator() {
           <TouchableOpacity 
             style={{ 
               padding: 16, 
-              backgroundColor: theme.colors.secondary, 
               borderRadius: 8, 
               marginBottom: 12,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
+              overflow: 'hidden',
             }}
             onPress={() => {
               setShowActionModal(false);
               navigation.dispatch(CommonActions.navigate({ name: 'Split' }));
             }}
           >
+            <LinearGradient
+              colors={[theme.colors.secondary, theme.colors.gradientEnd]}
+              style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0 
+              }}
+            />
             <Ionicons name="people" size={24} color="white" />
             <Text style={{ color: 'white', fontWeight: '600' }}>Split Bill</Text>
           </TouchableOpacity>
@@ -228,8 +255,8 @@ function SwipeableTabNavigator() {
 
                 return <Ionicons name={iconName} size={size} color={color} />;
               },
-              tabBarActiveTintColor: '#10B981',
-              tabBarInactiveTintColor: theme.colors.textSecondary,
+              tabBarActiveTintColor: theme.colors.tabActive,
+              tabBarInactiveTintColor: theme.colors.tabInactive,
               tabBarStyle: {
                 backgroundColor: theme.colors.background,
                 borderTopColor: theme.colors.border,
@@ -281,10 +308,10 @@ function SwipeableTabNavigator() {
             />
             
             <Tab.Screen 
-              name="DealsHub" 
-              component={DealsHubScreen}
+              name="Reminders" 
+              component={Reminders}
               options={{
-                tabBarLabel: 'Deals Hub',
+                tabBarLabel: 'Reminders',
               }}
             />
             
@@ -317,7 +344,6 @@ const styles = StyleSheet.create({
     top: 5,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
