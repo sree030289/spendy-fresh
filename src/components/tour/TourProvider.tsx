@@ -1,52 +1,80 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import AppTour from './AppTourNew';
+// src/components/tour/TourProvider.tsx - Fixed version
 
-const STORAGE_KEY = 'app_tour_completed';
+import React, { createContext, useContext, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/hooks/useAuth';
 
 interface TourContextType {
-  showTour: boolean;
   startTour: () => void;
-  closeTour: () => void;
   resetTour: () => Promise<void>;
 }
 
 const TourContext = createContext<TourContextType | undefined>(undefined);
 
-export const TourProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [showTour, setShowTour] = useState(false);
+export function TourProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const tourInProgress = useRef(false);
 
-  const startTour = () => {
-    setShowTour(true);
-  };
+  // FIXED: Memoized callbacks to prevent unnecessary re-renders
+  const startTour = useCallback(() => {
+    console.log('🎯 TourProvider: startTour called');
+    
+    if (tourInProgress.current) {
+      console.log('🎯 TourProvider: Tour already in progress, skipping');
+      return;
+    }
 
-  const closeTour = async () => {
-    setShowTour(false);
-    // Mark tour as completed
-    await AsyncStorage.setItem(STORAGE_KEY, 'true');
-  };
+    if (!user?.id) {
+      console.log('🎯 TourProvider: No user ID available');
+      return;
+    }
 
-  const resetTour = async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-    setShowTour(true);
-  };
+    // FIXED: Don't set tourInProgress here - let the AppNavigator handle it
+    console.log('🎯 TourProvider: Starting tour for user:', user.id);
+    
+    // The actual tour display is handled by the AppNavigator
+    // This just signals that we want to start the tour
+  }, [user?.id]);
+
+  const resetTour = useCallback(async () => {
+    try {
+      console.log('🎯 TourProvider: resetTour called');
+      
+      if (!user?.id) {
+        console.log('🎯 TourProvider: No user ID available for reset');
+        return;
+      }
+
+      const tourKey = `app_tour_completed_${user.id}`;
+      await AsyncStorage.removeItem(tourKey);
+      tourInProgress.current = false;
+      
+      console.log('🎯 TourProvider: Tour reset completed for user:', user.id);
+    } catch (error) {
+      console.error('❌ TourProvider: Error resetting tour:', error);
+    }
+  }, [user?.id]);
+
+  // FIXED: Memoized context value to prevent child re-renders
+  const contextValue = React.useMemo(
+    () => ({
+      startTour,
+      resetTour,
+    }),
+    [startTour, resetTour]
+  );
 
   return (
-    <TourContext.Provider value={{ showTour, startTour, closeTour, resetTour }}>
+    <TourContext.Provider value={contextValue}>
       {children}
-      <AppTour
-        visible={showTour}
-        onComplete={closeTour}
-        onSkip={closeTour}
-      />
     </TourContext.Provider>
   );
-};
+}
 
-export const useTour = () => {
+export function useTour() {
   const context = useContext(TourContext);
   if (context === undefined) {
     throw new Error('useTour must be used within a TourProvider');
   }
   return context;
-};
+}

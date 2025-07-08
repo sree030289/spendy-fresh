@@ -1,6 +1,6 @@
-// App.tsx - Fixed version to resolve modal conflicts
+// App.tsx - Test with simplified modal
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, Text, StyleSheet, Alert } from 'react-native';
+import { View, ActivityIndicator, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
@@ -29,9 +29,9 @@ import { SplittingService } from '@/services/firebase/splitting';
 import { notificationManager } from '@/services/NotificationManager';
 import SmartMoneyApp from '@/screens/main/SmartMoneyApp';
 
-// Import subscription components
-import SubscriptionModal from '@/components/modals/SubscriptionModal';
-import { SubscriptionService } from '@/services/SubscriptionService';
+ import SubscriptionModal from '@/components/modals/SubscriptionModal';
+
+
 
 const Stack = createStackNavigator();
 
@@ -49,9 +49,15 @@ const AppNavigator = () => {
   const [subscriptionCanClose, setSubscriptionCanClose] = useState(true);
   const [subscriptionCountdown, setSubscriptionCountdown] = useState(0);
 
-  // Add app ready state to prevent conflicts
+  // Add app ready state and modal sequencing
   const [appReady, setAppReady] = useState(false);
   const [subscriptionCheckComplete, setSubscriptionCheckComplete] = useState(false);
+  const [pendingSubscriptionModal, setPendingSubscriptionModal] = useState<{
+    reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature';
+    feature?: string;
+    canClose: boolean;
+  } | null>(null);
+  const [shouldShowTourAfterSubscription, setShouldShowTourAfterSubscription] = useState(false);
 
   console.log('AppNavigator - User:', user ? 'Authenticated' : 'Not authenticated');
   console.log('AppNavigator - Loading:', isLoading);
@@ -73,52 +79,23 @@ const AppNavigator = () => {
     checkTourStatus();
   }, []);
 
-  // FIXED: Better sequencing of tour and subscription modals
+  // Simplified subscription check for debugging
   useEffect(() => {
     const checkSubscriptionStatus = async () => {
-      if (!user?.id || !appReady) return;
+      if (!user?.id || !appReady || !tourCheckCompleted) return;
 
       try {
-        console.log('🔍 Checking subscription status for user:', user.id);
-        const subscriptionService = SubscriptionService.getInstance();
+        console.log('🔍 DEBUG: Checking subscription status for user:', user.id);
         
-        // Check if user should see first-time subscription modal
-        const shouldShowFirstTime = await subscriptionService.shouldShowFirstTimePrompt(user.id);
-        if (shouldShowFirstTime) {
-          console.log('🎯 User should see first-time subscription modal');
+        // For debugging, always show first-time modal for new users
+        if (!hasShownTour) {
+          console.log('🎯 DEBUG: New user detected, will show subscription modal first');
           
-          // Mark as shown immediately to prevent repeated triggers
-          await subscriptionService.markFirstTimePromptShown(user.id);
-          
-          // Wait a bit longer to ensure app is fully loaded
-          setTimeout(() => {
-            console.log('🎯 Showing first-time subscription modal');
-            setSubscriptionReason('firstTime');
-            setSubscriptionCanClose(false);
-            setSubscriptionCountdown(5);
-            setShowSubscriptionModal(true);
-          }, 3000); // Increased delay
-          
-          setSubscriptionCheckComplete(true);
-          return;
-        }
-
-        // Check if user should see daily prompt
-        const shouldShowDaily = await subscriptionService.shouldShowDailyPrompt(user.id);
-        if (shouldShowDaily) {
-          console.log('🌅 User should see daily subscription prompt');
-          
-          // Wait for app to be fully ready
-          setTimeout(() => {
-            console.log('🌅 Showing daily subscription prompt');
-            setSubscriptionReason('dailyPrompt');
-            setSubscriptionCanClose(false);
-            setSubscriptionCountdown(5);
-            setShowSubscriptionModal(true);
-          }, 2000);
-          
-          // Mark daily prompt as shown
-          await subscriptionService.markDailyPromptShown(user.id);
+          setPendingSubscriptionModal({
+            reason: 'firstTime',
+            canClose: false
+          });
+          setShouldShowTourAfterSubscription(true);
         }
         
         setSubscriptionCheckComplete(true);
@@ -129,7 +106,22 @@ const AppNavigator = () => {
     };
 
     checkSubscriptionStatus();
-  }, [user?.id, appReady]);
+  }, [user?.id, appReady, tourCheckCompleted, hasShownTour]);
+
+  // Show pending subscription modal when ready
+  useEffect(() => {
+    if (pendingSubscriptionModal && appReady && subscriptionCheckComplete) {
+      setTimeout(() => {
+        console.log('🎯 DEBUG: Showing pending subscription modal:', pendingSubscriptionModal.reason);
+        setSubscriptionReason(pendingSubscriptionModal.reason);
+        setFeatureName(pendingSubscriptionModal.feature || '');
+        setSubscriptionCanClose(pendingSubscriptionModal.canClose);
+        setSubscriptionCountdown(pendingSubscriptionModal.canClose ? 0 : 5);
+        setShowSubscriptionModal(true);
+        setPendingSubscriptionModal(null);
+      }, 1500);
+    }
+  }, [pendingSubscriptionModal, appReady, subscriptionCheckComplete]);
 
   // Handle subscription countdown
   useEffect(() => {
@@ -187,7 +179,7 @@ const AppNavigator = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // FIXED: Better tour trigger logic to avoid conflicts
+  // Tour trigger logic
   useEffect(() => {
     console.log('🔍 Tour trigger check:', {
       user: !!user,
@@ -197,28 +189,31 @@ const AppNavigator = () => {
       tourCheckCompleted,
       appReady,
       subscriptionCheckComplete,
-      showSubscriptionModal
+      showSubscriptionModal,
+      pendingSubscriptionModal: !!pendingSubscriptionModal,
+      shouldShowTourAfterSubscription
     });
     
-    // Only show tour if:
-    // 1. User is authenticated
-    // 2. App is not loading or initializing
-    // 3. User hasn't seen tour yet
-    // 4. Tour check is completed
-    // 5. App is ready
-    // 6. Subscription check is complete
-    // 7. Subscription modal is not currently showing
-    if (user && !isLoading && !initializing && !hasShownTour && tourCheckCompleted && appReady && subscriptionCheckComplete && !showSubscriptionModal) {
-      // Delay tour to ensure everything is ready
+    if (user && 
+        !isLoading && 
+        !initializing && 
+        !hasShownTour && 
+        tourCheckCompleted && 
+        appReady && 
+        subscriptionCheckComplete && 
+        !showSubscriptionModal && 
+        !pendingSubscriptionModal &&
+        !shouldShowTourAfterSubscription) {
+      
       const timer = setTimeout(() => {
-        console.log('🎯 Showing onboarding tour for new user');
+        console.log('🎯 Showing onboarding tour for user (no subscription conflicts)');
         startTour();
         setHasShownTour(true);
       }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [user, isLoading, initializing, hasShownTour, tourCheckCompleted, startTour, appReady, subscriptionCheckComplete, showSubscriptionModal]);
+  }, [user, isLoading, initializing, hasShownTour, tourCheckCompleted, startTour, appReady, subscriptionCheckComplete, showSubscriptionModal, pendingSubscriptionModal, shouldShowTourAfterSubscription]);
 
   useEffect(() => {
     // Initialize notifications
@@ -257,41 +252,39 @@ const AppNavigator = () => {
   // Handle subscription purchase
   const handleSubscriptionPurchase = async (plan: 'monthly' | 'yearly', promoCode?: string) => {
     try {
-      if (!user?.id) {
-        Alert.alert('Error', 'User not authenticated');
-        return;
-      }
-
-      console.log('🔄 Processing subscription purchase:', { plan, promoCode });
-
-      const subscriptionService = SubscriptionService.getInstance();
-      const result = await subscriptionService.processSubscription(user.id, plan, promoCode);
-
-      if (result.success) {
-        setShowSubscriptionModal(false);
-        
-        // Reset subscription state
-        setSubscriptionCountdown(0);
-        setSubscriptionCanClose(true);
-        
-        Alert.alert('Success! 🎉', result.message, [
-          {
-            text: 'Awesome!',
-            onPress: () => {
-              console.log('✅ Subscription purchase completed successfully');
+      console.log('🔄 DEBUG: Mock subscription purchase:', { plan, promoCode });
+      
+      setShowSubscriptionModal(false);
+      
+      // Reset subscription state
+      setSubscriptionCountdown(0);
+      setSubscriptionCanClose(true);
+      
+      Alert.alert('Success! 🎉', 'Mock subscription completed', [
+        {
+          text: 'Awesome!',
+          onPress: () => {
+            console.log('✅ Mock subscription purchase completed');
+            
+            // If we should show tour after subscription, do it now
+            if (shouldShowTourAfterSubscription && !hasShownTour) {
+              setShouldShowTourAfterSubscription(false);
+              setTimeout(() => {
+                console.log('🎯 Showing onboarding tour after subscription completion');
+                startTour();
+                setHasShownTour(true);
+              }, 1000);
             }
           }
-        ]);
-      } else {
-        Alert.alert('Error', result.message);
-      }
+        }
+      ]);
     } catch (error) {
       console.error('Subscription purchase error:', error);
       Alert.alert('Error', 'Failed to process subscription. Please try again.');
     }
   };
 
-  // FIXED: Global function to show subscription modal for various reasons
+  // Global function to show subscription modal for various reasons
   const showSubscriptionModalForReason = (
     reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature',
     feature?: string,
@@ -306,21 +299,39 @@ const AppNavigator = () => {
     setShowSubscriptionModal(true);
   };
 
-  // Handle modal close
+  // Handle modal close with tour trigger
   const handleSubscriptionModalClose = () => {
-    console.log('🔄 Closing subscription modal');
+    console.log('🔄 DEBUG: Closing subscription modal');
     setShowSubscriptionModal(false);
     setSubscriptionCountdown(0);
     setSubscriptionCanClose(true);
+    
+    // If we should show tour after subscription and user hasn't seen it yet
+    if (shouldShowTourAfterSubscription && !hasShownTour) {
+      setShouldShowTourAfterSubscription(false);
+      setTimeout(() => {
+        console.log('🎯 Showing onboarding tour after subscription modal close');
+        startTour();
+        setHasShownTour(true);
+      }, 500);
+    }
   };
 
   // Expose global subscription modal function
   React.useEffect(() => {
-    // Make this function available globally
-    (global as any).showSubscriptionModal = showSubscriptionModalForReason;
+    // Make this function available globally with debugging
+    console.log('🔧 Setting up global subscription modal function');
+    (global as any).showSubscriptionModal = (
+      reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature',
+      feature?: string,
+      canClose: boolean = true
+    ) => {
+      console.log('🔔 Global showSubscriptionModal called:', { reason, feature, canClose });
+      showSubscriptionModalForReason(reason, feature, canClose);
+    };
     
     return () => {
-      // Cleanup
+      console.log('🧹 Cleaning up global subscription modal function');
       (global as any).showSubscriptionModal = undefined;
     };
   }, []);
@@ -368,8 +379,8 @@ const AppNavigator = () => {
         )}
       </Stack.Navigator>
 
-      {/* FIXED: Global Subscription Modal with better error handling */}
-      {user && ( // Only render when user exists
+      {/* Simple subscription modal for testing */}
+      {user && (
         <SubscriptionModal
           visible={showSubscriptionModal}
           onClose={handleSubscriptionModalClose}
