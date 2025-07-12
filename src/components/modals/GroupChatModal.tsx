@@ -5,7 +5,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   ScrollView,
   TextInput,
@@ -13,13 +12,13 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { Group, SplittingService } from '@/services/firebase/splitting';
 import { User } from '@/types';
 import { getCurrencySymbol } from '@/utils/currency';
+import FullscreenModal from '@/components/common/FullscreenModal';
 
 interface ChatMessage {
   id: string;
@@ -291,33 +290,19 @@ const renderMessage = (message: ChatMessage, index: number) => {
   if (!group) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          
-          <View style={styles.headerCenter}>
-            <Text style={styles.groupAvatar}>{group.avatar}</Text>
-            <View>
-              <Text style={[styles.groupName, { color: theme.colors.text }]}>
-                {group.name}
-              </Text>
-              <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
-                {group.members.length} members
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity 
-            style={styles.headerAction}
-            onPress={() => Alert.alert('Group Info', 'Group details coming soon')}
-          >
-            <Ionicons name="information-circle" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-        </View>
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title={group.name}
+      rightActions={
+        <TouchableOpacity 
+          style={styles.headerAction}
+          onPress={() => Alert.alert('Group Info', 'Group details coming soon')}
+        >
+          <Ionicons name="information-circle" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+      }
+    >
 
         {/* Messages */}
         <KeyboardAvoidingView 
@@ -415,8 +400,7 @@ const renderMessage = (message: ChatMessage, index: number) => {
             </View>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
-    </Modal>
+    </FullscreenModal>
   );
 }
 
