@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -230,16 +229,19 @@ const renderInviteMethod = () => (
 );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Create Group</Text>
-          <View style={{ width: 24 }} />
-        </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+        <TouchableOpacity 
+          onPress={onClose} 
+          disabled={loading}
+          style={styles.cancelButton}
+        >
+          <Ionicons name="close" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Create Group</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
         <ScrollView contentContainerStyle={styles.content}>
           {/* Group Name */}
@@ -322,8 +324,7 @@ const renderInviteMethod = () => (
           </View>
         </View>
       </SafeAreaView>
-    </Modal>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
@@ -336,6 +337,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
+  },
+  cancelButton: {
+    padding: 4,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
