@@ -4,16 +4,15 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   ScrollView,
   TextInput,
   Alert,
   Dimensions,
-  SafeAreaView,
   StatusBar,
   Platform,
 } from 'react-native';
+import FullscreenModal from '@/components/common/FullscreenModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -165,29 +164,22 @@ export default function SubscriptionModal({
   }
 
   return (
-    <Modal visible={visible} transparent={false} animationType="slide">
-      <StatusBar barStyle="light-content" backgroundColor="#667eea" />
-      <SafeAreaView style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          {/* Header */}
-          <View style={styles.header}>
-            {canCloseModal && (
-              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>←</Text>
-              </TouchableOpacity>
-            )}
-            <View style={styles.headerContent}>
-              <Text style={styles.title}>{getModalTitle()}</Text>
-              <Text style={styles.subtitle}>{getModalSubtitle()}</Text>
-            </View>
-            {!canCloseModal && countdown > 0 && (
-              <View style={styles.countdownContainer}>
-                <Text style={styles.countdownText}>{countdown}</Text>
-              </View>
-            )}
+    <FullscreenModal
+      visible={visible}
+      onClose={canCloseModal ? handleClose : () => {}}
+      title={getModalTitle()}
+      showBackButton={canCloseModal}
+      rightActions={
+        !canCloseModal && countdown > 0 ? (
+          <View style={styles.countdownContainer}>
+            <Text style={styles.countdownText}>{countdown}</Text>
           </View>
-
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        ) : null
+      }
+    >
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Subtitle */}
+        <Text style={styles.subtitle}>{getModalSubtitle()}</Text>
             {/* Plan Selection */}
             <View style={styles.planContainer}>
               <Text style={styles.sectionTitle}>Choose Your Plan</Text>
@@ -313,8 +305,7 @@ export default function SubscriptionModal({
                 </View>
               )}
             </View>
-          </ScrollView>
-
+          
           {/* Footer */}
           <View style={styles.footer}>
             <TouchableOpacity
@@ -335,62 +326,24 @@ export default function SubscriptionModal({
               Cancel anytime in your account settings.
             </Text>
           </View>
-        </View>
-      </SafeAreaView>
-    </Modal>
+        </ScrollView>
+    </FullscreenModal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  content: {
     flex: 1,
     backgroundColor: '#667eea',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#667eea',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginTop: 10,
-  },
-  headerContent: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
-    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.9)',
     lineHeight: 22,
     textAlign: 'center',
-  },
-  closeButton: {
-    padding: 10,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 22,
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'absolute',
-    left: 16,
-    top: Platform.OS === 'ios' ? 50 : 20,
-    zIndex: 10,
-  },
-  closeButtonText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 32,
   },
   countdownContainer: {
     width: 40,
@@ -404,11 +357,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 10,
   },
   sectionTitle: {
     fontSize: 20,
