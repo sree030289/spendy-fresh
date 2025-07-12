@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  
   TouchableOpacity,
   ScrollView,
   TextInput,
@@ -12,7 +11,6 @@ import {
   Platform,
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
-
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';
@@ -325,20 +323,12 @@ export default function RecurringExpenseModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            {editingRecurring ? 'Edit Recurring' : 'Create Recurring Expense'}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <ScrollView contentContainerStyle={styles.content}>
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title={editingRecurring ? 'Edit Recurring' : 'Create Recurring Expense'}
+    >
+      <ScrollView contentContainerStyle={styles.content}>
           {/* Template Name */}
           <View style={styles.inputContainer}>
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Template Name *</Text>
@@ -703,8 +693,7 @@ export default function RecurringExpenseModal({
             style={styles.submitButton}
           />
         </View>
-      </SafeAreaView>
-    </Modal>
+    </FullscreenModal>
   );
 }
 
