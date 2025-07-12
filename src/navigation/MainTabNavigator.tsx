@@ -9,7 +9,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { GRADIENTS } from '@/constants/theme';
 
-// Import screens
+// Import modals
+import EnhancedAddModal from '@/components/modals/EnhancedAddModal';
 import SmartMoneyScreen from '@/screens/main/SmartMoneyApp';
 import Reminders from '@/screens/main/RemindersScreen';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
@@ -112,99 +113,30 @@ function SwipeableTabNavigator() {
     }
   };
 
-  // Simple Action Modal Component
-  const ActionModal = () => {
-    if (!showActionModal) return null;
-    
-    return (
-      <View style={{ 
-        position: 'absolute', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        bottom: 0, 
-        backgroundColor: 'rgba(0,0,0,0.5)', 
-        justifyContent: 'center', 
-        alignItems: 'center',
-        zIndex: 1000,
-      }}>
-        <View style={{ 
-          backgroundColor: theme.colors.surface, 
-          padding: 20, 
-          borderRadius: 16, 
-          margin: 20,
-          minWidth: 200,
-        }}>
-          <TouchableOpacity 
-            style={{ 
-              padding: 16, 
-              borderRadius: 8, 
-              marginBottom: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              overflow: 'hidden',
-            }}
-            onPress={() => {
-              setShowActionModal(false);
-              navigation.dispatch(CommonActions.navigate({ name: 'SmartMoney' }));
-            }}
-          >
-            <LinearGradient
-              colors={[theme.colors.gradientStart, theme.colors.gradientEnd]}
-              style={{ 
-                position: 'absolute', 
-                top: 0, 
-                left: 0, 
-                right: 0, 
-                bottom: 0 
-              }}
-            />
-            <Ionicons name="wallet" size={24} color="white" />
-            <Text style={{ color: 'white', fontWeight: '600' }}>Add Expense</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={{ 
-              padding: 16, 
-              borderRadius: 8, 
-              marginBottom: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              overflow: 'hidden',
-            }}
-            onPress={() => {
-              setShowActionModal(false);
-              navigation.dispatch(CommonActions.navigate({ name: 'Split' }));
-            }}
-          >
-            <LinearGradient
-              colors={[theme.colors.secondary, theme.colors.gradientEnd]}
-              style={{ 
-                position: 'absolute', 
-                top: 0, 
-                left: 0, 
-                right: 0, 
-                bottom: 0 
-              }}
-            />
-            <Ionicons name="people" size={24} color="white" />
-            <Text style={{ color: 'white', fontWeight: '600' }}>Split Bill</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={{ padding: 16, alignItems: 'center' }}
-            onPress={() => setShowActionModal(false)}
-          >
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
+  // Enhanced Action Modal Component
+  const ActionModal = () => (
+    <EnhancedAddModal
+      visible={showActionModal}
+      onClose={() => setShowActionModal(false)}
+      onAddExpenseForSplitting={() => {
+        setShowActionModal(false);
+        navigation.dispatch(CommonActions.navigate({ name: 'Split' }));
+      }}
+      onAddTransactionForSmartMoney={() => {
+        setShowActionModal(false);
+        navigation.dispatch(CommonActions.navigate({ name: 'SmartMoney' }));
+      }}
+      onAddReminder={() => {
+        setShowActionModal(false);
+        navigation.dispatch(CommonActions.navigate({ name: 'Reminders' }));
+      }}
+      onSyncGmail={() => {
+        setShowActionModal(false);
+        // Navigate to smart money and trigger Gmail sync
+        navigation.dispatch(CommonActions.navigate({ name: 'SmartMoney' }));
+      }}
+    />
+  );
 
   return (
     <>
@@ -238,8 +170,8 @@ function SwipeableTabNavigator() {
                   case 'AddAction':
                     iconName = 'add';
                     break;
-                  case 'DealsHub':
-                    iconName = focused ? 'storefront' : 'storefront-outline';
+                  case 'Reminders':
+                    iconName = focused ? 'calendar' : 'calendar-outline';
                     break;
                   case 'Profile':
                     iconName = focused ? 'person' : 'person-outline';

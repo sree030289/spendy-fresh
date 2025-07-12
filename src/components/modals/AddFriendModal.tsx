@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -13,11 +12,11 @@ import {
   PermissionsAndroid,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
+import FullscreenModal from '@/components/common/FullscreenModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { InviteService } from '@/services/payments/PaymentService';
 import { requestCameraPermissionsAsync } from 'expo-image-picker';
@@ -735,18 +734,20 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Add Friend</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <ScrollView contentContainerStyle={styles.content}>
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title="Add Friend"
+      rightActions={
+        <TouchableOpacity
+          onPress={onOpenQRScanner}
+          style={{ padding: 4 }}
+        >
+          <Ionicons name="qr-code" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+      }
+    >
+      <ScrollView contentContainerStyle={styles.content}>
           {/* Method Selection */}
           <View style={styles.methodSelector}>
             <TouchableOpacity
@@ -815,26 +816,11 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           {activeMethod === 'phone' && renderPhoneMethod()}
           {activeMethod === 'qr' && renderQRMethod()}
         </ScrollView>
-      </SafeAreaView>
-    </Modal>
+    </FullscreenModal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
   content: {
     flexGrow: 1,
     padding: 20,

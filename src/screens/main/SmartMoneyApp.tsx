@@ -1477,12 +1477,12 @@ const SmartMoneyScreen: React.FC = () => {
               style={styles.headerAction}
               onPress={connectGmail}
             >
-              <Ionicons name="cloud-download" size={24} color={theme.colors.text} />
+              <Ionicons name="cloud-download" size={24} color="#EF4444" />
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.headerAction}
             >
-              <Ionicons name="notifications" size={24} color={theme.colors.text} />
+              <Ionicons name="notifications" size={24} color="#F59E0B" />
               {reminders.filter(r => r.status === 'pending').length > 0 && (
                 <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
                   <Text style={styles.notificationBadgeText}>
