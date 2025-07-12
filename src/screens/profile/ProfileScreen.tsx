@@ -309,13 +309,18 @@ export default function ProfileScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
-          <TouchableOpacity onPress={toggleTheme}>
-            <Ionicons 
-              name={isDark ? 'sunny' : 'moon'} 
-              size={24} 
-              color={theme.colors.text} 
-            />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity onPress={startTour} style={styles.tourButton}>
+              <Ionicons name="help-circle-outline" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleTheme}>
+              <Ionicons 
+                name={isDark ? 'sunny' : 'moon'} 
+                size={24} 
+                color={theme.colors.text} 
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Profile Info */}
@@ -669,6 +674,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 32,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  tourButton: {
+    padding: 4,
   },
   headerTitle: {
     fontSize: 28,

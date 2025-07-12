@@ -4,15 +4,14 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   Alert,
   ActivityIndicator,
-  Animated,
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
+import FullscreenModal from '@/components/common/FullscreenModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -47,44 +46,7 @@ export default function FriendRequestModal({
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDeclining, setIsDeclining] = useState(false);
 
-  const slideAnim = React.useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const opacityAnim = React.useRef(new Animated.Value(0)).current;
-  const [shouldRender, setShouldRender] = React.useState(visible);
-
-  React.useEffect(() => {
-    if (visible) {
-      setShouldRender(true);
-      // Animate in
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      // Animate out
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: SCREEN_HEIGHT,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setShouldRender(false);
-      });
-    }
-  }, [visible]);
+  if (!friendRequest) return null;
 
   const handleAccept = async () => {
     if (!friendRequest) return;
@@ -186,66 +148,21 @@ export default function FriendRequestModal({
     }
   };
 
-  if (!friendRequest || !shouldRender) return null;
-
-  const handleBackdropPress = () => {
-    if (!isAccepting && !isDeclining) {
-      onClose();
-    }
-  };
-
   return (
-    <Modal
-      visible={shouldRender}
-      transparent
-      animationType="none"
-      statusBarTranslucent
-      onRequestClose={onClose}
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title="Friend Request"
+      rightActions={
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
+            {formatTimeAgo(friendRequest.createdAt)}
+          </Text>
+        </View>
+      }
     >
-      <Animated.View 
-        style={[
-          styles.overlay,
-          { opacity: opacityAnim }
-        ]}
-      >
-        <TouchableOpacity 
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={handleBackdropPress}
-        />
-        
-        <Animated.View
-          style={[
-            styles.modalContainer,
-            {
-              backgroundColor: theme.colors.background,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerContent}>
-              <View style={styles.headerIcon}>
-                <Ionicons name="person-add" size={24} color={theme.colors.primary} />
-              </View>
-              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-                Friend Request
-              </Text>
-              <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-                {formatTimeAgo(friendRequest.createdAt)}
-              </Text>
-            </View>
-            <TouchableOpacity 
-              style={[styles.closeButton, { backgroundColor: theme.colors.surface }]}
-              onPress={onClose}
-            >
-              <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Content */}
-          <View style={styles.content}>
+      {/* Content */}
+      <View style={styles.content}>
             {/* User Info */}
             <View style={[styles.userCard, { backgroundColor: theme.colors.surface }]}>
               <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
@@ -299,9 +216,8 @@ export default function FriendRequestModal({
                 </View>
               </View>
             </View>
-          </View>
 
-          {/* Actions */}
+            {/* Actions */}
           <View style={styles.actions}>
             <TouchableOpacity
               style={[
@@ -341,59 +257,15 @@ export default function FriendRequestModal({
               )}
             </TouchableOpacity>
           </View>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
+      </View>
+    </FullscreenModal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-  },
-  modalContainer: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 8,
-    paddingBottom: 34,
-    maxHeight: SCREEN_HEIGHT * 0.85,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
   headerContent: {
     flex: 1,
     alignItems: 'center',
-  },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(79, 70, 229, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,

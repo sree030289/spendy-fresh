@@ -4,13 +4,12 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   ScrollView,
   Alert,
   TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import FullscreenModal from '@/components/common/FullscreenModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -471,21 +470,13 @@ export default function PaymentModal({
   if (!friend) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            {friend.balance > 0 ? 'Request Payment' : 'Send Payment'}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        {/* Step Indicator */}
-        {renderStepIndicator()}
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title={friend.balance > 0 ? 'Request Payment' : 'Send Payment'}
+    >
+      {/* Step Indicator */}
+      {renderStepIndicator()}
 
         {/* Content */}
         <View style={styles.content}>
@@ -519,8 +510,7 @@ export default function PaymentModal({
             />
           </View>
         </View>
-      </SafeAreaView>
-    </Modal>
+    </FullscreenModal>
   );
 }
 

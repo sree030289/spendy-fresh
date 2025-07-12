@@ -4,19 +4,18 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   ScrollView,
   Alert,
   TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { Expense, ExpenseSplit, SplittingService } from '@/services/firebase/splitting';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
+import FullscreenModal from '@/components/common/FullscreenModal';
 
 interface ExpenseSettlementModalProps {
   visible: boolean;
@@ -358,36 +357,28 @@ export default function ExpenseSettlementModal({
   const hasSettlements = settlementItems.some(item => item.isSettled);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Settle Expense
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title="Settle Expense"
+    >
+      {/* Expense Info */}
+      <View style={[styles.expenseInfo, { backgroundColor: theme.colors.surface }]}>
+        <Text style={styles.expenseIcon}>{expense.categoryIcon}</Text>
+        <View style={styles.expenseDetails}>
+          <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
+            {expense.description}
           </Text>
-          <View style={{ width: 24 }} />
+          <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
+            {getCurrencySymbol(expense.currency)}{expense.amount.toFixed(2)}
+          </Text>
+          <Text style={[styles.expenseDate, { color: theme.colors.textSecondary }]}>
+            {expense.date.toLocaleDateString()} • Paid by {expense.paidByData.fullName}
+          </Text>
         </View>
+      </View>
 
-        {/* Expense Info */}
-        <View style={[styles.expenseInfo, { backgroundColor: theme.colors.surface }]}>
-          <Text style={styles.expenseIcon}>{expense.categoryIcon}</Text>
-          <View style={styles.expenseDetails}>
-            <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
-              {expense.description}
-            </Text>
-            <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-              {getCurrencySymbol(expense.currency)}{expense.amount.toFixed(2)}
-            </Text>
-            <Text style={[styles.expenseDate, { color: theme.colors.textSecondary }]}>
-              {expense.date.toLocaleDateString()} • Paid by {expense.paidByData.fullName}
-            </Text>
-          </View>
-        </View>
-
-        <ScrollView style={styles.content}>
+      <ScrollView style={styles.content}>
           {/* Settlement Summary */}
           <View style={[styles.summaryCard, { backgroundColor: theme.colors.surface }]}>
             <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>Settlement Summary</Text>
@@ -471,25 +462,13 @@ export default function ExpenseSettlementModal({
             </View>
           </View>
         )}
-      </SafeAreaView>
-    </Modal>
+    </FullscreenModal>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
   },
   expenseInfo: {
     flexDirection: 'row',

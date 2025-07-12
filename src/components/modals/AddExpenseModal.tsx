@@ -4,19 +4,18 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   TextInput,
   ScrollView,
   Alert,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
+import FullscreenModal from '@/components/common/FullscreenModal';
 import { Friend, Group } from '@/services/firebase/splitting';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
@@ -1105,60 +1104,61 @@ const initializeSplitData = () => {
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Add Expense</Text>
-          <View style={{ width: 24 }} />
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title="Add Expense"
+      rightActions={
+        <TouchableOpacity
+          onPress={() => setShowReceiptScanner(true)}
+          style={{ padding: 4 }}
+        >
+          <Ionicons name="camera" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+      }
+    >
+      {/* Step Indicator */}
+      {renderStepIndicator()}
+
+      {/* Step Content */}
+      <PanGestureHandler onGestureEvent={handleSwipe}>
+        <View style={styles.content}>
+          {activeStep === 'details' && renderDetailsStep()}
+          {activeStep === 'split' && renderSplitStep()}
+          {activeStep === 'review' && renderReviewStep()}
         </View>
+      </PanGestureHandler>
 
-        {/* Step Indicator */}
-        {renderStepIndicator()}
-
-        {/* Step Content */}
-        <PanGestureHandler onGestureEvent={handleSwipe}>
-          <View style={styles.content}>
-            {activeStep === 'details' && renderDetailsStep()}
-            {activeStep === 'split' && renderSplitStep()}
-            {activeStep === 'review' && renderReviewStep()}
-          </View>
-        </PanGestureHandler>
-
-        {/* Footer */}
-        <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
-          <View style={styles.footerButtons}>
-            {activeStep !== 'details' && (
-              <Button
-                title="Back"
-                onPress={handleBack}
-                variant="outline"
-                style={styles.footerButton}
-                disabled={loading}
-              />
-            )}
-            
-            {activeStep === 'review' ? (
-              <Button
-                title="Add Expense"
-                onPress={handleSubmit}
-                loading={loading}
-                style={StyleSheet.flatten([styles.footerButton, activeStep === 'review' && styles.fullWidthButton])}
-              />
-            ) : (
-              <Button
-                title="Next"
-                onPress={handleNext}
-                style={StyleSheet.flatten([styles.footerButton, activeStep === 'details' && styles.fullWidthButton])}
-                disabled={loading}
-              />
-            )}
-          </View>
+      {/* Footer */}
+      <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
+        <View style={styles.footerButtons}>
+          {activeStep !== 'details' && (
+            <Button
+              title="Back"
+              onPress={handleBack}
+              variant="outline"
+              style={styles.footerButton}
+              disabled={loading}
+            />
+          )}
+          
+          {activeStep === 'review' ? (
+            <Button
+              title="Add Expense"
+              onPress={handleSubmit}
+              loading={loading}
+              style={StyleSheet.flatten([styles.footerButton, activeStep === 'review' && styles.fullWidthButton])}
+            />
+          ) : (
+            <Button
+              title="Next"
+              onPress={handleNext}
+              style={StyleSheet.flatten([styles.footerButton, activeStep === 'details' && styles.fullWidthButton])}
+              disabled={loading}
+            />
+          )}
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Receipt Scanner Modal */}
       <ReceiptScannerModal
@@ -1167,24 +1167,13 @@ const initializeSplitData = () => {
         onReceiptProcessed={handleReceiptData}
       />
 
-    </Modal>
+    </FullscreenModal>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
   },
   stepIndicator: {
     flexDirection: 'row',

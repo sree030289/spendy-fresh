@@ -4,16 +4,15 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   Alert,
   Share,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
+import FullscreenModal from '@/components/common/FullscreenModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { InviteService } from '@/services/payments/PaymentService';
 import { User } from '@/types';
@@ -488,23 +487,24 @@ const handleScannerClose = useCallback(() => {
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity 
-            onPress={onClose} 
-            disabled={loading || scannerState.isProcessing}
-            style={{ opacity: (loading || scannerState.isProcessing) ? 0.6 : 1 }}
-          >
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            {scannerState.isProcessing ? 'Processing QR Code...' : 'QR Code'}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title={scannerState.isProcessing ? 'Processing QR Code...' : 'QR Code'}
+      showBackButton={!loading && !scannerState.isProcessing}
+      rightActions={
+        <TouchableOpacity
+          onPress={() => setMode(mode === 'scanner' ? 'friend' : 'scanner')}
+          style={{ padding: 4 }}
+        >
+          <Ionicons 
+            name={mode === 'scanner' ? 'qr-code' : 'camera'} 
+            size={24} 
+            color={theme.colors.text} 
+          />
+        </TouchableOpacity>
+      }
+    >
         {/* Mode Selector */}
         {renderModeSelector()}
 
@@ -525,7 +525,6 @@ const handleScannerClose = useCallback(() => {
             QR codes expire after {mode === 'friend' ? '7 days' : '30 days'} for security
           </Text>
         </View>
-      </SafeAreaView>
 
       {/* QR Scanner Modal */}
       <QRCodeScanner
@@ -533,25 +532,11 @@ const handleScannerClose = useCallback(() => {
         onQRCodeScanned={handleQRCodeScanned}
         onClose={handleScannerClose}
             />
-    </Modal>
+    </FullscreenModal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
   modeSelector: {
     flexDirection: 'row',
     backgroundColor: '#F3F4F6',

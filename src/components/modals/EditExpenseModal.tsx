@@ -4,14 +4,12 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   TextInput,
   ScrollView,
   Alert,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';
@@ -21,6 +19,7 @@ import { Friend, Group, Expense, SplittingService } from '@/services/firebase/sp
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
 import ExpenseDeletionModal from './ExpenseDeletionModal';
+import FullscreenModal from '@/components/common/FullscreenModal';
 
 interface EditExpenseModalProps {
   visible: boolean;
@@ -1040,77 +1039,66 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
   if (!expense) return null;
 
   return (
-    <Modal
+    <FullscreenModal
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onClose={onClose}
+      title="Edit Expense"
+      rightActions={
+        <TouchableOpacity 
+          onPress={() => setShowDeleteModal(true)}
+          style={styles.deleteButton}
+        >
+          <Ionicons name="trash" size={20} color={theme.colors.error} />
+        </TouchableOpacity>
+      }
     >
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Show success message overlay when expense is updated */}
-        {showSuccessMessage ? renderSuccessMessage() : (
-          <>
-            {/* Header */}
-            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-              <TouchableOpacity onPress={onClose} disabled={loading}>
-                <Ionicons name="close" size={24} color={theme.colors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-                Edit Expense
-              </Text>
-              <TouchableOpacity 
-                onPress={() => setShowDeleteModal(true)}
-                style={styles.deleteButton}
-              >
-                <Ionicons name="trash" size={20} color={theme.colors.error} />
-              </TouchableOpacity>
+      {/* Show success message overlay when expense is updated */}
+      {showSuccessMessage ? renderSuccessMessage() : (
+        <>
+          {/* Step Indicator */}
+          {renderStepIndicator()}
+
+          {/* Step Content */}
+          <PanGestureHandler onGestureEvent={handleSwipe}>
+            <View style={styles.content}>
+              {activeStep === 'details' && renderDetailsStep()}
+              {activeStep === 'split' && renderSplitStep()}
+              {activeStep === 'review' && renderReviewStep()}
             </View>
+          </PanGestureHandler>
 
-            {/* Step Indicator */}
-            {renderStepIndicator()}
-
-            {/* Step Content */}
-            <PanGestureHandler onGestureEvent={handleSwipe}>
-              <View style={styles.content}>
-                {activeStep === 'details' && renderDetailsStep()}
-                {activeStep === 'split' && renderSplitStep()}
-                {activeStep === 'review' && renderReviewStep()}
-              </View>
-            </PanGestureHandler>
-
-            {/* Footer */}
-            <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
-              <View style={styles.footerButtons}>
-                {activeStep !== 'details' && (
-                  <Button
-                    title="Back"
-                    onPress={handleBack}
-                    variant="outline"
-                    style={styles.footerButton}
-                    disabled={loading}
-                  />
-                )}
-                
-                {activeStep === 'review' ? (
-                  <Button
-                    title="Update Expense"
-                    onPress={handleSubmit}
-                    loading={loading}
-                    style={StyleSheet.flatten([styles.footerButton, activeStep === 'review' && styles.fullWidthButton])}
-                  />
-                ) : (
-                  <Button
-                    title="Next"
-                    onPress={handleNext}
-                    style={StyleSheet.flatten([styles.footerButton, activeStep === 'details' && styles.fullWidthButton])}
-                    disabled={loading}
-                  />
-                )}
-              </View>
+          {/* Footer */}
+          <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
+            <View style={styles.footerButtons}>
+              {activeStep !== 'details' && (
+                <Button
+                  title="Back"
+                  onPress={handleBack}
+                  variant="outline"
+                  style={styles.footerButton}
+                  disabled={loading}
+                />
+              )}
+              
+              {activeStep === 'review' ? (
+                <Button
+                  title="Update Expense"
+                  onPress={handleSubmit}
+                  loading={loading}
+                  style={StyleSheet.flatten([styles.footerButton, activeStep === 'review' && styles.fullWidthButton])}
+                />
+              ) : (
+                <Button
+                  title="Next"
+                  onPress={handleNext}
+                  style={StyleSheet.flatten([styles.footerButton, activeStep === 'details' && styles.fullWidthButton])}
+                  disabled={loading}
+                />
+              )}
             </View>
-          </>
-        )}
-      </SafeAreaView>
+          </View>
+        </>
+      )}
 
       {/* Delete Modal */}
       <ExpenseDeletionModal
@@ -1124,24 +1112,13 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
         }}
         isUserAdmin={isUserAdmin}
       />
-    </Modal>
+    </FullscreenModal>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
   },
   deleteButton: {
     padding: 8,

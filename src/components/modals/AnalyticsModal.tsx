@@ -4,20 +4,19 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   ScrollView,
   Dimensions,
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart, PieChart, BarChart } from 'react-native-chart-kit';
 import { useTheme } from '@/hooks/useTheme';
 import { SplittingService, ExpenseAnalytics } from '@/services/firebase/splitting';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
+import FullscreenModal from '@/components/common/FullscreenModal';
 
 interface AnalyticsModalProps {
   visible: boolean;
@@ -736,76 +735,59 @@ export default function AnalyticsModal({ visible, onClose, currentUser, groupId 
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            {groupId ? 'Group Analytics' : 'Expense Analytics'}
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title={groupId ? 'Group Analytics' : 'Expense Analytics'}
+      rightActions={
+        <TouchableOpacity onPress={loadAnalytics}>
+          <Ionicons name="refresh" size={24} color={theme.colors.primary} />
+        </TouchableOpacity>
+      }
+    >
+      {/* Timeframe Selector */}
+      {renderTimeframeSelector()}
+
+      {/* View Selector */}
+      {!groupId && renderViewSelector()}
+
+      {error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={theme.colors.error} />
+          <Text style={[styles.errorTitle, { color: theme.colors.error }]}>
+            Failed to Load Analytics
           </Text>
-          <TouchableOpacity onPress={loadAnalytics}>
-            <Ionicons name="refresh" size={24} color={theme.colors.primary} />
+          <Text style={[styles.errorMessage, { color: theme.colors.textSecondary }]}>
+            {error}
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+            onPress={handleRetry}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Timeframe Selector */}
-        {renderTimeframeSelector()}
-
-        {/* View Selector */}
-        {!groupId && renderViewSelector()}
-
-        {error ? (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={48} color={theme.colors.error} />
-            <Text style={[styles.errorTitle, { color: theme.colors.error }]}>
-              Failed to Load Analytics
-            </Text>
-            <Text style={[styles.errorMessage, { color: theme.colors.textSecondary }]}>
-              {error}
-            </Text>
-            <TouchableOpacity
-              style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
-              onPress={handleRetry}
-            >
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
-              Analyzing your expenses...
-            </Text>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.content}>
-            {activeView === 'overview' && renderOverview()}
-            {activeView === 'groups' && renderGroupsView()}
-            {activeView === 'trends' && renderTrendsView()}
-          </ScrollView>
-        )}
-      </SafeAreaView>
-    </Modal>
+      ) : loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+            Analyzing your expenses...
+          </Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          {activeView === 'overview' && renderOverview()}
+          {activeView === 'groups' && renderGroupsView()}
+          {activeView === 'trends' && renderTrendsView()}
+        </ScrollView>
+      )}
+    </FullscreenModal>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
   },
   timeframeSelector: {
     flexDirection: 'row',

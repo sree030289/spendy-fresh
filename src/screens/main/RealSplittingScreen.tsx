@@ -1994,25 +1994,25 @@ export default function RealSplittingScreen() {
             style={styles.headerAction}
             onPress={handleQRScannerAccess}
           >
-            <Ionicons name="qr-code" size={24} color={theme.colors.text} />
+            <Ionicons name="qr-code" size={24} color="#8B5CF6" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerAction}
             onPress={() => setShowRecurringExpense(true)}
           >
-            <Ionicons name="repeat" size={24} color={theme.colors.text} />
+            <Ionicons name="repeat" size={24} color="#4F46E5" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerAction}
             onPress={handleAnalyticsAccess}
           >
-            <Ionicons name="analytics" size={24} color={theme.colors.text} />
+            <Ionicons name="analytics" size={24} color="#10B981" />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerAction}
             onPress={handleNotificationsPress}
           >
-            <Ionicons name="notifications" size={24} color={theme.colors.text} />
+            <Ionicons name="notifications" size={24} color="#F59E0B" />
             {notifications.length > 0 && (
               <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
                 <Text style={styles.notificationBadgeText}>
