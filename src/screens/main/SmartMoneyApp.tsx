@@ -25,7 +25,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import your services
-import { FirebaseNotificationService } from '@/services/smartMoney/firebaseNotificationService';
+import BudgetPlanSection from '@/components/budget/BudgetPlanSection';
 import { AnalyticsService } from '@/services/smartMoney/analyticsService';
 import { DataService } from '@/services/smartMoney/dataService';
 import { MigrationService } from '@/services/smartMoney/migrationService';
@@ -567,7 +567,6 @@ const SmartMoneyScreen: React.FC = () => {
   const tabs = [
     { id: 'overview', title: 'Overview', icon: 'analytics-outline' },
     { id: 'transactions', title: 'Transactions', icon: 'card-outline' },
-    { id: 'reminders', title: 'Reminders', icon: 'calendar-outline' },
   ];
 
   const [formData, setFormData] = useState({
@@ -1046,23 +1045,15 @@ const SmartMoneyScreen: React.FC = () => {
           }}
         />
 
-        {/* Upcoming Reminders - Enhanced Card Rows */}
-        <UpcomingRemindersView
-          reminders={reminders}
-          theme={theme}
-          onViewAll={() => setActiveTab('reminders')}
-          onReminderPress={(reminder) => {
+        {/* Budget Plan for Family */}
+        <BudgetPlanSection
+          onManageBudget={() => {
             Alert.alert(
-              reminder.title,
-              `Amount: ${reminder.amount.toFixed(2)}\nDue: ${new Date(reminder.dueDate).toLocaleDateString()}\nStatus: ${reminder.status}`,
-              [
-                { text: 'Mark Paid', onPress: () => markReminderPaid(reminder.id) },
-                { text: 'Delete', style: 'destructive', onPress: () => deleteItem(reminder.id, 'reminder') },
-                { text: 'Cancel', style: 'cancel' }
-              ]
+              'Budget Management',
+              'Budget management features coming soon! Set up categories, limits, and track family spending.',
+              [{ text: 'OK' }]
             );
           }}
-          onMarkPaid={markReminderPaid}
         />
       </ScrollView>
     );
@@ -1197,86 +1188,16 @@ const SmartMoneyScreen: React.FC = () => {
         </LinearGradient>
       )}
 
-      {/* Reminders List */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Ionicons name="notifications" color="#3B82F6" size={24} />
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Payment Reminders</Text>
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: '#3B82F6' }]}
-            onPress={() => {
-              setFormType('reminder');
-              setShowAddForm(true);
-            }}
-          >
-            <Ionicons name="add" color="#FFFFFF" size={20} />
-          </TouchableOpacity>
-        </View>
-        
-        {reminders.length === 0 ? (
-          <View style={styles.emptyStateContainer}>
-            <Ionicons name="notifications" color="#D1D5DB" size={40} />
-            <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No payment reminders</Text>
-            <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-              Stay on top of your bills by adding reminders
-            </Text>
-          </View>
-        ) : (
-          reminders.slice(0, 10).map(reminder => (
-            <View
-              key={reminder.id}
-              style={[
-                styles.reminderCard,
-                { backgroundColor: theme.colors.surface },
-                reminder.status === 'paid' && styles.paidReminderCard,
-                new Date(reminder.dueDate) < new Date() && reminder.status === 'pending' && styles.overdueReminderCard
-              ]}
-            >
-              <View style={styles.reminderContent}>
-                <View style={styles.reminderHeader}>
-                  <Text style={[styles.reminderTitle, { color: theme.colors.text }]}>{reminder.title}</Text>
-                  <View style={styles.reminderBadges}>
-                    {reminder.autoDetected && (
-                      <View style={styles.aiBadge}>
-                        <Text style={styles.aiBadgeText}>AI</Text>
-                      </View>
-                    )}
-                    {reminder.status === 'paid' && (
-                      <Ionicons name="checkmark-circle" color="#10B981" size={16} />
-                    )}
-                    {new Date(reminder.dueDate) < new Date() && reminder.status === 'pending' && (
-                      <Ionicons name="alert-circle" color="#EF4444" size={16} />
-                    )}
-                  </View>
-                </View>
-                <Text style={[styles.reminderAmount, { color: theme.colors.text }]}>
-                  ${reminder.amount.toFixed(2)}
-                </Text>
-                <Text style={[styles.reminderDetails, { color: theme.colors.textSecondary }]}>
-                  {reminder.category} • Due: {new Date(reminder.dueDate).toLocaleDateString()} • {reminder.recurring || 'One-time'}
-                </Text>
-              </View>
-              
-              <View style={styles.reminderActions}>
-                {reminder.status === 'pending' && (
-                  <TouchableOpacity
-                    style={styles.markPaidButton}
-                    onPress={() => markReminderPaid(reminder.id)}
-                  >
-                    <Ionicons name="checkmark-circle" color="#10B981" size={24} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => deleteItem(reminder.id, 'reminder')}
-                >
-                  <Ionicons name="trash-outline" color="#EF4444" size={16} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
-      </View>
+      {/* Budget Plan for Family */}
+      <BudgetPlanSection
+        onManageBudget={() => {
+          Alert.alert(
+            'Budget Management',
+            'Budget management features coming soon! Set up categories, limits, and track family spending.',
+            [{ text: 'OK' }]
+          );
+        }}
+      />
     </ScrollView>
   );
 
@@ -1514,7 +1435,6 @@ const SmartMoneyScreen: React.FC = () => {
       <View style={styles.tabContainer}>
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'transactions' && renderTransactions()}
-        {activeTab === 'reminders' && renderReminders()}
       </View>
 
       {/* Floating Action Button */}
