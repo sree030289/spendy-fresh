@@ -7,13 +7,11 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Modal,
   Alert,
   Switch,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,6 +20,7 @@ import { CustomDateTimePicker } from '@/components/common/DateTimePicker'; // Us
 import { RemindersService } from '@/services/reminders/RemindersService1';
 import { ReminderCategory, RecurringType } from '@/types/reminder';
 import { formatCurrency } from '@/utils/currency';
+import FullscreenModal from '@/components/common/FullscreenModal';
 
 interface AddReminderModalProps {
   visible: boolean;
@@ -248,43 +247,29 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
   );
 
   return (
-    <Modal
+    <FullscreenModal
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+      onClose={onClose}
+      title="Add Reminder"
+      rightActions={
+        <TouchableOpacity 
+          onPress={handleSubmit} 
+          style={styles.headerButton}
+          disabled={loading}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.headerButton}>
-              <Text style={[styles.headerButtonText, { color: theme.colors.textSecondary }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            
-            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-              Add Reminder
-            </Text>
-            
-            <TouchableOpacity 
-              onPress={handleSubmit} 
-              style={styles.headerButton}
-              disabled={loading}
-            >
-              <Text style={[styles.headerButtonText, { 
-                color: loading ? theme.colors.textSecondary : theme.colors.primary 
-              }]}>
-                {loading ? 'Saving...' : 'Save'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <Text style={[styles.headerButtonText, { 
+            color: loading ? theme.colors.textSecondary : theme.colors.primary 
+          }]}>
+            {loading ? 'Saving...' : 'Save'}
+          </Text>
+        </TouchableOpacity>
+      }
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {/* Title */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: theme.colors.text }]}>
@@ -528,8 +513,8 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
 
         <CategoryPicker />
         <RecurringPicker />
-      </SafeAreaView>
-    </Modal>
+      </KeyboardAvoidingView>
+    </FullscreenModal>
   );
 }
 

@@ -4,14 +4,15 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
+  
   TouchableOpacity,
   ScrollView,
   TextInput,
   Alert,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import FullscreenModal from '@/components/common/FullscreenModal';
+
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';

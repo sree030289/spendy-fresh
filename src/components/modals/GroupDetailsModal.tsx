@@ -4,7 +4,7 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
+  
   TouchableOpacity,
   ScrollView,
   Alert,
@@ -15,7 +15,8 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import FullscreenModal from '@/components/common/FullscreenModal';
+
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import useBalances from '@/hooks/useBalances';
@@ -69,12 +70,12 @@ export default function GroupDetailsModal({
   const [showAddMember, setShowAddMember] = useState(false);
   const [showInviteContact, setShowInviteContact] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
-  const [showQRModal, setShowQRModal] = useState(false);
+  const [showQR setShowQRModal] = useState(false);
   const [showEditExpense, setShowEditExpense] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [selectedMemberForAction, setSelectedMemberForAction] = useState<string | null>(null);
-  const [showGroupExpenseModal, setShowGroupExpenseModal] = useState(false);
-  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [showGroupExpense setShowGroupExpenseModal] = useState(false);
+  const [showSettlement setShowSettlementModal] = useState(false);
   const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
   const [expenseListGroupId, setExpenseListGroupId] = useState<string | undefined>(undefined);
   const [expenseListTitle, setExpenseListTitle] = useState('All Expenses');
@@ -635,28 +636,11 @@ export default function GroupDetailsModal({
   });
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet">
-      <SafeAreaView style={[styles.fullScreenContainer, { backgroundColor: theme.colors.background }]}>
-        <Animated.View 
-          style={[
-            styles.modalContent, 
-            { 
-              backgroundColor: theme.colors.background,
-              transform: [{ translateY: slideTransform }],
-              opacity: fadeAnim
-            }
-          ]}
-        >
-          {/* Header with Gradient */}
-          <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.closeBtn}
-              onPress={onClose}
-            >
-              <Ionicons name="close" size={20} color="white" />
-            </TouchableOpacity>
-            
-            <View style={styles.groupHeader}>
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title={group?.name || 'Group Details'}
+    >
               <View style={styles.groupAvatar}>
                 <Text style={styles.groupAvatarText}>{localGroupData.avatar}</Text>
               </View>
@@ -878,8 +862,7 @@ export default function GroupDetailsModal({
               )}
             </ScrollView>
           </View>
-        </Animated.View>
-      </SafeAreaView>
+    </FullscreenModal>
       
       {/* All Modals */}
       {selectedMemberForAction && (
@@ -947,7 +930,7 @@ export default function GroupDetailsModal({
       {/* Add Member Modal */}
       {showAddMember && (
         <Modal visible={true} animationType="slide" presentationStyle="pageSheet">
-          <SafeAreaView style={[styles.addMemberModal, { backgroundColor: theme.colors.background }]}>
+          <SafeAreaView style={[styles.addMember { backgroundColor: theme.colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <TouchableOpacity onPress={() => setShowAddMember(false)}>
                 <Ionicons name="close" size={24} color={theme.colors.text} />
@@ -1144,7 +1127,6 @@ export default function GroupDetailsModal({
         currentUser={currentUser}
         onSettlementComplete={loadGroupExpenses}
       />
-    </Modal>
   );
 }
 

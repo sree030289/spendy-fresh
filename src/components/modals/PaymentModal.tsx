@@ -4,13 +4,14 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
+  
   TouchableOpacity,
   ScrollView,
   Alert,
   TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import FullscreenModal from '@/components/common/FullscreenModal';
+
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';

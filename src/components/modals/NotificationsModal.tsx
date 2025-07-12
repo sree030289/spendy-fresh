@@ -5,12 +5,13 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
+  
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import FullscreenModal from '@/components/common/FullscreenModal';
+
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
@@ -134,28 +135,22 @@ export default function NotificationsModal({
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+    <FullscreenModal
+      visible={visible}
+      onClose={onClose}
+      title="Notifications"
+      rightActions={
+        notifications.length > 0 ? (
+          <TouchableOpacity onPress={onMarkAllAsRead}>
+            <Text style={[styles.markAllText, { color: theme.colors.primary }]}>
+              Mark All Read
+            </Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Notifications
-          </Text>
-          {notifications.length > 0 && (
-            <TouchableOpacity onPress={onMarkAllAsRead}>
-              <Text style={[styles.markAllText, { color: theme.colors.primary }]}>
-                Mark All Read
-              </Text>
-            </TouchableOpacity>
-          )}
-          {notifications.length === 0 && <View style={{ width: 24 }} />}
-        </View>
-
-        {/* Notifications List */}
-        <ScrollView contentContainerStyle={styles.content}>
+        ) : null
+      }
+    >
+      {/* Notifications List */}
+      <ScrollView contentContainerStyle={styles.content}>
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -182,8 +177,7 @@ export default function NotificationsModal({
             </>
           )}
         </ScrollView>
-      </SafeAreaView>
-    </Modal>
+    </FullscreenModal>
   );
 }
 
