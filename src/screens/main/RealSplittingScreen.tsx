@@ -1967,6 +1967,18 @@ export default function RealSplittingScreen() {
     );
   }
 
+  // If showCreateGroup is true, render CreateGroupModal as full-screen
+  if (showCreateGroup) {
+    return (
+      <CreateGroupModal
+        visible={showCreateGroup}
+        onClose={() => setShowCreateGroup(false)}
+        onSubmit={handleCreateGroup}
+        friends={friends}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
@@ -2076,13 +2088,6 @@ export default function RealSplittingScreen() {
           setQrScanSource('addFriend');
           setShowQRScanner(true);
         }}
-      />
-      
-      <CreateGroupModal
-        visible={showCreateGroup}
-        onClose={() => setShowCreateGroup(false)}
-        onSubmit={handleCreateGroup}
-        friends={friends}
       />
       
       <GroupDetailsModal
