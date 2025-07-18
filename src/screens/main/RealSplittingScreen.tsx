@@ -65,7 +65,6 @@ import ReceiptScannerModal from '@/components/modals/ReceiptScannerModal';
 import GroupDetailsModal from '@/components/modals/GroupDetailsModal';
 import ExpenseRefreshService from '@/services/expenseRefreshService';
 import NotificationsModal from '@/components/modals/NotificationsModal';
-import RecurringExpenseModal from '@/components/modals/RecurringExpenseModal';
 import AnalyticsModal from '@/components/modals/AnalyticsModal';
 import ExpenseDeletionModal from '@/components/modals/ExpenseDeletionModal';
 import ExpenseSettlementModal from '@/components/modals/ExpenseSettlementModal';
@@ -93,6 +92,7 @@ export default function RealSplittingScreen() {
   
   // State management
   const [activeTab, setActiveTab] = useState('overview');
+  const [activeFriendsTab, setActiveFriendsTab] = useState('accepted'); // New state for friends subtabs
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
@@ -111,7 +111,6 @@ export default function RealSplittingScreen() {
   const [selectedGroupForExpense, setSelectedGroupForExpense] = useState<Group | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [showRecurringExpense, setShowRecurringExpense] = useState(false);
 
   // Modal states
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -393,22 +392,66 @@ export default function RealSplittingScreen() {
     }
   };
 
-  // Handle notifications
-  const handleNotificationsPress = () => {
-    setShowNotifications(true);
-  };
-
   const markAllNotificationsRead = async () => {
     try {
       if (!user?.id) return;
       
       await SplittingService.markAllNotificationsAsRead(user.id);
-      setNotifications([]);
+      await loadNotifications(); // Reload notifications instead of clearing
       
       Alert.alert('Success', 'All notifications marked as read');
     } catch (error) {
       console.error('Mark notifications read error:', error);
       Alert.alert('Error', 'Failed to mark notifications as read');
+    }
+  };
+
+  // Handle notifications press - mark as read when opened
+  const handleNotificationsPress = async () => {
+    setShowNotifications(true);
+    
+    // Mark all unread notifications as read when opening the modal
+    try {
+      if (user?.id && notifications.some(n => !n.isRead)) {
+        await SplittingService.markAllNotificationsAsRead(user.id);
+        await loadNotifications();
+      }
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
+  };
+
+  // Handle resend invitation
+  const handleResendInvitation = async (friend: Friend) => {
+    try {
+      if (!user?.id) return;
+      
+      const method = friend.inviteMethod || 'email';
+      
+      if (method === 'email') {
+        const result = await SplittingService.sendFriendRequest(user.id, friend.friendData.email);
+        Alert.alert('Success', 'Invitation resent successfully!');
+      } else if (method === 'sms' || method === 'whatsapp') {
+        // Resend SMS/WhatsApp invitation
+        const contactData = {
+          name: friend.friendData.fullName,
+          phoneNumber: friend.friendData.mobile || ''
+        };
+        
+        if (contactData.phoneNumber) {
+          await createPendingFriendInvitation(contactData, method);
+          Alert.alert('Success', `${method.toUpperCase()} invitation resent to ${friend.friendData.fullName}!`);
+        } else {
+          Alert.alert('Error', 'No phone number available for this friend');
+        }
+      }
+      
+      // Refresh friends list
+      await friendsManager.forceRefresh();
+      
+    } catch (error: any) {
+      console.error('Error resending invitation:', error);
+      Alert.alert('Error', error.message || 'Failed to resend invitation');
     }
   };
 
@@ -1063,12 +1106,12 @@ export default function RealSplittingScreen() {
 
           <TouchableOpacity
             style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
-            onPress={() => setShowRecurringExpense(true)}
+            onPress={() => setShowAddFriend(true)}
           >
-            <Ionicons name="repeat" size={24} color="#4F46E5" />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Recurring</Text>
+            <Ionicons name="person-add" size={24} color="#10B981" />
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Friend</Text>
             <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-              Set up recurring expenses
+              Invite friends to split expenses
             </Text>
           </TouchableOpacity>
 
@@ -1294,6 +1337,9 @@ export default function RealSplittingScreen() {
       isLoading: friendsBalances.isLoading
     });
 
+    const acceptedFriends = friends.filter(f => f.status === 'accepted');
+    const invitedFriends = friends.filter(f => f.status === 'invited' || f.status === 'pending');
+
     return (
       <ScrollView 
         contentContainerStyle={styles.tabContent}
@@ -1317,87 +1363,164 @@ export default function RealSplittingScreen() {
           </View>
         </View>
 
-        {friends.length === 0 ? (
-          <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-            <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
-            <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Friends Yet</Text>
-            <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-              Add friends to start splitting expenses
+        {/* Friends Subtabs */}
+        <View style={[styles.subTabContainer, { backgroundColor: theme.colors.surface }]}>
+          <TouchableOpacity
+            style={[
+              styles.subTab,
+              activeFriendsTab === 'accepted' && { backgroundColor: theme.colors.primary }
+            ]}
+            onPress={() => setActiveFriendsTab('accepted')}
+          >
+            <Text style={[
+              styles.subTabText,
+              { color: activeFriendsTab === 'accepted' ? 'white' : theme.colors.text }
+            ]}>
+              Accepted ({acceptedFriends.length})
             </Text>
-          </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.subTab,
+              activeFriendsTab === 'invited' && { backgroundColor: theme.colors.primary }
+            ]}
+            onPress={() => setActiveFriendsTab('invited')}
+          >
+            <Text style={[
+              styles.subTabText,
+              { color: activeFriendsTab === 'invited' ? 'white' : theme.colors.text }
+            ]}>
+              Invited ({invitedFriends.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeFriendsTab === 'accepted' ? (
+          // Accepted Friends Content
+          acceptedFriends.length === 0 ? (
+            <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Accepted Friends Yet</Text>
+              <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                Friends you've accepted will appear here
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.section}>
+              <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
+                Friends ({acceptedFriends.length})
+              </Text>
+              {acceptedFriends.map((friend, index) => {
+                // Get balance from unified balance system
+                const balanceDetail = friendsBalances.allBalances.find(b => b.userId === friend.friendId);
+                const balance = balanceDetail?.balance || 0;
+                
+                return (
+                  <TouchableOpacity
+                    key={`friend-${friend.id}-${index}`}
+                    style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
+                    onPress={() => showFriendActionsMenu(friend)}
+                  >
+                    <View style={styles.balanceItemLeft}>
+                      <View style={[styles.personAvatar, { backgroundColor: theme.colors.primary }]}>
+                        <Text style={styles.personAvatarText}>
+                          {friend.friendData.fullName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.personInfo}>
+                        <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
+                          {friend.friendData.fullName}
+                        </Text>
+                        <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                          {friend.friendData.email}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.balanceItemRight}>
+                      <View style={styles.balanceDisplay}>
+                        {Math.abs(balance) < 0.01 ? (
+                          <>
+                            <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                            <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                              Settled up
+                            </Text>
+                          </>
+                        ) : balance > 0 ? (
+                          <>
+                            <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
+                            <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                              Owes you {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
+                            <Text style={[styles.balanceText, { color: theme.colors.error }]}>
+                              You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
+                            </Text>
+                          </>
+                        )}
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )
         ) : (
-          <>
-            {/* Accepted Friends Section */}
-            {friends.filter(f => f.status === 'accepted').length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
-                  Friends ({friends.filter(f => f.status === 'accepted').length})
-                </Text>
-                {friends
-                  .filter(friend => friend.status === 'accepted')
-                  .map((friend, index) => {
-                    // Get balance from unified balance system
-                    const balanceDetail = friendsBalances.allBalances.find(b => b.userId === friend.friendId);
-                    const balance = balanceDetail?.balance || 0;
-                    
-                    return (
-                      <TouchableOpacity
-                        key={`friend-${friend.id}-${index}`}
-                        style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
-                        onPress={() => showFriendActionsMenu(friend)}
-                      >
-                        <View style={styles.balanceItemLeft}>
-                          <View style={[styles.personAvatar, { backgroundColor: theme.colors.primary }]}>
-                            <Text style={styles.personAvatarText}>
-                              {friend.friendData.fullName.charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                          <View style={styles.personInfo}>
-                            <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
-                              {friend.friendData.fullName}
-                            </Text>
-                            <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                              {friend.friendData.email}
-                            </Text>
-                          </View>
-                        </View>
+          // Invited Friends Content
+          invitedFriends.length === 0 ? (
+            <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="mail-outline" size={64} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Pending Invitations</Text>
+              <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                Friends you've invited will appear here
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.section}>
+              <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
+                Pending Invitations ({invitedFriends.length})
+              </Text>
+              {invitedFriends.map((friend, index) => (
+                <View
+                  key={`invited-${friend.id}-${index}`}
+                  style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
+                >
+                  <View style={styles.balanceItemLeft}>
+                    <View style={[styles.personAvatar, { backgroundColor: theme.colors.warning }]}>
+                      <Text style={styles.personAvatarText}>
+                        {friend.friendData.fullName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.personInfo}>
+                      <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
+                        {friend.friendData.fullName}
+                      </Text>
+                      <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                        {friend.friendData.email || friend.friendData.mobile}
+                      </Text>
+                      <Text style={[styles.statusText, { color: theme.colors.warning }]}>
+                        Invited via {friend.inviteMethod || 'email'}
+                      </Text>
+                    </View>
+                  </View>
 
-                        <View style={styles.balanceItemRight}>
-                          <View style={styles.balanceDisplay}>
-                            {Math.abs(balance) < 0.01 ? (
-                              <>
-                                <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
-                                <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                                  Settled up
-                                </Text>
-                              </>
-                            ) : balance > 0 ? (
-                              <>
-                                <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
-                                <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                                  Owes you {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
-                                </Text>
-                              </>
-                            ) : (
-                              <>
-                                <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
-                                <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                                  You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
-                                </Text>
-                              </>
-                            )}
-                          </View>
-                          <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-              </View>
-            )}
-
-            {/* Keep existing pending invitations and group members sections... */}
-            {/* [Previous code for pending invitations and group members continues here] */}
-          </>
+                  <View style={styles.balanceItemRight}>
+                    <TouchableOpacity
+                      style={[styles.resendButton, { backgroundColor: theme.colors.primary }]}
+                      onPress={() => handleResendInvitation(friend)}
+                    >
+                      <Ionicons name="send" size={16} color="white" />
+                      <Text style={styles.resendButtonText}>Resend</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )
         )}
       </ScrollView>
     );
@@ -1918,6 +2041,9 @@ export default function RealSplittingScreen() {
         console.error('❌ Failed to refresh friends list:', refreshError);
       }
       
+      // Reload notifications to remove/update the friend request notification
+      await loadNotifications();
+      
       setShowFriendRequest(false);
       setSelectedFriendRequest(null);
       Alert.alert('Success', 'Friend request accepted!');
@@ -1939,6 +2065,9 @@ export default function RealSplittingScreen() {
       } catch (refreshError) {
         console.error('❌ Failed to refresh friends list:', refreshError);
       }
+      
+      // Reload notifications to remove/update the friend request notification
+      await loadNotifications();
       
       setShowFriendRequest(false);
       setSelectedFriendRequest(null);
@@ -1998,12 +2127,6 @@ export default function RealSplittingScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerAction}
-            onPress={() => setShowRecurringExpense(true)}
-          >
-            <Ionicons name="repeat" size={24} color="#4F46E5" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerAction}
             onPress={handleAnalyticsAccess}
           >
             <Ionicons name="analytics" size={24} color="#10B981" />
@@ -2013,10 +2136,10 @@ export default function RealSplittingScreen() {
             onPress={handleNotificationsPress}
           >
             <Ionicons name="notifications" size={24} color="#F59E0B" />
-            {notifications.length > 0 && (
+            {notifications.filter(n => !n.isRead).length > 0 && (
               <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
                 <Text style={styles.notificationBadgeText}>
-                  {notifications.length > 99 ? '99+' : notifications.length}
+                  {notifications.filter(n => !n.isRead).length > 99 ? '99+' : notifications.filter(n => !n.isRead).length}
                 </Text>
               </View>
             )}
@@ -2221,18 +2344,6 @@ export default function RealSplittingScreen() {
         }}
         isUserAdmin={groups.find(g => g.id === selectedExpenseForAction?.groupId)
           ?.members.find(m => m.userId === user?.id)?.role === 'admin'}
-      />
-
-      <RecurringExpenseModal
-        visible={showRecurringExpense}
-        onClose={() => setShowRecurringExpense(false)}
-        onSubmit={async (recurringData) => {
-          await SplittingService.createRecurringExpense(recurringData);
-          Alert.alert('Success', 'Recurring expense created!');
-          setShowRecurringExpense(false);
-        }}
-        groups={groups}
-        currentUser={user}
       />
 
       <AnalyticsModal
@@ -3382,5 +3493,43 @@ friendCardRowBalance: {
 friendCardRowBalanceText: {
   fontSize: 16,
   fontWeight: 'bold',
+},
+
+// New styles for friends subtabs
+subTabContainer: {
+  flexDirection: 'row',
+  marginBottom: 16,
+  borderRadius: 8,
+  padding: 4,
+  marginHorizontal: 16,
+},
+subTab: {
+  flex: 1,
+  paddingVertical: 8,
+  paddingHorizontal: 16,
+  borderRadius: 6,
+  alignItems: 'center',
+},
+subTabText: {
+  fontSize: 14,
+  fontWeight: '500',
+},
+statusText: {
+  fontSize: 12,
+  fontStyle: 'italic',
+  marginTop: 2,
+},
+resendButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 6,
+  gap: 4,
+},
+resendButtonText: {
+  color: 'white',
+  fontSize: 12,
+  fontWeight: '500',
 },
 });

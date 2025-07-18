@@ -851,6 +851,28 @@ static async acceptFriendRequest(requestId: string): Promise<void> {
     
     await batch.commit();
     
+    // Remove the original friend request notification
+    try {
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('userId', '==', requestData.toUserId),
+        where('type', '==', 'friend_request'),
+        where('data.requestId', '==', requestId)
+      );
+      const notificationSnapshot = await getDocs(notificationsQuery);
+      
+      if (!notificationSnapshot.empty) {
+        const batch2 = writeBatch(db);
+        notificationSnapshot.docs.forEach((doc) => {
+          batch2.delete(doc.ref);
+        });
+        await batch2.commit();
+        console.log('✅ Removed original friend request notification');
+      }
+    } catch (notificationError) {
+      console.warn('Failed to remove original friend request notification:', notificationError);
+    }
+    
     // Send notification to requester
     await this.createNotification({
       userId: requestData.fromUserId,
@@ -883,6 +905,28 @@ static async declineFriendRequest(requestId: string): Promise<void> {
       status: 'declined',
       updatedAt: new Date()
     });
+
+    // Remove the original friend request notification
+    try {
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('userId', '==', requestData.toUserId),
+        where('type', '==', 'friend_request'),
+        where('data.requestId', '==', requestId)
+      );
+      const notificationSnapshot = await getDocs(notificationsQuery);
+      
+      if (!notificationSnapshot.empty) {
+        const batch = writeBatch(db);
+        notificationSnapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log('✅ Removed original friend request notification');
+      }
+    } catch (notificationError) {
+      console.warn('Failed to remove original friend request notification:', notificationError);
+    }
 
     // Send notification to requester
     await this.createNotification({
