@@ -1,7 +1,7 @@
 {
-  "preset": "ts-jest",
-  "testEnvironment": "node",
-  "setupFilesAfterEnv": [],
+  "preset": "react-native",
+  "testEnvironment": "jsdom",
+  "setupFilesAfterEnv": ["@testing-library/jest-dom"],
   "moduleNameMapper": {
     "^@/(.*)$": "<rootDir>/src/$1"
   },
@@ -22,5 +22,8 @@
       }
     }]
   },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(react-native|@react-native|expo|@expo|react-navigation|@react-navigation|@testing-library)/)"
+  ],
   "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json"]
 }
