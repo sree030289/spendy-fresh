@@ -77,6 +77,10 @@ import QRCodeScanner from '@/components/QRCodeScanner';
 import QRScannerManager from '@/services/qr/QRScannerManager';
 import EditExpenseModal from '@/components/modals/EditExpenseModal';
 import SimpleExpenseListModal from '@/components/modals/SimpleExpenseListModal';
+import RemindModal from '@/components/modals/RemindModal';
+import AnimatedSuccessModal from '@/components/modals/AnimatedSuccessModal';
+import ExportModal from '@/components/modals/ExportModal';
+import { ExportService } from '@/services/ExportService';
 
 export default function RealSplittingScreen() {
   const navigation = useNavigation();
@@ -123,6 +127,27 @@ export default function RealSplittingScreen() {
   const [showGroupChat, setShowGroupChat] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  
+  // Remind modal state
+  const [showRemindModal, setShowRemindModal] = useState(false);
+  const [selectedFriendForRemind, setSelectedFriendForRemind] = useState<Friend | null>(null);
+  const [remindBalance, setRemindBalance] = useState(0);
+  
+  // Animated success modal state
+  const [showAnimatedModal, setShowAnimatedModal] = useState(false);
+  const [animatedModalProps, setAnimatedModalProps] = useState<{
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    title: '',
+    message: '',
+    type: 'success'
+  });
+  
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [selectedGroupForExport, setSelectedGroupForExport] = useState<Group | null>(null);
   
   // Additional modal states
   const [showEditExpense, setShowEditExpense] = useState(false);
@@ -452,6 +477,68 @@ export default function RealSplittingScreen() {
     } catch (error: any) {
       console.error('Error resending invitation:', error);
       Alert.alert('Error', error.message || 'Failed to resend invitation');
+    }
+  };
+
+  // Handle remind friend about balance
+  const handleRemindFriend = (friend: Friend, balance: number) => {
+    setSelectedFriendForRemind(friend);
+    setRemindBalance(balance);
+    setShowRemindModal(true);
+  };
+
+  // Handle sending reminder through different methods
+  const handleSendReminder = async (method: 'sms' | 'whatsapp' | 'app', message: string) => {
+    try {
+      if (!selectedFriendForRemind || !user?.id) return;
+
+      // Create a notification for the reminder action
+      await SplittingService.createNotification({
+        userId: selectedFriendForRemind.friendId,
+        type: 'payment_request',
+        title: 'Payment Reminder',
+        message: message,
+        data: { 
+          fromUserId: user.id,
+          amount: Math.abs(remindBalance),
+          currency: user.currency || 'USD',
+          method: method
+        },
+        isRead: false,
+        createdAt: new Date()
+      });
+
+      console.log(`Reminder sent via ${method} to ${selectedFriendForRemind.friendData.fullName}`);
+      
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      throw error;
+    }
+  };
+
+  // Helper function to show animated modal
+  const showAnimatedSuccess = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    setAnimatedModalProps({ title, message, type });
+    setShowAnimatedModal(true);
+  };
+
+  // Handle export group data
+  const handleExportGroup = (group: Group) => {
+    setSelectedGroupForExport(group);
+    setShowExportModal(true);
+  };
+
+  // Handle export completion
+  const handleExportComplete = async (format: 'csv' | 'pdf') => {
+    try {
+      if (!selectedGroupForExport) return;
+      
+      await ExportService.exportGroupData(selectedGroupForExport, format);
+      showAnimatedSuccess('Export Complete! 📄', `Group data exported as ${format.toUpperCase()} file`);
+      
+    } catch (error: any) {
+      console.error('Export error:', error);
+      showAnimatedSuccess('Export Failed', error.message || 'Failed to export group data', 'error');
     }
   };
 
@@ -1462,7 +1549,18 @@ export default function RealSplittingScreen() {
                           </>
                         )}
                       </View>
-                      <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                      <View style={styles.friendActions}>
+                        {Math.abs(balance) >= 0.01 && (
+                          <TouchableOpacity
+                            style={[styles.remindButton, { backgroundColor: theme.colors.warning }]}
+                            onPress={() => handleRemindFriend(friend, balance)}
+                          >
+                            <Ionicons name="notifications" size={14} color="white" />
+                            <Text style={styles.remindButtonText}>Remind</Text>
+                          </TouchableOpacity>
+                        )}
+                        <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                      </View>
                     </View>
                   </TouchableOpacity>
                 );
@@ -1609,20 +1707,31 @@ export default function RealSplittingScreen() {
                     </View>
                   </View>
                 </View>
-                <TouchableOpacity
-                  onPress={async (e) => {
-                    e.stopPropagation();
-                    // Check QR code access before showing
-                    const hasAccess = await subscriptionHelper.checkQRCodeAccess(user?.id || '');
-                    if (hasAccess) {
-                      setSelectedGroup(group);
-                      setShowQRCode(true);
-                    }
-                  }}
-                  style={styles.groupActionButton}
-                >
-                  <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
+                <View style={styles.groupHeaderActions}>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleExportGroup(group);
+                    }}
+                    style={styles.groupActionButton}
+                  >
+                    <Ionicons name="download" size={20} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={async (e) => {
+                      e.stopPropagation();
+                      // Check QR code access before showing
+                      const hasAccess = await subscriptionHelper.checkQRCodeAccess(user?.id || '');
+                      if (hasAccess) {
+                        setSelectedGroup(group);
+                        setShowQRCode(true);
+                      }
+                    }}
+                    style={styles.groupActionButton}
+                  >
+                    <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={styles.groupStats}>
@@ -2046,7 +2155,7 @@ export default function RealSplittingScreen() {
       
       setShowFriendRequest(false);
       setSelectedFriendRequest(null);
-      Alert.alert('Success', 'Friend request accepted!');
+      showAnimatedSuccess('Success! 🤝', 'Friend request accepted!');
     } catch (error: any) {
       console.error('Error accepting friend request:', error);
       Alert.alert('Error', error.message || 'Failed to accept friend request');
@@ -2071,7 +2180,7 @@ export default function RealSplittingScreen() {
       
       setShowFriendRequest(false);
       setSelectedFriendRequest(null);
-      Alert.alert('Success', 'Friend request declined');
+      showAnimatedSuccess('Request Declined', 'Friend request declined', 'info');
     } catch (error: any) {
       console.error('Error declining friend request:', error);
       Alert.alert('Error', error.message || 'Failed to decline friend request');
@@ -2400,25 +2509,23 @@ export default function RealSplittingScreen() {
           const scannerManager = QRScannerManager.getInstance();
           
           if (!user) {
-            Alert.alert('Error', 'User not authenticated');
             setShowQRScanner(false);
             setQrScanSource(null);
+            Alert.alert('Error', 'User not authenticated');
             return;
           }
 
+          // Handle error cases first
           if (qrData === 'INVALID_QR_FORMAT') {
             Alert.alert(
               'Invalid QR Code',
-              'This is not a valid Spendy QR code. Please scan a QR code generated by Spendy.',
+              'This QR code is not compatible with Spendy. Please scan a valid Spendy QR code.',
               [
-                { text: 'Try Again', onPress: () => {} },
-                {
-                  text: 'Cancel',
-                  onPress: () => {
-                    setShowQRScanner(false);
-                    setQrScanSource(null);
-                  }
-                }
+                { text: 'Try Again', style: 'default' },
+                { text: 'Cancel', style: 'cancel', onPress: () => {
+                  setShowQRScanner(false);
+                  setQrScanSource(null);
+                }}
               ]
             );
             return;
@@ -2427,81 +2534,95 @@ export default function RealSplittingScreen() {
           if (qrData === 'SCAN_ERROR') {
             Alert.alert(
               'Scan Error',
-              'An error occurred while scanning. Please try again.',
+              'Unable to read QR code. Please try again.',
               [
-                { text: 'Try Again', onPress: () => {} },
-                {
-                  text: 'Cancel',
-                  onPress: () => {
-                    setShowQRScanner(false);
-                    setQrScanSource(null);
-                  }
-                }
+                { text: 'Try Again', style: 'default' },
+                { text: 'Cancel', style: 'cancel', onPress: () => {
+                  setShowQRScanner(false);
+                  setQrScanSource(null);
+                }}
               ]
             );
             return;
           }
 
+          // Process valid QR code
           try {
+            console.log('🔄 Processing QR code...');
             const result = await scannerManager.processQRCode(qrData, user.id, {
               closeOnSuccess: true,
               navigation: navigation
             });
 
+            // Close scanner immediately on success or failure
+            setShowQRScanner(false);
+            setQrScanSource(null);
+
             if (result.success) {
-              setShowQRScanner(false);
-              setQrScanSource(null);
+              console.log('✅ QR code processed successfully');
               
-              setTimeout(() => {
-                Alert.alert(
-                  'Success',
-                  'QR code processed successfully!',
-                  [{
-                    text: 'OK',
-                    onPress: async () => {
-                      await Promise.all([
-                        loadGroups(),
-                        loadRecentExpenses()
-                      ]);
-                      notifyBalanceChange(); // FIXED: Notify balance system
-                    }
-                  }]
-                );
-              }, 100);
+              // Refresh data silently
+              await Promise.all([
+                loadGroups(),
+                loadRecentExpenses(),
+                friendsManager.forceRefresh()
+              ]);
+              notifyBalanceChange();
+              
+              // Show animated success message
+              showAnimatedSuccess('Success! 🎉', 'QR code processed successfully!');
             } else {
+              console.log('❌ QR code processing failed:', result.error);
               Alert.alert(
-                'QR Code Error',
-                result.error || 'Failed to process QR code',
-                [
-                  {
-                    text: 'Cancel',
-                    style: 'cancel',
-                    onPress: () => {
-                      setShowQRScanner(false);
-                      setQrScanSource(null);
-                    }
-                  },
-                  { text: 'Try Again', onPress: () => {} }
-                ]
+                'Processing Failed',
+                result.error || 'Unable to process this QR code. Please check that it\'s a valid Spendy QR code.',
+                [{ text: 'OK' }]
               );
             }
           } catch (error: any) {
+            console.error('❌ QR scanner error:', error);
+            setShowQRScanner(false);
+            setQrScanSource(null);
+            
             Alert.alert(
-              'Error',
-              error.message || 'Unexpected error occurred',
-              [
-                {
-                  text: 'Cancel',
-                  onPress: () => {
-                    setShowQRScanner(false);
-                    setQrScanSource(null);
-                  }
-                },
-                { text: 'Try Again', onPress: () => {} }
-              ]
+              'Unexpected Error',
+              'Something went wrong while processing the QR code. Please try again.',
+              [{ text: 'OK' }]
             );
           }
         }}
+      />
+
+      <RemindModal
+        visible={showRemindModal}
+        onClose={() => {
+          setShowRemindModal(false);
+          setSelectedFriendForRemind(null);
+          setRemindBalance(0);
+        }}
+        friend={selectedFriendForRemind}
+        balance={remindBalance}
+        currency={user?.currency || 'USD'}
+        onSendReminder={handleSendReminder}
+      />
+
+      <AnimatedSuccessModal
+        visible={showAnimatedModal}
+        onClose={() => setShowAnimatedModal(false)}
+        title={animatedModalProps.title}
+        message={animatedModalProps.message}
+        type={animatedModalProps.type}
+      />
+
+      <ExportModal
+        visible={showExportModal}
+        onClose={() => {
+          setShowExportModal(false);
+          setSelectedGroupForExport(null);
+        }}
+        group={selectedGroupForExport}
+        currentUserId={user?.id || ''}
+        onExportComplete={handleExportComplete}
       />
     </SafeAreaView>
   );
@@ -3531,5 +3652,26 @@ resendButtonText: {
   color: 'white',
   fontSize: 12,
   fontWeight: '500',
+},
+friendActions: {
+  alignItems: 'center',
+  gap: 8,
+},
+remindButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 4,
+  gap: 2,
+},
+remindButtonText: {
+  color: 'white',
+  fontSize: 10,
+  fontWeight: '500',
+},
+groupHeaderActions: {
+  flexDirection: 'row',
+  gap: 8,
 },
 });

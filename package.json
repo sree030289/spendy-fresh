@@ -77,6 +77,7 @@
     "date-fns": "^2.29.0",
     "framer-motion": "^10.0.0",
     "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.0.4",
     "postcss": "^8.4.0",
     "react-hot-toast": "^2.4.0",
     "react-test-renderer": "^19.0.0",
