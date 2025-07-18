@@ -29,7 +29,8 @@ import { SplittingService } from '@/services/firebase/splitting';
 import { notificationManager } from '@/services/NotificationManager';
 import SmartMoneyApp from '@/screens/main/SmartMoneyApp';
 
- import SubscriptionModal from '@/components/modals/SubscriptionModal';
+ import { SubscriptionService } from '@/services/SubscriptionService';
+import SubscriptionModal from '@/components/modals/SubscriptionModal';
 
 
 
@@ -79,23 +80,30 @@ const AppNavigator = () => {
     checkTourStatus();
   }, []);
 
-  // Simplified subscription check for debugging
+  // Subscription check with proper premium user verification
   useEffect(() => {
     const checkSubscriptionStatus = async () => {
       if (!user?.id || !appReady || !tourCheckCompleted) return;
 
       try {
-        console.log('🔍 DEBUG: Checking subscription status for user:', user.id);
+        console.log('🔍 Checking subscription status for user:', user.id);
         
-        // For debugging, always show first-time modal for new users
-        if (!hasShownTour) {
-          console.log('🎯 DEBUG: New user detected, will show subscription modal first');
+        // Check if user is already premium
+        const subscriptionService = SubscriptionService.getInstance();
+        const isPremium = await subscriptionService.isPremiumUser(user.id);
+        console.log('🔍 User premium status:', isPremium);
+        
+        // Only show subscription modal for FREE users who haven't seen the tour
+        if (!isPremium && !hasShownTour) {
+          console.log('🎯 Free user detected, will show subscription modal first');
           
           setPendingSubscriptionModal({
             reason: 'firstTime',
             canClose: false
           });
           setShouldShowTourAfterSubscription(true);
+        } else {
+          console.log('🔍 Premium user or tour already shown - skipping subscription modal');
         }
         
         setSubscriptionCheckComplete(true);

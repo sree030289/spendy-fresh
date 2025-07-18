@@ -11,6 +11,8 @@ import {
   Switch,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
@@ -247,257 +249,258 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
   );
 
   return (
-    <FullscreenModal
-      visible={visible}
-      onClose={onClose}
-      title="Add Reminder"
-      rightActions={
-        <TouchableOpacity 
-          onPress={handleSubmit} 
-          style={styles.headerButton}
-          disabled={loading}
-        >
-          <Text style={[styles.headerButtonText, { 
-            color: loading ? theme.colors.textSecondary : theme.colors.primary 
-          }]}>
-            {loading ? 'Saving...' : 'Save'}
-          </Text>
-        </TouchableOpacity>
-      }
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+    <>
+      <FullscreenModal
+        visible={visible}
+        onClose={onClose}
+        title="Add Reminder"
+        rightActions={
+          <TouchableOpacity 
+            onPress={handleSubmit} 
+            style={styles.headerButton}
+            disabled={loading}
+          >
+            <Text style={[styles.headerButtonText, { 
+              color: loading ? theme.colors.textSecondary : theme.colors.primary 
+            }]}>
+              {loading ? 'Saving...' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+        }
       >
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Title */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.colors.text }]}>
-                Title *
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.colors.surface,
-                    borderColor: errors.title ? theme.colors.error : theme.colors.border,
-                    color: theme.colors.text,
-                  }
-                ]}
-                placeholder="Enter reminder title"
-                placeholderTextColor={theme.colors.textSecondary}
-                value={formData.title}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, title: text });
-                  if (errors.title) setErrors({ ...errors, title: '' });
-                }}
-                returnKeyType="next"
-              />
-              {errors.title ? (
-                <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                  {errors.title}
-                </Text>
-              ) : null}
-            </View>
-
-            {/* Description */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.colors.text }]}>
-                Description
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.textArea,
-                  {
-                    backgroundColor: theme.colors.surface,
-                    borderColor: theme.colors.border,
-                    color: theme.colors.text,
-                  }
-                ]}
-                placeholder="Add a description (optional)"
-                placeholderTextColor={theme.colors.textSecondary}
-                value={formData.description}
-                onChangeText={(text) => setFormData({ ...formData, description: text })}
-                multiline
-                numberOfLines={3}
-                returnKeyType="next"
-              />
-            </View>
-
-            {/* Amount */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.colors.text }]}>
-                Amount *
-              </Text>
-              <View style={styles.amountContainer}>
-                <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
-                  {user?.currency || 'USD'}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+              {/* Title */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.text }]}>
+                  Title *
                 </Text>
                 <TextInput
                   style={[
                     styles.input,
-                    styles.amountInput,
                     {
                       backgroundColor: theme.colors.surface,
-                      borderColor: errors.amount ? theme.colors.error : theme.colors.border,
+                      borderColor: errors.title ? theme.colors.error : theme.colors.border,
                       color: theme.colors.text,
                     }
                   ]}
-                  placeholder="0.00"
+                  placeholder="Enter reminder title"
                   placeholderTextColor={theme.colors.textSecondary}
-                  value={formData.amount}
+                  value={formData.title}
                   onChangeText={(text) => {
-                    const numericText = text.replace(/[^0-9.]/g, '');
-                    setFormData({ ...formData, amount: numericText });
-                    if (errors.amount) setErrors({ ...errors, amount: '' });
+                    setFormData({ ...formData, title: text });
+                    if (errors.title) setErrors({ ...errors, title: '' });
                   }}
-                  keyboardType="decimal-pad"
+                  returnKeyType="next"
+                />
+                {errors.title ? (
+                  <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                    {errors.title}
+                  </Text>
+                ) : null}
+              </View>
+
+              {/* Description */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.text }]}>
+                  Description
+                </Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.textArea,
+                    {
+                      backgroundColor: theme.colors.surface,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    }
+                  ]}
+                  placeholder="Add a description (optional)"
+                  placeholderTextColor={theme.colors.textSecondary}
+                  value={formData.description}
+                  onChangeText={(text) => setFormData({ ...formData, description: text })}
+                  multiline
+                  numberOfLines={3}
                   returnKeyType="next"
                 />
               </View>
-              {errors.amount ? (
-                <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                  {errors.amount}
-                </Text>
-              ) : null}
-            </View>
 
-            {/* Category */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.colors.text }]}>
-                Category
-              </Text>
-              <TouchableOpacity
-                style={[
-                  styles.selector,
-                  {
-                    backgroundColor: theme.colors.surface,
-                    borderColor: theme.colors.border,
-                  }
-                ]}
-                onPress={() => setShowCategoryPicker(true)}
-              >
-                <View style={[styles.categoryIcon, { backgroundColor: selectedCategory.color }]}>
-                  <Ionicons name={selectedCategory.icon as any} size={16} color="white" />
-                </View>
-                <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                  {selectedCategory.label}
+              {/* Amount */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.text }]}>
+                  Amount *
                 </Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Due Date */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.colors.text }]}>
-                Due Date *
-              </Text>
-              <TouchableOpacity
-                style={[
-                  styles.selector,
-                  {
-                    backgroundColor: theme.colors.surface,
-                    borderColor: errors.dueDate ? theme.colors.error : theme.colors.border,
-                  }
-                ]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Ionicons 
-                  name="calendar-outline" 
-                  size={20} 
-                  color={theme.colors.textSecondary} 
-                  style={{ marginRight: 12 }}
-                />
-                <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                  {formatDate(formData.dueDate)}
-                </Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-              {errors.dueDate ? (
-                <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                  {errors.dueDate}
-                </Text>
-              ) : null}
-            </View>
-
-            {/* Recurring */}
-            <View style={styles.inputGroup}>
-              <View style={styles.switchRow}>
-                <View style={styles.switchLabel}>
-                  <Text style={[styles.label, { color: theme.colors.text }]}>
-                    Recurring Bill
+                <View style={styles.amountContainer}>
+                  <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
+                    {user?.currency || 'USD'}
                   </Text>
-                  <Text style={[styles.sublabel, { color: theme.colors.textSecondary }]}>
-                    This bill repeats regularly
-                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      styles.amountInput,
+                      {
+                        backgroundColor: theme.colors.surface,
+                        borderColor: errors.amount ? theme.colors.error : theme.colors.border,
+                        color: theme.colors.text,
+                      }
+                    ]}
+                    placeholder="0.00"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={formData.amount}
+                    onChangeText={(text) => {
+                      const numericText = text.replace(/[^0-9.]/g, '');
+                      setFormData({ ...formData, amount: numericText });
+                      if (errors.amount) setErrors({ ...errors, amount: '' });
+                    }}
+                    keyboardType="decimal-pad"
+                    returnKeyType="next"
+                  />
                 </View>
-                <Switch
-                  value={formData.isRecurring}
-                  onValueChange={(value) => setFormData({ ...formData, isRecurring: value })}
-                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                  thumbColor={formData.isRecurring ? 'white' : theme.colors.textSecondary}
-                />
+                {errors.amount ? (
+                  <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                    {errors.amount}
+                  </Text>
+                ) : null}
               </View>
-              
-              {formData.isRecurring && (
+
+              {/* Category */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.text }]}>
+                  Category
+                </Text>
                 <TouchableOpacity
                   style={[
                     styles.selector,
-                    styles.recurringSelector,
                     {
                       backgroundColor: theme.colors.surface,
                       borderColor: theme.colors.border,
                     }
                   ]}
-                  onPress={() => setShowRecurringPicker(true)}
+                  onPress={() => setShowCategoryPicker(true)}
+                >
+                  <View style={[styles.categoryIcon, { backgroundColor: selectedCategory.color }]}>
+                    <Ionicons name={selectedCategory.icon as any} size={16} color="white" />
+                  </View>
+                  <Text style={[styles.selectorText, { color: theme.colors.text }]}>
+                    {selectedCategory.label}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Due Date */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.text }]}>
+                  Due Date *
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.selector,
+                    {
+                      backgroundColor: theme.colors.surface,
+                      borderColor: errors.dueDate ? theme.colors.error : theme.colors.border,
+                    }
+                  ]}
+                  onPress={() => setShowDatePicker(true)}
                 >
                   <Ionicons 
-                    name="repeat-outline" 
+                    name="calendar-outline" 
                     size={20} 
                     color={theme.colors.textSecondary} 
                     style={{ marginRight: 12 }}
                   />
                   <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                    {RECURRING_OPTIONS.find(opt => opt.id === formData.recurringType)?.label || 'Monthly'}
+                    {formatDate(formData.dueDate)}
                   </Text>
                   <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Preview */}
-            <View style={[styles.previewCard, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.previewTitle, { color: theme.colors.text }]}>
-                Preview
-              </Text>
-              <View style={styles.previewContent}>
-                <View style={styles.previewRow}>
-                  <Ionicons name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
-                  <Text style={[styles.previewText, { color: theme.colors.text }]}>
-                    {formData.title || 'Reminder Title'}
+                {errors.dueDate ? (
+                  <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                    {errors.dueDate}
                   </Text>
-                  <Text style={[styles.previewAmount, { color: theme.colors.primary }]}>
-                    {formData.amount ? formatCurrency(parseFloat(formData.amount) || 0, user?.currency || 'USD') : '$0.00'}
+                ) : null}
+              </View>
+
+              {/* Recurring */}
+              <View style={styles.inputGroup}>
+                <View style={styles.switchRow}>
+                  <View style={styles.switchLabel}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>
+                      Recurring Bill
+                    </Text>
+                    <Text style={[styles.sublabel, { color: theme.colors.textSecondary }]}>
+                      This bill repeats regularly
+                    </Text>
+                  </View>
+                  <Switch
+                    value={formData.isRecurring}
+                    onValueChange={(value) => setFormData({ ...formData, isRecurring: value })}
+                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                    thumbColor={formData.isRecurring ? 'white' : theme.colors.textSecondary}
+                  />
+                </View>
+                
+                {formData.isRecurring && (
+                  <TouchableOpacity
+                    style={[
+                      styles.selector,
+                      styles.recurringSelector,
+                      {
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                      }
+                    ]}
+                    onPress={() => setShowRecurringPicker(true)}
+                  >
+                    <Ionicons 
+                      name="repeat-outline" 
+                      size={20} 
+                      color={theme.colors.textSecondary} 
+                      style={{ marginRight: 12 }}
+                    />
+                    <Text style={[styles.selectorText, { color: theme.colors.text }]}>
+                      {RECURRING_OPTIONS.find(opt => opt.id === formData.recurringType)?.label || 'Monthly'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Preview */}
+              <View style={[styles.previewCard, { backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.previewTitle, { color: theme.colors.text }]}>
+                  Preview
+                </Text>
+                <View style={styles.previewContent}>
+                  <View style={styles.previewRow}>
+                    <Ionicons name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
+                    <Text style={[styles.previewText, { color: theme.colors.text }]}>
+                      {formData.title || 'Reminder Title'}
+                    </Text>
+                    <Text style={[styles.previewAmount, { color: theme.colors.primary }]}>
+                      {formData.amount ? formatCurrency(parseFloat(formData.amount) || 0, user?.currency || 'USD') : '$0.00'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.previewDate, { color: theme.colors.textSecondary }]}>
+                    Due: {formatDate(formData.dueDate)}
+                    {formData.isRecurring && ` • Repeats ${formData.recurringType}`}
                   </Text>
                 </View>
-                <Text style={[styles.previewDate, { color: theme.colors.textSecondary }]}>
-                  Due: {formatDate(formData.dueDate)}
-                  {formData.isRecurring && ` • Repeats ${formData.recurringType}`}
-                </Text>
               </View>
-            </View>
-          </ScrollView>
+            </ScrollView>
 
-          {/* Submit Button */}
-          <View style={styles.footer}>
-            <Button
-              title="Create Reminder"
-              onPress={handleSubmit}
-              loading={loading}
-              style={styles.submitButton}
-            />
-          </View>
+            {/* Submit Button */}
+            <View style={styles.footer}>
+              <Button
+                title="Create Reminder"
+                onPress={handleSubmit}
+                loading={loading}
+                style={styles.submitButton}
+              />
+            </View>
         </KeyboardAvoidingView>
 
         {/* Date Picker */}
@@ -510,11 +513,11 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
           minimumDate={new Date()}
           title="Select Due Date"
         />
+      </FullscreenModal>
 
-        <CategoryPicker />
-        <RecurringPicker />
-      </KeyboardAvoidingView>
-    </FullscreenModal>
+      <CategoryPicker />
+      <RecurringPicker />
+    </>
   );
 }
 

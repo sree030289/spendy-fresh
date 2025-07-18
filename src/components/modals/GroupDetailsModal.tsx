@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  
   TouchableOpacity,
   ScrollView,
   Alert,
@@ -12,11 +11,9 @@ import {
   Share,
   TextInput,
   Linking,
-  Animated,
   Dimensions,
 } from 'react-native';
-import FullscreenModal from '@/components/common/FullscreenModal';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import useBalances from '@/hooks/useBalances';
@@ -70,12 +67,12 @@ export default function GroupDetailsModal({
   const [showAddMember, setShowAddMember] = useState(false);
   const [showInviteContact, setShowInviteContact] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
-  const [showQR setShowQRModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
   const [showEditExpense, setShowEditExpense] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [selectedMemberForAction, setSelectedMemberForAction] = useState<string | null>(null);
-  const [showGroupExpense setShowGroupExpenseModal] = useState(false);
-  const [showSettlement setShowSettlementModal] = useState(false);
+  const [showGroupExpenseModal, setShowGroupExpenseModal] = useState(false);
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
   const [expenseListGroupId, setExpenseListGroupId] = useState<string | undefined>(undefined);
   const [expenseListTitle, setExpenseListTitle] = useState('All Expenses');
@@ -83,10 +80,6 @@ export default function GroupDetailsModal({
   // Member balances state
   const [memberBalances, setMemberBalances] = useState<Map<string, number>>(new Map());
   const [renderKey, setRenderKey] = useState(0);
-  
-  // Animation values
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
   
   // Local state for group data to enable real-time updates
   const [localGroupData, setLocalGroupData] = useState<Group | null>(null);
@@ -177,27 +170,6 @@ export default function GroupDetailsModal({
     // Force a re-render by updating a dummy state to ensure UI updates
     setRenderKey(prev => prev + 1);
   }, [localGroupData, currentUser?.id, calculateGroupBalance]);
-
-  // Animation effects
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      slideAnim.setValue(0);
-      fadeAnim.setValue(0);
-    }
-  }, [visible]);
 
   // Sync local group data with prop changes
   useEffect(() => {
@@ -580,501 +552,504 @@ export default function GroupDetailsModal({
     );
   };
 
-  // Show loading state if modal is visible but no data yet
+  // Show loading state if visible but no data yet
   if (visible && !localGroupData) {
     console.log('⏳ GroupDetailsModal: Showing loading state');
     return (
-      <Modal visible={visible} animationType="slide" transparent>
-        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', minHeight: 300 }]}>
-            <TouchableOpacity 
-              style={[styles.closeBtn, { position: 'absolute', top: 20, right: 20, backgroundColor: theme.colors.surface }]}
-              onPress={onClose}
-            >
-              <Ionicons name="close" size={20} color={theme.colors.text} />
-            </TouchableOpacity>
-            
-            {loadingTimeout ? (
-              <>
-                <Ionicons name="warning" size={48} color={theme.colors.error} />
-                <Text style={[styles.loadingText, { color: theme.colors.text, marginTop: 16, textAlign: 'center' }]}>
-                  Failed to load group details
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.retryButton, { backgroundColor: theme.colors.primary, marginTop: 16 }]}
-                  onPress={() => {
-                    setLoadingTimeout(false);
-                    if (group) {
-                      setLocalGroupData(group);
-                    }
-                  }}
-                >
-                  <Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-                <Text style={[styles.loadingText, { color: theme.colors.text, marginTop: 16 }]}>Loading group details...</Text>
-              </>
-            )}
-          </View>
+      <View style={[styles.fullScreenContainer, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center', flex: 1 }]}>
+          <TouchableOpacity 
+            style={[styles.closeBtn, { position: 'absolute', top: 60, right: 20, backgroundColor: theme.colors.surface }]}
+            onPress={onClose}
+          >
+            <Ionicons name="close" size={20} color={theme.colors.text} />
+          </TouchableOpacity>
+          
+          {loadingTimeout ? (
+            <>
+              <Ionicons name="warning" size={48} color={theme.colors.error} />
+              <Text style={[styles.loadingText, { color: theme.colors.text, marginTop: 16, textAlign: 'center' }]}>
+                Failed to load group details
+              </Text>
+              <TouchableOpacity 
+                style={[styles.retryButton, { backgroundColor: theme.colors.primary, marginTop: 16 }]}
+                onPress={() => {
+                  setLoadingTimeout(false);
+                  if (group) {
+                    setLocalGroupData(group);
+                  }
+                }}
+              >
+                <Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={[styles.loadingText, { color: theme.colors.text, marginTop: 16 }]}>Loading group details...</Text>
+            </>
+          )}
         </View>
-      </Modal>
+      </View>
     );
   }
 
-  // Don't render anything if modal is not visible or no group data
+  // Don't render anything if not visible or no group data
   if (!visible || !localGroupData) {
     console.log('❌ GroupDetailsModal: Not rendering - visible:', visible, 'localGroupData:', !!localGroupData);
     return null;
   }
 
-  const slideTransform = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [50, 0],
-  });
-
   return (
-    <FullscreenModal
-      visible={visible}
-      onClose={onClose}
-      title={group?.name || 'Group Details'}
-    >
-              <View style={styles.groupAvatar}>
-                <Text style={styles.groupAvatarText}>{localGroupData.avatar}</Text>
-              </View>
-              <Text style={styles.groupName}>{localGroupData.name}</Text>
-              {localGroupData.description && (
-                <Text style={styles.groupDescription}>{localGroupData.description}</Text>
-              )}
-              
-              <View style={styles.groupBadges}>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    📅 {localGroupData.createdAt.toLocaleDateString()}
-                  </Text>
-                </View>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>💰 {localGroupData.currency}</Text>
-                </View>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>👥 {localGroupData.members.length} members</Text>
-                </View>
-              </View>
-              
-              <View style={styles.statsContainer}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {getCurrencySymbol(localGroupData.currency)}{localGroupData.totalExpenses.toFixed(2)}
-                  </Text>
-                  <Text style={styles.statLabel}>Total Spent</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {getCurrencySymbol(localGroupData.currency)}{(localGroupData.totalExpenses / localGroupData.members.length).toFixed(2)}
-                  </Text>
-                  <Text style={styles.statLabel}>Per Person</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{groupExpenses.length}</Text>
-                  <Text style={styles.statLabel}>Expenses</Text>
-                </View>
-              </View>
-            </View>
-          </View>
+    <View style={[styles.fullScreenContainer, { backgroundColor: theme.colors.background }]}>
+      <View 
+        style={[
+          styles.modalContent, 
+          { 
+            backgroundColor: theme.colors.background
+          }
+        ]}
+      >
+        {/* Header with Gradient */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.closeBtn}
+            onPress={onClose}
+          >
+            <Ionicons name="close" size={20} color="white" />
+          </TouchableOpacity>
           
-          {/* Content */}
-          <View style={[styles.content, { backgroundColor: theme.colors.background }]}>
-            {/* Tabs */}
-            <View style={[styles.tabs, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
-              {['expenses', 'members', 'settings'].map((tab) => (
-                <TouchableOpacity
-                  key={tab}
-                  style={[
-                    styles.tab,
-                    activeTab === tab && { borderBottomColor: theme.colors.primary }
-                  ]}
-                  onPress={() => setActiveTab(tab as any)}
-                >
-                  <Text style={[
-                    styles.tabText,
-                    { color: activeTab === tab ? theme.colors.primary : theme.colors.textSecondary }
-                  ]}>
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          <View style={styles.groupHeader}>
+            <View style={styles.groupAvatar}>
+              <Text style={styles.groupAvatarText}>{localGroupData.avatar}</Text>
+            </View>
+            <Text style={styles.groupName}>{localGroupData.name}</Text>
+            {localGroupData.description && (
+              <Text style={styles.groupDescription}>{localGroupData.description}</Text>
+            )}
+            
+            <View style={styles.groupBadges}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  📅 {localGroupData.createdAt.toLocaleDateString()}
+                </Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>💰 {localGroupData.currency}</Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>👥 {localGroupData.members.length} members</Text>
+              </View>
             </View>
             
-            {/* Tab Content */}
-            <ScrollView 
-              style={{ maxHeight: height * 0.6 }}
-              contentContainerStyle={styles.tabContent} 
-              showsVerticalScrollIndicator={false}
-            >
-              {activeTab === 'expenses' && (
-                <View>
-                  <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                      Recent Expenses
-                    </Text>
-                    <View style={styles.headerActions}>
-                      <TouchableOpacity onPress={handleRefresh} style={styles.refreshBtn}>
-                        <Ionicons name="refresh" size={16} color={theme.colors.primary} />
-                      </TouchableOpacity>
-                      {groupExpenses.length > 0 && (
-                        <TouchableOpacity
-                          style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
-                          onPress={() => {
-                            setExpenseListGroupId(localGroupData?.id);
-                            setExpenseListTitle(`${localGroupData?.name} Expenses`);
-                            setShowSimpleExpenseList(true);
-                          }}
-                        >
-                          <Text style={styles.actionBtnText}>View All</Text>
-                        </TouchableOpacity>
-                      )}
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>
+                  {getCurrencySymbol(localGroupData.currency)}{localGroupData.totalExpenses.toFixed(2)}
+                </Text>
+                <Text style={styles.statLabel}>Total Spent</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>
+                  {getCurrencySymbol(localGroupData.currency)}{(localGroupData.totalExpenses / localGroupData.members.length).toFixed(2)}
+                </Text>
+                <Text style={styles.statLabel}>Per Person</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{groupExpenses.length}</Text>
+                <Text style={styles.statLabel}>Expenses</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+        
+        {/* Content */}
+        <View style={[styles.content, { backgroundColor: theme.colors.background }]}>
+          {/* Tabs */}
+          <View style={[styles.tabs, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
+            {['expenses', 'members', 'settings'].map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[
+                  styles.tab,
+                  activeTab === tab && { borderBottomColor: theme.colors.primary }
+                ]}
+                onPress={() => setActiveTab(tab as any)}
+              >
+                <Text style={[
+                  styles.tabText,
+                  { color: activeTab === tab ? theme.colors.primary : theme.colors.textSecondary }
+                ]}>
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          
+          {/* Tab Content */}
+          <ScrollView 
+            style={{ maxHeight: height * 0.6 }}
+            contentContainerStyle={styles.tabContent} 
+            showsVerticalScrollIndicator={false}
+          >
+            {activeTab === 'expenses' && (
+              <View>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                    Recent Expenses
+                  </Text>
+                  <View style={styles.headerActions}>
+                    <TouchableOpacity onPress={handleRefresh} style={styles.refreshBtn}>
+                      <Ionicons name="refresh" size={16} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                    {groupExpenses.length > 0 && (
                       <TouchableOpacity
                         style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
-                        onPress={onAddExpense}
+                        onPress={() => {
+                          setExpenseListGroupId(localGroupData?.id);
+                          setExpenseListTitle(`${localGroupData?.name} Expenses`);
+                          setShowSimpleExpenseList(true);
+                        }}
                       >
-                        <Text style={styles.actionBtnText}>+ Add</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  
-                  {loading ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="small" color={theme.colors.primary} />
-                      <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
-                        Loading expenses...
-                      </Text>
-                    </View>
-                  ) : groupExpenses.length === 0 ? (
-                    <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-                      <Text style={styles.emptyIcon}>📋</Text>
-                      <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                        No expenses yet
-                      </Text>
-                      <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                        Add your first expense to start tracking
-                      </Text>
-                    </View>
-                  ) : (
-                    groupExpenses.slice(0, 10).map((expense, index) => renderExpenseCard(expense, index))
-                  )}
-                </View>
-              )}
-              
-              {activeTab === 'members' && (
-                <View>
-                  <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                      Group Members
-                    </Text>
-                    {isUserAdmin && (
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
-                        onPress={() => setShowAddMember(true)}
-                      >
-                        <Text style={styles.actionBtnText}>+ Add Member</Text>
+                        <Text style={styles.actionBtnText}>View All</Text>
                       </TouchableOpacity>
                     )}
-                  </View>
-                  
-                  {localGroupData.members.map((member, index) => renderMemberCard(member, index))}
-                </View>
-              )}
-              
-              {activeTab === 'settings' && (
-                <View>
-                  <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface }]}>
-                    <Text style={[styles.settingsTitle, { color: theme.colors.text }]}>
-                      Invite Friends
-                    </Text>
-                    <View style={[styles.inviteCodeDisplay, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                      <Text style={[styles.inviteCode, { color: theme.colors.primary }]}>
-                        {localGroupData.inviteCode}
-                      </Text>
-                      <Text style={[styles.inviteHint, { color: theme.colors.textSecondary }]}>
-                        Share this code to invite friends
-                      </Text>
-                    </View>
-                    <View style={styles.buttonGroup}>
-                      <TouchableOpacity
-                        style={[styles.secondaryBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
-                        onPress={() => Alert.alert('Copied!', 'Invite code copied to clipboard')}
-                      >
-                        <Ionicons name="copy" size={16} color={theme.colors.textSecondary} />
-                        <Text style={[styles.secondaryBtnText, { color: theme.colors.textSecondary }]}>
-                          Copy Code
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]}
-                        onPress={() => setShowQRModal(true)}
-                      >
-                        <Ionicons name="qr-code" size={16} color="white" />
-                        <Text style={styles.primaryBtnText}>QR Code</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  
-                  <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface }]}>
-                    <Text style={[styles.settingsTitle, { color: theme.colors.text }]}>
-                      Group Actions
-                    </Text>
                     <TouchableOpacity
-                      style={[styles.actionRow, { borderBottomColor: theme.colors.border }]}
-                      onPress={handleShareInviteCode}
+                      style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
+                      onPress={onAddExpense}
                     >
-                      <Ionicons name="share" size={20} color={theme.colors.textSecondary} />
-                      <Text style={[styles.actionRowText, { color: theme.colors.text }]}>
-                        Share Invite Link
-                      </Text>
-                      <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionRow}
-                      onPress={() => Alert.alert('Export', 'Feature coming soon!')}
-                    >
-                      <Ionicons name="download" size={20} color={theme.colors.textSecondary} />
-                      <Text style={[styles.actionRowText, { color: theme.colors.text }]}>
-                        Export Group Data
-                      </Text>
-                      <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <View style={styles.dangerSection}>
-                    <TouchableOpacity
-                      style={[styles.dangerBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
-                      onPress={handleLeaveGroup}
-                    >
-                      <Ionicons name="exit" size={20} color="#DC2626" />
-                      <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>
-                        Leave Group
-                      </Text>
+                      <Text style={styles.actionBtnText}>+ Add</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
-              )}
-            </ScrollView>
-          </View>
-    </FullscreenModal>
+                
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+                      Loading expenses...
+                    </Text>
+                  </View>
+                ) : groupExpenses.length === 0 ? (
+                  <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+                    <Text style={styles.emptyIcon}>📋</Text>
+                    <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                      No expenses yet
+                    </Text>
+                    <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                      Add your first expense to start tracking
+                    </Text>
+                  </View>
+                ) : (
+                  groupExpenses.slice(0, 10).map((expense, index) => renderExpenseCard(expense, index))
+                )}
+              </View>
+            )}
+            
+            {activeTab === 'members' && (
+              <View>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                    Group Members
+                  </Text>
+                  {isUserAdmin && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
+                      onPress={() => setShowAddMember(true)}
+                    >
+                      <Text style={styles.actionBtnText}>+ Add Member</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
+                {localGroupData.members.map((member, index) => renderMemberCard(member, index))}
+              </View>
+            )}
+            
+            {activeTab === 'settings' && (
+              <View>
+                <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.settingsTitle, { color: theme.colors.text }]}>
+                    Invite Friends
+                  </Text>
+                  <View style={[styles.inviteCodeDisplay, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                    <Text style={[styles.inviteCode, { color: theme.colors.primary }]}>
+                      {localGroupData.inviteCode}
+                    </Text>
+                    <Text style={[styles.inviteHint, { color: theme.colors.textSecondary }]}>
+                      Share this code to invite friends
+                    </Text>
+                  </View>
+                  <View style={styles.buttonGroup}>
+                    <TouchableOpacity
+                      style={[styles.secondaryBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
+                      onPress={() => Alert.alert('Copied!', 'Invite code copied to clipboard')}
+                    >
+                      <Ionicons name="copy" size={16} color={theme.colors.textSecondary} />
+                      <Text style={[styles.secondaryBtnText, { color: theme.colors.textSecondary }]}>
+                        Copy Code
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]}
+                      onPress={() => setShowQRModal(true)}
+                    >
+                      <Ionicons name="qr-code" size={16} color="white" />
+                      <Text style={styles.primaryBtnText}>QR Code</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                
+                <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.settingsTitle, { color: theme.colors.text }]}>
+                    Group Actions
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.actionRow, { borderBottomColor: theme.colors.border }]}
+                    onPress={handleShareInviteCode}
+                  >
+                    <Ionicons name="share" size={20} color={theme.colors.textSecondary} />
+                    <Text style={[styles.actionRowText, { color: theme.colors.text }]}>
+                      Share Invite Link
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionRow}
+                    onPress={() => Alert.alert('Export', 'Feature coming soon!')}
+                  >
+                    <Ionicons name="download" size={20} color={theme.colors.textSecondary} />
+                    <Text style={[styles.actionRowText, { color: theme.colors.text }]}>
+                      Export Group Data
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.dangerSection}>
+                  <TouchableOpacity
+                    style={[styles.dangerBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+                    onPress={handleLeaveGroup}
+                  >
+                    <Ionicons name="exit" size={20} color="#DC2626" />
+                    <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>
+                      Leave Group
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </View>
       
       {/* All Modals */}
       {selectedMemberForAction && (
-        <Modal visible={true} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={[styles.actionModalContent, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.actionModalTitle, { color: theme.colors.text }]}>
-                Member Actions
+        <View style={styles.modalOverlay}>
+          <View style={[styles.actionModalContent, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.actionModalTitle, { color: theme.colors.text }]}>
+              Member Actions
+            </Text>
+            
+            {(() => {
+              const member = localGroupData?.members.find(m => m.userId === selectedMemberForAction);
+              return member ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.actionModalOption}
+                    onPress={() => {
+                      setSelectedMemberForAction(null);
+                      if (member.role === 'admin') {
+                        handleRemoveAdmin(selectedMemberForAction);
+                      } else {
+                        handleMakeAdmin(selectedMemberForAction);
+                      }
+                    }}
+                  >
+                    <Ionicons 
+                      name={member.role === 'admin' ? 'person-remove' : 'ribbon'} 
+                      size={20} 
+                      color={theme.colors.primary} 
+                    />
+                    <Text style={[styles.actionModalOptionText, { color: theme.colors.text }]}>
+                      {member.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.actionModalOption}
+                    onPress={() => {
+                      setSelectedMemberForAction(null);
+                      handleRemoveMember(selectedMemberForAction);
+                    }}
+                  >
+                    <Ionicons name="person-remove" size={20} color="#DC2626" />
+                    <Text style={[styles.actionModalOptionText, { color: '#DC2626' }]}>
+                      Remove from Group
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : null;
+            })()}
+            
+            <TouchableOpacity
+              style={[styles.actionModalOption, styles.cancelOption]}
+              onPress={() => setSelectedMemberForAction(null)}
+            >
+              <Text style={[styles.actionModalOptionText, { color: theme.colors.textSecondary }]}>
+                Cancel
               </Text>
-              
-              {(() => {
-                const member = localGroupData?.members.find(m => m.userId === selectedMemberForAction);
-                return member ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.actionModalOption}
-                      onPress={() => {
-                        setSelectedMemberForAction(null);
-                        if (member.role === 'admin') {
-                          handleRemoveAdmin(selectedMemberForAction);
-                        } else {
-                          handleMakeAdmin(selectedMemberForAction);
-                        }
-                      }}
-                    >
-                      <Ionicons 
-                        name={member.role === 'admin' ? 'person-remove' : 'ribbon'} 
-                        size={20} 
-                        color={theme.colors.primary} 
-                      />
-                      <Text style={[styles.actionModalOptionText, { color: theme.colors.text }]}>
-                        {member.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
-                      </Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity
-                      style={styles.actionModalOption}
-                      onPress={() => {
-                        setSelectedMemberForAction(null);
-                        handleRemoveMember(selectedMemberForAction);
-                      }}
-                    >
-                      <Ionicons name="person-remove" size={20} color="#DC2626" />
-                      <Text style={[styles.actionModalOptionText, { color: '#DC2626' }]}>
-                        Remove from Group
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                ) : null;
-              })()}
-              
-              <TouchableOpacity
-                style={[styles.actionModalOption, styles.cancelOption]}
-                onPress={() => setSelectedMemberForAction(null)}
-              >
-                <Text style={[styles.actionModalOptionText, { color: theme.colors.textSecondary }]}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </View>
-        </Modal>
+        </View>
       )}
 
       {/* Add Member Modal */}
       {showAddMember && (
-        <Modal visible={true} animationType="slide" presentationStyle="pageSheet">
-          <SafeAreaView style={[styles.addMember { backgroundColor: theme.colors.background }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-              <TouchableOpacity onPress={() => setShowAddMember(false)}>
-                <Ionicons name="close" size={24} color={theme.colors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.modalHeaderTitle, { color: theme.colors.text }]}>
-                Add Member
+        <SafeAreaView style={[styles.addMemberModal, { backgroundColor: theme.colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+            <TouchableOpacity onPress={() => setShowAddMember(false)}>
+              <Ionicons name="close" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalHeaderTitle, { color: theme.colors.text }]}>
+              Add Member
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+          
+          <ScrollView style={styles.addMemberContent}>
+            <View style={[styles.inviteSection, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                Invite New Users
               </Text>
-              <View style={{ width: 24 }} />
-            </View>
-            
-            <ScrollView style={styles.addMemberContent}>
-              <View style={[styles.inviteSection, { backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                  Invite New Users
+              <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
+                Invite friends who don't have the app yet
+              </Text>
+              
+              <TouchableOpacity
+                style={[styles.inviteContactsBtn, { backgroundColor: theme.colors.primary }]}
+                onPress={handleShareInviteCode}
+              >
+                <Ionicons name="person-add" size={20} color="white" />
+                <Text style={styles.inviteContactsBtnText}>
+                  Share Group Invite
                 </Text>
-                <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
-                  Invite friends who don't have the app yet
+              </TouchableOpacity>
+            </View>
+
+            {/* Accepted Friends Section */}
+            {friends.filter(friend => 
+              friend.status === 'accepted' && 
+              !localGroupData?.members.some(member => member.userId === friend.friendId)
+            ).length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 24 }]}>
+                  Your Friends
                 </Text>
                 
-                <TouchableOpacity
-                  style={[styles.inviteContactsBtn, { backgroundColor: theme.colors.primary }]}
-                  onPress={handleShareInviteCode}
-                >
-                  <Ionicons name="person-add" size={20} color="white" />
-                  <Text style={styles.inviteContactsBtnText}>
-                    Share Group Invite
-                  </Text>
-                </TouchableOpacity>
+                {friends
+                  .filter(friend => 
+                    friend.status === 'accepted' && 
+                    !localGroupData?.members.some(member => member.userId === friend.friendId)
+                  )
+                  .map((friend) => (
+                    <TouchableOpacity
+                      key={friend.id}
+                      style={[styles.card, { backgroundColor: theme.colors.surface }]}
+                      onPress={() => handleAddFriendToGroup(friend.friendId)}
+                    >
+                      <View style={styles.friendRow}>
+                        <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
+                          <Text style={styles.memberAvatarText}>
+                            {friend.friendData.fullName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.memberInfo}>
+                          <Text style={[styles.memberName, { color: theme.colors.text }]}>
+                            {friend.friendData.fullName}
+                          </Text>
+                          <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                            {friend.friendData.email}
+                          </Text>
+                        </View>
+                        <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+              </>
+            )}
+
+            {/* Pending Friends Section - Only users already on Spendy */}
+            {friends.filter(friend => 
+              (friend.status === 'pending' || friend.status === 'invited') && 
+              !friend.isNewUser &&
+              !localGroupData?.members.some(member => member.userId === friend.friendId)
+            ).length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 24 }]}>
+                  Pending Friend Requests
+                </Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary, marginBottom: 12 }]}>
+                  Friends on Spendy who haven't accepted your request yet
+                </Text>
+                
+                {friends
+                  .filter(friend => 
+                    (friend.status === 'pending' || friend.status === 'invited') && 
+                    !friend.isNewUser &&
+                    !localGroupData?.members.some(member => member.userId === friend.friendId)
+                  )
+                  .map((friend) => (
+                    <TouchableOpacity
+                      key={friend.id}
+                      style={[styles.card, { backgroundColor: theme.colors.surface }]}
+                      onPress={() => handleAddPendingFriendToGroup(friend)}
+                    >
+                      <View style={styles.friendRow}>
+                        <View style={[styles.memberAvatar, { backgroundColor: theme.colors.warning }]}>
+                          <Text style={styles.memberAvatarText}>
+                            {friend.friendData.fullName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.memberInfo}>
+                          <Text style={[styles.memberName, { color: theme.colors.text }]}>
+                            {friend.friendData.fullName}
+                          </Text>
+                          <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
+                            {friend.friendData.email}
+                          </Text>
+                          <View style={styles.statusIndicator}>
+                            <Ionicons name="time" size={12} color={theme.colors.warning} />
+                            <Text style={[styles.statusText, { color: theme.colors.warning }]}>
+                              Friend request pending
+                            </Text>
+                          </View>
+                        </View>
+                        <Ionicons name="add-circle" size={24} color={theme.colors.warning} />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+              </>
+            )}
+
+            {/* Empty State */}
+            {friends.filter(friend => 
+              (friend.status === 'accepted' || 
+               (friend.status === 'pending' || friend.status === 'invited') && !friend.isNewUser) &&
+              !localGroupData?.members.some(member => member.userId === friend.friendId)
+            ).length === 0 && (
+              <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+                <Text style={styles.emptyIcon}>👥</Text>
+                <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                  No friends available to add
+                </Text>
+                <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                  Invite new users to Spendy or accept pending friend requests to add them to groups
+                </Text>
               </View>
-
-              {/* Accepted Friends Section */}
-              {friends.filter(friend => 
-                friend.status === 'accepted' && 
-                !localGroupData?.members.some(member => member.userId === friend.friendId)
-              ).length > 0 && (
-                <>
-                  <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 24 }]}>
-                    Your Friends
-                  </Text>
-                  
-                  {friends
-                    .filter(friend => 
-                      friend.status === 'accepted' && 
-                      !localGroupData?.members.some(member => member.userId === friend.friendId)
-                    )
-                    .map((friend) => (
-                      <TouchableOpacity
-                        key={friend.id}
-                        style={[styles.card, { backgroundColor: theme.colors.surface }]}
-                        onPress={() => handleAddFriendToGroup(friend.friendId)}
-                      >
-                        <View style={styles.friendRow}>
-                          <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
-                            <Text style={styles.memberAvatarText}>
-                              {friend.friendData.fullName.charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                          <View style={styles.memberInfo}>
-                            <Text style={[styles.memberName, { color: theme.colors.text }]}>
-                              {friend.friendData.fullName}
-                            </Text>
-                            <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                              {friend.friendData.email}
-                            </Text>
-                          </View>
-                          <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                </>
-              )}
-
-              {/* Pending Friends Section - Only users already on Spendy */}
-              {friends.filter(friend => 
-                (friend.status === 'pending' || friend.status === 'invited') && 
-                !friend.isNewUser &&
-                !localGroupData?.members.some(member => member.userId === friend.friendId)
-              ).length > 0 && (
-                <>
-                  <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 24 }]}>
-                    Pending Friend Requests
-                  </Text>
-                  <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary, marginBottom: 12 }]}>
-                    Friends on Spendy who haven't accepted your request yet
-                  </Text>
-                  
-                  {friends
-                    .filter(friend => 
-                      (friend.status === 'pending' || friend.status === 'invited') && 
-                      !friend.isNewUser &&
-                      !localGroupData?.members.some(member => member.userId === friend.friendId)
-                    )
-                    .map((friend) => (
-                      <TouchableOpacity
-                        key={friend.id}
-                        style={[styles.card, { backgroundColor: theme.colors.surface }]}
-                        onPress={() => handleAddPendingFriendToGroup(friend)}
-                      >
-                        <View style={styles.friendRow}>
-                          <View style={[styles.memberAvatar, { backgroundColor: theme.colors.warning }]}>
-                            <Text style={styles.memberAvatarText}>
-                              {friend.friendData.fullName.charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                          <View style={styles.memberInfo}>
-                            <Text style={[styles.memberName, { color: theme.colors.text }]}>
-                              {friend.friendData.fullName}
-                            </Text>
-                            <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                              {friend.friendData.email}
-                            </Text>
-                            <View style={styles.statusIndicator}>
-                              <Ionicons name="time" size={12} color={theme.colors.warning} />
-                              <Text style={[styles.statusText, { color: theme.colors.warning }]}>
-                                Friend request pending
-                              </Text>
-                            </View>
-                          </View>
-                          <Ionicons name="add-circle" size={24} color={theme.colors.warning} />
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                </>
-              )}
-
-              {/* Empty State */}
-              {friends.filter(friend => 
-                (friend.status === 'accepted' || 
-                 (friend.status === 'pending' || friend.status === 'invited') && !friend.isNewUser) &&
-                !localGroupData?.members.some(member => member.userId === friend.friendId)
-              ).length === 0 && (
-                <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-                  <Text style={styles.emptyIcon}>👥</Text>
-                  <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                    No friends available to add
-                  </Text>
-                  <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                    Invite new users to Spendy or accept pending friend requests to add them to groups
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-          </SafeAreaView>
-        </Modal>
+            )}
+          </ScrollView>
+        </SafeAreaView>
       )}
 
       {/* QR Code Modal */}
@@ -1127,12 +1102,19 @@ export default function GroupDetailsModal({
         currentUser={currentUser}
         onSettlementComplete={loadGroupExpenses}
       />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
   modalContainer: {
     flex: 1,
@@ -1571,6 +1553,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
   actionModalContent: {
     borderRadius: 12,
