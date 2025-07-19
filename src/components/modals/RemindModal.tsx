@@ -79,15 +79,24 @@ export default function RemindModal({
           return;
         }
         
+        // Try to open WhatsApp directly without checking if it can open URL first
+        // The canOpenURL check is often unreliable for WhatsApp
         const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
-        const canOpen = await Linking.canOpenURL(url);
         
-        if (canOpen) {
+        try {
           await Linking.openURL(url);
           await onSendReminder(method, message);
-          Alert.alert('Success', 'WhatsApp reminder sent!');
-        } else {
-          Alert.alert('Error', 'WhatsApp is not installed on this device');
+          Alert.alert('Success', 'WhatsApp opened! Please send the message to complete the reminder.');
+        } catch (error) {
+          // If WhatsApp fails, try web WhatsApp as fallback
+          const webUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+          try {
+            await Linking.openURL(webUrl);
+            await onSendReminder(method, message);
+            Alert.alert('Success', 'WhatsApp Web opened! Please send the message to complete the reminder.');
+          } catch (webError) {
+            Alert.alert('Error', 'WhatsApp is not available on this device. Please try SMS instead.');
+          }
         }
       } else if (method === 'app') {
         // Send app notification

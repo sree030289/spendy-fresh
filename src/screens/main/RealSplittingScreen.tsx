@@ -80,6 +80,7 @@ import SimpleExpenseListModal from '@/components/modals/SimpleExpenseListModal';
 import RemindModal from '@/components/modals/RemindModal';
 import AnimatedSuccessModal from '@/components/modals/AnimatedSuccessModal';
 import ExportModal from '@/components/modals/ExportModal';
+import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
 import { ExportService } from '@/services/ExportService';
 
 export default function RealSplittingScreen() {
@@ -148,6 +149,9 @@ export default function RealSplittingScreen() {
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedGroupForExport, setSelectedGroupForExport] = useState<Group | null>(null);
+  
+  // Unified action modal state
+  const [showUnifiedActions, setShowUnifiedActions] = useState(false);
   
   // Additional modal states
   const [showEditExpense, setShowEditExpense] = useState(false);
@@ -446,39 +450,7 @@ export default function RealSplittingScreen() {
     }
   };
 
-  // Handle resend invitation
-  const handleResendInvitation = async (friend: Friend) => {
-    try {
-      if (!user?.id) return;
-      
-      const method = friend.inviteMethod || 'email';
-      
-      if (method === 'email') {
-        const result = await SplittingService.sendFriendRequest(user.id, friend.friendData.email);
-        Alert.alert('Success', 'Invitation resent successfully!');
-      } else if (method === 'sms' || method === 'whatsapp') {
-        // Resend SMS/WhatsApp invitation
-        const contactData = {
-          name: friend.friendData.fullName,
-          phoneNumber: friend.friendData.mobile || ''
-        };
-        
-        if (contactData.phoneNumber) {
-          await createPendingFriendInvitation(contactData, method);
-          Alert.alert('Success', `${method.toUpperCase()} invitation resent to ${friend.friendData.fullName}!`);
-        } else {
-          Alert.alert('Error', 'No phone number available for this friend');
-        }
-      }
-      
-      // Refresh friends list
-      await friendsManager.forceRefresh();
-      
-    } catch (error: any) {
-      console.error('Error resending invitation:', error);
-      Alert.alert('Error', error.message || 'Failed to resend invitation');
-    }
-  };
+  // Handle resend invitation - REMOVED DUPLICATE (keeping the better implementation below)
 
   // Handle remind friend about balance
   const handleRemindFriend = (friend: Friend, balance: number) => {
@@ -586,7 +558,7 @@ export default function RealSplittingScreen() {
         // FIXED: Notify unified balance system
         notifyBalanceChange();
         
-        Alert.alert('Success', 'Expense added successfully!');
+        showAnimatedSuccess('Expense Added! 🧾', 'Expense has been added and split successfully!');
         setShowAddExpense(false);
         setSelectedGroupForExpense(null);
         
@@ -646,9 +618,9 @@ export default function RealSplittingScreen() {
         const result = await SplittingService.sendFriendRequest(user.id, email);
         
         if (result.isNewUser) {
-          Alert.alert('Invitation Saved!', result.message, [{ text: 'OK' }]);
+          showAnimatedSuccess('Invitation Saved! 📧', result.message);
         } else {
-          Alert.alert('Success', result.message || 'Friend request sent!');
+          showAnimatedSuccess('Friend Request Sent! 🤝', result.message || 'Friend request sent successfully!');
         }
       } else if (method === 'sms' || method === 'whatsapp') {
         if (contactData) {
@@ -731,23 +703,9 @@ export default function RealSplittingScreen() {
       notifyBalanceChange();
       
       const memberCount = 1 + (groupData.selectedFriends?.length || 0);
-      Alert.alert(
+      showAnimatedSuccess(
         'Group Created! 🎉', 
-        `"${groupData.name}" has been created successfully with ${memberCount} member${memberCount > 1 ? 's' : ''}!\n\nInvite Code: ${inviteCode}\n\nYou can share this code to invite more friends.`,
-        [
-          {
-            text: 'Share Invite Code',
-            onPress: () => {
-              require('react-native').Share.share({
-                message: `Join "${groupData.name}" on Spendy! Use invite code: ${inviteCode} or download the app: https://spendy.app/join/${inviteCode}`
-              });
-            }
-          },
-          {
-            text: 'Done',
-            style: 'default'
-          }
-        ]
+        `"${groupData.name}" has been created successfully with ${memberCount} member${memberCount > 1 ? 's' : ''}!`
       );
       
       setShowCreateGroup(false);
@@ -974,15 +932,28 @@ export default function RealSplittingScreen() {
           );
         }
       } else {
-        // For existing Spendy users
+        // For existing Spendy users - don't send another friend request, just remind them via other means
         if (friend.inviteMethod === 'email') {
-          // Resend email invitation to existing user
-          await SplittingService.sendFriendRequest(
-            user.id,
-            friend.friendData.email,
-            `Hi! This is a reminder to connect on Spendy 💰`
+          // Open email app with reminder message instead of using API
+          const message = encodeURIComponent('Hi! Don\'t forget to accept my friend request on Spendy so we can start splitting expenses! 💰');
+          const subject = encodeURIComponent('Friend Request Reminder - Spendy');
+          const mailtoUrl = `mailto:${friend.friendData.email}?subject=${subject}&body=${message}`;
+          
+          Alert.alert(
+            'Send Email Reminder',
+            `Would you like to send ${friend.friendData.fullName} an email reminder about your pending friend request?`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Send Email',
+                onPress: () => {
+                  Linking.openURL(mailtoUrl).catch(() => {
+                    Alert.alert('Error', 'Could not open email app. Please send them a message manually.');
+                  });
+                }
+              }
+            ]
           );
-          Alert.alert('Reminder Sent! 📧', `Email reminder sent to ${friend.friendData.fullName}`);
         } else if (friend.inviteMethod === 'sms' || friend.inviteMethod === 'whatsapp') {
           // For SMS/WhatsApp to existing users (rare case)
           const methodName = friend.inviteMethod === 'whatsapp' ? 'WhatsApp' : 'SMS';
@@ -990,7 +961,7 @@ export default function RealSplittingScreen() {
             `${methodName} Reminder`, 
             `You can send ${friend.friendData.fullName} another ${methodName.toLowerCase()} message to remind them to accept your friend request on Spendy.`,
             [
-              { text: 'OK', style: 'default' },
+              { text: 'Cancel', style: 'cancel' },
               {
                 text: `Open ${methodName}`,
                 onPress: () => {
@@ -1009,13 +980,12 @@ export default function RealSplittingScreen() {
             ]
           );
         } else {
-          // Default fallback
-          await SplittingService.sendFriendRequest(
-            user.id,
-            friend.friendData.email,
-            `Hi! This is a reminder to connect on Spendy 💰`
+          // Default fallback - just show alert instead of API call
+          Alert.alert(
+            'Reminder', 
+            `You can manually remind ${friend.friendData.fullName} to accept your friend request on Spendy.`,
+            [{ text: 'OK', style: 'default' }]
           );
-          Alert.alert('Reminder Sent! 📤', `Reminder sent to ${friend.friendData.fullName}`);
         }
       }
       
@@ -1502,6 +1472,11 @@ export default function RealSplittingScreen() {
                 const balanceDetail = friendsBalances.allBalances.find(b => b.userId === friend.friendId);
                 const balance = balanceDetail?.balance || 0;
                 
+                // Safety check for friend data
+                const friendName = friend.friendData?.fullName || friend.friendData?.name || 'Unknown Friend';
+                const friendEmail = friend.friendData?.email || '';
+                const friendInitial = friendName.charAt(0).toUpperCase() || '?';
+                
                 return (
                   <TouchableOpacity
                     key={`friend-${friend.id}-${index}`}
@@ -1511,15 +1486,15 @@ export default function RealSplittingScreen() {
                     <View style={styles.balanceItemLeft}>
                       <View style={[styles.personAvatar, { backgroundColor: theme.colors.primary }]}>
                         <Text style={styles.personAvatarText}>
-                          {friend.friendData.fullName.charAt(0).toUpperCase()}
+                          {friendInitial}
                         </Text>
                       </View>
                       <View style={styles.personInfo}>
                         <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
-                          {friend.friendData.fullName}
+                          {friendName}
                         </Text>
                         <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                          {friend.friendData.email}
+                          {friendEmail}
                         </Text>
                       </View>
                     </View>
@@ -1969,7 +1944,10 @@ export default function RealSplittingScreen() {
       setShowManualSettlement(false);
       setSelectedFriend(null);
 
-      Alert.alert('Success', type === 'pay' ? 'Payment marked as paid successfully!' : 'Payment request sent!');
+      showAnimatedSuccess(
+        type === 'pay' ? 'Payment Recorded! 💰' : 'Payment Request Sent! 📤', 
+        type === 'pay' ? 'Payment marked as paid successfully!' : 'Payment request sent!'
+      );
     } catch (error: any) {
       console.error('Manual settlement error:', error);
       Alert.alert('Error', error.message || `Failed to ${type === 'pay' ? 'mark payment as paid' : 'send payment request'}`);
@@ -2296,7 +2274,7 @@ export default function RealSplittingScreen() {
       {/* Floating Action Button */}
       <TouchableOpacity
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        onPress={() => setShowAddExpense(true)}
+        onPress={() => setShowUnifiedActions(true)}
       >
         <Ionicons name="add" size={28} color="white" />
       </TouchableOpacity>
@@ -2623,6 +2601,12 @@ export default function RealSplittingScreen() {
         group={selectedGroupForExport}
         currentUserId={user?.id || ''}
         onExportComplete={handleExportComplete}
+      />
+
+      {/* Unified Action Modal */}
+      <UnifiedActionModal
+        visible={showUnifiedActions}
+        onClose={() => setShowUnifiedActions(false)}
       />
     </SafeAreaView>
   );
