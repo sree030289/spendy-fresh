@@ -443,10 +443,16 @@ export default function RealSplittingScreen() {
       await SplittingService.markAllNotificationsAsRead(user.id);
       await loadNotifications(); // Reload notifications instead of clearing
       
-      Alert.alert('Success', 'All notifications marked as read');
+      showAnimatedSuccess('All Read! ✅', 'All notifications marked as read');
     } catch (error) {
       console.error('Mark notifications read error:', error);
-      Alert.alert('Error', 'Failed to mark notifications as read');
+      showGenericError(
+        'Failed to Mark as Read',
+        'Unable to mark notifications as read. Please check your connection and try again.',
+        'Retry',
+        'Cancel',
+        () => handleMarkAllRead()
+      );
     }
   };
 
@@ -608,7 +614,12 @@ export default function RealSplittingScreen() {
       
     } catch (error: any) {
       console.error('Add expense error:', error);
-      Alert.alert('Error', error.message || 'Failed to add expense');
+      showGenericError(
+        'Failed to Add Expense',
+        error.message || 'Unable to add expense. Please check your data and try again.',
+        'Try Again',
+        'Cancel'
+      );
     }
   };
 
@@ -2031,7 +2042,7 @@ export default function RealSplittingScreen() {
             setActiveTab('groups');
             await loadGroups();
             notifyBalanceChange(); // FIXED: Notify balance system
-            Alert.alert('Welcome to the Group! 🎉', `You have successfully joined "${intent.groupName}"`);
+            showAnimatedSuccess('Welcome to the Group! 🎉', `You have successfully joined "${intent.groupName}"`);
           }
           break;
 
@@ -2159,7 +2170,7 @@ export default function RealSplittingScreen() {
                       await SplittingService.joinGroupByInviteCode(data.inviteCode, user.id);
                       await loadGroups();
                       notifyBalanceChange(); // FIXED: Notify balance system
-                      Alert.alert('Welcome! 🎊', `You've successfully joined "${data.groupName}"!`);
+                      showAnimatedSuccess('Welcome! 🎊', `You've successfully joined "${data.groupName}"!`);
                     } catch (error: any) {
                       Alert.alert('Error', error.message || 'Failed to join group');
                     }
