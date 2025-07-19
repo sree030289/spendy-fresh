@@ -18,12 +18,12 @@ import { useAuth } from '@/hooks/useAuth';
 
 // Import modals
 import AddExpenseModal from '@/components/modals/AddExpenseModal';
-import AddReminderModal from '@/components/smartMoney/AddReminderModal';
-import SmartMoneyExpenseModal from '@/components/smartMoney/SmartMoneyExpenseModal';
+import AddReminderModal from '@/components/reminders/AddReminderModal';
+// import SmartMoneyExpenseModal from '@/components/smartMoney/SmartMoneyExpenseModal'; // TODO: Create this component
 import GmailSyncModal from './GmailSyncModal';
 
 // Import services
-import { SplittingService } from '@/services/firebase/splitting';
+import { SplittingService, Group, Friend } from '@/services/firebase/splitting';
 import { SmartMoneyService } from '@/services/smartMoney/SmartMoneyService';
 import { RemindersService } from '@/services/reminders/RemindersService';
 
@@ -45,8 +45,8 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
   const [showGmailSync, setShowGmailSync] = useState(false);
   
   // Data states
-  const [groups, setGroups] = useState([]);
-  const [friends, setFriends] = useState([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
@@ -56,6 +56,8 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
   }, [visible, user]);
 
   const loadUserData = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
       const [userGroups, userFriends] = await Promise.all([
@@ -105,6 +107,8 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
   };
 
   const handleSmartExpenseSubmit = async (expenseData: any) => {
+    if (!user) return;
+    
     try {
       setLoading(true);
       await SmartMoneyService.addTransaction({
@@ -121,26 +125,6 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
     } catch (error) {
       console.error('Error adding smart expense:', error);
       Alert.alert('Error', 'Failed to add smart expense. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReminderSubmit = async (reminderData: any) => {
-    try {
-      setLoading(true);
-      await RemindersService.createReminder(user.id, {
-        ...reminderData,
-        status: 'upcoming',
-        notificationEnabled: true,
-        reminderDays: [3, 1],
-        autoDetected: false
-      });
-      setShowReminder(false);
-      Alert.alert('Success', 'Reminder added successfully!');
-    } catch (error) {
-      console.error('Error adding reminder:', error);
-      Alert.alert('Error', 'Failed to add reminder. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -280,7 +264,7 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
                       
                       {/* Gradient Border */}
                       <LinearGradient
-                        colors={item.gradient}
+                        colors={[item.gradient[0], item.gradient[1]]}
                         style={styles.gradientBorder}
                       />
                     </TouchableOpacity>
@@ -313,18 +297,23 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
         friends={friends}
       />
 
-      {/* Smart Money Expense Modal */}
-      <SmartMoneyExpenseModal
+      {/* Smart Money Expense Modal - TODO: Create dedicated component */}
+      <AddExpenseModal
         visible={showSmartExpense}
         onClose={() => setShowSmartExpense(false)}
         onSubmit={handleSmartExpenseSubmit}
+        groups={groups}
+        friends={friends}
       />
 
       {/* Add Reminder Modal */}
       <AddReminderModal
         visible={showReminder}
         onClose={() => setShowReminder(false)}
-        onSubmit={handleReminderSubmit}
+        onReminderAdded={() => {
+          setShowReminder(false);
+          Alert.alert('Success', 'Reminder added successfully!');
+        }}
       />
 
       {/* Gmail Sync Modal */}
