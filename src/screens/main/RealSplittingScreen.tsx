@@ -78,7 +78,8 @@ import QRScannerManager from '@/services/qr/QRScannerManager';
 import EditExpenseModal from '@/components/modals/EditExpenseModal';
 import SimpleExpenseListModal from '@/components/modals/SimpleExpenseListModal';
 import RemindModal from '@/components/modals/RemindModal';
-import AnimatedSuccessModal from '@/components/modals/AnimatedSuccessModal';
+import SuccessAnimationModal from '@/components/modals/SuccessAnimationModal';
+import GenericErrorModal from '@/components/modals/GenericErrorModal';
 import ExportModal from '@/components/modals/ExportModal';
 import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
 import { ExportService } from '@/services/ExportService';
@@ -144,6 +145,20 @@ export default function RealSplittingScreen() {
     title: '',
     message: '',
     type: 'success'
+  });
+  
+  // Generic error modal state
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorModalProps, setErrorModalProps] = useState<{
+    title: string;
+    message: string;
+    primaryButtonText?: string;
+    secondaryButtonText?: string;
+    onPrimaryPress?: () => void;
+    onSecondaryPress?: () => void;
+  }>({
+    title: '',
+    message: '',
   });
   
   // Export modal state
@@ -492,6 +507,26 @@ export default function RealSplittingScreen() {
   const showAnimatedSuccess = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
     setAnimatedModalProps({ title, message, type });
     setShowAnimatedModal(true);
+  };
+
+  // Helper function to show error modal
+  const showGenericError = (
+    title: string, 
+    message: string, 
+    primaryButtonText?: string,
+    secondaryButtonText?: string,
+    onPrimaryPress?: () => void,
+    onSecondaryPress?: () => void
+  ) => {
+    setErrorModalProps({ 
+      title, 
+      message, 
+      primaryButtonText, 
+      secondaryButtonText, 
+      onPrimaryPress, 
+      onSecondaryPress 
+    });
+    setShowErrorModal(true);
   };
 
   // Handle export group data
@@ -974,6 +1009,37 @@ export default function RealSplittingScreen() {
                     Linking.openURL(url).catch(() => {
                       Alert.alert('Error', `Could not open ${methodName}`);
                     });
+                  }
+                }
+              }
+            ]
+          );
+        } else if (friend.inviteMethod === 'qr' || friend.inviteMethod === 'qrcode') {
+          // For QR code invitations, send an app notification
+          Alert.alert(
+            'Send App Reminder',
+            `Would you like to send ${friend.friendData.fullName} an in-app notification reminder about your pending friend request?`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Send Reminder',
+                onPress: async () => {
+                  try {
+                    // Send app notification via Firebase
+                    await SplittingService.sendFriendRequestReminder(user.id, friend.id, {
+                      type: 'friend_request_reminder',
+                      title: 'Friend Request Reminder',
+                      message: `${user.fullName} is waiting for you to accept their friend request!`,
+                      data: {
+                        friendId: user.id,
+                        friendName: user.fullName,
+                        requestId: friend.requestId
+                      }
+                    });
+                    Alert.alert('Reminder Sent', `App notification sent to ${friend.friendData.fullName}!`);
+                  } catch (error) {
+                    console.error('Failed to send app notification:', error);
+                    Alert.alert('Error', 'Failed to send app notification. Please try again.');
                   }
                 }
               }
@@ -2584,12 +2650,25 @@ export default function RealSplittingScreen() {
         onSendReminder={handleSendReminder}
       />
 
-      <AnimatedSuccessModal
+      <SuccessAnimationModal
         visible={showAnimatedModal}
         onClose={() => setShowAnimatedModal(false)}
         title={animatedModalProps.title}
         message={animatedModalProps.message}
         type={animatedModalProps.type}
+        autoClose={true}
+        duration={2500}
+      />
+
+      <GenericErrorModal
+        visible={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        title={errorModalProps.title}
+        message={errorModalProps.message}
+        primaryButtonText={errorModalProps.primaryButtonText}
+        secondaryButtonText={errorModalProps.secondaryButtonText}
+        onPrimaryPress={errorModalProps.onPrimaryPress}
+        onSecondaryPress={errorModalProps.onSecondaryPress}
       />
 
       <ExportModal
@@ -3195,17 +3274,21 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     marginBottom: 8,
+    minHeight: 80, // Ensure consistent height
   },
   balanceItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    flex: 2, // Give more space to the left side
     minWidth: 0,
+    marginRight: 12, // Add margin to prevent overlap
   },
   balanceItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flexDirection: 'column', // Stack balance info vertically for better space usage
+    alignItems: 'flex-end',
+    gap: 4,
+    flex: 1, // Limit right side width
+    maxWidth: '40%', // Prevent overflow
   },
   personAvatar: {
     width: 40,
@@ -3223,15 +3306,20 @@ const styles = StyleSheet.create({
   personInfo: {
     flex: 1,
     minWidth: 0,
+    marginLeft: 12, // Add spacing from avatar
+    paddingRight: 8, // Prevent text from touching the right section
   },
   personName: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 2,
+    fontWeight: '600', // Make name more prominent
+    marginBottom: 4,
+    lineHeight: 20,
   },
   personEmail: {
     fontSize: 12,
     marginBottom: 2,
+    opacity: 0.7,
+    lineHeight: 16,
   },
   sourceIndicator: {
     flexDirection: 'row',
@@ -3247,10 +3335,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexWrap: 'wrap', // Allow wrapping if needed
+    justifyContent: 'flex-end',
   },
   balanceText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13, // Slightly smaller to fit better
+    fontWeight: '600',
+    textAlign: 'right',
+    flexShrink: 1, // Allow text to shrink if needed
   },
   // Pending invitation styles
   pendingIndicator: {

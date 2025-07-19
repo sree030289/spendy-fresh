@@ -184,10 +184,10 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
       <Modal
         visible={visible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={onClose}
       >
-        <BlurView intensity={20} style={styles.overlay}>
+        <View style={styles.overlay}>
           <TouchableOpacity 
             style={styles.backdrop} 
             activeOpacity={1} 
@@ -285,7 +285,7 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
-        </BlurView>
+        </View>
       </Modal>
 
       {/* Split Expense Modal */}
@@ -329,6 +329,7 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   backdrop: {

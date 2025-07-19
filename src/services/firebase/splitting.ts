@@ -3247,6 +3247,34 @@ static async removePendingFriendInvitation(userId: string, friendRequestId: stri
   }
 }
 
+// Send friend request reminder via app notification
+static async sendFriendRequestReminder(fromUserId: string, toUserId: string, notificationData: any): Promise<void> {
+  try {
+    console.log('Sending friend request reminder:', { fromUserId, toUserId });
+    
+    // Create notification in Firestore
+    const notificationRef = await addDoc(collection(db, 'notifications'), {
+      userId: toUserId,
+      fromUserId: fromUserId,
+      type: 'friend_request_reminder',
+      title: notificationData.title,
+      message: notificationData.message,
+      data: notificationData.data,
+      read: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    
+    console.log('✅ Friend request reminder notification created:', notificationRef.id);
+    
+    // Here you could also trigger a push notification if you have that service set up
+    
+  } catch (error) {
+    console.error('❌ Send friend request reminder error:', error);
+    throw new Error('Failed to send reminder. Please try again.');
+  }
+}
+
 // SETTLEMENT TRANSACTION METHODS
 // Fix for Settlement Transaction undefined fields error in splitting.ts
 // Replace the createSettlementTransaction method with this fixed version
