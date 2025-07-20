@@ -77,7 +77,6 @@ import ManualSettlementModal from '@/components/modals/ManualSettlementModal';
 import GroupSettlementModal from '@/components/modals/GroupSettlementModal';
 import FriendRequestModal from '@/components/modals/FriendRequestModal';
 import ImportSplitwiseModal from '@/components/modals/ImportSplitwise';
-import SettlementScreen from '@/screens/main/SettlementScreen';
 import { getCurrencySymbol } from '@/utils/currency';
 import QRCodeScanner from '@/components/QRCodeScanner';
 import QRScannerManager from '@/services/qr/QRScannerManager';
@@ -213,9 +212,6 @@ export default function RealSplittingScreen() {
   
   // Import Splitwise modal state
   const [showImportSplitwise, setShowImportSplitwise] = useState(false);
-
-  // Settlement modal state
-  const [showSettlementModal, setShowSettlementModal] = useState(false);
 
   // Simple Expense List Modal states
   const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
@@ -1312,7 +1308,7 @@ export default function RealSplittingScreen() {
             </View>
           </View>
           
-          <TouchableOpacity onPress={() => setShowSettlementModal(true)}>
+          <TouchableOpacity onPress={() => navigation.navigate('SettlementScreen' as never, { filter: 'all' } as never)}>
             <Text style={styles.balanceSubtext}>Tap to view details</Text>
           </TouchableOpacity>
         </View>
@@ -1354,7 +1350,7 @@ export default function RealSplittingScreen() {
 
           <TouchableOpacity
             style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
-            onPress={() => setShowSettlementModal(true)}
+            onPress={() => navigation.navigate('SettlementScreen' as never, { filter: 'all' } as never)}
           >
             <Ionicons name="cash" size={24} color="#F59E0B" />
             <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Settlements</Text>
@@ -1971,8 +1967,11 @@ export default function RealSplittingScreen() {
                 <TouchableOpacity
                   onPress={(e) => {
                     e.stopPropagation();
-                    setSelectedGroup(group);
-                    setShowGroupSettlement(true);
+                    // Navigate to SettlementScreen with group filter and specific group
+                    navigation.navigate('SettlementScreen' as never, { 
+                      filter: 'groups', 
+                      groupId: group.id 
+                    } as never);
                   }}
                   style={[styles.actionButton, styles.settlementButton, { backgroundColor: theme.colors.success + '20' }]}
                 >
@@ -2024,13 +2023,11 @@ export default function RealSplittingScreen() {
       actions.push({
         text: 'Mark as Paid',
         onPress: () => {
-          // Create friend object with correct balance from friendsBalances
-          const friendWithCorrectBalance = {
-            ...friend,
-            balance: balance // Use the balance from friendsBalances, not from friend object
-          };
-          setSelectedFriend(friendWithCorrectBalance);
-          setShowManualSettlement(true);
+          // Navigate to SettlementScreen with friend filter and specific friend
+          navigation.navigate('SettlementScreen' as never, { 
+            filter: 'friends', 
+            friendId: friend.friendId 
+          } as never);
         }
       });
     }
@@ -2609,75 +2606,7 @@ export default function RealSplittingScreen() {
         }}
       />
 
-      {/* Settlement Screen Modal */}
-      {showSettlementModal && (
-        <Modal
-          animationType="slide"
-          presentationStyle="fullScreen"
-          visible={showSettlementModal}
-          onRequestClose={() => setShowSettlementModal(false)}
-        >
-          <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            <View style={{ flex: 1 }}>
-              {/* Header with back button - FIXED positioning */}
-              <View style={[
-                styles.modalHeader, 
-                { 
-                  backgroundColor: theme.colors.surface,
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.colors.border,
-                  paddingTop: 8, // Extra padding from SafeAreaView
-                }
-              ]}>
-                <TouchableOpacity
-                  style={[
-                    styles.backButton, 
-                    { 
-                      backgroundColor: theme.colors.background,
-                      minHeight: 44, // Ensure touchable area
-                      minWidth: 44,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }
-                  ]}
-                  onPress={() => setShowSettlementModal(false)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                  Settlements
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.backButton, 
-                    { 
-                      backgroundColor: theme.colors.background,
-                      minHeight: 44,
-                      minWidth: 44,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }
-                  ]}
-                  onPress={() => {
-                    // Refresh settlements data
-                    overviewBalances.forceRefresh();
-                    friendsBalances.forceRefresh();
-                  }}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="refresh" size={20} color={theme.colors.text} />
-                </TouchableOpacity>
-              </View>
-              
-              {/* Settlement Screen Content */}
-              <SettlementScreen />
-            </View>
-          </SafeAreaView>
-        </Modal>
-      )}
+
 
       <EditExpenseModal
         visible={showEditExpense}

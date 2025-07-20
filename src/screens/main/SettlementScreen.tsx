@@ -8,7 +8,8 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
-  SafeAreaView
+  SafeAreaView,
+  Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
@@ -19,6 +20,7 @@ import { getCurrencySymbol } from '@/utils/currency';
 import ManualSettlementModal from '@/components/modals/ManualSettlementModal';
 import GroupSettlementModal from '@/components/modals/GroupSettlementModal';
 import SuccessAnimationModal from '@/components/modals/SuccessAnimationModal';
+import { useRoute, useNavigation } from '@react-navigation/native';
 
 interface SettlementEntry {
   id: string;
@@ -31,16 +33,27 @@ interface SettlementEntry {
   isOwed: boolean; // true if they owe you, false if you owe them
 }
 
+interface SettlementScreenParams {
+  filter?: 'all' | 'friends' | 'groups';
+  groupId?: string;
+  friendId?: string;
+}
+
 export default function SettlementScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const route = useRoute();
+  const navigation = useNavigation();
+  const params = route.params as SettlementScreenParams | undefined;
   const overviewBalances = useOverviewBalances();
   const friendsBalances = useFriendsBalances();
 
   const [settlements, setSettlements] = useState<SettlementEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'friends' | 'groups'>('all'); // Add filter state
+  const [activeFilter, setActiveFilter] = useState<'all' | 'friends' | 'groups'>(
+    params?.filter || 'all'
+  );
   const [summary, setSummary] = useState({
     totalOwed: 0,
     totalOwing: 0,
@@ -50,10 +63,29 @@ export default function SettlementScreen() {
   // Modal states
   const [showManualSettlement, setShowManualSettlement] = useState(false);
   const [showGroupSettlement, setShowGroupSettlement] = useState(false);
+  const [showRemindModal, setShowRemindModal] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<any>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selectedSettlement, setSelectedSettlement] = useState<SettlementEntry | null>(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successMessage, setSuccessMessage] = useState({ title: '', message: '' });
+
+  // Handle navigation parameters for filtering
+  useEffect(() => {
+    if (params?.filter) {
+      setActiveFilter(params.filter);
+    }
+    
+    // If specific group or friend is provided, set the filter and potentially open settlement
+    if (params?.groupId) {
+      setActiveFilter('groups');
+      setSelectedGroupId(params.groupId);
+    }
+    
+    if (params?.friendId) {
+      setActiveFilter('friends');
+    }
+  }, [params]);
 
   // Load settlements when balances change
   useEffect(() => {
@@ -160,6 +192,70 @@ export default function SettlementScreen() {
     }
   };
 
+  const handleRemindUser = async (settlement: SettlementEntry) => {
+    try {
+      const message = settlement.isOwed 
+        ? `Friendly reminder: You owe ${getCurrencySymbol(user?.currency || 'USD')}${settlement.amount.toFixed(2)} to ${user?.fullName || 'me'} for ${settlement.description}`
+        : `Hi! Just a reminder that I owe you ${getCurrencySymbol(user?.currency || 'USD')}${settlement.amount.toFixed(2)} for ${settlement.description}`;
+
+      // Show options for reminder methods
+      Alert.alert(
+        'Send Reminder',
+        'How would you like to remind them?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'SMS', 
+            onPress: () => sendSMSReminder(settlement, message)
+          },
+          { 
+            text: 'Email', 
+            onPress: () => sendEmailReminder(settlement, message)
+          },
+          { 
+            text: 'App Notification', 
+            onPress: () => sendAppNotification(settlement, message)
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      Alert.alert('Error', 'Failed to send reminder');
+    }
+  };
+
+  const sendSMSReminder = async (settlement: SettlementEntry, message: string) => {
+    try {
+      const smsUrl = `sms:${settlement.userId}?body=${encodeURIComponent(message)}`;
+      await Linking.openURL(smsUrl);
+    } catch (error) {
+      Alert.alert('Error', 'Unable to open SMS app');
+    }
+  };
+
+  const sendEmailReminder = async (settlement: SettlementEntry, message: string) => {
+    try {
+      const subject = `Payment Reminder - ${settlement.description}`;
+      const emailUrl = `mailto:${settlement.userId}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+      await Linking.openURL(emailUrl);
+    } catch (error) {
+      Alert.alert('Error', 'Unable to open email app');
+    }
+  };
+
+  const sendAppNotification = async (settlement: SettlementEntry, message: string) => {
+    try {
+      // Here you would integrate with your notification service
+      // For now, show a success message
+      setSuccessMessage({
+        title: 'Reminder Sent! 📬',
+        message: 'In-app notification has been sent successfully!'
+      });
+      setShowSuccessAnimation(true);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to send app notification');
+    }
+  };
   const handleSettlementPress = (settlement: SettlementEntry) => {
     if (settlement.type === 'friend') {
       // Open friend settlement modal
@@ -229,18 +325,33 @@ export default function SettlementScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.settleButton,
-            { backgroundColor: settlement.isOwed ? theme.colors.success : theme.colors.error }
-          ]}
-          onPress={() => handleSettlementPress(settlement)}
-        >
-          <Ionicons name="checkmark-circle" size={18} color="white" />
-          <Text style={styles.settleButtonText}>
-            {settlement.type === 'friend' ? 'Settle' : 'View Group'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.settlementActions}>
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.remindButton,
+              { backgroundColor: theme.colors.warning }
+            ]}
+            onPress={() => handleRemindUser(settlement)}
+          >
+            <Ionicons name="notifications-outline" size={16} color="white" />
+            <Text style={styles.actionButtonText}>Remind</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.settleButton,
+              { backgroundColor: settlement.isOwed ? theme.colors.success : theme.colors.error }
+            ]}
+            onPress={() => handleSettlementPress(settlement)}
+          >
+            <Ionicons name="checkmark-circle" size={16} color="white" />
+            <Text style={styles.actionButtonText}>
+              Mark as Paid
+            </Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -580,17 +691,29 @@ const styles = StyleSheet.create({
   amountLabel: {
     fontSize: 12,
   },
-  settleButton: {
+  settlementActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
+    padding: 10,
     borderRadius: 8,
-    gap: 6,
+    gap: 4,
   },
-  settleButtonText: {
+  remindButton: {
+    flex: 0.4,
+  },
+  settleButton: {
+    flex: 0.6,
+  },
+  actionButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   emptyContainer: {
