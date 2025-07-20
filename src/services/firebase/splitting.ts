@@ -3446,7 +3446,8 @@ static async createSettlementTransaction(settlementData: {
     
     // 3. Update friend balances if they are friends
     try {
-      await this.updateFriendBalance(settlementData.toUserId, settlementData.fromUserId, -settlementData.amount);
+      // FIXED: When fromUserId pays toUserId, reduce fromUserId's debt to toUserId
+      await this.updateFriendBalance(settlementData.fromUserId, settlementData.toUserId, -settlementData.amount);
       console.log(`Updated friend balance after settlement: ${settlementData.fromUserId} paid ${settlementData.toUserId} ${settlementData.amount}`);
     } catch (error) {
       console.log('No friendship found, skipping friend balance update');

@@ -14,7 +14,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -203,7 +202,8 @@ interface ActionItem {
         statusBarTranslucent
       >
         <Animated.View style={[styles.overlay, { opacity }]}>
-          <BlurView intensity={10} style={StyleSheet.absoluteFill} />
+          {/* FIXED: Remove BlurView and use proper background overlay */}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
           
           {/* Backdrop */}
           <TouchableOpacity 

@@ -2619,19 +2619,30 @@ export default function RealSplittingScreen() {
         >
           <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
             <View style={{ flex: 1 }}>
-              {/* Header with back button */}
+              {/* Header with back button - FIXED positioning */}
               <View style={[
                 styles.modalHeader, 
                 { 
                   backgroundColor: theme.colors.surface,
                   borderBottomWidth: 1,
-                  borderBottomColor: theme.colors.border
+                  borderBottomColor: theme.colors.border,
+                  paddingTop: 8, // Extra padding from SafeAreaView
                 }
               ]}>
                 <TouchableOpacity
-                  style={[styles.backButton, { backgroundColor: theme.colors.background }]}
+                  style={[
+                    styles.backButton, 
+                    { 
+                      backgroundColor: theme.colors.background,
+                      minHeight: 44, // Ensure touchable area
+                      minWidth: 44,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }
+                  ]}
                   onPress={() => setShowSettlementModal(false)}
                   activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
@@ -2639,13 +2650,23 @@ export default function RealSplittingScreen() {
                   Settlements
                 </Text>
                 <TouchableOpacity
-                  style={[styles.backButton, { backgroundColor: theme.colors.background }]}
+                  style={[
+                    styles.backButton, 
+                    { 
+                      backgroundColor: theme.colors.background,
+                      minHeight: 44,
+                      minWidth: 44,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }
+                  ]}
                   onPress={() => {
                     // Refresh settlements data
                     overviewBalances.forceRefresh();
                     friendsBalances.forceRefresh();
                   }}
                   activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons name="refresh" size={20} color={theme.colors.text} />
                 </TouchableOpacity>
