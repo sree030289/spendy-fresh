@@ -1,5 +1,5 @@
 // src/components/modals/UnifiedActionModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,312 +18,296 @@ import { BlurView } from 'expo-blur';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 
-// Import modals
-import AddExpenseModal from '@/components/modals/AddExpenseModal';
-import AddReminderModal from '@/components/reminders/AddReminderModal';
-// import SmartMoneyExpenseModal from '@/components/smartMoney/SmartMoneyExpenseModal'; // TODO: Create this component
-import GmailSyncModal from './GmailSyncModal';
-
-// Import services
-import { SplittingService, Group, Friend } from '@/services/firebase/splitting';
-import { SmartMoneyService } from '@/services/smartMoney/SmartMoneyService';
-import { RemindersService } from '@/services/reminders/RemindersService';
-
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface UnifiedActionModalProps {
   visible: boolean;
   onClose: () => void;
+  onActionSelect?: (actionId: string) => void;
 }
 
-export default function UnifiedActionModal({ visible, onClose }: UnifiedActionModalProps) {
+export default function UnifiedActionModal({ visible, onClose, onActionSelect }: UnifiedActionModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   
-  // Modal states
-  const [showSplitExpense, setShowSplitExpense] = useState(false);
-  const [showSmartExpense, setShowSmartExpense] = useState(false);
-  const [showReminder, setShowReminder] = useState(false);
-  const [showGmailSync, setShowGmailSync] = useState(false);
-  
-  // Data states
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [friends, setFriends] = useState<Friend[]>([]);
+  // Loading state
   const [loading, setLoading] = useState(false);
+  
+  // Animation values
+  const translateY = useRef(new Animated.Value(height)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
 
+  // Animation effects
   React.useEffect(() => {
-    if (visible && user) {
-      loadUserData();
+    if (visible) {
+      showModal();
+    } else {
+      hideModal();
     }
-  }, [visible, user]);
+  }, [visible]);
 
-  const loadUserData = async () => {
-    if (!user) return;
-    
-    try {
-      setLoading(true);
-      const [userGroups, userFriends] = await Promise.all([
-        SplittingService.getUserGroups(user.id),
-        SplittingService.getFriends(user.id)
-      ]);
-      setGroups(userGroups);
-      setFriends(userFriends);
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    } finally {
-      setLoading(false);
-    }
+  const showModal = () => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
-  const handleActionSelect = (action: string) => {
-    onClose();
-    
-    switch (action) {
-      case 'split-expense':
-        setShowSplitExpense(true);
-        break;
-      case 'smart-expense':
-        setShowSmartExpense(true);
-        break;
-      case 'reminder':
-        setShowReminder(true);
-        break;
-      case 'gmail-sync':
-        setShowGmailSync(true);
-        break;
-    }
+  const hideModal = () => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: height,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
-  const handleSplitExpenseSubmit = async (expenseData: any) => {
-    try {
-      setLoading(true);
-      await SplittingService.addExpense(expenseData);
-      setShowSplitExpense(false);
-      Alert.alert('Success', 'Split expense added successfully!');
-    } catch (error) {
-      console.error('Error adding split expense:', error);
-      Alert.alert('Error', 'Failed to add split expense. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  const handleClose = () => {
+    hideModal();
+    setTimeout(onClose, 200);
   };
 
-  const handleSmartExpenseSubmit = async (expenseData: any) => {
-    if (!user) return;
+  // Pan gesture for swipe to dismiss
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      return Math.abs(gestureState.dy) > 10;
+    },
+    onPanResponderMove: (_, gestureState) => {
+      if (gestureState.dy > 0) {
+        translateY.setValue(gestureState.dy);
+      }
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dy > 100 || gestureState.vy > 0.5) {
+        handleClose();
+      } else {
+        Animated.spring(translateY, {
+          toValue: 0,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+  });
+
+  const handleActionSelect = async (actionId: string) => {
+    setLoading(true);
     
     try {
-      setLoading(true);
-      await SmartMoneyService.addTransaction({
-        ...expenseData,
-        userId: user.id,
-        source: 'manual',
-        aiConfidence: 0.8,
-        canSplit: true,
-        tags: [expenseData.category.toLowerCase()],
-        date: new Date()
+      console.log('🎯 Action selected:', actionId);
+      
+      // Close the main modal first with animation
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 300,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        onClose();
+        
+        // Pass action to parent after modal is closed
+        setTimeout(() => {
+          onActionSelect?.(actionId);
+        }, 100);
       });
-      setShowSmartExpense(false);
-      Alert.alert('Success', 'Smart Money expense added successfully!');
+      
     } catch (error) {
-      console.error('Error adding smart expense:', error);
-      Alert.alert('Error', 'Failed to add smart expense. Please try again.');
+      console.error('Error handling action:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGmailSync = async () => {
-    try {
-      setLoading(true);
-      // This would integrate with Gmail API to sync and analyze emails
-      // For now, show the sync modal
-      setShowGmailSync(true);
-    } catch (error) {
-      console.error('Error with Gmail sync:', error);
-      Alert.alert('Error', 'Failed to sync with Gmail. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+interface ActionItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  gradient: readonly [string, string];
+  color: string;
+}
 
-  const actionItems = [
+  const actionItems: ActionItem[] = [
     {
       id: 'split-expense',
       title: 'Split Expense',
-      subtitle: 'Add expense to share with groups',
+      subtitle: 'Add expense to share with friends',
       icon: 'people',
-      gradient: ['#3B82F6', '#2563EB'],
-      iconBg: 'rgba(59, 130, 246, 0.2)',
+      gradient: ['#667eea', '#764ba2'] as const,
+      color: '#667eea',
     },
     {
       id: 'smart-expense',
-      title: 'Smart Money Expense',
+      title: 'Smart Money',
       subtitle: 'AI-powered expense tracking',
       icon: 'sparkles',
-      gradient: ['#10B981', '#059669'],
-      iconBg: 'rgba(16, 185, 129, 0.2)',
+      gradient: ['#11998e', '#38ef7d'] as const,
+      color: '#11998e',
     },
     {
       id: 'reminder',
       title: 'Bill Reminder',
-      subtitle: 'Never miss a payment again',
-      icon: 'notifications',
-      gradient: ['#F59E0B', '#D97706'],
-      iconBg: 'rgba(245, 158, 11, 0.2)',
+      subtitle: 'Never miss a payment',
+      icon: 'alarm',
+      gradient: ['#f093fb', '#f5576c'] as const,
+      color: '#f093fb',
     },
     {
       id: 'gmail-sync',
-      title: 'Gmail Sync & Analysis',
-      subtitle: 'Auto-detect bills from Gmail',
+      title: 'Gmail Sync',
+      subtitle: 'Auto-detect bills from email',
       icon: 'mail',
-      gradient: ['#EF4444', '#DC2626'],
-      iconBg: 'rgba(239, 68, 68, 0.2)',
+      gradient: ['#4facfe', '#00f2fe'] as const,
+      color: '#4facfe',
     },
   ];
+
+  if (!visible) return null;
+
+  console.log('🎬 UnifiedActionModal rendering:', {
+    visible,
+    loading,
+    actionItemsCount: actionItems.length
+  });
 
   return (
     <>
       <Modal
         visible={visible}
         transparent
-        animationType="slide"
-        onRequestClose={onClose}
+        animationType="none"
+        onRequestClose={handleClose}
+        statusBarTranslucent
       >
-        <View style={styles.overlay}>
+        <Animated.View style={[styles.overlay, { opacity }]}>
+          <BlurView intensity={10} style={StyleSheet.absoluteFill} />
+          
+          {/* Backdrop */}
           <TouchableOpacity 
-            style={styles.backdrop} 
-            activeOpacity={1} 
-            onPress={onClose}
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={handleClose}
+          />
+          
+          {/* Modal Content */}
+          <Animated.View 
+            style={[
+              styles.modalContainer,
+              { 
+                backgroundColor: theme.colors.background,
+                transform: [{ translateY }],
+              }
+            ]}
+            {...panResponder.panHandlers}
           >
-            <View style={styles.container}>
+            {/* Drag Handle */}
+            <View style={styles.dragHandle}>
+              <View style={[styles.handle, { backgroundColor: theme.colors.border }]} />
+            </View>
+            
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.headerLeft}>
+                <Text style={[styles.title, { color: theme.colors.text }]}>
+                  Quick Actions
+                </Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+                  Choose what you'd like to add
+                </Text>
+              </View>
               <TouchableOpacity 
-                activeOpacity={1} 
-                style={[styles.modal, { backgroundColor: theme.colors.background }]}
+                onPress={handleClose}
+                style={[styles.closeButton, { backgroundColor: theme.colors.surface }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                {/* Handle Bar */}
-                <View style={styles.handleBar}>
-                  <View style={[styles.handle, { backgroundColor: theme.colors.border }]} />
-                </View>
-                
-                {/* Header */}
-                <View style={styles.header}>
-                  <View style={styles.headerContent}>
-                    <View>
-                      <Text style={[styles.title, { color: theme.colors.text }]}>
-                        Quick Actions
-                      </Text>
-                      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                        What would you like to add?
-                      </Text>
-                    </View>
-                    <TouchableOpacity 
-                      onPress={onClose}
-                      style={[styles.closeButton, { backgroundColor: theme.colors.surface }]}
-                    >
-                      <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Action Items */}
-                <View style={styles.actionsContainer}>
-                  {actionItems.map((item, index) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[styles.actionItem, { 
-                        backgroundColor: theme.colors.surface,
-                        marginBottom: index === actionItems.length - 1 ? 0 : 12
-                      }]}
-                      onPress={() => handleActionSelect(item.id)}
-                      disabled={loading}
-                    >
-                      <View style={styles.actionContent}>
-                        <View style={[styles.actionIconContainer, { backgroundColor: item.iconBg }]}>
-                          <Ionicons 
-                            name={item.icon as any} 
-                            size={24} 
-                            color={item.gradient[0]} 
-                          />
-                        </View>
-                        
-                        <View style={styles.actionText}>
-                          <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
-                            {item.title}
-                          </Text>
-                          <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-                            {item.subtitle}
-                          </Text>
-                        </View>
-                        
-                        <View style={styles.actionArrow}>
-                          <Ionicons 
-                            name="chevron-forward" 
-                            size={20} 
-                            color={theme.colors.textSecondary} 
-                          />
-                        </View>
-                      </View>
-                      
-                      {/* Gradient Border */}
-                      <LinearGradient
-                        colors={[item.gradient[0], item.gradient[1]]}
-                        style={styles.gradientBorder}
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Footer */}
-                <View style={styles.footer}>
-                  <TouchableOpacity
-                    style={[styles.cancelButton, { backgroundColor: theme.colors.surface }]}
-                    onPress={onClose}
-                  >
-                    <Text style={[styles.cancelText, { color: theme.colors.textSecondary }]}>
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </View>
+
+            {/* Action Items */}
+            <View style={styles.actionsContainer}>
+              {actionItems.map((item, index) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.actionItem,
+                    { 
+                      backgroundColor: theme.colors.surface,
+                      marginBottom: index === actionItems.length - 1 ? 0 : 16,
+                    }
+                  ]}
+                  onPress={() => {
+                    console.log('🔥 Button pressed:', item.id, item.title);
+                    handleActionSelect(item.id);
+                  }}
+                  disabled={loading}
+                  activeOpacity={0.7}
+                >
+                  <LinearGradient
+                    colors={item.gradient}
+                    style={styles.actionGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <View style={styles.actionContent}>
+                      <View style={styles.iconContainer}>
+                        <Ionicons 
+                          name={item.icon as any} 
+                          size={24} 
+                          color="white" 
+                        />
+                      </View>
+                      
+                      <View style={styles.textContainer}>
+                        <Text style={styles.actionTitle}>
+                          {item.title}
+                        </Text>
+                        <Text style={styles.actionSubtitle}>
+                          {item.subtitle}
+                        </Text>
+                      </View>
+                      
+                      <View style={styles.arrowContainer}>
+                        <Ionicons 
+                          name="chevron-forward" 
+                          size={20} 
+                          color="rgba(255,255,255,0.8)" 
+                        />
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Safe Area Bottom */}
+            <View style={styles.safeAreaBottom} />
+          </Animated.View>
+        </Animated.View>
       </Modal>
-
-      {/* Split Expense Modal */}
-      <AddExpenseModal
-        visible={showSplitExpense}
-        onClose={() => setShowSplitExpense(false)}
-        onSubmit={handleSplitExpenseSubmit}
-        groups={groups}
-        friends={friends}
-      />
-
-      {/* Smart Money Expense Modal - TODO: Create dedicated component */}
-      <AddExpenseModal
-        visible={showSmartExpense}
-        onClose={() => setShowSmartExpense(false)}
-        onSubmit={handleSmartExpenseSubmit}
-        groups={groups}
-        friends={friends}
-      />
-
-      {/* Add Reminder Modal */}
-      <AddReminderModal
-        visible={showReminder}
-        onClose={() => setShowReminder(false)}
-        onReminderAdded={() => {
-          setShowReminder(false);
-          Alert.alert('Success', 'Reminder added successfully!');
-        }}
-      />
-
-      {/* Gmail Sync Modal */}
-      <GmailSyncModal
-        visible={showGmailSync}
-        onClose={() => setShowGmailSync(false)}
-        onSync={handleGmailSync}
-      />
     </>
   );
 }
@@ -329,54 +315,57 @@ export default function UnifiedActionModal({ visible, onClose }: UnifiedActionMo
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
   backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  container: {
-    justifyContent: 'flex-end',
-  },
-  modal: {
+  modalContainer: {
+    backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '80%',
+    paddingTop: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 16,
+    shadowRadius: 20,
+    elevation: 20,
   },
-  handleBar: {
+  dragHandle: {
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingVertical: 8,
   },
   handle: {
-    width: 36,
+    width: 40,
     height: 4,
     borderRadius: 2,
+    backgroundColor: '#E5E7EB',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
+    borderBottomColor: '#F3F4F6',
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  headerLeft: {
+    flex: 1,
   },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 15,
+    opacity: 0.7,
   },
   closeButton: {
     width: 32,
@@ -384,6 +373,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 16,
   },
   actionsContainer: {
     padding: 24,
@@ -393,55 +383,43 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 4,
+  },
+  actionGradient: {
+    padding: 20,
   },
   actionContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
   },
-  actionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  actionText: {
+  textContainer: {
     flex: 1,
   },
   actionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    color: 'white',
+    marginBottom: 2,
   },
   actionSubtitle: {
     fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
   },
-  actionArrow: {
+  arrowContainer: {
     marginLeft: 8,
   },
-  gradientBorder: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-  },
-  footer: {
-    padding: 24,
-    paddingTop: 8,
-  },
-  cancelButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  cancelText: {
-    fontSize: 16,
-    fontWeight: '500',
+  safeAreaBottom: {
+    height: 34,
   },
 });

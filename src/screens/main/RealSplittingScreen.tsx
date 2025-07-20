@@ -10,6 +10,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Linking,
+  Modal,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -48,6 +49,10 @@ import { db } from '@/services/firebase/config';
 
 // Import our real services
 import { SplittingService, Friend, Group, Expense, Notification } from '@/services/firebase/splitting';
+
+// Import animation components - using simple versions for Expo Go compatibility
+import FullScreenSuccessAnimationSimple from '@/components/animations/FullScreenSuccessAnimationSimple';
+import FullScreenErrorSimple from '@/components/animations/FullScreenErrorSimple';
 import { PaymentService } from '@/services/payments/PaymentService';
 import { PushNotificationService } from '@/services/notifications/PushNotificationService';
 import { RealNotificationService } from '@/services/notifications/RealNotificationService';
@@ -72,6 +77,7 @@ import ManualSettlementModal from '@/components/modals/ManualSettlementModal';
 import GroupSettlementModal from '@/components/modals/GroupSettlementModal';
 import FriendRequestModal from '@/components/modals/FriendRequestModal';
 import ImportSplitwiseModal from '@/components/modals/ImportSplitwise';
+import SettlementScreen from '@/screens/main/SettlementScreen';
 import { getCurrencySymbol } from '@/utils/currency';
 import QRCodeScanner from '@/components/QRCodeScanner';
 import QRScannerManager from '@/services/qr/QRScannerManager';
@@ -81,7 +87,6 @@ import RemindModal from '@/components/modals/RemindModal';
 import SuccessAnimationModal from '@/components/modals/SuccessAnimationModal';
 import GenericErrorModal from '@/components/modals/GenericErrorModal';
 import ExportModal from '@/components/modals/ExportModal';
-import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
 import { ExportService } from '@/services/ExportService';
 
 export default function RealSplittingScreen() {
@@ -140,7 +145,7 @@ export default function RealSplittingScreen() {
   const [animatedModalProps, setAnimatedModalProps] = useState<{
     title: string;
     message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
+    type: 'success' | 'error' | 'warning';
   }>({
     title: '',
     message: '',
@@ -165,8 +170,31 @@ export default function RealSplittingScreen() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedGroupForExport, setSelectedGroupForExport] = useState<Group | null>(null);
   
-  // Unified action modal state
-  const [showUnifiedActions, setShowUnifiedActions] = useState(false);
+  // Full-screen animation states
+  const [showFullScreenSuccess, setShowFullScreenSuccess] = useState(false);
+  const [fullScreenSuccessProps, setFullScreenSuccessProps] = useState<{
+    title: string;
+    message: string;
+    subtitle?: string;
+    buttonText?: string;
+    onContinue?: () => void;
+  }>({
+    title: '',
+    message: '',
+  });
+  
+  const [showFullScreenError, setShowFullScreenError] = useState(false);
+  const [fullScreenErrorProps, setFullScreenErrorProps] = useState<{
+    title: string;
+    message: string;
+    subtitle?: string;
+    errorCode?: string;
+    onRestart: () => void;
+  }>({
+    title: '',
+    message: '',
+    onRestart: () => {},
+  });
   
   // Additional modal states
   const [showEditExpense, setShowEditExpense] = useState(false);
@@ -185,6 +213,9 @@ export default function RealSplittingScreen() {
   
   // Import Splitwise modal state
   const [showImportSplitwise, setShowImportSplitwise] = useState(false);
+
+  // Settlement modal state
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
 
   // Simple Expense List Modal states
   const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
@@ -451,7 +482,7 @@ export default function RealSplittingScreen() {
         'Unable to mark notifications as read. Please check your connection and try again.',
         'Retry',
         'Cancel',
-        () => handleMarkAllRead()
+        () => markAllNotificationsRead()
       );
     }
   };
@@ -509,13 +540,59 @@ export default function RealSplittingScreen() {
     }
   };
 
-  // Helper function to show animated modal
-  const showAnimatedSuccess = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
-    setAnimatedModalProps({ title, message, type });
-    setShowAnimatedModal(true);
+  // Helper function to show full-screen success animation
+  const showFullScreenSuccessAnimation = (
+    title: string, 
+    message: string, 
+    subtitle?: string,
+    buttonText?: string,
+    onContinue?: () => void
+  ) => {
+    setFullScreenSuccessProps({ 
+      title, 
+      message, 
+      subtitle,
+      buttonText,
+      onContinue: onContinue || (() => setShowFullScreenSuccess(false))
+    });
+    setShowFullScreenSuccess(true);
   };
 
-  // Helper function to show error modal
+  // Helper function to show full-screen error
+  const showFullScreenErrorAnimation = (
+    title: string,
+    message: string,
+    subtitle?: string,
+    errorCode?: string,
+    onRestart?: () => void
+  ) => {
+    const handleRestart = onRestart || (() => {
+      // Default restart behavior - you might want to implement app restart logic
+      console.log('App restart requested');
+      setShowFullScreenError(false);
+    });
+
+    setFullScreenErrorProps({
+      title,
+      message,
+      subtitle,
+      errorCode,
+      onRestart: handleRestart
+    });
+    setShowFullScreenError(true);
+  };
+
+  // Legacy helper function for backward compatibility - now uses full-screen animation
+  const showAnimatedSuccess = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    if (type === 'error') {
+      showFullScreenErrorAnimation(title, message);
+    } else {
+      // For 'info', 'warning', and 'success', use the success animation
+      showFullScreenSuccessAnimation(title, message);
+    }
+  };
+
+  // Helper function to show error modal - now uses full-screen error for critical errors
   const showGenericError = (
     title: string, 
     message: string, 
@@ -524,15 +601,21 @@ export default function RealSplittingScreen() {
     onPrimaryPress?: () => void,
     onSecondaryPress?: () => void
   ) => {
-    setErrorModalProps({ 
-      title, 
-      message, 
-      primaryButtonText, 
-      secondaryButtonText, 
-      onPrimaryPress, 
-      onSecondaryPress 
-    });
-    setShowErrorModal(true);
+    // For critical errors, use full-screen error
+    if (title.toLowerCase().includes('critical') || title.toLowerCase().includes('restart') || title.toLowerCase().includes('crash')) {
+      showFullScreenErrorAnimation(title, message, 'Please restart the app to continue.', 'CRITICAL_ERROR_001');
+    } else {
+      // For non-critical errors, use the original error modal
+      setErrorModalProps({ 
+        title, 
+        message, 
+        primaryButtonText, 
+        secondaryButtonText, 
+        onPrimaryPress, 
+        onSecondaryPress 
+      });
+      setShowErrorModal(true);
+    }
   };
 
   // Handle export group data
@@ -599,17 +682,23 @@ export default function RealSplittingScreen() {
         // FIXED: Notify unified balance system
         notifyBalanceChange();
         
-        showAnimatedSuccess('Expense Added! 🧾', 'Expense has been added and split successfully!');
         setShowAddExpense(false);
         setSelectedGroupForExpense(null);
         
-        // If expense was added from group details, go back to group details
-        if (fromGroupDetails) {
-          setTimeout(() => {
-            setSelectedGroup(fromGroupDetails);
-            setShowGroupDetails(true);
-          }, 500);
-        }
+        // Show full-screen success with navigation to group details
+        showFullScreenSuccessAnimation(
+          'Expense Added! 🧾', 
+          'Expense has been added and split successfully!',
+          fromGroupDetails ? `Added to ${fromGroupDetails.name}` : 'Check your groups for updates',
+          fromGroupDetails ? 'View Group Details' : 'Continue',
+          () => {
+            setShowFullScreenSuccess(false);
+            if (fromGroupDetails) {
+              setSelectedGroup(fromGroupDetails);
+              setShowGroupDetails(true);
+            }
+          }
+        );
       }
       
     } catch (error: any) {
@@ -664,7 +753,7 @@ export default function RealSplittingScreen() {
         const result = await SplittingService.sendFriendRequest(user.id, email);
         
         if (result.isNewUser) {
-          showAnimatedSuccess('Invitation Saved! 📧', result.message);
+          showAnimatedSuccess('Invitation Saved! 📧', result.message || 'Invitation sent successfully!');
         } else {
           showAnimatedSuccess('Friend Request Sent! 🤝', result.message || 'Friend request sent successfully!');
         }
@@ -748,13 +837,27 @@ export default function RealSplittingScreen() {
       // FIXED: Notify balance system of new group
       notifyBalanceChange();
       
-      const memberCount = 1 + (groupData.selectedFriends?.length || 0);
-      showAnimatedSuccess(
-        'Group Created! 🎉', 
-        `"${groupData.name}" has been created successfully with ${memberCount} member${memberCount > 1 ? 's' : ''}!`
-      );
-      
       setShowCreateGroup(false);
+      
+      const memberCount = 1 + (groupData.selectedFriends?.length || 0);
+      
+      // Show full-screen success with navigation to group details
+      showFullScreenSuccessAnimation(
+        'Group Created! 🎉', 
+        `"${groupData.name}" has been created successfully!`,
+        `${memberCount} member${memberCount > 1 ? 's' : ''} ready to split expenses`,
+        'View Group',
+        () => {
+          setShowFullScreenSuccess(false);
+          // Find and show the newly created group
+          setTimeout(async () => {
+            await loadGroups(); // Refresh groups to get the new one
+            // The group should now be in the groups list, but we'll need the ID
+            // For now, just close and let user find it in the groups tab
+            setActiveTab('groups');
+          }, 100);
+        }
+      );
     } catch (error: any) {
       console.error('Create group error:', error);
       Alert.alert('Error', error.message || 'Failed to create group');
@@ -1209,7 +1312,7 @@ export default function RealSplittingScreen() {
             </View>
           </View>
           
-          <TouchableOpacity onPress={() => setActiveTab('friends')}>
+          <TouchableOpacity onPress={() => setShowSettlementModal(true)}>
             <Text style={styles.balanceSubtext}>Tap to view details</Text>
           </TouchableOpacity>
         </View>
@@ -1251,6 +1354,17 @@ export default function RealSplittingScreen() {
 
           <TouchableOpacity
             style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
+            onPress={() => setShowSettlementModal(true)}
+          >
+            <Ionicons name="cash" size={24} color="#F59E0B" />
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Settlements</Text>
+            <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
+              Manage outstanding balances
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
             onPress={handleAnalyticsAccess}
           >
             <Ionicons name="analytics" size={24} color="#10B981" />
@@ -1266,9 +1380,6 @@ export default function RealSplittingScreen() {
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Expenses</Text>
             <View style={styles.sectionActions}>
-              <TouchableOpacity onPress={() => setShowAddExpense(true)} style={styles.addButton}>
-                <Ionicons name="add" size={16} color={theme.colors.primary} />
-              </TouchableOpacity>
               <TouchableOpacity onPress={navigateToExpenses} style={styles.viewAllButton}>
                 <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
                 <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
@@ -1550,7 +1661,7 @@ export default function RealSplittingScreen() {
                 const balance = balanceDetail?.balance || 0;
                 
                 // Safety check for friend data
-                const friendName = friend.friendData?.fullName || friend.friendData?.name || 'Unknown Friend';
+                const friendName = friend.friendData?.fullName || 'Unknown Friend';
                 const friendEmail = friend.friendData?.email || '';
                 const friendInitial = friendName.charAt(0).toUpperCase() || '?';
                 
@@ -1591,6 +1702,16 @@ export default function RealSplittingScreen() {
                             <Text style={[styles.balanceText, { color: theme.colors.success }]}>
                               Owes you {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
                             </Text>
+                            {balanceDetail?.breakdown && (
+                              <Text style={[styles.balanceBreakdown, { color: theme.colors.textSecondary }]}>
+                                {balanceDetail.source === 'mixed' 
+                                  ? `Friends: ${getCurrencySymbol(user?.currency || 'USD')}${balanceDetail.breakdown.fromFriendships.toFixed(2)} + Groups`
+                                  : balanceDetail.source === 'group' 
+                                    ? `From: ${balanceDetail.groupName}`
+                                    : 'Direct friendship'
+                                }
+                              </Text>
+                            )}
                           </>
                         ) : (
                           <>
@@ -1598,6 +1719,16 @@ export default function RealSplittingScreen() {
                             <Text style={[styles.balanceText, { color: theme.colors.error }]}>
                               You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
                             </Text>
+                            {balanceDetail?.breakdown && (
+                              <Text style={[styles.balanceBreakdown, { color: theme.colors.textSecondary }]}>
+                                {balanceDetail.source === 'mixed' 
+                                  ? `Friends: ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balanceDetail.breakdown.fromFriendships).toFixed(2)} + Groups`
+                                  : balanceDetail.source === 'group' 
+                                    ? `From: ${balanceDetail.groupName}`
+                                    : 'Direct friendship'
+                                }
+                              </Text>
+                            )}
                           </>
                         )}
                       </View>
@@ -1817,15 +1948,24 @@ export default function RealSplittingScreen() {
                 <TouchableOpacity
                   onPress={(e) => {
                     e.stopPropagation();
+                    setSelectedGroup(group);
+                    setShowGroupDetails(true);
+                  }}
+                  style={[styles.actionButton, styles.viewDetailsButton, { backgroundColor: theme.colors.primary + '20' }]}
+                >
+                  <Ionicons name="eye" size={16} color={theme.colors.primary} />
+                  <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>View Details</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
                     handleGroupChatAccess(group);
                   }}
-                  style={[styles.actionButton, styles.enhancedChatButton]}
+                  style={[styles.actionButton, { backgroundColor: theme.colors.primary + '20' }]}
                 >
-                  <Ionicons name="chatbubbles" size={18} color="white" />
-                  <Text style={[styles.actionButtonText, { color: 'white', fontWeight: 'bold' }]}>Chat</Text>
-                  <View style={styles.chatBadge}>
-                    <Text style={styles.chatBadgeText}>2</Text>
-                  </View>
+                  <Ionicons name="chatbubbles" size={16} color={theme.colors.primary} />
+                  <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Chat</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
@@ -1838,18 +1978,6 @@ export default function RealSplittingScreen() {
                 >
                   <Ionicons name="card" size={16} color={theme.colors.success} />
                   <Text style={[styles.actionButtonText, { color: theme.colors.success }]}>Settle</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedGroupForExpense(group);
-                    setShowAddExpense(true);
-                  }}
-                  style={[styles.actionButton, styles.addExpenseButton, { backgroundColor: theme.colors.primary }]}
-                >
-                  <Ionicons name="add" size={16} color="white" />
-                  <Text style={[styles.actionButtonText, { color: 'white' }]}>Add Expense</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -1896,7 +2024,12 @@ export default function RealSplittingScreen() {
       actions.push({
         text: 'Mark as Paid',
         onPress: () => {
-          setSelectedFriend(friend);
+          // Create friend object with correct balance from friendsBalances
+          const friendWithCorrectBalance = {
+            ...friend,
+            balance: balance // Use the balance from friendsBalances, not from friend object
+          };
+          setSelectedFriend(friendWithCorrectBalance);
           setShowManualSettlement(true);
         }
       });
@@ -1997,6 +2130,8 @@ export default function RealSplittingScreen() {
     try {
       if (!user?.id) return;
 
+      const friend = friends.find(f => f.friendId === friendId);
+
       if (type === 'pay') {
         await SplittingService.markPaymentAsPaid(
           user.id,
@@ -2015,16 +2150,24 @@ export default function RealSplittingScreen() {
         });
       }
 
-      // FIXED: Notify balance system
-      notifyBalanceChange();
-
+      // Close modal first to prevent double alerts
       setShowManualSettlement(false);
       setSelectedFriend(null);
 
-      showAnimatedSuccess(
-        type === 'pay' ? 'Payment Recorded! 💰' : 'Payment Request Sent! 📤', 
-        type === 'pay' ? 'Payment marked as paid successfully!' : 'Payment request sent!'
-      );
+      // Force immediate refresh of balances
+      await Promise.all([
+        friendsBalances.forceRefresh(),
+        overviewBalances.forceRefresh()
+      ]);
+
+      // Show success after balance refresh to show correct state
+      setTimeout(() => {
+        showAnimatedSuccess(
+          type === 'pay' ? 'Payment Recorded! 💰' : 'Payment Request Sent! 📤', 
+          type === 'pay' ? 'Payment marked as paid successfully!' : `${friend?.friendData?.fullName || 'Friend'} will receive a notification and SMS with your payment request.`
+        );
+      }, 500);
+
     } catch (error: any) {
       console.error('Manual settlement error:', error);
       Alert.alert('Error', error.message || `Failed to ${type === 'pay' ? 'mark payment as paid' : 'send payment request'}`);
@@ -2210,7 +2353,19 @@ export default function RealSplittingScreen() {
       
       setShowFriendRequest(false);
       setSelectedFriendRequest(null);
-      showAnimatedSuccess('Success! 🤝', 'Friend request accepted!');
+      
+      // Show full-screen success with navigation to friends tab
+      showFullScreenSuccessAnimation(
+        'Success! 🤝', 
+        'Friend request accepted!',
+        'You can now split expenses together',
+        'View Friends',
+        () => {
+          setShowFullScreenSuccess(false);
+          setActiveTab('friends');
+          setActiveFriendsTab('accepted');
+        }
+      );
     } catch (error: any) {
       console.error('Error accepting friend request:', error);
       Alert.alert('Error', error.message || 'Failed to accept friend request');
@@ -2348,14 +2503,6 @@ export default function RealSplittingScreen() {
         {activeTab === 'friends' && renderFriendsTab()}
       </View>
 
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        onPress={() => setShowUnifiedActions(true)}
-      >
-        <Ionicons name="add" size={28} color="white" />
-      </TouchableOpacity>
-
       {/* All Modals - Keep existing modal implementations */}
       <AddExpenseModal
         visible={showAddExpense}
@@ -2462,6 +2609,55 @@ export default function RealSplittingScreen() {
         }}
       />
 
+      {/* Settlement Screen Modal */}
+      {showSettlementModal && (
+        <Modal
+          animationType="slide"
+          presentationStyle="fullScreen"
+          visible={showSettlementModal}
+          onRequestClose={() => setShowSettlementModal(false)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            <View style={{ flex: 1 }}>
+              {/* Header with back button */}
+              <View style={[
+                styles.modalHeader, 
+                { 
+                  backgroundColor: theme.colors.surface,
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.colors.border
+                }
+              ]}>
+                <TouchableOpacity
+                  style={[styles.backButton, { backgroundColor: theme.colors.background }]}
+                  onPress={() => setShowSettlementModal(false)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                  Settlements
+                </Text>
+                <TouchableOpacity
+                  style={[styles.backButton, { backgroundColor: theme.colors.background }]}
+                  onPress={() => {
+                    // Refresh settlements data
+                    overviewBalances.forceRefresh();
+                    friendsBalances.forceRefresh();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="refresh" size={20} color={theme.colors.text} />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Settlement Screen Content */}
+              <SettlementScreen />
+            </View>
+          </SafeAreaView>
+        </Modal>
+      )}
+
       <EditExpenseModal
         visible={showEditExpense}
         onClose={() => {
@@ -2536,10 +2732,19 @@ export default function RealSplittingScreen() {
         groupId={selectedGroup?.id || null}
         userCurrency={user?.currency || 'USD'}
         currentUserId={user?.id || ''}
-        onRefresh={() => {
-          loadRecentExpenses();
+        onRefresh={async () => {
+          // Reload all data that might be affected by settlements
+          await loadRecentExpenses();
+          await loadGroups(); // Refresh groups to update balances
           notifyBalanceChange(); // FIXED: Notify balance system
+          
+          // Force refresh all balance systems
+          await Promise.all([
+            friendsBalances.forceRefresh(),
+            overviewBalances.forceRefresh()
+          ]);
         }}
+        onSettlementSuccess={showAnimatedSuccess}
       />     
 
       <SimpleExpenseListModal
@@ -2693,10 +2898,25 @@ export default function RealSplittingScreen() {
         onExportComplete={handleExportComplete}
       />
 
-      {/* Unified Action Modal */}
-      <UnifiedActionModal
-        visible={showUnifiedActions}
-        onClose={() => setShowUnifiedActions(false)}
+      {/* Full-screen Success Animation */}
+      <FullScreenSuccessAnimationSimple
+        visible={showFullScreenSuccess}
+        title={fullScreenSuccessProps.title}
+        message={fullScreenSuccessProps.message}
+        subtitle={fullScreenSuccessProps.subtitle}
+        buttonText={fullScreenSuccessProps.buttonText}
+        onContinue={fullScreenSuccessProps.onContinue || (() => setShowFullScreenSuccess(false))}
+        showButton={true}
+      />
+
+      {/* Full-screen Error Animation */}
+      <FullScreenErrorSimple
+        visible={showFullScreenError}
+        title={fullScreenErrorProps.title}
+        message={fullScreenErrorProps.message}
+        subtitle={fullScreenErrorProps.subtitle}
+        errorCode={fullScreenErrorProps.errorCode}
+        onRestart={fullScreenErrorProps.onRestart}
       />
     </SafeAreaView>
   );
@@ -2896,21 +3116,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
   },
   expenseItem: {
     flexDirection: 'row',
@@ -3130,38 +3335,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  enhancedChatButton: {
-    backgroundColor: '#00C851',
+  viewDetailsButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 6,
-    flex: 1.2,
-    justifyContent: 'center',
-    minHeight: 40,
-    shadowColor: '#00C851',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  chatBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF4444',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    gap: 4,
+    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chatBadgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+    minHeight: 36,
   },
   settlementButton: {
     flex: 1,
@@ -3354,6 +3537,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'right',
     flexShrink: 1, // Allow text to shrink if needed
+  },
+  balanceBreakdown: {
+    fontSize: 10,
+    fontStyle: 'italic',
+    textAlign: 'right',
+    marginTop: 2,
+    opacity: 0.8,
   },
   // Pending invitation styles
   pendingIndicator: {
@@ -3727,19 +3917,6 @@ statusText: {
   fontStyle: 'italic',
   marginTop: 2,
 },
-resendButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 6,
-  gap: 4,
-},
-resendButtonText: {
-  color: 'white',
-  fontSize: 12,
-  fontWeight: '500',
-},
 friendActions: {
   alignItems: 'center',
   gap: 8,
@@ -3760,5 +3937,24 @@ remindButtonText: {
 groupHeaderActions: {
   flexDirection: 'row',
   gap: 8,
+},
+modalHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 16,
+  paddingVertical: 16,
+  minHeight: 64,
+},
+backButton: {
+  padding: 12,
+  borderRadius: 12,
+  marginRight: 8,
+},
+modalTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  flex: 1,
+  textAlign: 'center',
 },
 });

@@ -80,12 +80,17 @@ export class QRScannerManager {
       navigation?: any;
     }
   ): Promise<QRScanResult> {
-    // Prevent multiple rapid scans
-    if (this.state.isProcessing || this.state.hasScanned) {
+    // Prevent multiple rapid scans but allow retry after a short delay
+    if (this.state.isProcessing) {
       return {
         success: false,
-        error: 'Already processing a QR code',
+        error: 'Please wait, processing your previous QR code...',
       };
+    }
+
+    // Reset hasScanned if it's been more than 3 seconds
+    if (this.state.hasScanned) {
+      this.resetForNewScan();
     }
 
     this.updateState({
@@ -145,11 +150,12 @@ export class QRScannerManager {
            qrData.includes('"type":');
   }
 
-  // Reset scanner for new scan
+    // Reset scanner for new scan
   resetForNewScan(): void {
     this.updateState({
       isProcessing: false,
       hasScanned: false,
+      isScanning: true,
       error: null,
     });
   }

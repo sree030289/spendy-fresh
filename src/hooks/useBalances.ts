@@ -1,5 +1,5 @@
 // src/hooks/useBalances.ts - COMPLETE FIXED VERSION with proper friend categorization
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { SplittingService, Friend } from '@/services/firebase/splitting';
 
@@ -445,32 +445,33 @@ export const useBalances = () => {
     refresh();
   }, [user?.id, refresh]);
 
-  // FIXED: Format balances for display with proper friend categorization
-  const friends = balances?.details.filter(detail => {
+  // FIXED: Format balances for display with proper friend categorization using useMemo
+  const friends = useMemo(() => balances?.details.filter(detail => {
     // Check if this person is actually a friend (not just a group member)
     const isFriend = friendsData.some(friend => 
       friend.friendId === detail.userId && friend.status === 'accepted'
     );
     return isFriend; // Only include actual friends, regardless of source
-  }) || [];
+  }) || [], [balances?.details, friendsData]);
   
-  const groupMembers = balances?.details.filter(detail => {
+  const groupMembers = useMemo(() => balances?.details.filter(detail => {
     // Check if this person is NOT a friend but is in groups
     const isFriend = friendsData.some(friend => 
       friend.friendId === detail.userId && friend.status === 'accepted'
     );
     return !isFriend && (detail.source === 'group' || detail.source === 'mixed');
-  }) || [];
+  }) || [], [balances?.details, friendsData]);
   
-  const allBalances = balances?.details.map(detail => ({
+  const allBalances = useMemo(() => balances?.details.map(detail => ({
     userId: detail.userId,
     name: detail.name,
     email: detail.email,
     balance: detail.balance,
     source: detail.source,
     groupName: detail.groupName,
-    groupId: detail.groupId
-  })) || [];
+    groupId: detail.groupId,
+    breakdown: detail.breakdown // Include the breakdown property
+  })) || [], [balances?.details]);
 
   // Debug log current state
   useEffect(() => {
@@ -498,7 +499,7 @@ export const useBalances = () => {
     }
   }, [balances, friends.length, groupMembers.length, allBalances.length, friendsData.length]);
 
-  return {
+  return useMemo(() => ({
     // Core balance data
     balances,
     isLoading,
@@ -530,26 +531,37 @@ export const useBalances = () => {
     // Utilities for testing
     verifyCalculation: UnifiedSettlementService.verifyManualCalculation,
     calculateGroupBalance: UnifiedSettlementService.calculateGroupPairwiseBalance
-  };
+  }), [
+    balances,
+    isLoading,
+    error,
+    friends,
+    groupMembers,
+    allBalances,
+    friendsData,
+    refresh,
+    forceRefresh,
+    notifyChange
+  ]);
 };
 
 // Export specialized hooks for different components
 export const useOverviewBalances = () => {
   const baseBalances = useBalances();
   
-  return {
+  return useMemo(() => ({
     ...baseBalances,
     // Add any overview-specific formatting here
-  };
+  }), [baseBalances]);
 };
 
 export const useFriendsBalances = () => {
   const baseBalances = useBalances();
   
-  return {
+  return useMemo(() => ({
     ...baseBalances,
     // Add any friends-specific formatting here
-  };
+  }), [baseBalances]);
 };
 
 export default useBalances;

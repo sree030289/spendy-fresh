@@ -47,6 +47,14 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
     }
   }, [visible]);
 
+  // Add cleanup when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setScanned(false);
+      setProcessing(false);
+    }
+  }, [visible]);
+
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
     // Prevent multiple rapid scans
     if (scanned || processing) {
