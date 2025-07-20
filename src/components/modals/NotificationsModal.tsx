@@ -38,6 +38,8 @@ export default function NotificationsModal({
 }: NotificationsModalProps) {
   const { theme } = useTheme();
 
+  const hasUnreadNotifications = notifications.some(n => !n.isRead);
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'friend_request':
@@ -104,7 +106,10 @@ export default function NotificationsModal({
       key={notification.id}
       style={[
         styles.notificationItem,
-        { backgroundColor: theme.colors.surface }
+        { 
+          backgroundColor: notification.isRead ? theme.colors.background : theme.colors.surface,
+          opacity: notification.isRead ? 0.6 : 1.0
+        }
       ]}
       onPress={() => handleNotificationPress(notification)}
     >
@@ -112,15 +117,27 @@ export default function NotificationsModal({
         <Ionicons
           name={getNotificationIcon(notification.type) as any}
           size={20}
-          color={theme.colors.primary}
+          color={notification.isRead ? theme.colors.textSecondary : theme.colors.primary}
         />
       </View>
       
       <View style={styles.notificationContent}>
-        <Text style={[styles.notificationTitle, { color: theme.colors.text }]}>
+        <Text style={[
+          styles.notificationTitle, 
+          { 
+            color: notification.isRead ? theme.colors.textSecondary : theme.colors.text,
+            fontWeight: notification.isRead ? 'normal' : 'bold'
+          }
+        ]}>
           {notification.title}
         </Text>
-        <Text style={[styles.notificationMessage, { color: theme.colors.textSecondary }]}>
+        <Text style={[
+          styles.notificationMessage, 
+          { 
+            color: theme.colors.textSecondary,
+            fontStyle: notification.isRead ? 'italic' : 'normal'
+          }
+        ]}>
           {notification.message}
         </Text>
         <Text style={[styles.notificationTime, { color: theme.colors.textSecondary }]}>
@@ -140,12 +157,16 @@ export default function NotificationsModal({
       onClose={onClose}
       title="Notifications"
       rightActions={
-        notifications.length > 0 ? (
+        notifications.length > 0 && hasUnreadNotifications ? (
           <TouchableOpacity onPress={onMarkAllAsRead}>
             <Text style={[styles.markAllText, { color: theme.colors.primary }]}>
               Mark All Read
             </Text>
           </TouchableOpacity>
+        ) : notifications.length > 0 ? (
+          <Text style={[styles.markAllText, { color: theme.colors.textSecondary }]}>
+            All Read ✓
+          </Text>
         ) : null
       }
     >

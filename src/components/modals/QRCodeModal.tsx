@@ -190,6 +190,8 @@ const handleScanQR = useCallback(() => {
     return;
   }
   
+  // Reset scanner state before opening
+  scannerManager.resetForNewScan();
   setShowScanner(true);
   scannerManager.startScanning();
 }, [scannerManager]);
@@ -209,7 +211,8 @@ const handleQRCodeScanned = useCallback(async (qrData: string) => {
         {
           text: 'Try Again',
           onPress: () => {
-            // Keep scanner open for retry
+            // Reset scanner state and keep it open for retry
+            scannerManager.resetForNewScan();
           }
         },
         {
@@ -232,7 +235,8 @@ const handleQRCodeScanned = useCallback(async (qrData: string) => {
         {
           text: 'Try Again',
           onPress: () => {
-            // Keep scanner open for retry
+            // Reset scanner state and keep it open for retry
+            scannerManager.resetForNewScan();
           }
         },
         {
@@ -250,6 +254,9 @@ const handleQRCodeScanned = useCallback(async (qrData: string) => {
   setIsHandlingScan(true);
 
   try {
+    // Reset scanner state before processing
+    scannerManager.resetForNewScan();
+    
     const result = await scannerManager.processQRCode(qrData, user.id, {
       closeOnSuccess: true,
     });
@@ -262,16 +269,29 @@ const handleQRCodeScanned = useCallback(async (qrData: string) => {
       // Show success message with a slight delay to ensure UI updates
       setTimeout(() => {
         Alert.alert(
-          'Success',
+          'Success! 🎉',
           'QR code processed successfully!',
           [{ text: 'OK' }]
         );
       }, 100);
     } else {
       // Handle error without using QRScannerManager's alert
+      const errorMessage = result.error || 'Failed to process QR code';
+      
+      // Don't show "Already processing" errors to user, just retry
+      if (errorMessage.includes('processing') || errorMessage.includes('wait')) {
+        console.log('Processing retry needed:', errorMessage);
+        // Auto retry after short delay
+        setTimeout(() => {
+          setIsHandlingScan(false);
+          handleQRCodeScanned(qrData);
+        }, 1000);
+        return;
+      }
+      
       Alert.alert(
         'QR Code Error',
-        result.error || 'Failed to process QR code',
+        errorMessage,
         [
           {
             text: 'Cancel',
@@ -284,7 +304,9 @@ const handleQRCodeScanned = useCallback(async (qrData: string) => {
           {
             text: 'Try Again',
             onPress: () => {
-              // Keep scanner open for retry
+              // Reset and keep scanner open for retry
+              scannerManager.resetForNewScan();
+              setIsHandlingScan(false);
             }
           }
         ]
@@ -306,7 +328,9 @@ const handleQRCodeScanned = useCallback(async (qrData: string) => {
         {
           text: 'Try Again',
           onPress: () => {
-            // Keep scanner open for retry
+            // Reset and keep scanner open for retry
+            scannerManager.resetForNewScan();
+            setIsHandlingScan(false);
           }
         }
       ]

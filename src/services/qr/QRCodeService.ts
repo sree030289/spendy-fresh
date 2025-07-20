@@ -266,29 +266,71 @@ static decodeQRData(qrString: string): QRData {
       Alert.alert('Oops!', 'You cannot add yourself as a friend');
       return;
     }
+
+    // Import services needed
+    const { SplittingService } = await import('../firebase/splitting');
+    
+    // Check if user exists and get current status
+    let userExists = false;
+    let connectionStatus = null;
+    
+    try {
+      connectionStatus = await SplittingService.checkFriendshipStatus(currentUserId, qrData.userData.email);
+      userExists = true;
+    } catch (error: any) {
+      // User might not exist or connection might not be established
+      console.log('User connection check:', error.message);
+    }
+
+    // Show appropriate dialog based on user existence and connection status
+    let dialogTitle = 'Friend Invitation';
+    let dialogMessage = `${qrData.userData.fullName} wants to be your friend on Spendy.`;
+    let buttonText = 'Add Friend';
+    
+    if (userExists && connectionStatus) {
+      switch (connectionStatus) {
+        case 'accepted':
+          Alert.alert('Already Friends', `You are already friends with ${qrData.userData.fullName}.`);
+          return;
+        case 'request_sent':
+          Alert.alert('Request Pending', `You have already sent a friend request to ${qrData.userData.fullName}. Please wait for them to respond.`);
+          return;
+        case 'request_received':
+          Alert.alert('Request Received', `${qrData.userData.fullName} has already sent you a friend request. Check your notifications to accept it.`);
+          return;
+        case 'pending':
+          Alert.alert('Request Pending', `A friend request with ${qrData.userData.fullName} is already pending.`);
+          return;
+      }
+    }
+
+    if (!userExists) {
+      dialogMessage = `${qrData.userData.fullName} (${qrData.userData.email}) is not on Spendy yet. We'll save your invitation and automatically send them a friend request when they join!`;
+      buttonText = 'Send Invite';
+    }
     
     Alert.alert(
-      'Friend Invitation',
-      `${qrData.userData.fullName} wants to be your friend on Spendy. Send friend request?`,
+      dialogTitle,
+      dialogMessage,
       [
         {
           text: 'Cancel',
           style: 'cancel'
         },
         {
-          text: 'Add Friend',
+          text: buttonText,
           onPress: async () => {
             try {
               const result = await SplittingService.sendFriendRequest(
                 currentUserId,
                 qrData.userData!.email,
-                'Added via QR code'
+                'Added via QR code scan'
               );
               
               if (result.isNewUser) {
-                Alert.alert('Invitation Saved!', result.message || 'Invitation saved for when they join Spendy!');
+                Alert.alert('Invitation Saved!', result.message || `We've saved your invitation for ${qrData.userData!.fullName}. They'll get a friend request automatically when they join Spendy!`);
               } else {
-                Alert.alert('Success', result.message || 'Friend request sent!');
+                Alert.alert('Success!', result.message || `Friend request sent to ${qrData.userData!.fullName}! They'll receive a notification about your request.`);
               }
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to send friend request');

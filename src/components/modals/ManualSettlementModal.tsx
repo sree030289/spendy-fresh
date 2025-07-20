@@ -93,10 +93,7 @@ export default function ManualSettlementModal({
     try {
       await onSettlement(friend.friendId, finalAmount, settlementType, description.trim() || 'Manual settlement');
       
-      const successMessage = settlementType === 'pay' 
-        ? 'Payment marked as paid successfully!'
-        : 'Payment request sent successfully!';
-      Alert.alert('Success', successMessage);
+      // Don't show alert here - let parent component handle success message
       handleClose();
     } catch (error: any) {
       const errorMessage = settlementType === 'pay'

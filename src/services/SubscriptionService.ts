@@ -118,6 +118,12 @@ export const PREMIUM_FEATURES: PremiumFeature[] = [
     name: 'Gmail Integration',
     description: 'Connect with Gmail for expense reminders',
     premiumOnly: true
+  },
+  {
+    id: 'export_data',
+    name: 'Export Data',
+    description: 'Export group data to CSV or PDF files',
+    premiumOnly: true
   }
 ];
 

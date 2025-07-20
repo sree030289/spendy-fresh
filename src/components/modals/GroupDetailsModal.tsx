@@ -31,6 +31,9 @@ import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
 import ExpenseSettlementModal from './ExpenseSettlementModal';
 import SimpleExpenseListModal from './SimpleExpenseListModal';
+import { SubscriptionHelper } from '@/utils/SubscriptionHelper';
+import { ExportService } from '@/services/ExportService';
+import ExportModal from './ExportModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -76,6 +79,7 @@ export default function GroupDetailsModal({
   const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
   const [expenseListGroupId, setExpenseListGroupId] = useState<string | undefined>(undefined);
   const [expenseListTitle, setExpenseListTitle] = useState('All Expenses');
+  const [showExportModal, setShowExportModal] = useState(false);
   
   // Member balances state
   const [memberBalances, setMemberBalances] = useState<Map<string, number>>(new Map());
@@ -84,6 +88,8 @@ export default function GroupDetailsModal({
   // Local state for group data to enable real-time updates
   const [localGroupData, setLocalGroupData] = useState<Group | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  const subscriptionHelper = SubscriptionHelper.getInstance();
 
   const isUserAdmin = localGroupData?.members?.find(member => 
     member.userId === currentUser?.id
@@ -284,6 +290,37 @@ export default function GroupDetailsModal({
         }
       ]
     );
+  };
+
+  const handleExportGroup = async () => {
+    if (!localGroupData || !currentUser) return;
+    
+    try {
+      // Check if user has export access
+      const hasAccess = await subscriptionHelper.checkExportAccess(currentUser.id);
+      if (!hasAccess) {
+        return; // SubscriptionHelper will show the subscription modal
+      }
+      
+      setShowExportModal(true);
+    } catch (error) {
+      console.error('Export group error:', error);
+      Alert.alert('Error', 'Failed to access export feature');
+    }
+  };
+
+  const handleExportComplete = async (format: 'csv' | 'pdf') => {
+    try {
+      if (!localGroupData) return;
+      
+      await ExportService.exportGroupData(localGroupData, format);
+      Alert.alert('Export Complete! 📄', `Group data exported as ${format.toUpperCase()} file`);
+      setShowExportModal(false);
+      
+    } catch (error: any) {
+      console.error('Export error:', error);
+      Alert.alert('Export Failed', error.message || 'Failed to export group data');
+    }
   };
 
   const handleMakeAdmin = async (userId: string) => {
@@ -559,10 +596,10 @@ export default function GroupDetailsModal({
       <View style={[styles.fullScreenContainer, { backgroundColor: theme.colors.background }]}>
         <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center', flex: 1 }]}>
           <TouchableOpacity 
-            style={[styles.closeBtn, { position: 'absolute', top: 60, right: 20, backgroundColor: theme.colors.surface }]}
+            style={[styles.backBtn, { position: 'absolute', top: 60, left: 20, backgroundColor: theme.colors.surface }]}
             onPress={onClose}
           >
-            <Ionicons name="close" size={20} color={theme.colors.text} />
+            <Ionicons name="arrow-back" size={20} color={theme.colors.text} />
           </TouchableOpacity>
           
           {loadingTimeout ? (
@@ -613,10 +650,10 @@ export default function GroupDetailsModal({
         {/* Header with Gradient */}
         <View style={styles.header}>
           <TouchableOpacity 
-            style={styles.closeBtn}
+            style={styles.backBtn}
             onPress={onClose}
           >
-            <Ionicons name="close" size={20} color="white" />
+            <Ionicons name="arrow-back" size={20} color="white" />
           </TouchableOpacity>
           
           <View style={styles.groupHeader}>
@@ -816,7 +853,7 @@ export default function GroupDetailsModal({
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionRow}
-                    onPress={() => Alert.alert('Export', 'Feature coming soon!')}
+                    onPress={handleExportGroup}
                   >
                     <Ionicons name="download" size={20} color={theme.colors.textSecondary} />
                     <Text style={[styles.actionRowText, { color: theme.colors.text }]}>
@@ -1100,7 +1137,21 @@ export default function GroupDetailsModal({
         onClose={() => setShowSettlementModal(false)}
         expense={selectedExpense}
         currentUser={currentUser}
-        onSettlementComplete={loadGroupExpenses}
+        onSettlementComplete={async () => {
+          await loadGroupExpenses();
+          await calculateMemberBalances(); // Refresh member balances after settlement
+          // Also trigger parent refresh if available
+          onRefresh?.();
+        }}
+      />
+
+      {/* Export Modal */}
+      <ExportModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        group={localGroupData}
+        currentUserId={currentUser?.id || ''}
+        onExportComplete={handleExportComplete}
       />
     </View>
   );
@@ -1141,6 +1192,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  backBtn: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
     width: 40,
     height: 40,
     borderRadius: 20,

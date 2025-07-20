@@ -234,7 +234,8 @@ export class SubscriptionHelper {
     RECEIPT_SCANNING: 'receipt_scanning',
     GROUP_CHAT: 'group_chat',
     QR_CODES: 'qr_codes',
-    GMAIL_INTEGRATION: 'gmail_integration'
+    GMAIL_INTEGRATION: 'gmail_integration',
+    EXPORT_DATA: 'export_data'
   };
 
   // Feature names for display
@@ -243,7 +244,8 @@ export class SubscriptionHelper {
     [SubscriptionHelper.PREMIUM_FEATURES.RECEIPT_SCANNING]: 'Receipt Scanning',
     [SubscriptionHelper.PREMIUM_FEATURES.GROUP_CHAT]: 'Group Chat',
     [SubscriptionHelper.PREMIUM_FEATURES.QR_CODES]: 'QR Code Features',
-    [SubscriptionHelper.PREMIUM_FEATURES.GMAIL_INTEGRATION]: 'Gmail Integration'
+    [SubscriptionHelper.PREMIUM_FEATURES.GMAIL_INTEGRATION]: 'Gmail Integration',
+    [SubscriptionHelper.PREMIUM_FEATURES.EXPORT_DATA]: 'Export Data'
   };
 
   // Helper method to check specific premium features
@@ -284,6 +286,14 @@ export class SubscriptionHelper {
       userId, 
       SubscriptionHelper.PREMIUM_FEATURES.GMAIL_INTEGRATION, 
       SubscriptionHelper.FEATURE_NAMES[SubscriptionHelper.PREMIUM_FEATURES.GMAIL_INTEGRATION]
+    );
+  }
+
+  async checkExportAccess(userId: string): Promise<boolean> {
+    return this.checkPremiumFeature(
+      userId, 
+      SubscriptionHelper.PREMIUM_FEATURES.EXPORT_DATA, 
+      SubscriptionHelper.FEATURE_NAMES[SubscriptionHelper.PREMIUM_FEATURES.EXPORT_DATA]
     );
   }
 

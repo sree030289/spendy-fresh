@@ -10,7 +10,10 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import { GRADIENTS } from '@/constants/theme';
 
 // Import modals
-import EnhancedAddModal from '@/components/modals/EnhancedAddModal';
+import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
+import AddExpenseModal from '@/components/modals/AddExpenseModal';
+import AddReminderModal from '@/components/reminders/AddReminderModal';
+import GmailSyncModal from '@/components/modals/GmailSyncModal';
 import SmartMoneyScreen from '@/screens/main/SmartMoneyApp';
 import Reminders from '@/screens/main/RemindersScreen';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
@@ -53,10 +56,39 @@ const TAB_ROUTES = [
 function SwipeableTabNavigator() {
   const { theme } = useTheme();
   const [showActionModal, setShowActionModal] = useState(false);
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [showReminder, setShowReminder] = useState(false);
+  const [showGmailSync, setShowGmailSync] = useState(false);
   const navigation = useNavigation();
   
   // Pan gesture handler for swipe navigation
   const translateX = useRef(new Animated.Value(0)).current;
+  
+  const handleActionSelect = (actionId: string) => {
+    console.log('🎯 Handling action in MainTabNavigator:', actionId);
+    
+    switch (actionId) {
+      case 'split-expense':
+        setShowAddExpense(true);
+        break;
+      case 'smart-expense':
+        // Navigate to Smart Money tab
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: 'SmartMoney'
+          })
+        );
+        break;
+      case 'reminder':
+        setShowReminder(true);
+        break;
+      case 'gmail-sync':
+        setShowGmailSync(true);
+        break;
+      default:
+        console.log('❓ Unknown action:', actionId);
+    }
+  };
   
   const handleSwipeGesture = (event: any) => {
     const { translationX, velocityX, state } = event.nativeEvent;
@@ -115,26 +147,10 @@ function SwipeableTabNavigator() {
 
   // Enhanced Action Modal Component
   const ActionModal = () => (
-    <EnhancedAddModal
+    <UnifiedActionModal
       visible={showActionModal}
       onClose={() => setShowActionModal(false)}
-      onAddExpenseForSplitting={() => {
-        setShowActionModal(false);
-        navigation.dispatch(CommonActions.navigate({ name: 'Split' }));
-      }}
-      onAddTransactionForSmartMoney={() => {
-        setShowActionModal(false);
-        navigation.dispatch(CommonActions.navigate({ name: 'SmartMoney' }));
-      }}
-      onAddReminder={() => {
-        setShowActionModal(false);
-        navigation.dispatch(CommonActions.navigate({ name: 'Reminders' }));
-      }}
-      onSyncGmail={() => {
-        setShowActionModal(false);
-        // Navigate to smart money and trigger Gmail sync
-        navigation.dispatch(CommonActions.navigate({ name: 'SmartMoney' }));
-      }}
+      onActionSelect={handleActionSelect}
     />
   );
 
@@ -260,6 +276,36 @@ function SwipeableTabNavigator() {
 
       {/* Action Modal */}
       <ActionModal />
+      
+      {/* Individual Action Modals */}
+      <AddExpenseModal
+        visible={showAddExpense}
+        onClose={() => setShowAddExpense(false)}
+        onSubmit={(data) => {
+          console.log('Split expense submitted:', data);
+          setShowAddExpense(false);
+        }}
+        groups={[]}
+        friends={[]}
+      />
+      
+      <AddReminderModal
+        visible={showReminder}
+        onClose={() => setShowReminder(false)}
+        onReminderAdded={() => {
+          console.log('Reminder added successfully');
+          setShowReminder(false);
+        }}
+      />
+      
+      <GmailSyncModal
+        visible={showGmailSync}
+        onClose={() => setShowGmailSync(false)}
+        onSync={() => {
+          console.log('Gmail sync initiated');
+          setShowGmailSync(false);
+        }}
+      />
     </>
   );
 }

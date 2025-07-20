@@ -35,6 +35,7 @@ interface GroupSettlementModalProps {
   userCurrency: string;
   currentUserId: string;
   onRefresh?: () => void;
+  onSettlementSuccess?: (title: string, message: string) => void;
 }
 
 export default function GroupSettlementModal({
@@ -43,10 +44,11 @@ export default function GroupSettlementModal({
   groupId,
   userCurrency,
   currentUserId,
-  onRefresh
+  onRefresh,
+  onSettlementSuccess
 }: GroupSettlementModalProps) {
   const { theme } = useTheme();
-  const { allBalances, calculateGroupBalance, refresh: refreshBalances } = useBalances();
+  const { allBalances, calculateGroupBalance, refresh: refreshBalances, forceRefresh } = useBalances();
   
   const [settlements, setSettlements] = useState<{
     allSettlements: DirectSettlement[];
@@ -99,15 +101,16 @@ export default function GroupSettlementModal({
     let totalToReceive = 0;
     let totalToPay = 0;
 
-    // Calculate settlements between ALL group members
+    // Calculate settlements between ALL group members using GROUP-SPECIFIC balances ONLY
     for (let i = 0; i < group.members.length; i++) {
       for (let j = i + 1; j < group.members.length; j++) {
         const member1 = group.members[i];
         const member2 = group.members[j];
         
+        // ALWAYS use group-specific balance calculation
         const pairwiseBalance = await calculateGroupBalance(member1.userId, member2.userId, groupId);
-        
-        console.log(`🔍 ${member1.userData.fullName} vs ${member2.userData.fullName} = ${pairwiseBalance}`);
+
+        console.log(`🔍 ${member1.userData.fullName} vs ${member2.userData.fullName} = ${pairwiseBalance} (GROUP-SPECIFIC ONLY)`);
 
         if (Math.abs(pairwiseBalance) > 0.01) {
           const settlement: DirectSettlement = {
@@ -116,7 +119,7 @@ export default function GroupSettlementModal({
             toUserId: pairwiseBalance > 0 ? member1.userId : member2.userId,
             toUserName: pairwiseBalance > 0 ? member1.userData.fullName : member2.userData.fullName,
             amount: Math.abs(pairwiseBalance),
-            type: 'group_settlement',
+            type: 'group_settlement', // Changed to group-specific
             description: `Group settlement: ${group.name}`
           };
 
@@ -145,9 +148,7 @@ export default function GroupSettlementModal({
     });
 
     console.log('✅ Group settlements loaded:', allSettlements.length, 'settlements');
-  };
-
-  const loadGlobalSettlements = async () => {
+  };  const loadGlobalSettlements = async () => {
     console.log('🌍 Loading GLOBAL settlements');
 
     const allSettlements: DirectSettlement[] = [];
@@ -220,11 +221,37 @@ export default function GroupSettlementModal({
         `Settlement: ${settlement.description}`
       );
 
-      Alert.alert('Success', 'Payment marked as paid successfully!');
+      console.log('✅ Settlement processed, refreshing balances...');
       
-      await loadSettlements();
-      refreshBalances();
+      // Force immediate refresh of balance systems
+      await forceRefresh();
+      
+      // Also trigger any parent refresh callbacks
       onRefresh?.();
+      
+      // Notify ExpenseRefreshService to trigger UI updates across all components
+      const ExpenseRefreshService = require('@/services/expenseRefreshService').default;
+      const refreshService = ExpenseRefreshService.getInstance();
+      refreshService.notifyExpenseAdded();
+      
+      // Wait a moment for balances to update, then reload settlements
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      await loadSettlements();
+      
+      // Close modal after everything is updated
+      onClose();
+      
+      // Show full screen success animation
+      setTimeout(() => {
+        if (onSettlementSuccess) {
+          onSettlementSuccess(
+            'Payment Recorded! 💰',
+            `Settlement of ${getCurrencySymbol(userCurrency)}${settlement.amount.toFixed(2)} has been recorded successfully!`
+          );
+        } else {
+          Alert.alert('Success', 'Payment marked as paid successfully!');
+        }
+      }, 200);
       
     } catch (error: any) {
       console.error('❌ Settlement processing error:', error);

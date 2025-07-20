@@ -436,7 +436,9 @@ export class SplittingService {
       message: message || '',
       status: 'pending',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      source: message?.includes('QR code') ? 'qr_scan' : 'email_invite', // Track invitation source
+      inviteMethod: message?.includes('QR code') ? 'qr' : 'email' // Also track the method for UI display
     };
     
     const docRef = await addDoc(collection(db, 'friendRequests'), friendRequest);
@@ -453,18 +455,23 @@ export class SplittingService {
     // Create notification for the recipient
     console.log('📝 Creating in-app notification for friend request...');
     console.log('🎯 Notification will be sent to userId:', toUserId, '(', toUserData?.fullName, ')');
+    const notificationMessage = message?.includes('QR code') 
+      ? `${fromUserData?.fullName || 'Someone'} scanned your QR code and wants to be your friend`
+      : `${fromUserData?.fullName || 'Someone'} wants to be your friend`;
+      
     await this.createNotification({
       userId: toUserId,
       type: 'friend_request',
       title: 'New Friend Request',
-      message: `${fromUserData?.fullName || 'Someone'} wants to be your friend`,
+      message: notificationMessage,
       data: { 
         friendRequestId: docRef.id,
         fromUserId,
         senderName: fromUserData?.fullName || 'Unknown User',
         senderEmail: fromUserData?.email || '',
         senderAvatar: fromUserData?.profilePicture || '',
-        message: message || `${fromUserData?.fullName || 'Someone'} wants to be your friend`
+        message: notificationMessage,
+        source: friendRequest.source
       },
       isRead: false,
       createdAt: new Date()
@@ -851,6 +858,28 @@ static async acceptFriendRequest(requestId: string): Promise<void> {
     
     await batch.commit();
     
+    // Remove the original friend request notification
+    try {
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('userId', '==', requestData.toUserId),
+        where('type', '==', 'friend_request'),
+        where('data.requestId', '==', requestId)
+      );
+      const notificationSnapshot = await getDocs(notificationsQuery);
+      
+      if (!notificationSnapshot.empty) {
+        const batch2 = writeBatch(db);
+        notificationSnapshot.docs.forEach((doc) => {
+          batch2.delete(doc.ref);
+        });
+        await batch2.commit();
+        console.log('✅ Removed original friend request notification');
+      }
+    } catch (notificationError) {
+      console.warn('Failed to remove original friend request notification:', notificationError);
+    }
+    
     // Send notification to requester
     await this.createNotification({
       userId: requestData.fromUserId,
@@ -883,6 +912,28 @@ static async declineFriendRequest(requestId: string): Promise<void> {
       status: 'declined',
       updatedAt: new Date()
     });
+
+    // Remove the original friend request notification
+    try {
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('userId', '==', requestData.toUserId),
+        where('type', '==', 'friend_request'),
+        where('data.requestId', '==', requestId)
+      );
+      const notificationSnapshot = await getDocs(notificationsQuery);
+      
+      if (!notificationSnapshot.empty) {
+        const batch = writeBatch(db);
+        notificationSnapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log('✅ Removed original friend request notification');
+      }
+    } catch (notificationError) {
+      console.warn('Failed to remove original friend request notification:', notificationError);
+    }
 
     // Send notification to requester
     await this.createNotification({
@@ -975,6 +1026,17 @@ static async getFriends(userId: string): Promise<Friend[]> {
   } catch (error) {
     console.error('❌ Get friends error:', error);
     return [];
+  }
+}
+
+// Check friendship status by email - simplified version for QR code scanning
+static async checkFriendshipStatus(userId: string, friendEmail: string): Promise<string | null> {
+  try {
+    const existingCheck = await this.checkExistingFriendship(userId, friendEmail);
+    return existingCheck.isFriend ? existingCheck.status || null : null;
+  } catch (error) {
+    console.error('Check friendship status error:', error);
+    return null;
   }
 }
 
@@ -3203,6 +3265,58 @@ static async removePendingFriendInvitation(userId: string, friendRequestId: stri
   }
 }
 
+// Send friend request reminder via app notification
+static async sendFriendRequestReminder(fromUserId: string, toUserId: string, notificationData: any): Promise<void> {
+  try {
+    console.log('Sending friend request reminder:', { fromUserId, toUserId });
+    
+    // Get user data for the reminder
+    const fromUserDoc = await getDoc(doc(db, 'users', fromUserId));
+    const fromUserData = fromUserDoc.data();
+    
+    // Create notification in Firestore
+    const notificationRef = await addDoc(collection(db, 'notifications'), {
+      userId: toUserId,
+      fromUserId: fromUserId,
+      type: 'friend_request_reminder',
+      title: notificationData.title || 'Friend Request Reminder',
+      message: notificationData.message || `${fromUserData?.fullName || 'Someone'} is waiting for you to accept their friend request!`,
+      data: {
+        ...notificationData.data,
+        fromUserName: fromUserData?.fullName || 'Someone',
+        fromUserEmail: fromUserData?.email || '',
+        fromUserAvatar: fromUserData?.profilePicture || ''
+      },
+      read: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    
+    console.log('✅ Friend request reminder notification created:', notificationRef.id);
+    
+    // Send push notification to the target user
+    try {
+      const { RealNotificationService } = await import('../notifications/RealNotificationService');
+      await RealNotificationService.sendFriendRequestNotification(
+        toUserId,
+        fromUserData?.fullName || 'Someone',
+        fromUserId,
+        notificationData.data?.requestId || '',
+        fromUserData?.email || '',
+        fromUserData?.profilePicture || ''
+      );
+      console.log('✅ Push notification reminder sent successfully');
+    } catch (notificationError) {
+      console.warn('Failed to send push notification reminder:', notificationError);
+      // Don't fail the whole operation if push notification fails
+    }
+    
+  } catch (error) {
+    console.error('❌ Send friend request reminder error:', error);
+    throw new Error('Failed to send reminder. Please try again.');
+  }
+}
+
 // SETTLEMENT TRANSACTION METHODS
 // Fix for Settlement Transaction undefined fields error in splitting.ts
 // Replace the createSettlementTransaction method with this fixed version
@@ -3332,7 +3446,8 @@ static async createSettlementTransaction(settlementData: {
     
     // 3. Update friend balances if they are friends
     try {
-      await this.updateFriendBalance(settlementData.toUserId, settlementData.fromUserId, -settlementData.amount);
+      // FIXED: When fromUserId pays toUserId, reduce fromUserId's debt to toUserId
+      await this.updateFriendBalance(settlementData.fromUserId, settlementData.toUserId, -settlementData.amount);
       console.log(`Updated friend balance after settlement: ${settlementData.fromUserId} paid ${settlementData.toUserId} ${settlementData.amount}`);
     } catch (error) {
       console.log('No friendship found, skipping friend balance update');
@@ -3691,6 +3806,9 @@ static async markPaymentAsPaid(
     
     console.log('✅ Settlement transaction created:', settlementId);
     
+    // UPDATE EXPENSE SPLITS - Mark relevant splits as paid
+    await this.updateExpenseSplitsForSettlement(fromUserId, toUserId, amount, groupId);
+    
     // Send confirmation notifications using NotificationManager
     try {
       const { notificationManager } = await import('../NotificationManager');
@@ -3762,11 +3880,114 @@ static async markPaymentAsPaid(
     
     console.log('✅ Payment marked as paid successfully');
     
+    // Notify ExpenseRefreshService to trigger UI updates
+    try {
+      const ExpenseRefreshService = (await import('@/services/expenseRefreshService')).default;
+      const refreshService = ExpenseRefreshService.getInstance();
+      refreshService.notifyExpenseAdded();
+      console.log('✅ ExpenseRefreshService notified after settlement');
+    } catch (error) {
+      console.error('⚠️ Failed to notify ExpenseRefreshService:', error);
+    }
+    
   } catch (error) {
     console.error('❌ Mark payment as paid error:', error);
     throw error;
   }
 }
+
+// UPDATE EXPENSE SPLITS FOR SETTLEMENT - Mark relevant expense splits as paid
+static async updateExpenseSplitsForSettlement(
+  fromUserId: string,
+  toUserId: string,
+  settlementAmount: number,
+  groupId?: string
+): Promise<void> {
+  try {
+    console.log('🔄 Updating expense splits for settlement:', { fromUserId, toUserId, settlementAmount, groupId });
+    
+    // Get all expenses for the group or between the users
+    const expenses = groupId 
+      ? await this.getGroupExpenses(groupId)
+      : await this.getUserExpenses(fromUserId, 50); // Get user expenses if no group
+    
+    // Filter to get unpaid expenses where fromUser owes toUser
+    const relevantExpenses = expenses.filter(expense => {
+      // Skip settlement transactions
+      if (expense.isSettlementTransaction) return false;
+      
+      // Only expenses paid by toUser where fromUser has unpaid splits
+      if (expense.paidBy !== toUserId) return false;
+      
+      // Check if fromUser has an unpaid split
+      const fromUserSplit = expense.splitData.find(split => 
+        split.userId === fromUserId && !split.isPaid
+      );
+      
+      return !!fromUserSplit;
+    });
+    
+    console.log(`📋 Found ${relevantExpenses.length} relevant expenses to update`);
+    
+    let remainingAmount = settlementAmount;
+    const batch = writeBatch(db);
+    let updatesCount = 0;
+    
+    // Sort by date (oldest first) to settle oldest debts first
+    relevantExpenses.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    
+    for (const expense of relevantExpenses) {
+      if (remainingAmount <= 0) break;
+      
+      const fromUserSplit = expense.splitData.find(split => 
+        split.userId === fromUserId && !split.isPaid
+      );
+      
+      if (!fromUserSplit) continue;
+      
+      const splitAmount = fromUserSplit.amount;
+      
+      if (remainingAmount >= splitAmount) {
+        // Fully pay this split
+        console.log(`✅ Fully paying split of ${splitAmount} for expense: ${expense.description}`);
+        
+        const updatedSplitData = expense.splitData.map(split => 
+          split.userId === fromUserId 
+            ? { ...split, isPaid: true, paidAt: new Date() }
+            : split
+        );
+        
+        batch.update(doc(db, 'expenses', expense.id), {
+          splitData: updatedSplitData,
+          updatedAt: new Date()
+        });
+        
+        updatesCount++;
+        remainingAmount -= splitAmount;
+      } else {
+        // Partially pay this split (though this is complex - for now, skip partial payments)
+        console.log(`⚠️ Partial payment not implemented for expense: ${expense.description}`);
+        break;
+      }
+    }
+    
+    if (updatesCount > 0) {
+      await batch.commit();
+      console.log(`✅ Updated ${updatesCount} expense records`);
+    } else {
+      console.log('ℹ️ No expense splits needed updating');
+    }
+    
+    if (remainingAmount > 0) {
+      console.log(`⚠️ Settlement amount exceeded expense splits by ${remainingAmount}`);
+    }
+    
+  } catch (error) {
+    console.error('❌ Update expense splits for settlement error:', error);
+    throw error;
+  }
+}
+
 // ==========================================
 // PHASE 1: COMPREHENSIVE BALANCE CALCULATION
 // ==========================================

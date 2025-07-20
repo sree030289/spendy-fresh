@@ -47,6 +47,14 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
     }
   }, [visible]);
 
+  // Add cleanup when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setScanned(false);
+      setProcessing(false);
+    }
+  }, [visible]);
+
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
     // Prevent multiple rapid scans
     if (scanned || processing) {
@@ -57,25 +65,45 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
     setProcessing(true);
     
     try {
-      // Basic validation - but don't show alert here, let parent handle all errors
-      if (!data.startsWith('spendy://qr') && !data.includes('spendy') && !data.includes('"type":')) {
-        // Set error state but let parent handle the alert
+      console.log('📱 QR Code scanned:', data);
+      
+      // Simple validation - check if it's a valid JSON or Spendy URL
+      let isValidQR = false;
+      
+      if (data.startsWith('spendy://')) {
+        isValidQR = true;
+      } else {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type && (parsed.type.includes('invite') || parsed.type.includes('friend') || parsed.type.includes('group'))) {
+            isValidQR = true;
+          }
+        } catch {
+          // Not JSON, check other patterns
+          if (data.includes('spendy') || data.includes('friend') || data.includes('group')) {
+            isValidQR = true;
+          }
+        }
+      }
+
+      if (!isValidQR) {
+        console.log('❌ Invalid QR format');
         setProcessing(false);
         setScanned(false);
         onQRCodeScanned('INVALID_QR_FORMAT');
         return;
       }
 
-      // Delay to ensure smooth UX
+      console.log('✅ Valid QR code detected, passing to parent');
+      // Pass the data to parent with a small delay for smooth UX
       setTimeout(() => {
         onQRCodeScanned(data);
-        // Don't close immediately - let parent handle closing
-      }, 200);
+      }, 300);
 
     } catch (error: any) {
+      console.error('❌ QR scan error:', error);
       setProcessing(false);
       setScanned(false);
-      // Let parent handle all error alerts
       onQRCodeScanned('SCAN_ERROR');
     }
   };
