@@ -498,11 +498,29 @@ export default function SettlementScreen() {
           <View style={styles.emptyContainer}>
             <Ionicons name="checkmark-circle" size={64} color={theme.colors.success} />
             <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-              All Settled!
+              {activeFilter === 'all' 
+                ? 'All Settled!' 
+                : activeFilter === 'friends' 
+                  ? 'No Friend Balances'
+                  : 'No Group Balances'
+              }
             </Text>
             <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-              No outstanding balances need to be settled.
+              {activeFilter === 'all' 
+                ? 'No outstanding balances need to be settled.'
+                : activeFilter === 'friends' 
+                  ? 'You have no outstanding friend balances to settle.'
+                  : 'You have no outstanding group balances to settle.'
+              }
             </Text>
+            {activeFilter !== 'all' && (
+              <TouchableOpacity
+                style={[styles.switchFilterButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => setActiveFilter('all')}
+              >
+                <Text style={styles.switchFilterText}>View All Settlements</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <>
@@ -764,5 +782,16 @@ const styles = StyleSheet.create({
   filterTabText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  switchFilterButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  switchFilterText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
