@@ -2698,6 +2698,9 @@ export default function RealSplittingScreen() {
             loadRecentExpenses()
           ]);
           notifyBalanceChange(); // FIXED: Notify balance system
+          
+          // Show success animation for deletion
+          showAnimatedSuccess('Expense Deleted! 🗑️', 'Your expense has been deleted successfully');
         }}
       />
 
