@@ -24,6 +24,7 @@ interface RemindModalProps {
   balance: number;
   currency: string;
   onSendReminder: (method: 'sms' | 'whatsapp' | 'app', message: string) => Promise<void>;
+  onSuccess?: (title: string, message: string) => void; // Add success callback
 }
 
 export default function RemindModal({
@@ -33,6 +34,7 @@ export default function RemindModal({
   balance,
   currency,
   onSendReminder,
+  onSuccess,
 }: RemindModalProps) {
   const { theme } = useTheme();
   const [customMessage, setCustomMessage] = useState('');
@@ -67,7 +69,13 @@ export default function RemindModal({
         if (canOpen) {
           await Linking.openURL(url);
           await onSendReminder(method, message);
-          Alert.alert('Success', 'SMS reminder sent!');
+          
+          // Use animated success instead of Alert
+          if (onSuccess) {
+            onSuccess('SMS Sent! 📱', 'Your reminder has been sent via SMS');
+          } else {
+            Alert.alert('Success', 'SMS reminder sent!');
+          }
         } else {
           Alert.alert('Error', 'Cannot send SMS on this device');
         }
@@ -86,14 +94,25 @@ export default function RemindModal({
         try {
           await Linking.openURL(url);
           await onSendReminder(method, message);
-          Alert.alert('Success', 'WhatsApp opened! Please send the message to complete the reminder.');
+          
+          // Use animated success instead of Alert
+          if (onSuccess) {
+            onSuccess('WhatsApp Opened! 💚', 'Please send the message to complete the reminder');
+          } else {
+            Alert.alert('Success', 'WhatsApp opened! Please send the message to complete the reminder.');
+          }
         } catch (error) {
           // If WhatsApp fails, try web WhatsApp as fallback
           const webUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
           try {
             await Linking.openURL(webUrl);
             await onSendReminder(method, message);
-            Alert.alert('Success', 'WhatsApp Web opened! Please send the message to complete the reminder.');
+            
+            if (onSuccess) {
+              onSuccess('WhatsApp Web Opened! 💚', 'Please send the message to complete the reminder');
+            } else {
+              Alert.alert('Success', 'WhatsApp Web opened! Please send the message to complete the reminder.');
+            }
           } catch (webError) {
             Alert.alert('Error', 'WhatsApp is not available on this device. Please try SMS instead.');
           }
@@ -101,7 +120,13 @@ export default function RemindModal({
       } else if (method === 'app') {
         // Send app notification
         await onSendReminder(method, message);
-        Alert.alert('Success', 'In-app reminder sent!');
+        
+        // Use animated success instead of Alert
+        if (onSuccess) {
+          onSuccess('Reminder Sent! 🔔', 'In-app notification has been sent successfully');
+        } else {
+          Alert.alert('Success', 'In-app reminder sent!');
+        }
       }
       
       onClose();

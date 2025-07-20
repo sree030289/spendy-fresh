@@ -2885,6 +2885,7 @@ export default function RealSplittingScreen() {
         balance={remindBalance}
         currency={user?.currency || 'USD'}
         onSendReminder={handleSendReminder}
+        onSuccess={showAnimatedSuccess}
       />
 
       <SuccessAnimationModal
