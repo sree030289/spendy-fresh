@@ -545,7 +545,7 @@ const FullScreenCalendarModal: React.FC<{
 const SmartMoneyScreen: React.FC = () => {
   const { user = null } = useAuth() || {};
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [income, setIncome] = useState<Income[]>([]);
@@ -563,10 +563,12 @@ const SmartMoneyScreen: React.FC = () => {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showTransactionListModal, setShowTransactionListModal] = useState(false);
   
-  // Define tabs configuration
+  // Updated tabs for Family Financial Management System
   const tabs = [
-    { id: 'overview', title: 'Overview', icon: 'analytics-outline' },
+    { id: 'dashboard', title: 'Dashboard', icon: 'home-outline' },
+    { id: 'analytics', title: 'Analytics', icon: 'analytics-outline' },
     { id: 'transactions', title: 'Transactions', icon: 'card-outline' },
+    { id: 'budget', title: 'Budget', icon: 'wallet-outline' }
   ];
 
   const [formData, setFormData] = useState({
@@ -914,7 +916,7 @@ const SmartMoneyScreen: React.FC = () => {
     );
   };
 
-  const renderOverview = () => {
+  const renderDashboard = () => {
     const totalIncome = income.reduce((sum, item) => sum + item.amount, 0);
     const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
     const netFlow = totalIncome - totalExpenses;
@@ -924,10 +926,13 @@ const SmartMoneyScreen: React.FC = () => {
         contentContainerStyle={styles.tabContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Balance Card */}
+        {/* Family Financial Overview Card */}
         <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
           <View style={styles.balanceHeader}>
-            <Text style={styles.balanceTitle}>Your Balance</Text>
+            <Text style={styles.balanceTitle}>Family Financial Overview</Text>
+            <Text style={[styles.balanceSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>
+              Current Month
+            </Text>
           </View>
 
           <View style={styles.balanceGrid}>
@@ -935,7 +940,7 @@ const SmartMoneyScreen: React.FC = () => {
               <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
                 ${totalIncome.toFixed(2)}
               </Text>
-              <Text style={styles.balanceLabel}>Income</Text>
+              <Text style={styles.balanceLabel}>Total Income</Text>
             </View>
             
             <View style={[styles.balanceItem, {
@@ -947,7 +952,7 @@ const SmartMoneyScreen: React.FC = () => {
               <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
                 ${totalExpenses.toFixed(2)}
               </Text>
-              <Text style={styles.balanceLabel}>Expenses</Text>
+              <Text style={styles.balanceLabel}>Total Expenses</Text>
             </View>
             
             <View style={styles.balanceItem}>
@@ -966,9 +971,9 @@ const SmartMoneyScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Quick Actions */}
+        {/* Quick Actions for Family Management */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Family Financial Actions</Text>
           <View style={styles.quickActionsGrid}>
             <TouchableOpacity
               style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
@@ -980,7 +985,7 @@ const SmartMoneyScreen: React.FC = () => {
               <Ionicons name="remove-circle-outline" size={24} color={theme.colors.error} />
               <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Expense</Text>
               <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-                Track spending
+                Track family spending
               </Text>
             </TouchableOpacity>
 
@@ -994,7 +999,7 @@ const SmartMoneyScreen: React.FC = () => {
               <Ionicons name="add-circle-outline" size={24} color={theme.colors.success} />
               <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Income</Text>
               <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-                Record earnings
+                Record family income
               </Text>
             </TouchableOpacity>
             
@@ -1005,34 +1010,34 @@ const SmartMoneyScreen: React.FC = () => {
                 setShowAddForm(true);
               }}
             >
-              <Ionicons name="calendar-outline" size={24} color={theme.colors.warning} />
-              <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Reminder</Text>
+              <Ionicons name="notifications-outline" size={24} color={theme.colors.warning} />
+              <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Bill Reminder</Text>
               <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-                Set alerts
+                Set payment alerts
               </Text>
             </TouchableOpacity>
             
             <TouchableOpacity
               style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
-              onPress={() => setShowCalendarModal(true)}
+              onPress={() => setActiveTab('budget')}
             >
-              <Ionicons name="calendar" size={24} color={theme.colors.primary} />
-              <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Calendar View</Text>
+              <Ionicons name="wallet-outline" size={24} color={theme.colors.primary} />
+              <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Budget Plan</Text>
               <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-                See timeline
+                Manage family budget
               </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Analytics Section */}
-        {renderAnalyticsSection()}
+        {/* Budget Alerts Section */}
+        {renderBudgetAlerts()}
 
         {/* Recent Transactions - Enhanced Card Rows */}
         <RecentTransactionsView
           expenses={expenses}
           theme={theme}
-          onViewAll={() => setShowTransactionListModal(true)}
+          onViewAll={() => setActiveTab('transactions')}
           onExpensePress={(expense) => {
             Alert.alert(
               expense.title,
@@ -1045,18 +1050,309 @@ const SmartMoneyScreen: React.FC = () => {
           }}
         />
 
-        {/* Budget Plan for Family */}
-        <BudgetPlanSection
-          onManageBudget={() => {
+        {/* Upcoming Bills & Reminders */}
+        <UpcomingRemindersView
+          reminders={reminders}
+          theme={theme}
+          onViewAll={() => setShowReminderListModal(true)}
+          onReminderPress={(reminder) => {
             Alert.alert(
-              'Budget Management',
-              'Budget management features coming soon! Set up categories, limits, and track family spending.',
-              [{ text: 'OK' }]
+              reminder.title,
+              `Amount: ${reminder.amount.toFixed(2)}\nCategory: ${reminder.category}\nDue: ${new Date(reminder.dueDate).toLocaleDateString()}`,
+              [
+                { text: 'Mark Paid', onPress: () => markReminderAsPaid(reminder.id) },
+                { text: 'Cancel', style: 'cancel' }
+              ]
             );
           }}
+          onMarkPaid={markReminderAsPaid}
         />
       </ScrollView>
     );
+  };
+
+  const renderAnalytics = () => {
+    const totalIncome = income.reduce((sum, item) => sum + item.amount, 0);
+    const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+
+    // Calculate category-wise expenses
+    const categoryExpenses = expenses.reduce((acc: any, expense) => {
+      acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+      return acc;
+    }, {});
+
+    // Calculate monthly trends
+    const monthlyExpenses = expenses.reduce((acc: any, expense) => {
+      const month = new Date(expense.date).toISOString().slice(0, 7);
+      acc[month] = (acc[month] || 0) + expense.amount;
+      return acc;
+    }, {});
+
+    return (
+      <ScrollView
+        contentContainerStyle={styles.tabContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Financial Health Card */}
+        <View style={[styles.balanceCard, { backgroundColor: theme.colors.success }]}>
+          <View style={styles.balanceHeader}>
+            <Text style={styles.balanceTitle}>Financial Health Score</Text>
+            <Text style={[styles.balanceSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>
+              Based on spending patterns
+            </Text>
+          </View>
+          <View style={styles.balanceItem}>
+            <Text style={[styles.balanceAmount, { fontSize: 48 }]}>
+              {totalIncome > 0 ? Math.min(100, Math.round((1 - totalExpenses / totalIncome) * 100)) : 0}%
+            </Text>
+            <Text style={styles.balanceLabel}>
+              {totalIncome > totalExpenses ? 'Excellent' : 'Needs Attention'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Spending by Category */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Spending by Category</Text>
+          {Object.entries(categoryExpenses).length === 0 ? (
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="pie-chart-outline" size={40} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+                No spending data yet
+              </Text>
+            </View>
+          ) : (
+            Object.entries(categoryExpenses)
+              .sort(([,a], [,b]) => (b as number) - (a as number))
+              .map(([category, amount]) => (
+                <View key={category} style={styles.categoryRow}>
+                  <View style={styles.categoryLeft}>
+                    <Text style={styles.categoryIcon}>{getCategoryEmoji(category)}</Text>
+                    <Text style={[styles.categoryName, { color: theme.colors.text }]}>{category}</Text>
+                  </View>
+                  <View style={styles.categoryRight}>
+                    <Text style={[styles.categoryAmount, { color: theme.colors.text }]}>
+                      ${(amount as number).toFixed(2)}
+                    </Text>
+                    <View style={[styles.categoryBar, { backgroundColor: theme.colors.border }]}>
+                      <View 
+                        style={[
+                          styles.categoryBarFill, 
+                          { 
+                            width: `${((amount as number) / Math.max(...Object.values(categoryExpenses) as number[])) * 100}%`,
+                            backgroundColor: getCategoryColor(category)
+                          }
+                        ]} 
+                      />
+                    </View>
+                  </View>
+                </View>
+              ))
+          )}
+        </View>
+
+        {/* Monthly Trends */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Monthly Spending Trends</Text>
+          {Object.entries(monthlyExpenses).length === 0 ? (
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="trending-up-outline" size={40} color={theme.colors.textSecondary} />
+              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+                No trend data yet
+              </Text>
+            </View>
+          ) : (
+            Object.entries(monthlyExpenses)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([month, amount]) => (
+                <View key={month} style={styles.trendRow}>
+                  <Text style={[styles.trendMonth, { color: theme.colors.text }]}>
+                    {new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </Text>
+                  <Text style={[styles.trendAmount, { color: theme.colors.text }]}>
+                    ${(amount as number).toFixed(2)}
+                  </Text>
+                </View>
+              ))
+          )}
+        </View>
+
+        {/* Budget Insights */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Budget Insights</Text>
+          <View style={styles.insightCard}>
+            <Ionicons name="bulb-outline" size={24} color={theme.colors.warning} />
+            <View style={styles.insightContent}>
+              <Text style={[styles.insightTitle, { color: theme.colors.text }]}>
+                Smart Savings Tip
+              </Text>
+              <Text style={[styles.insightText, { color: theme.colors.textSecondary }]}>
+                {totalExpenses > totalIncome * 0.8 
+                  ? "Consider reducing expenses in your top spending categories to improve your financial health."
+                  : "Great job! You're maintaining a healthy spending ratio. Consider increasing savings."}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderBudget = () => {
+    const totalIncome = income.reduce((sum, item) => sum + item.amount, 0);
+    const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+    const remainingBudget = totalIncome - totalExpenses;
+
+    // Sample budget categories - in a real app, this would be user-configurable
+    const budgetCategories = [
+      { name: 'Housing', budgeted: totalIncome * 0.3, spent: expenses.filter(e => e.category === 'Housing').reduce((sum, e) => sum + e.amount, 0) },
+      { name: 'Food', budgeted: totalIncome * 0.15, spent: expenses.filter(e => e.category === 'Food').reduce((sum, e) => sum + e.amount, 0) },
+      { name: 'Transportation', budgeted: totalIncome * 0.15, spent: expenses.filter(e => e.category === 'Transportation').reduce((sum, e) => sum + e.amount, 0) },
+      { name: 'Utilities', budgeted: totalIncome * 0.1, spent: expenses.filter(e => e.category === 'Utilities').reduce((sum, e) => sum + e.amount, 0) },
+      { name: 'Entertainment', budgeted: totalIncome * 0.1, spent: expenses.filter(e => e.category === 'Entertainment').reduce((sum, e) => sum + e.amount, 0) },
+      { name: 'Savings', budgeted: totalIncome * 0.2, spent: 0 },
+    ];
+
+    return (
+      <ScrollView
+        contentContainerStyle={styles.tabContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Budget Overview */}
+        <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
+          <View style={styles.balanceHeader}>
+            <Text style={styles.balanceTitle}>Monthly Budget Overview</Text>
+            <Text style={[styles.balanceSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>
+              Family Financial Plan
+            </Text>
+          </View>
+          <View style={styles.balanceGrid}>
+            <View style={styles.balanceItem}>
+              <Text style={styles.balanceAmount}>${totalIncome.toFixed(2)}</Text>
+              <Text style={styles.balanceLabel}>Monthly Income</Text>
+            </View>
+            <View style={[styles.balanceItem, { borderLeftWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }]}>
+              <Text style={styles.balanceAmount}>${totalExpenses.toFixed(2)}</Text>
+              <Text style={styles.balanceLabel}>Spent This Month</Text>
+            </View>
+            <View style={[styles.balanceItem, { borderLeftWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }]}>
+              <Text style={[styles.balanceAmount, { color: remainingBudget >= 0 ? '#FFD700' : '#FFA500' }]}>
+                ${Math.abs(remainingBudget).toFixed(2)}
+              </Text>
+              <Text style={styles.balanceLabel}>
+                {remainingBudget >= 0 ? 'Remaining' : 'Over Budget'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Budget Categories */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Budget Categories</Text>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+              onPress={() => {
+                Alert.alert(
+                  'Budget Management',
+                  'Budget category management coming soon! Set custom limits and track spending per category.',
+                  [{ text: 'OK' }]
+                );
+              }}
+            >
+              <Ionicons name="settings" color="white" size={20} />
+            </TouchableOpacity>
+          </View>
+          
+          {budgetCategories.map((category) => {
+            const percentage = category.budgeted > 0 ? (category.spent / category.budgeted) * 100 : 0;
+            const isOverBudget = percentage > 100;
+            
+            return (
+              <View key={category.name} style={styles.budgetCategoryCard}>
+                <View style={styles.budgetCategoryHeader}>
+                  <View style={styles.budgetCategoryLeft}>
+                    <Text style={styles.budgetCategoryIcon}>{getCategoryEmoji(category.name)}</Text>
+                    <View>
+                      <Text style={[styles.budgetCategoryName, { color: theme.colors.text }]}>
+                        {category.name}
+                      </Text>
+                      <Text style={[styles.budgetCategorySubtext, { color: theme.colors.textSecondary }]}>
+                        ${category.spent.toFixed(2)} of ${category.budgeted.toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.budgetCategoryRight}>
+                    <Text style={[
+                      styles.budgetCategoryPercentage, 
+                      { color: isOverBudget ? theme.colors.error : theme.colors.success }
+                    ]}>
+                      {percentage.toFixed(0)}%
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={[styles.budgetProgress, { backgroundColor: theme.colors.border }]}>
+                  <View 
+                    style={[
+                      styles.budgetProgressFill, 
+                      { 
+                        width: `${Math.min(100, percentage)}%`,
+                        backgroundColor: isOverBudget ? theme.colors.error : theme.colors.success
+                      }
+                    ]} 
+                  />
+                </View>
+                
+                {isOverBudget && (
+                  <Text style={[styles.budgetWarning, { color: theme.colors.error }]}>
+                    Over budget by ${(category.spent - category.budgeted).toFixed(2)}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Budget Tips */}
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Budget Tips</Text>
+          <View style={styles.tipCard}>
+            <Ionicons name="lightbulb-outline" size={24} color={theme.colors.primary} />
+            <View style={styles.tipContent}>
+              <Text style={[styles.tipTitle, { color: theme.colors.text }]}>
+                50/30/20 Rule
+              </Text>
+              <Text style={[styles.tipText, { color: theme.colors.textSecondary }]}>
+                Allocate 50% for needs, 30% for wants, and 20% for savings and debt repayment.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderBudgetAlerts = () => {
+    const totalIncome = income.reduce((sum, item) => sum + item.amount, 0);
+    const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+    
+    if (totalExpenses > totalIncome * 0.8) {
+      return (
+        <View style={[styles.alertCard, { backgroundColor: theme.colors.warning + '20', borderColor: theme.colors.warning }]}>
+          <Ionicons name="warning-outline" size={24} color={theme.colors.warning} />
+          <View style={styles.alertContent}>
+            <Text style={[styles.alertTitle, { color: theme.colors.text }]}>
+              Budget Alert
+            </Text>
+            <Text style={[styles.alertText, { color: theme.colors.textSecondary }]}>
+              You've spent 80% of your monthly income. Consider reviewing your expenses.
+            </Text>
+          </View>
+        </View>
+      );
+    }
+    return null;
   };
 
   const renderTransactions = () => (
@@ -1388,9 +1684,9 @@ const SmartMoneyScreen: React.FC = () => {
       <View style={[styles.header, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.border }]}>
         <View style={styles.headerContent}>
           <View>
-            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Smart Money</Text>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Family Finance</Text>
             <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-              Track your finances
+              Manage your family's finances
             </Text>
           </View>
           <View style={styles.headerActions}>
@@ -1433,8 +1729,10 @@ const SmartMoneyScreen: React.FC = () => {
 
       {/* Tab Content */}
       <View style={styles.tabContainer}>
-        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'dashboard' && renderDashboard()}
+        {activeTab === 'analytics' && renderAnalytics()}
         {activeTab === 'transactions' && renderTransactions()}
+        {activeTab === 'budget' && renderBudget()}
       </View>
 
       {/* Floating Action Button */}
@@ -2486,6 +2784,184 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: '#D1D5DB',
     opacity: 0.7,
+  },
+
+  // Enhanced Analytics Styles
+  categoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  categoryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  categoryIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  categoryName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  categoryRight: {
+    alignItems: 'flex-end',
+    flex: 1,
+  },
+  categoryAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  categoryBar: {
+    height: 4,
+    width: 80,
+    borderRadius: 2,
+  },
+  categoryBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  trendRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  trendMonth: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  trendAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  insightCard: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'flex-start',
+  },
+  insightContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  insightTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  insightText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  // Budget Styles
+  budgetCategoryCard: {
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  budgetCategoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  budgetCategoryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  budgetCategoryIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  budgetCategoryName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  budgetCategorySubtext: {
+    fontSize: 14,
+  },
+  budgetCategoryRight: {
+    alignItems: 'flex-end',
+  },
+  budgetCategoryPercentage: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  budgetProgress: {
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  budgetProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  budgetWarning: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  tipCard: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'flex-start',
+  },
+  tipContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  tipTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  tipText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  // Alert Styles
+  alertCard: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    alignItems: 'flex-start',
+  },
+  alertContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  alertText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  balanceSubtitle: {
+    fontSize: 12,
+    marginTop: 4,
   },
 });
 
