@@ -40,6 +40,7 @@ export default function SettlementScreen() {
   const [settlements, setSettlements] = useState<SettlementEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'friends' | 'groups'>('all'); // Add filter state
   const [summary, setSummary] = useState({
     totalOwed: 0,
     totalOwing: 0,
@@ -259,6 +260,14 @@ export default function SettlementScreen() {
 
   const currencySymbol = getCurrencySymbol(user?.currency || 'USD');
 
+  // Filter settlements based on active filter
+  const filteredSettlements = settlements.filter(settlement => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'friends') return settlement.type === 'friend';
+    if (activeFilter === 'groups') return settlement.type === 'group';
+    return true;
+  });
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
@@ -325,8 +334,56 @@ export default function SettlementScreen() {
           </View>
         </View>
 
+        {/* Filter Tabs */}
+        <View style={[styles.filterContainer, { backgroundColor: theme.colors.surface }]}>
+          <TouchableOpacity
+            style={[
+              styles.filterTab,
+              activeFilter === 'all' && { backgroundColor: theme.colors.primary }
+            ]}
+            onPress={() => setActiveFilter('all')}
+          >
+            <Text style={[
+              styles.filterTabText,
+              { color: activeFilter === 'all' ? 'white' : theme.colors.text }
+            ]}>
+              All ({settlements.length})
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.filterTab,
+              activeFilter === 'friends' && { backgroundColor: theme.colors.primary }
+            ]}
+            onPress={() => setActiveFilter('friends')}
+          >
+            <Text style={[
+              styles.filterTabText,
+              { color: activeFilter === 'friends' ? 'white' : theme.colors.text }
+            ]}>
+              Friends ({settlements.filter(s => s.type === 'friend').length})
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.filterTab,
+              activeFilter === 'groups' && { backgroundColor: theme.colors.primary }
+            ]}
+            onPress={() => setActiveFilter('groups')}
+          >
+            <Text style={[
+              styles.filterTabText,
+              { color: activeFilter === 'groups' ? 'white' : theme.colors.text }
+            ]}>
+              Groups ({settlements.filter(s => s.type === 'group').length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Settlements List */}
-        {settlements.length === 0 ? (
+        {filteredSettlements.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="checkmark-circle" size={64} color={theme.colors.success} />
             <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
@@ -339,9 +396,9 @@ export default function SettlementScreen() {
         ) : (
           <>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Outstanding Balances ({settlements.length})
+              Outstanding Balances ({filteredSettlements.length})
             </Text>
-            {settlements.map(renderSettlementCard)}
+            {filteredSettlements.map(renderSettlementCard)}
           </>
         )}
 
@@ -565,5 +622,24 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    padding: 4,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterTabText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

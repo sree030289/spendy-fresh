@@ -3495,16 +3495,17 @@ const styles = StyleSheet.create({
   balanceItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 2, // Give more space to the left side
+    flex: 3, // Increase space for left side
     minWidth: 0,
-    marginRight: 12, // Add margin to prevent overlap
+    marginRight: 16, // Increase margin to prevent overlap
   },
   balanceItemRight: {
     flexDirection: 'column', // Stack balance info vertically for better space usage
     alignItems: 'flex-end',
     gap: 4,
-    flex: 1, // Limit right side width
-    maxWidth: '40%', // Prevent overflow
+    flex: 2, // Increase right side to accommodate longer balance text
+    maxWidth: '45%', // Allow more space for balance text
+    justifyContent: 'center',
   },
   personAvatar: {
     width: 40,
@@ -3522,14 +3523,15 @@ const styles = StyleSheet.create({
   personInfo: {
     flex: 1,
     minWidth: 0,
-    marginLeft: 12, // Add spacing from avatar
-    paddingRight: 8, // Prevent text from touching the right section
+    marginLeft: 8, // Reduce spacing slightly
+    paddingRight: 12, // Increase padding to prevent text from touching the right section
   },
   personName: {
     fontSize: 16,
     fontWeight: '600', // Make name more prominent
     marginBottom: 4,
     lineHeight: 20,
+    flexShrink: 1, // Allow name to shrink if very long
   },
   personEmail: {
     fontSize: 12,
@@ -3555,10 +3557,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   balanceText: {
-    fontSize: 13, // Slightly smaller to fit better
+    fontSize: 12, // Make smaller to fit better
     fontWeight: '600',
     textAlign: 'right',
     flexShrink: 1, // Allow text to shrink if needed
+    maxWidth: '100%', // Ensure text doesn't overflow
   },
   balanceBreakdown: {
     fontSize: 10,
