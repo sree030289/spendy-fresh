@@ -499,6 +499,9 @@ export const useBalances = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+    const [isRepairing, setIsRepairing] = useState(false);
+  const [repairResults, setRepairResults] = useState<any>(null);
+
   const refresh = useCallback(async (force: boolean = false) => {
     if (!user?.id) return;
 
@@ -535,6 +538,73 @@ export const useBalances = () => {
 
   const forceRefresh = useCallback(() => refresh(true), [refresh]);
 
+  // Diagnose balance issues for a specific relationship
+  const diagnoseRelationship = useCallback(async (
+    userId1: string, 
+    userId2: string, 
+    groupId?: string
+  ) => {
+    try {
+      const diagnosis = await SplittingService.diagnoseBalanceConsistency(userId1, userId2, groupId);
+      console.log('🔍 Balance Diagnosis:', diagnosis);
+      return diagnosis;
+    } catch (error) {
+      console.error('❌ Diagnosis failed:', error);
+      throw error;
+    }
+  }, []);
+
+  // Repair balance issues for a specific relationship
+  const repairRelationship = useCallback(async (
+    userId1: string, 
+    userId2: string, 
+    groupId?: string
+  ) => {
+    try {
+      setIsRepairing(true);
+      await SplittingService.repairBalanceInconsistencies(userId1, userId2, groupId);
+      console.log('✅ Balance repair completed');
+    } catch (error) {
+      console.error('❌ Repair failed:', error);
+      throw error;
+    } finally {
+      setIsRepairing(false);
+    }
+  }, []);
+
+  // Repair all balances in a group
+  const repairGroupBalances = useCallback(async (groupId: string) => {
+    try {
+      setIsRepairing(true);
+      const results = await SplittingService.repairGroupBalanceConsistencies(groupId);
+      setRepairResults(results);
+      console.log('✅ Group balance repair completed:', results);
+      return results;
+    } catch (error) {
+      console.error('❌ Group repair failed:', error);
+      throw error;
+    } finally {
+      setIsRepairing(false);
+    }
+  }, []);
+
+  // Enhanced settlement with full synchronization
+  const settleWithSync = useCallback(async (
+    fromUserId: string,
+    toUserId: string,
+    amount: number,
+    groupId?: string,
+    description?: string
+  ) => {
+    try {
+      // Use the enhanced markPaymentAsPaid method
+      await SplittingService.markPaymentAsPaid(fromUserId, toUserId, amount, groupId, description);
+      console.log('✅ Settlement with sync completed');
+    } catch (error) {
+      console.error('❌ Settlement with sync failed:', error);
+      throw error;
+    }
+  }, []);
   const notifyChange = useCallback(() => {
     console.log('🔔 useBalances: Balance change notification received');
     refresh();
@@ -649,10 +719,78 @@ export const useBalances = () => {
     friendsData,
     refresh,
     forceRefresh,
-    notifyChange
+    notifyChange,
+     diagnoseRelationship,
+    repairRelationship,
+    repairGroupBalances,
+    settleWithSync,
+    isRepairing,
+    repairResults
   ]);
 };
+// Enhanced useBalances hook with diagnostic capabilities
+export const useEnhancedBalances = () => {
+  const balanceSync = useBalanceSync();
+  
+  // Test balance consistency across the app
+  const runBalanceHealthCheck = useCallback(async (userId: string) => {
+    try {
+      console.log('🏥 Running balance health check...');
+      
+      // Get user's groups
+      const groups = await SplittingService.getUserGroups(userId);
+      const friends = await SplittingService.getFriends(userId);
+      
+      const results = {
+        groupsChecked: 0,
+        relationshipsChecked: 0,
+        inconsistenciesFound: 0,
+        repairsNeeded: []
+      };
+      
+      // Check each group
+      for (const group of groups) {
+        results.groupsChecked++;
+        
+        // Check all relationships in this group
+        for (const member of group.members) {
+          if (member.userId === userId) continue;
+          
+          try {
+            const diagnosis = await balanceSync.diagnoseRelationship(userId, member.userId, group.id);
+            results.relationshipsChecked++;
+            
+            if (!diagnosis.isConsistent) {
+              results.inconsistenciesFound++;
+              results.repairsNeeded.push({
+                userId1: userId,
+                userId2: member.userId,
+                groupId: group.id,
+                groupName: group.name,
+                memberName: member.userData.fullName,
+                discrepancy: diagnosis.discrepancy
+              });
+            }
+          } catch (error) {
+            console.error('Error checking relationship:', error);
+          }
+        }
+      }
+      
+      console.log('🏥 Health check results:', results);
+      return results;
+      
+    } catch (error) {
+      console.error('❌ Health check failed:', error);
+      throw error;
+    }
+  }, [balanceSync]);
 
+  return {
+    ...balanceSync,
+    runBalanceHealthCheck
+  };
+};
 // Export specialized hooks for different components
 export const useOverviewBalances = () => {
   const baseBalances = useBalances();

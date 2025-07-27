@@ -3874,7 +3874,83 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
   }
 }
 
-// MARK PAYMENT AS PAID - Process settlement payment for groups or friends
+/**
+ * NEW: Direct friend balance synchronization for settlements
+ */
+static async syncFriendBalanceForSettlement(
+  fromUserId: string,
+  toUserId: string,
+  settlementAmount: number
+): Promise<void> {
+  try {
+    console.log(`🔄 SYNC: Updating friend balance for settlement`);
+    console.log(`📝 ${fromUserId} pays ${toUserId} $${settlementAmount}`);
+    console.log(`💡 This should REDUCE ${fromUserId}'s debt to ${toUserId}`);
+    
+    // Ensure friendship exists
+    const toUserDoc = await getDoc(doc(db, 'users', toUserId));
+    const toUserData = toUserDoc.data();
+    
+    const existingCheck = await this.checkExistingFriendship(fromUserId, toUserData?.email || '');
+    
+    if (!existingCheck.isFriend) {
+      console.log('🔗 Creating friendship for settlement...');
+      const fromUserDoc = await getDoc(doc(db, 'users', fromUserId));
+      const fromUserData = fromUserDoc.data();
+      
+      // Create friendship
+      const friendship1: Omit<Friend, 'id'> = {
+        userId: fromUserId,
+        friendId: toUserId,
+        friendData: {
+          id: toUserId,
+          fullName: toUserData?.fullName || 'Unknown User',
+          email: toUserData?.email || '',
+          mobile: '',
+          avatar: toUserData?.profilePicture || '',
+          profilePicture: toUserData?.profilePicture || ''
+        },
+        status: 'accepted',
+        balance: 0,
+        lastActivity: new Date(),
+        createdAt: new Date()
+      };
+      
+      const friendship2: Omit<Friend, 'id'> = {
+        userId: toUserId,
+        friendId: fromUserId,
+        friendData: {
+          id: fromUserId,
+          fullName: fromUserData?.fullName || 'Unknown User',
+          email: fromUserData?.email || '',
+          mobile: '',
+          avatar: fromUserData?.profilePicture || '',
+          profilePicture: fromUserData?.profilePicture || ''
+        },
+        status: 'accepted',
+        balance: 0,
+        lastActivity: new Date(),
+        createdAt: new Date()
+      };
+      
+      await addDoc(collection(db, 'friends'), friendship1);
+      await addDoc(collection(db, 'friends'), friendship2);
+    }
+    
+    // Update friend balances with settlement
+    // When fromUserId pays toUserId, we SUBTRACT the amount from the balance
+    await this.updateFriendBalance(fromUserId, toUserId, -settlementAmount);
+    console.log(`✅ SYNC: Friend balance updated for settlement`);
+    
+  } catch (error) {
+    console.error('❌ Sync friend balance error:', error);
+    throw error;
+  }
+}
+
+/**
+ * MAIN FIX: Enhanced settlement that updates both group and friend balances
+ */
 static async markPaymentAsPaid(
   fromUserId: string,
   toUserId: string,
@@ -3883,8 +3959,8 @@ static async markPaymentAsPaid(
   description?: string
 ): Promise<void> {
   try {
-    console.log('🔄 Marking payment as paid:', { fromUserId, toUserId, amount, groupId, description });
-    console.log(`💰 Payment direction: ${fromUserId} pays ${toUserId} $${amount} (${description || 'Manual settlement'})`);
+    console.log('🔄 ENHANCED: Marking payment as paid with full synchronization');
+    console.log(`💰 Payment: ${fromUserId} pays ${toUserId} $${amount}`);
     
     // Get user data for both parties
     const [fromUserDoc, toUserDoc] = await Promise.all([
@@ -3899,7 +3975,7 @@ static async markPaymentAsPaid(
     const fromUserData = fromUserDoc.data();
     const toUserData = toUserDoc.data();
     
-    // Determine currency - use group currency if available, otherwise default
+    // 1. Create settlement transaction (existing logic)
     let currency = 'USD';
     let groupData = undefined;
     
@@ -3915,7 +3991,6 @@ static async markPaymentAsPaid(
       }
     }
     
-    // Create settlement transaction
     const settlementData = {
       fromUserId,
       toUserId,
@@ -3924,21 +3999,19 @@ static async markPaymentAsPaid(
       description: description || 'Manual settlement',
       groupId,
       method: 'manual_settlement' as const,
-      notes: 'Marked as paid via settlement modal'
+      notes: 'Enhanced settlement with balance sync'
     };
     
     const settlementId = await this.createSettlementTransaction(settlementData);
     
-    console.log('✅ Settlement transaction created:', settlementId);
+    // 2. 🔥 CRITICAL FIX: Update friend balances DIRECTLY
+    console.log('🔄 SYNC FIX: Updating friend balances directly');
+    await this.syncFriendBalanceForSettlement(fromUserId, toUserId, amount);
     
-    // UPDATE EXPENSE SPLITS - Mark relevant splits as paid
+    // 3. Update expense splits to mark them as paid
     await this.updateExpenseSplitsForSettlement(fromUserId, toUserId, amount, groupId);
     
-    // NOTE: Notifications are automatically sent by createSettlementTransaction via sendSettlementNotifications
-    // No need to send additional notifications here to avoid duplicates
-    console.log('✅ Settlement notifications will be sent by createSettlementTransaction automatically');
-    
-    // Add settlement message to group chat if in a group
+    // 4. Add settlement message to group chat
     if (groupId && groupId !== 'personal' && groupData) {
       await this.sendGroupMessage({
         groupId,
@@ -3949,25 +4022,196 @@ static async markPaymentAsPaid(
       });
     }
     
-    console.log('✅ Payment marked as paid successfully');
+    console.log('✅ ENHANCED: Payment marked as paid with full synchronization');
     
-    // Notify ExpenseRefreshService to trigger UI updates
+  } catch (error) {
+    console.error('❌ Enhanced mark payment as paid error:', error);
+    throw error;
+  }
+}
+/**
+ * DIAGNOSTIC: Check balance consistency between systems
+ */
+static async diagnoseBalanceConsistency(userId1: string, userId2: string, groupId?: string): Promise<{
+  friendBalance: number;
+  groupBalance: number;
+  expenseBalance: number;
+  isConsistent: boolean;
+  discrepancy: number;
+}> {
+  try {
+    console.log(`🔍 DIAGNOSTIC: Checking balance consistency`);
+    console.log(`👤 User 1: ${userId1}`);
+    console.log(`👤 User 2: ${userId2}`);
+    console.log(`🏢 Group: ${groupId || 'N/A'}`);
+    
+    // 1. Get friend balance
+    let friendBalance = 0;
     try {
-      const ExpenseRefreshService = (await import('@/services/expenseRefreshService')).default;
-      const refreshService = ExpenseRefreshService.getInstance();
-      refreshService.notifyExpenseAdded();
-      console.log('✅ ExpenseRefreshService notified after settlement');
+      const friendshipQuery = query(
+        collection(db, 'friends'),
+        where('userId', '==', userId1),
+        where('friendId', '==', userId2),
+        limit(1)
+      );
+      const friendSnapshot = await getDocs(friendshipQuery);
+      
+      if (!friendSnapshot.empty) {
+        friendBalance = friendSnapshot.docs[0].data().balance || 0;
+      }
     } catch (error) {
-      console.error('⚠️ Failed to notify ExpenseRefreshService:', error);
+      console.log('No friendship found');
+    }
+    
+    // 2. Get group balance (if applicable)
+    let groupBalance = 0;
+    if (groupId) {
+      groupBalance = await this.calculatePairwiseBalance(userId1, userId2, groupId);
+    }
+    
+    // 3. Calculate balance from expense splits
+    let expenseBalance = 0;
+    const expenses = groupId 
+      ? await this.getGroupExpenses(groupId)
+      : await this.getUserExpenses(userId1, 100);
+    
+    expenses.forEach(expense => {
+      if (expense.isSettlementTransaction) return;
+      
+      if (expense.paidBy === userId1) {
+        const user2Split = expense.splitData.find(s => s.userId === userId2);
+        if (user2Split && !user2Split.isPaid) {
+          expenseBalance += user2Split.amount;
+        }
+      } else if (expense.paidBy === userId2) {
+        const user1Split = expense.splitData.find(s => s.userId === userId1);
+        if (user1Split && !user1Split.isPaid) {
+          expenseBalance -= user1Split.amount;
+        }
+      }
+    });
+    
+    const maxBalance = Math.max(Math.abs(friendBalance), Math.abs(groupBalance), Math.abs(expenseBalance));
+    const isConsistent = Math.abs(friendBalance - expenseBalance) < 0.01;
+    const discrepancy = Math.abs(friendBalance - expenseBalance);
+    
+    console.log(`📊 DIAGNOSTIC RESULTS:`);
+    console.log(`   Friend Balance: ${friendBalance}`);
+    console.log(`   Group Balance: ${groupBalance}`);
+    console.log(`   Expense Balance: ${expenseBalance}`);
+    console.log(`   Consistent: ${isConsistent}`);
+    console.log(`   Discrepancy: ${discrepancy}`);
+    
+    return {
+      friendBalance,
+      groupBalance,
+      expenseBalance,
+      isConsistent,
+      discrepancy
+    };
+    
+  } catch (error) {
+    console.error('❌ Diagnostic error:', error);
+    return {
+      friendBalance: 0,
+      groupBalance: 0,
+      expenseBalance: 0,
+      isConsistent: false,
+      discrepancy: 0
+    };
+  }
+}
+
+/**
+ * REPAIR: Fix balance inconsistencies
+ */
+static async repairBalanceInconsistencies(userId1: string, userId2: string, groupId?: string): Promise<void> {
+  try {
+    console.log(`🔧 REPAIR: Fixing balance inconsistencies`);
+    
+    const diagnosis = await this.diagnoseBalanceConsistency(userId1, userId2, groupId);
+    
+    if (diagnosis.isConsistent) {
+      console.log('✅ No repair needed - balances are consistent');
+      return;
+    }
+    
+    console.log(`🔧 Repairing discrepancy of ${diagnosis.discrepancy}`);
+    
+    // Set friend balance to match expense balance (source of truth)
+    const adjustment = diagnosis.expenseBalance - diagnosis.friendBalance;
+    
+    if (Math.abs(adjustment) > 0.01) {
+      await this.updateFriendBalance(userId1, userId2, adjustment);
+      console.log(`✅ REPAIR: Adjusted friend balance by ${adjustment}`);
     }
     
   } catch (error) {
-    console.error('❌ Mark payment as paid error:', error);
+    console.error('❌ Repair error:', error);
     throw error;
   }
 }
 
-// UPDATE EXPENSE SPLITS FOR SETTLEMENT - Mark relevant expense splits as paid
+
+
+/**
+ * UTILITY: Bulk repair for all relationships in a group
+ */
+static async repairGroupBalanceConsistencies(groupId: string): Promise<{
+  repairsNeeded: number;
+  repairsCompleted: number;
+  errors: number;
+}> {
+  try {
+    console.log(`🔧 BULK REPAIR: Fixing all balances in group ${groupId}`);
+    
+    const group = await this.getGroup(groupId);
+    if (!group) throw new Error('Group not found');
+    
+    let repairsNeeded = 0;
+    let repairsCompleted = 0;
+    let errors = 0;
+    
+    // Check all pairs of users
+    for (let i = 0; i < group.members.length; i++) {
+      for (let j = i + 1; j < group.members.length; j++) {
+        const user1 = group.members[i].userId;
+        const user2 = group.members[j].userId;
+        
+        try {
+          const diagnosis = await this.diagnoseBalanceConsistency(user1, user2, groupId);
+          
+          if (!diagnosis.isConsistent) {
+            repairsNeeded++;
+            console.log(`🔧 Repairing ${group.members[i].userData.fullName} vs ${group.members[j].userData.fullName}`);
+            
+            await this.repairBalanceInconsistencies(user1, user2, groupId);
+            repairsCompleted++;
+          }
+        } catch (error) {
+          errors++;
+          console.error(`❌ Error repairing ${user1} vs ${user2}:`, error);
+        }
+      }
+    }
+    
+    console.log(`✅ BULK REPAIR COMPLETE: ${repairsCompleted}/${repairsNeeded} repairs successful, ${errors} errors`);
+    
+    return {
+      repairsNeeded,
+      repairsCompleted,
+      errors
+    };
+    
+  } catch (error) {
+    console.error('❌ Bulk repair error:', error);
+    throw error;
+  }
+}
+
+/**
+ * ENHANCED: Update expense splits with friend balance sync
+ */
 static async updateExpenseSplitsForSettlement(
   fromUserId: string,
   toUserId: string,
@@ -3975,22 +4219,17 @@ static async updateExpenseSplitsForSettlement(
   groupId?: string
 ): Promise<void> {
   try {
-    console.log('🔄 Updating expense splits for settlement:', { fromUserId, toUserId, settlementAmount, groupId });
+    console.log('🔄 ENHANCED: Updating expense splits with friend sync');
     
-    // Get all expenses for the group or between the users
     const expenses = (groupId && groupId !== 'personal')
       ? await this.getGroupExpenses(groupId)
-      : await this.getUserExpenses(fromUserId, 50); // Get user expenses if no group or personal
+      : await this.getUserExpenses(fromUserId, 50);
     
-    // Filter to get unpaid expenses where fromUser owes toUser
+    // Filter relevant unpaid expenses
     const relevantExpenses = expenses.filter(expense => {
-      // Skip settlement transactions
       if (expense.isSettlementTransaction) return false;
-      
-      // Only expenses paid by toUser where fromUser has unpaid splits
       if (expense.paidBy !== toUserId) return false;
       
-      // Check if fromUser has an unpaid split
       const fromUserSplit = expense.splitData.find(split => 
         split.userId === fromUserId && !split.isPaid
       );
@@ -4004,7 +4243,7 @@ static async updateExpenseSplitsForSettlement(
     const batch = writeBatch(db);
     let updatesCount = 0;
     
-    // Sort by date (oldest first) to settle oldest debts first
+    // Sort by date (oldest first)
     relevantExpenses.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     
     for (const expense of relevantExpenses) {
@@ -4019,8 +4258,7 @@ static async updateExpenseSplitsForSettlement(
       const splitAmount = fromUserSplit.amount;
       
       if (remainingAmount >= splitAmount) {
-        // Fully pay this split
-        console.log(`✅ Fully paying split of ${splitAmount} for expense: ${expense.description}`);
+        console.log(`✅ Marking expense split as paid: ${expense.description} (${splitAmount})`);
         
         const updatedSplitData = expense.splitData.map(split => 
           split.userId === fromUserId 
@@ -4033,39 +4271,18 @@ static async updateExpenseSplitsForSettlement(
           updatedAt: new Date()
         });
         
-        // 🔥 CRITICAL FIX: When marking expense splits as paid, also update friend balances
-        // This ensures that group settlements also update friend balances
-        try {
-          console.log(`🔄 Updating friend balance for settlement: ${fromUserId} pays ${toUserId} ${splitAmount}`);
-          await this.updateFriendBalance(fromUserId, toUserId, -splitAmount);
-          console.log(`✅ Friend balance updated for expense split settlement`);
-        } catch (friendError) {
-          console.error(`❌ Failed to update friend balance for expense settlement:`, friendError);
-          // Don't throw - expense update should succeed even if friend update fails
-        }
-        
         updatesCount++;
         remainingAmount -= splitAmount;
-      } else {
-        // Partially pay this split (though this is complex - for now, skip partial payments)
-        console.log(`⚠️ Partial payment not implemented for expense: ${expense.description}`);
-        break;
       }
     }
     
     if (updatesCount > 0) {
       await batch.commit();
-      console.log(`✅ Updated ${updatesCount} expense records`);
-    } else {
-      console.log('ℹ️ No expense splits needed updating');
-    }
-    
-    if (remainingAmount > 0) {
-      console.log(`⚠️ Settlement amount exceeded expense splits by ${remainingAmount}`);
+      console.log(`✅ ENHANCED: Updated ${updatesCount} expense splits`);
     }
     
   } catch (error) {
-    console.error('❌ Update expense splits for settlement error:', error);
+    console.error('❌ Enhanced update expense splits error:', error);
     throw error;
   }
 }

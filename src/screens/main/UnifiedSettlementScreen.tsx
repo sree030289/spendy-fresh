@@ -368,69 +368,69 @@ export default function UnifiedSettlementScreen({
     setShowRemindModal(true);
   };
 
-  const confirmSettlement = async () => {
-    if (!selectedBalance || !user?.id || settling) return;
+const confirmSettlement = async () => {
+  if (!selectedBalance || !user?.id || settling) return;
+  
+  try {
+    setSettling(true);
     
-    try {
-      setSettling(true);
-      
-      console.log('🔄 Processing settlement:', {
-        from: selectedBalance.isOwed ? selectedBalance.userId : user.id,
-        to: selectedBalance.isOwed ? user.id : selectedBalance.userId,
-        amount: selectedBalance.amount,
-        groupId: selectedBalance.groupId,
-        type: selectedBalance.type
-      });
+    console.log('🔄 ENHANCED: Processing settlement with full synchronization');
+    console.log('Settlement details:', {
+      from: selectedBalance.isOwed ? selectedBalance.userId : user.id,
+      to: selectedBalance.isOwed ? user.id : selectedBalance.userId,
+      amount: selectedBalance.amount,
+      groupId: selectedBalance.groupId,
+      type: selectedBalance.type
+    });
 
-      // Determine payment direction
-      const fromUserId = selectedBalance.isOwed ? selectedBalance.userId : user.id;
-      const toUserId = selectedBalance.isOwed ? user.id : selectedBalance.userId;
-      
-      // Create settlement using SplittingService
-      await SplittingService.markPaymentAsPaid(
-        fromUserId,
-        toUserId,
-        selectedBalance.amount,
-        selectedBalance.type === 'group' ? selectedBalance.groupId : undefined,
-        settlementNote || 'Manual settlement via app'
-      );
+    // Determine payment direction
+    const fromUserId = selectedBalance.isOwed ? selectedBalance.userId : user.id;
+    const toUserId = selectedBalance.isOwed ? user.id : selectedBalance.userId;
+    
+    // 🔥 Use the ENHANCED settlement method with full synchronization
+    await SplittingService.markPaymentAsPaid(
+      fromUserId,
+      toUserId,
+      selectedBalance.amount,
+      selectedBalance.type === 'group' ? selectedBalance.groupId : undefined,
+      settlementNote || 'Manual settlement via app'
+    );
 
-      console.log('✅ Settlement recorded successfully');
-      
-      // Close modal first
-      setShowSettleModal(false);
-      setSelectedBalance(null);
-      setSettlementNote('');
-      
-      // Show success and refresh
-      Alert.alert(
-        'Settlement Recorded! 💰',
-        `Payment of ${getCurrencySymbol(user.currency || 'USD')}${selectedBalance.amount.toFixed(2)} has been recorded and balances updated.`,
-        [{ text: 'OK' }]
-      );
-      
-      // Force refresh all balance systems immediately
+    console.log('✅ ENHANCED: Settlement recorded with full synchronization');
+    
+    // Close modal first
+    setShowSettleModal(false);
+    setSelectedBalance(null);
+    setSettlementNote('');
+    
+    // Show success and refresh
+    Alert.alert(
+      'Settlement Recorded! 💰',
+      `Payment of ${getCurrencySymbol(user.currency || 'USD')}${selectedBalance.amount.toFixed(2)} has been recorded and all balances updated.`,
+      [{ text: 'OK' }]
+    );
+    
+    // Force refresh all balance systems
+    await handleRefresh();
+    
+    // Additional refresh after delay to ensure UI updates
+    setTimeout(async () => {
+      console.log('🔄 ENHANCED: Post-settlement secondary refresh...');
       await handleRefresh();
-      
-      // Trigger another refresh after a short delay to ensure all systems are updated
-      setTimeout(async () => {
-        console.log('🔄 Post-settlement secondary refresh...');
-        await handleRefresh();
-        // Also trigger balance filtering to update the current view
-        await filterAndCalculateBalances();
-      }, 1000);
-      
-    } catch (error: any) {
-      console.error('❌ Settlement error:', error);
-      Alert.alert(
-        'Settlement Failed',
-        error.message || 'Failed to record settlement. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setSettling(false);
-    }
-  };
+      await filterAndCalculateBalances();
+    }, 1000);
+    
+  } catch (error: any) {
+    console.error('❌ ENHANCED: Settlement error:', error);
+    Alert.alert(
+      'Settlement Failed',
+      error.message || 'Failed to record settlement. Please try again.',
+      [{ text: 'OK' }]
+    );
+  } finally {
+    setSettling(false);
+  }
+};
 
   const sendReminder = async (method: 'sms' | 'email' | 'app') => {
     if (!selectedBalance || !user?.id || sending) return;
