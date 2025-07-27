@@ -1525,6 +1525,77 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
     }
   }
 
+  /**
+   * Enhanced balance update for settlements - ensures both sides decrease correctly
+   */
+  static async updateFriendBalanceForSettlement(
+    fromUserId: string,
+    toUserId: string,
+    amount: number
+  ): Promise<void> {
+    try {
+      console.log(`🔄 Updating friend balance between ${fromUserId} and ${toUserId} by ${-amount}`);
+      console.log(`📝 Balance semantics: Positive amount means ${toUserId} owes ${fromUserId} more`);
+      
+      // For settlements, we need to get current balances and update them correctly
+      const batch = writeBatch(db);
+      
+      // Get current balances
+      const [fromFriendQuery, toFriendQuery] = [
+        query(
+          collection(db, 'friends'),
+          where('userId', '==', fromUserId),
+          where('friendId', '==', toUserId),
+          limit(1)
+        ),
+        query(
+          collection(db, 'friends'),
+          where('userId', '==', toUserId),
+          where('friendId', '==', fromUserId),
+          limit(1)
+        )
+      ];
+      
+      const [fromSnapshot, toSnapshot] = await Promise.all([
+        getDocs(fromFriendQuery),
+        getDocs(toFriendQuery)
+      ]);
+      
+      // Update fromUser's side (payer) - they owe less
+      if (!fromSnapshot.empty) {
+        const fromFriendDoc = fromSnapshot.docs[0];
+        const currentFromBalance = fromFriendDoc.data().balance || 0;
+        const newFromBalance = currentFromBalance - amount; // Payer owes less
+        
+        batch.update(fromFriendDoc.ref, {
+          balance: newFromBalance,
+          lastActivity: new Date()
+        });
+        console.log(`✅ Updated ${fromUserId}'s side: ${newFromBalance} (payer owes less)`);
+      }
+      
+      // Update toUser's side (receiver) - they are owed less  
+      if (!toSnapshot.empty) {
+        const toFriendDoc = toSnapshot.docs[0];
+        const currentToBalance = toFriendDoc.data().balance || 0;
+        const newToBalance = currentToBalance - amount; // Receiver is owed less
+        
+        batch.update(toFriendDoc.ref, {
+          balance: newToBalance,
+          lastActivity: new Date()
+        });
+        console.log(`✅ Updated ${toUserId}'s side: ${newToBalance} (receiver is owed less)`);
+      }
+      
+      await batch.commit();
+      console.log('Settlement balance update completed successfully');
+      
+    } catch (error) {
+      console.error('Update friend balance for settlement error:', error);
+      throw error;
+    }
+  }
+
   static async getGroupExpenses(groupId: string): Promise<Expense[]> {
   try {
     const expensesQuery = query(
@@ -3570,7 +3641,7 @@ static async createSettlementTransaction(settlementData: {
         console.log('🔗 Users are already friends');
       }
       
-      await this.updateFriendBalance(settlementData.fromUserId, settlementData.toUserId, -settlementData.amount);
+      await this.updateFriendBalanceForSettlement(settlementData.fromUserId, settlementData.toUserId, settlementData.amount);
       console.log(`✅ Updated friend balance after settlement: ${settlementData.fromUserId} paid ${settlementData.toUserId} ${settlementData.amount}`);
     } catch (error) {
       console.error(`❌ Friend balance update failed:`, error);
@@ -3938,8 +4009,8 @@ static async syncFriendBalanceForSettlement(
     }
     
     // Update friend balances with settlement
-    // When fromUserId pays toUserId, we SUBTRACT the amount from the balance
-    await this.updateFriendBalance(fromUserId, toUserId, -settlementAmount);
+    // When fromUserId pays toUserId, both balances should decrease
+    await this.updateFriendBalanceForSettlement(fromUserId, toUserId, settlementAmount);
     console.log(`✅ SYNC: Friend balance updated for settlement`);
     
   } catch (error) {
