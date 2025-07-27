@@ -23,7 +23,6 @@ import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import MainTabNavigator from './src/navigation/MainTabNavigator';
 import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
-import SettlementScreen from '@/screens/main/SettlementScreen';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { RealNotificationService } from './src/services/notifications/RealNotificationService';
 import { SplittingService } from '@/services/firebase/splitting';
@@ -363,16 +362,6 @@ const AppNavigator = () => {
           <>
             <Stack.Screen name="Main" component={MainTabNavigator} />
             <Stack.Screen name="RealSplittingScreen" component={RealSplittingScreen} />
-            <Stack.Screen 
-              name="SettlementScreen" 
-              component={SettlementScreen}
-              options={{
-                title: 'Settlements',
-                headerShown: true,
-                headerStyle: { backgroundColor: '#10B981' },
-                headerTintColor: 'white',
-              }}
-            />
             <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
           </>
         ) : (

@@ -111,6 +111,12 @@ export class NotificationManager {
         await PushNotificationService.sendNotificationToUser(member.userId, notification);
 
         // Create in-app notification record
+        const targetGroupId = groupData.id || expense.groupId;
+        if (!targetGroupId) {
+          console.error('Cannot create expense notification: Group ID is missing');
+          continue;
+        }
+
         await SplittingService.createNotification({
           userId: member.userId,
           type: 'expense_added',
@@ -118,7 +124,7 @@ export class NotificationManager {
           message: `${expense.paidByData.fullName} added "${expense.description}" for ${expense.currency} ${expense.amount} in ${groupData.name}`,
           data: {
             expenseId: expense.id,
-            groupId: groupData.id || expense.groupId, // Fallback to expense.groupId if groupData.id is undefined
+            groupId: targetGroupId,
             groupName: groupData.name,
             senderName: expense.paidByData.fullName,
             senderAvatar: expense.paidByData.avatar || '',
@@ -127,7 +133,7 @@ export class NotificationManager {
             description: expense.description,
             // Deep linking data
             navigationType: 'groupExpenseDetails',
-            targetGroupId: groupData.id || expense.groupId,
+            targetGroupId: targetGroupId,
             targetExpenseId: expense.id
           },
           isRead: false,
@@ -171,8 +177,13 @@ export class NotificationManager {
       }
 
       // Validate required data before creating notification
+      if (!groupData.id) {
+        console.error('Cannot send group invitation notification: Group ID is missing');
+        return;
+      }
+
       const safeGroupData = {
-        id: groupData.id || '',
+        id: groupData.id,
         name: groupData.name || 'Unknown Group',
         inviteCode: groupData.inviteCode || '',
         description: groupData.description || ''
@@ -211,7 +222,7 @@ export class NotificationManager {
           groupDescription: safeGroupData.description,
           // Deep linking data
           navigationType: 'groupJoin',
-          targetGroupId: groupData.id
+          targetGroupId: safeGroupData.id
         },
         isRead: false,
         createdAt: new Date()
