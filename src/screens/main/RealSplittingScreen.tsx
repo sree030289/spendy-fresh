@@ -73,11 +73,9 @@ import NotificationsModal from '@/components/modals/NotificationsModal';
 import AnalyticsModal from '@/components/modals/AnalyticsModal';
 import ExpenseDeletionModal from '@/components/modals/ExpenseDeletionModal';
 import ExpenseSettlementModal from '@/components/modals/ExpenseSettlementModal';
-import ManualSettlementModal from '@/components/modals/ManualSettlementModal';
-import GroupSettlementModal from '@/components/modals/GroupSettlementModal';
 import FriendRequestModal from '@/components/modals/FriendRequestModal';
+import UnifiedSettlementScreen from './UnifiedSettlementScreen';
 import ImportSplitwiseModal from '@/components/modals/ImportSplitwise';
-import SettlementScreen from '@/screens/main/SettlementScreen';
 import { getCurrencySymbol } from '@/utils/currency';
 import QRCodeScanner from '@/components/QRCodeScanner';
 import QRScannerManager from '@/services/qr/QRScannerManager';
@@ -203,8 +201,15 @@ export default function RealSplittingScreen() {
   const [showExpenseSettlement, setShowExpenseSettlement] = useState(false);
   const [showExpenseDeletion, setShowExpenseDeletion] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showManualSettlement, setShowManualSettlement] = useState(false);
-  const [showGroupSettlement, setShowGroupSettlement] = useState(false);
+  
+  // NEW: Unified settlement state
+  const [showUnifiedSettlement, setShowUnifiedSettlement] = useState(false);
+  const [settlementConfig, setSettlementConfig] = useState<{
+    filter: 'all' | 'friends' | 'groups' | 'friend';
+    groupId?: string;
+    friendId?: string;
+  }>({ filter: 'all' });
+  
   const [selectedExpenseForAction, setSelectedExpenseForAction] = useState<Expense | null>(null);
   
   // Friend request modal state
@@ -213,9 +218,6 @@ export default function RealSplittingScreen() {
   
   // Import Splitwise modal state
   const [showImportSplitwise, setShowImportSplitwise] = useState(false);
-
-  // Settlement modal state
-  const [showSettlementModal, setShowSettlementModal] = useState(false);
 
   // Simple Expense List Modal states
   const [showSimpleExpenseList, setShowSimpleExpenseList] = useState(false);
@@ -487,19 +489,10 @@ export default function RealSplittingScreen() {
     }
   };
 
-  // Handle notifications press - mark as read when opened
+  // Handle notifications press - FIXED: Don't auto-mark as read
   const handleNotificationsPress = async () => {
     setShowNotifications(true);
-    
-    // Mark all unread notifications as read when opening the modal
-    try {
-      if (user?.id && notifications.some(n => !n.isRead)) {
-        await SplittingService.markAllNotificationsAsRead(user.id);
-        await loadNotifications();
-      }
-    } catch (error) {
-      console.error('Error marking notifications as read:', error);
-    }
+    // REMOVED: Auto-marking notifications as read - let users decide when to mark them as read
   };
 
   // Handle resend invitation - REMOVED DUPLICATE (keeping the better implementation below)
@@ -636,6 +629,21 @@ export default function RealSplittingScreen() {
       console.error('Export error:', error);
       showAnimatedSuccess('Export Failed', error.message || 'Failed to export group data', 'error');
     }
+  };
+
+  // NEW: Unified settlement navigation
+  const openSettlementScreen = (config: {
+    filter: 'all' | 'friends' | 'groups' | 'friend';
+    groupId?: string;
+    friendId?: string;
+  }) => {
+    console.log('🔄 Opening settlement screen with config:', config);
+    
+    // Force a balance refresh before opening settlement
+    notifyBalanceChange();
+    
+    setSettlementConfig(config);
+    setShowUnifiedSettlement(true);
   };
 
   // SUBSCRIPTION-AWARE: Add expense with transaction limit checking
@@ -1312,7 +1320,7 @@ export default function RealSplittingScreen() {
             </View>
           </View>
           
-          <TouchableOpacity onPress={() => setShowSettlementModal(true)}>
+          <TouchableOpacity onPress={() => openSettlementScreen({ filter: 'all' })}>
             <Text style={styles.balanceSubtext}>Tap to view details</Text>
           </TouchableOpacity>
         </View>
@@ -1354,7 +1362,7 @@ export default function RealSplittingScreen() {
 
           <TouchableOpacity
             style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
-            onPress={() => setShowSettlementModal(true)}
+            onPress={() => openSettlementScreen({ filter: 'all' })}
           >
             <Ionicons name="cash" size={24} color="#F59E0B" />
             <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Settlements</Text>
@@ -1765,41 +1773,81 @@ export default function RealSplittingScreen() {
               <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
                 Pending Invitations ({invitedFriends.length})
               </Text>
-              {invitedFriends.map((friend, index) => (
-                <View
-                  key={`invited-${friend.id}-${index}`}
-                  style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
-                >
-                  <View style={styles.balanceItemLeft}>
-                    <View style={[styles.personAvatar, { backgroundColor: theme.colors.warning }]}>
-                      <Text style={styles.personAvatarText}>
-                        {friend.friendData.fullName.charAt(0).toUpperCase()}
-                      </Text>
+              {invitedFriends.map((friend, index) => {
+                // Determine if this is a received friend request or sent invitation
+                const isReceivedRequest = friend.requestType === 'received' && friend.status === 'pending';
+                
+                return (
+                  <TouchableOpacity
+                    key={`invited-${friend.id}-${index}`}
+                    style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
+                    onPress={() => showPendingFriendActionsMenu(friend)}
+                  >
+                    <View style={styles.balanceItemLeft}>
+                      <View style={[styles.personAvatar, { 
+                        backgroundColor: isReceivedRequest ? theme.colors.success : theme.colors.warning 
+                      }]}>
+                        <Text style={styles.personAvatarText}>
+                          {friend.friendData.fullName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.personInfo}>
+                        <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
+                          {friend.friendData.fullName}
+                        </Text>
+                        <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                          {friend.friendData.email || friend.friendData.mobile}
+                        </Text>
+                        <Text style={[styles.statusText, { 
+                          color: isReceivedRequest ? theme.colors.success : theme.colors.warning 
+                        }]}>
+                          {isReceivedRequest 
+                            ? 'Wants to be your friend' 
+                            : `Invited via ${friend.inviteMethod || 'email'}`}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.personInfo}>
-                      <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
-                        {friend.friendData.fullName}
-                      </Text>
-                      <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                        {friend.friendData.email || friend.friendData.mobile}
-                      </Text>
-                      <Text style={[styles.statusText, { color: theme.colors.warning }]}>
-                        Invited via {friend.inviteMethod || 'email'}
-                      </Text>
-                    </View>
-                  </View>
 
-                  <View style={styles.balanceItemRight}>
-                    <TouchableOpacity
-                      style={[styles.resendButton, { backgroundColor: theme.colors.primary }]}
-                      onPress={() => handleResendInvitation(friend)}
-                    >
-                      <Ionicons name="send" size={16} color="white" />
-                      <Text style={styles.resendButtonText}>Resend</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
+                    <View style={styles.balanceItemRight}>
+                      {isReceivedRequest ? (
+                        // Show Respond button for received requests - opens existing modal
+                        <TouchableOpacity
+                          style={[styles.respondButton, { backgroundColor: theme.colors.success }]}
+                          onPress={() => {
+                            // Create friend request data and open existing modal
+                            const friendRequestData = {
+                              id: friend.requestId || '',
+                              fromUserId: friend.friendId,
+                              fromUserData: {
+                                fullName: friend.friendData.fullName,
+                                email: friend.friendData.email || '',
+                                avatar: friend.friendData.avatar || ''
+                              },
+                              message: `${friend.friendData.fullName} wants to be your friend`,
+                              status: 'pending' as const,
+                              createdAt: new Date()
+                            };
+                            setSelectedFriendRequest(friendRequestData);
+                            setShowFriendRequest(true);
+                          }}
+                        >
+                          <Ionicons name="chatbubble" size={14} color="white" />
+                          <Text style={styles.respondButtonText}>Respond</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        // Show Resend button for sent invitations
+                        <TouchableOpacity
+                          style={[styles.resendButton, { backgroundColor: theme.colors.primary }]}
+                          onPress={() => handleResendInvitation(friend)}
+                        >
+                          <Ionicons name="send" size={16} color="white" />
+                          <Text style={styles.resendButtonText}>Resend</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )
         )}
@@ -1971,8 +2019,10 @@ export default function RealSplittingScreen() {
                 <TouchableOpacity
                   onPress={(e) => {
                     e.stopPropagation();
-                    setSelectedGroup(group);
-                    setShowGroupSettlement(true);
+                    openSettlementScreen({ 
+                      filter: 'groups', 
+                      groupId: group.id 
+                    });
                   }}
                   style={[styles.actionButton, styles.settlementButton, { backgroundColor: theme.colors.success + '20' }]}
                 >
@@ -2024,13 +2074,10 @@ export default function RealSplittingScreen() {
       actions.push({
         text: 'Mark as Paid',
         onPress: () => {
-          // Create friend object with correct balance from friendsBalances
-          const friendWithCorrectBalance = {
-            ...friend,
-            balance: balance // Use the balance from friendsBalances, not from friend object
-          };
-          setSelectedFriend(friendWithCorrectBalance);
-          setShowManualSettlement(true);
+          openSettlementScreen({ 
+            filter: 'friend', 
+            friendId: friend.friendId 
+          });
         }
       });
     }
@@ -2125,54 +2172,7 @@ export default function RealSplittingScreen() {
     }
   };
 
-  // Handle manual settlement
-  const handleManualSettlement = async (friendId: string, amount: number, type: 'pay' | 'request', description?: string) => {
-    try {
-      if (!user?.id) return;
-
-      const friend = friends.find(f => f.friendId === friendId);
-
-      if (type === 'pay') {
-        await SplittingService.markPaymentAsPaid(
-          user.id,
-          friendId,
-          amount,
-          undefined,
-          description || 'Manual settlement'
-        );
-      } else {
-        await SplittingService.createPaymentRequest({
-          fromUserId: user.id,
-          toUserId: friendId,
-          amount,
-          currency: user.currency,
-          message: description
-        });
-      }
-
-      // Close modal first to prevent double alerts
-      setShowManualSettlement(false);
-      setSelectedFriend(null);
-
-      // Force immediate refresh of balances
-      await Promise.all([
-        friendsBalances.forceRefresh(),
-        overviewBalances.forceRefresh()
-      ]);
-
-      // Show success after balance refresh to show correct state
-      setTimeout(() => {
-        showAnimatedSuccess(
-          type === 'pay' ? 'Payment Recorded! 💰' : 'Payment Request Sent! 📤', 
-          type === 'pay' ? 'Payment marked as paid successfully!' : `${friend?.friendData?.fullName || 'Friend'} will receive a notification and SMS with your payment request.`
-        );
-      }, 500);
-
-    } catch (error: any) {
-      console.error('Manual settlement error:', error);
-      Alert.alert('Error', error.message || `Failed to ${type === 'pay' ? 'mark payment as paid' : 'send payment request'}`);
-    }
-  };
+  // Handle manual settlement - REMOVED: Now handled by UnifiedSettlementScreen
 
   // Handle deep linking navigation from notifications
   const handleNavigationIntent = async (intent: any) => {
@@ -2609,75 +2609,7 @@ export default function RealSplittingScreen() {
         }}
       />
 
-      {/* Settlement Screen Modal */}
-      {showSettlementModal && (
-        <Modal
-          animationType="slide"
-          presentationStyle="fullScreen"
-          visible={showSettlementModal}
-          onRequestClose={() => setShowSettlementModal(false)}
-        >
-          <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            <View style={{ flex: 1 }}>
-              {/* Header with back button - FIXED positioning */}
-              <View style={[
-                styles.modalHeader, 
-                { 
-                  backgroundColor: theme.colors.surface,
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.colors.border,
-                  paddingTop: 8, // Extra padding from SafeAreaView
-                }
-              ]}>
-                <TouchableOpacity
-                  style={[
-                    styles.backButton, 
-                    { 
-                      backgroundColor: theme.colors.background,
-                      minHeight: 44, // Ensure touchable area
-                      minWidth: 44,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }
-                  ]}
-                  onPress={() => setShowSettlementModal(false)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                  Settlements
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.backButton, 
-                    { 
-                      backgroundColor: theme.colors.background,
-                      minHeight: 44,
-                      minWidth: 44,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }
-                  ]}
-                  onPress={() => {
-                    // Refresh settlements data
-                    overviewBalances.forceRefresh();
-                    friendsBalances.forceRefresh();
-                  }}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="refresh" size={20} color={theme.colors.text} />
-                </TouchableOpacity>
-              </View>
-              
-              {/* Settlement Screen Content */}
-              <SettlementScreen />
-            </View>
-          </SafeAreaView>
-        </Modal>
-      )}
+
 
       <EditExpenseModal
         visible={showEditExpense}
@@ -2736,40 +2668,24 @@ export default function RealSplittingScreen() {
         currentUser={user}
       />
 
-      <ManualSettlementModal
-        visible={showManualSettlement}
-        onClose={() => {
-          setShowManualSettlement(false);
-          setSelectedFriend(null);
-        }}
-        friend={selectedFriend}
-        userCurrency={user?.currency || 'USD'}
-        onSettlement={handleManualSettlement}
-      />
-
-      <GroupSettlementModal
-        visible={showGroupSettlement}
-        onClose={() => {
-          setShowGroupSettlement(false);
-          setSelectedGroup(null);
-        }}
-        groupId={selectedGroup?.id || null}
-        userCurrency={user?.currency || 'USD'}
-        currentUserId={user?.id || ''}
-        onRefresh={async () => {
-          // Reload all data that might be affected by settlements
-          await loadRecentExpenses();
-          await loadGroups(); // Refresh groups to update balances
-          notifyBalanceChange(); // FIXED: Notify balance system
-          
-          // Force refresh all balance systems
-          await Promise.all([
-            friendsBalances.forceRefresh(),
-            overviewBalances.forceRefresh()
-          ]);
-        }}
-        onSettlementSuccess={showAnimatedSuccess}
-      />     
+      <Modal
+        animationType="slide"
+        presentationStyle="fullScreen"
+        visible={showUnifiedSettlement}
+        onRequestClose={() => setShowUnifiedSettlement(false)}
+      >
+        <UnifiedSettlementScreen
+          key={`settlement-${settlementConfig.filter}-${settlementConfig.groupId || 'none'}-${settlementConfig.friendId || 'none'}`}
+          initialFilter={settlementConfig.filter}
+          initialGroupId={settlementConfig.groupId}
+          initialFriendId={settlementConfig.friendId}
+          onClose={() => {
+            setShowUnifiedSettlement(false);
+            // Refresh all data after settlement operations
+            onRefresh();
+          }}
+        />
+      </Modal>
 
       <SimpleExpenseListModal
         visible={showSimpleExpenseList}
@@ -3595,6 +3511,20 @@ const styles = StyleSheet.create({
   resendButtonText: {
     fontSize: 11,
     fontWeight: '500',
+  },
+  // Respond button for friend requests
+  respondButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  respondButtonText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: 'white',
   },
   // Invite button styles
   inviteButton: {

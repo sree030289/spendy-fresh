@@ -56,11 +56,11 @@ class UnifiedSettlementService {
             name: friend.friendData.fullName,
             email: friend.friendData.email,
             avatar: friend.friendData.avatar,
-            balance: friend.balance, // Direct from friendship
+            balance: friend.balance, // Direct from friendship (includes group expenses)
             source: 'friend',
             lastUpdated: friend.lastActivity || friend.createdAt,
             breakdown: {
-              fromFriendships: friend.balance,
+              fromFriendships: friend.balance, // This already includes group expenses
               fromGroups: {}
             }
           };
@@ -75,7 +75,7 @@ class UnifiedSettlementService {
         }
       }
 
-      // PHASE 2: Process group relationships
+      // PHASE 2: Process group relationships (ONLY for non-friends)
       const friendUserIds = new Set(friends.map(f => f.friendId));
       const allGroupMembersMap = new Map<string, { name: string; email: string; avatar?: string; groups: Array<{id: string; name: string}> }>();
       
@@ -109,7 +109,13 @@ class UnifiedSettlementService {
         for (const member of group.members) {
           if (member.userId === userId) continue;
 
-          // Calculate actual pairwise balance in this group
+          // FIXED: Skip friends - their balances are already included from friendship records
+          if (friendUserIds.has(member.userId)) {
+            console.log(`Skipping group balance for ${member.userData.fullName} - already counted as friend`);
+            continue;
+          }
+
+          // Calculate actual pairwise balance in this group ONLY for non-friends
           const groupBalance = await this.calculateGroupPairwiseBalance(
             userId, 
             member.userId, 
@@ -324,6 +330,107 @@ static async calculateGroupPairwiseBalance(
 }
 
   /**
+   * Calculate settlement-specific balance entries - includes groups even for friends
+   * This is different from calculateUserBalances which avoids double-counting
+   */
+  static async calculateSettlementBalances(userId: string): Promise<BalanceDetail[]> {
+    try {
+      console.log('🔄 Calculating SETTLEMENT balances for user:', userId);
+
+      // Get all relationships and group data
+      const [friends, userGroups] = await Promise.all([
+        SplittingService.getFriends(userId),
+        SplittingService.getUserGroups(userId)
+      ]);
+
+      const balanceMap = new Map<string, BalanceDetail>();
+
+      // PHASE 1: Process direct friendships
+      console.log(`Processing ${friends.length} friendships for settlement`);
+      for (const friend of friends) {
+        if (friend.status === 'accepted' && Math.abs(friend.balance) > 0.01) {
+          const balance: BalanceDetail = {
+            userId: friend.friendId,
+            name: friend.friendData.fullName,
+            email: friend.friendData.email,
+            avatar: friend.friendData.avatar,
+            balance: friend.balance,
+            source: 'friend',
+            lastUpdated: friend.lastActivity || friend.createdAt,
+            breakdown: {
+              fromFriendships: friend.balance,
+              fromGroups: {}
+            }
+          };
+
+          balanceMap.set(`friend-${friend.friendId}`, balance);
+        }
+      }
+
+      // PHASE 2: Process ALL group relationships (including friends)
+      console.log(`Processing ${userGroups.length} groups for settlement`);
+      
+      for (const group of userGroups) {
+        console.log(`Processing settlement balances for group: ${group.name} with ${group.members.length} members`);
+        
+        for (const member of group.members) {
+          if (member.userId === userId) continue;
+
+          // Calculate group balance for ALL members (including friends)
+          const groupBalance = await UnifiedSettlementService.calculateGroupPairwiseBalance(
+            userId, 
+            member.userId, 
+            group.id
+          );
+
+          if (Math.abs(groupBalance) > 0.01) {
+            // Create a separate group balance entry
+            const groupBalanceEntry: BalanceDetail = {
+              userId: member.userId,
+              name: member.userData.fullName,
+              email: member.userData.email,
+              avatar: member.userData.avatar,
+              balance: groupBalance,
+              source: 'group',
+              groupName: group.name,
+              groupId: group.id,
+              lastUpdated: new Date(),
+              breakdown: {
+                fromFriendships: 0,
+                fromGroups: {
+                  [group.id]: {
+                    groupName: group.name,
+                    balance: groupBalance
+                  }
+                }
+              }
+            };
+
+            // Use unique key for group balances
+            balanceMap.set(`group-${group.id}-${member.userId}`, groupBalanceEntry);
+            
+            console.log(`💰 Settlement: ${member.userData.fullName} in ${group.name}: ${groupBalance}`);
+          }
+        }
+      }
+
+      const balanceDetails = Array.from(balanceMap.values());
+
+      console.log('✅ SETTLEMENT balance calculation complete:', {
+        totalEntries: balanceDetails.length,
+        friendEntries: balanceDetails.filter(b => b.source === 'friend').length,
+        groupEntries: balanceDetails.filter(b => b.source === 'group').length
+      });
+
+      return balanceDetails;
+
+    } catch (error) {
+      console.error('❌ Calculate settlement balances error:', error);
+      return [];
+    }
+  }
+
+  /**
    * Verify manual calculation logic - FOR TESTING
    */
   static verifyManualCalculation(): {
@@ -530,7 +637,8 @@ export const useBalances = () => {
     
     // Utilities for testing
     verifyCalculation: UnifiedSettlementService.verifyManualCalculation,
-    calculateGroupBalance: UnifiedSettlementService.calculateGroupPairwiseBalance
+    calculateGroupBalance: UnifiedSettlementService.calculateGroupPairwiseBalance,
+    calculateSettlementBalances: UnifiedSettlementService.calculateSettlementBalances
   }), [
     balances,
     isLoading,

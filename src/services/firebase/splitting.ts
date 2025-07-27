@@ -1207,6 +1207,71 @@ static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'
       
       console.log('Member added successfully to group');
       
+      // 🔥 CRITICAL FIX: Auto-create friendships between all group members
+      // This ensures that group expenses can update friend balances properly
+      console.log('🤝 Auto-creating friendships between group members...');
+      
+      for (const existingMember of groupData.members) {
+        if (existingMember.userId === userId) continue; // Skip self
+        
+        try {
+          // Check if friendship already exists
+          const existingCheck = await this.checkExistingFriendship(existingMember.userId, userData?.email || '');
+          
+          if (!existingCheck.isFriend) {
+            console.log(`🔗 Creating friendship between ${userId} and ${existingMember.userId}`);
+            
+            // Create friendship in both directions
+            const friendship1: Omit<Friend, 'id'> = {
+              userId: userId,
+              friendId: existingMember.userId,
+              friendData: {
+                id: existingMember.userId,
+                fullName: existingMember.userData.fullName,
+                email: existingMember.userData.email,
+                mobile: '',
+                avatar: existingMember.userData.avatar || '',
+                profilePicture: existingMember.userData.avatar || ''
+              },
+              status: 'accepted',
+              balance: 0,
+              lastActivity: new Date(),
+              createdAt: new Date()
+            };
+            
+            const friendship2: Omit<Friend, 'id'> = {
+              userId: existingMember.userId,
+              friendId: userId,
+              friendData: {
+                id: userId,
+                fullName: userData?.fullName || 'Unknown User',
+                email: userData?.email || '',
+                mobile: '',
+                avatar: userData?.profilePicture || '',
+                profilePicture: userData?.profilePicture || ''
+              },
+              status: 'accepted',
+              balance: 0,
+              lastActivity: new Date(),
+              createdAt: new Date()
+            };
+            
+            // Add both friendships
+            await addDoc(collection(db, 'friends'), friendship1);
+            await addDoc(collection(db, 'friends'), friendship2);
+            
+            console.log(`✅ Auto-created friendship between ${userId} and ${existingMember.userId}`);
+          } else {
+            console.log(`🔗 Friendship already exists between ${userId} and ${existingMember.userId}`);
+          }
+        } catch (friendshipError) {
+          console.error(`❌ Failed to create friendship between ${userId} and ${existingMember.userId}:`, friendshipError);
+          // Don't throw - group member addition should succeed even if friendship creation fails
+        }
+      }
+      
+      console.log('Member added successfully to group');
+      
       // Trigger refresh notifications for UI updates
       try {
         const ExpenseRefreshService = (await import('@/services/expenseRefreshService')).default;
@@ -1406,12 +1471,15 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
   
   static async updateFriendBalance(userId: string, friendId: string, amount: number): Promise<void> {
     try {
-      console.log(`Updating balance between ${userId} and ${friendId} by ${amount}`);
+      console.log(`🔄 Updating friend balance between ${userId} and ${friendId} by ${amount}`);
+      console.log(`📝 Balance semantics: Positive amount means ${friendId} owes ${userId} more`);
       
       // Update both sides of the friendship with opposite amounts
       const batch = writeBatch(db);
       
-      // Update user's side (amount owed by friend)
+      // Update user's side (amount owed TO user BY friend)
+      // If amount is positive: friend owes user more
+      // If amount is negative: friend owes user less (payment/settlement)
       const userFriendQuery = query(
         collection(db, 'friends'),
         where('userId', '==', userId),
@@ -1426,10 +1494,11 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
           balance: increment(amount),
           lastActivity: new Date()
         });
-        console.log(`Updated ${userId}'s side: +${amount}`);
+        console.log(`✅ Updated ${userId}'s side: ${amount > 0 ? '+' : ''}${amount} (${amount > 0 ? 'friend owes more' : 'friend owes less'})`);
       }
       
       // Update friend's side (opposite amount)
+      // This maintains the symmetric relationship: if A's balance to B increases, B's balance to A decreases
       const friendUserQuery = query(
         collection(db, 'friends'),
         where('userId', '==', friendId),
@@ -1444,7 +1513,7 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
           balance: increment(-amount),
           lastActivity: new Date()
         });
-        console.log(`Updated ${friendId}'s side: -${amount}`);
+        console.log(`✅ Updated ${friendId}'s side: ${-amount > 0 ? '+' : ''}${-amount} (${-amount > 0 ? 'friend owes more' : 'friend owes less'})`);
       }
       
       await batch.commit();
@@ -3444,13 +3513,68 @@ static async createSettlementTransaction(settlementData: {
     const expenseRef = doc(collection(db, 'expenses'));
     batch.set(expenseRef, settlementExpense);
     
-    // 3. Update friend balances if they are friends
+    // 3. Update friend balances - create friendship if it doesn't exist
     try {
       // FIXED: When fromUserId pays toUserId, reduce fromUserId's debt to toUserId
+      console.log(`🔄 Settlement balance update: ${settlementData.fromUserId} pays ${settlementData.toUserId} ${settlementData.amount}`);
+      console.log(`📝 This should REDUCE ${settlementData.fromUserId}'s debt to ${settlementData.toUserId}`);
+      
+      // First, ensure friendship exists
+      console.log('🤝 Checking if users are friends for settlement...');
+      const existingCheck = await this.checkExistingFriendship(settlementData.fromUserId, toUserData?.email || '');
+      
+      if (!existingCheck.isFriend) {
+        console.log('🔗 Users are not friends, creating friendship for settlement...');
+        
+        // Create friendship in both directions for settlement
+        const friendship1: Omit<Friend, 'id'> = {
+          userId: settlementData.fromUserId,
+          friendId: settlementData.toUserId,
+          friendData: {
+            id: settlementData.toUserId,
+            fullName: toUserData?.fullName || 'Unknown User',
+            email: toUserData?.email || '',
+            mobile: '',
+            avatar: toUserData?.profilePicture || '',
+            profilePicture: toUserData?.profilePicture || ''
+          },
+          status: 'accepted',
+          balance: 0,
+          lastActivity: new Date(),
+          createdAt: new Date()
+        };
+        
+        const friendship2: Omit<Friend, 'id'> = {
+          userId: settlementData.toUserId,
+          friendId: settlementData.fromUserId,
+          friendData: {
+            id: settlementData.fromUserId,
+            fullName: fromUserData?.fullName || 'Unknown User',
+            email: fromUserData?.email || '',
+            mobile: '',
+            avatar: fromUserData?.profilePicture || '',
+            profilePicture: fromUserData?.profilePicture || ''
+          },
+          status: 'accepted',
+          balance: 0,
+          lastActivity: new Date(),
+          createdAt: new Date()
+        };
+        
+        // Add both friendships
+        await addDoc(collection(db, 'friends'), friendship1);
+        await addDoc(collection(db, 'friends'), friendship2);
+        
+        console.log(`✅ Auto-created friendship for settlement between ${settlementData.fromUserId} and ${settlementData.toUserId}`);
+      } else {
+        console.log('🔗 Users are already friends');
+      }
+      
       await this.updateFriendBalance(settlementData.fromUserId, settlementData.toUserId, -settlementData.amount);
-      console.log(`Updated friend balance after settlement: ${settlementData.fromUserId} paid ${settlementData.toUserId} ${settlementData.amount}`);
+      console.log(`✅ Updated friend balance after settlement: ${settlementData.fromUserId} paid ${settlementData.toUserId} ${settlementData.amount}`);
     } catch (error) {
-      console.log('No friendship found, skipping friend balance update');
+      console.error(`❌ Friend balance update failed:`, error);
+      console.log(`⚠️ Skipping friend balance update for ${settlementData.fromUserId} -> ${settlementData.toUserId}`);
     }
     
     // 4. Update group member balances if in a group
@@ -3760,6 +3884,7 @@ static async markPaymentAsPaid(
 ): Promise<void> {
   try {
     console.log('🔄 Marking payment as paid:', { fromUserId, toUserId, amount, groupId, description });
+    console.log(`💰 Payment direction: ${fromUserId} pays ${toUserId} $${amount} (${description || 'Manual settlement'})`);
     
     // Get user data for both parties
     const [fromUserDoc, toUserDoc] = await Promise.all([
@@ -3809,63 +3934,9 @@ static async markPaymentAsPaid(
     // UPDATE EXPENSE SPLITS - Mark relevant splits as paid
     await this.updateExpenseSplitsForSettlement(fromUserId, toUserId, amount, groupId);
     
-    // Send confirmation notifications using NotificationManager
-    try {
-      const { notificationManager } = await import('../NotificationManager');
-      
-      // Send payment settlement notification
-      await notificationManager.notifyPaymentSettled(
-        fromUserId,
-        toUserId,
-        amount,
-        currency,
-        description || 'Manual settlement',
-        settlementId,
-        groupId,
-        groupData?.name
-      );
-      
-      console.log('✅ Payment settlement notifications sent via NotificationManager');
-    } catch (notificationError) {
-      console.error('❌ Error sending payment settlement notifications:', notificationError);
-      
-      // Fallback to direct notification creation if NotificationManager fails
-      await this.createNotification({
-        userId: toUserId,
-        type: 'payment_received',
-        title: 'Payment Received',
-        message: `${fromUserData.fullName} marked a payment of ${currency} ${amount} as paid`,
-        data: {
-          settlementId,
-          fromUserId,
-          amount,
-          currency,
-          method: 'manual_settlement',
-          groupId,
-          navigationType: 'settlementDetails'
-        },
-        isRead: false,
-        createdAt: new Date()
-      });
-
-      await this.createNotification({
-        userId: fromUserId,
-        type: 'expense_settled',
-        title: 'Payment Confirmed',
-        message: `Your payment of ${currency} ${amount} to ${toUserData.fullName} has been recorded`,
-        data: {
-          settlementId,
-          toUserId,
-          amount,
-          currency,
-          method: 'manual_settlement',
-          groupId,
-          navigationType: 'settlementDetails'
-        },
-        isRead: false,
-        createdAt: new Date()
-      });
-    }
+    // NOTE: Notifications are automatically sent by createSettlementTransaction via sendSettlementNotifications
+    // No need to send additional notifications here to avoid duplicates
+    console.log('✅ Settlement notifications will be sent by createSettlementTransaction automatically');
     
     // Add settlement message to group chat if in a group
     if (groupId && groupId !== 'personal' && groupData) {
@@ -3907,9 +3978,9 @@ static async updateExpenseSplitsForSettlement(
     console.log('🔄 Updating expense splits for settlement:', { fromUserId, toUserId, settlementAmount, groupId });
     
     // Get all expenses for the group or between the users
-    const expenses = groupId 
+    const expenses = (groupId && groupId !== 'personal')
       ? await this.getGroupExpenses(groupId)
-      : await this.getUserExpenses(fromUserId, 50); // Get user expenses if no group
+      : await this.getUserExpenses(fromUserId, 50); // Get user expenses if no group or personal
     
     // Filter to get unpaid expenses where fromUser owes toUser
     const relevantExpenses = expenses.filter(expense => {
@@ -3961,6 +4032,17 @@ static async updateExpenseSplitsForSettlement(
           splitData: updatedSplitData,
           updatedAt: new Date()
         });
+        
+        // 🔥 CRITICAL FIX: When marking expense splits as paid, also update friend balances
+        // This ensures that group settlements also update friend balances
+        try {
+          console.log(`🔄 Updating friend balance for settlement: ${fromUserId} pays ${toUserId} ${splitAmount}`);
+          await this.updateFriendBalance(fromUserId, toUserId, -splitAmount);
+          console.log(`✅ Friend balance updated for expense split settlement`);
+        } catch (friendError) {
+          console.error(`❌ Failed to update friend balance for expense settlement:`, friendError);
+          // Don't throw - expense update should succeed even if friend update fails
+        }
         
         updatesCount++;
         remainingAmount -= splitAmount;
@@ -4183,20 +4265,52 @@ static async autoConnectGroupMembers(groupId: string, userId: string, showPrompt
           alreadyConnected++;
           console.log(`👥 Already connected with ${member.userData.fullName}`);
         } else {
-          // Send friend request with group context
-          const result = await this.sendFriendRequest(
-            userId,
-            member.userData.email,
-            `Hi! We're both in the group "${group.name}". Let's connect to easily split expenses and settle payments! 💰`
-          );
+          // 🔥 CRITICAL FIX: Auto-create friendship instead of sending friend request
+          console.log(`🔗 Auto-creating friendship with ${member.userData.fullName}`);
           
-          if (result.success) {
-            requestsSent++;
-            console.log(`✅ Friend request sent to ${member.userData.fullName}`);
-          } else {
-            failed++;
-            console.log(`❌ Failed to send request to ${member.userData.fullName}`);
-          }
+          const currentUserData = currentUserDoc.data();
+          
+          // Create friendship in both directions
+          const friendship1: Omit<Friend, 'id'> = {
+            userId: userId,
+            friendId: member.userId,
+            friendData: {
+              id: member.userId,
+              fullName: member.userData.fullName,
+              email: member.userData.email,
+              mobile: '',
+              avatar: member.userData.avatar || '',
+              profilePicture: member.userData.avatar || ''
+            },
+            status: 'accepted',
+            balance: 0,
+            lastActivity: new Date(),
+            createdAt: new Date()
+          };
+          
+          const friendship2: Omit<Friend, 'id'> = {
+            userId: member.userId,
+            friendId: userId,
+            friendData: {
+              id: userId,
+              fullName: currentUserData?.fullName || 'Unknown User',
+              email: currentUserData?.email || '',
+              mobile: '',
+              avatar: currentUserData?.profilePicture || '',
+              profilePicture: currentUserData?.profilePicture || ''
+            },
+            status: 'accepted',
+            balance: 0,
+            lastActivity: new Date(),
+            createdAt: new Date()
+          };
+          
+          // Add both friendships
+          await addDoc(collection(db, 'friends'), friendship1);
+          await addDoc(collection(db, 'friends'), friendship2);
+          
+          requestsSent++; // Count as "connection created"
+          console.log(`✅ Auto-created friendship with ${member.userData.fullName}`);
         }
       } catch (error) {
         failed++;
@@ -4216,6 +4330,106 @@ static async autoConnectGroupMembers(groupId: string, userId: string, showPrompt
     return {
       success: false,
       requestsSent: 0,
+      alreadyConnected: 0,
+      failed: 0
+    };
+  }
+}
+
+// 🔥 NEW: Utility function to auto-create friendships for existing groups
+static async createFriendshipsForExistingGroup(groupId: string): Promise<{
+  success: boolean;
+  friendshipsCreated: number;
+  alreadyConnected: number;
+  failed: number;
+}> {
+  try {
+    console.log('🔄 Creating friendships for existing group:', groupId);
+    
+    const group = await this.getGroup(groupId);
+    if (!group) throw new Error('Group not found');
+
+    let friendshipsCreated = 0;
+    let alreadyConnected = 0;
+    let failed = 0;
+
+    // Create friendships between all pairs of members
+    for (let i = 0; i < group.members.length; i++) {
+      for (let j = i + 1; j < group.members.length; j++) {
+        const member1 = group.members[i];
+        const member2 = group.members[j];
+        
+        try {
+          // Check if friendship already exists
+          const existingCheck = await this.checkExistingFriendship(member1.userId, member2.userData.email);
+          
+          if (existingCheck.isFriend) {
+            alreadyConnected++;
+            console.log(`👥 Already connected: ${member1.userData.fullName} <-> ${member2.userData.fullName}`);
+          } else {
+            console.log(`🔗 Creating friendship: ${member1.userData.fullName} <-> ${member2.userData.fullName}`);
+            
+            // Create friendship in both directions
+            const friendship1: Omit<Friend, 'id'> = {
+              userId: member1.userId,
+              friendId: member2.userId,
+              friendData: {
+                id: member2.userId,
+                fullName: member2.userData.fullName,
+                email: member2.userData.email,
+                mobile: '',
+                avatar: member2.userData.avatar || '',
+                profilePicture: member2.userData.avatar || ''
+              },
+              status: 'accepted',
+              balance: 0,
+              lastActivity: new Date(),
+              createdAt: new Date()
+            };
+            
+            const friendship2: Omit<Friend, 'id'> = {
+              userId: member2.userId,
+              friendId: member1.userId,
+              friendData: {
+                id: member1.userId,
+                fullName: member1.userData.fullName,
+                email: member1.userData.email,
+                mobile: '',
+                avatar: member1.userData.avatar || '',
+                profilePicture: member1.userData.avatar || ''
+              },
+              status: 'accepted',
+              balance: 0,
+              lastActivity: new Date(),
+              createdAt: new Date()
+            };
+            
+            // Add both friendships
+            await addDoc(collection(db, 'friends'), friendship1);
+            await addDoc(collection(db, 'friends'), friendship2);
+            
+            friendshipsCreated++;
+            console.log(`✅ Created friendship: ${member1.userData.fullName} <-> ${member2.userData.fullName}`);
+          }
+        } catch (error) {
+          failed++;
+          console.error(`❌ Error creating friendship between ${member1.userData.fullName} and ${member2.userData.fullName}:`, error);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      friendshipsCreated,
+      alreadyConnected,
+      failed
+    };
+
+  } catch (error) {
+    console.error('❌ Create friendships for existing group error:', error);
+    return {
+      success: false,
+      friendshipsCreated: 0,
       alreadyConnected: 0,
       failed: 0
     };
@@ -4673,6 +4887,86 @@ static async getExpenseTrends(userId: string, timeframe: 'week' | 'month' | 'qua
   }
 }
 
+  // BALANCE SYNCHRONIZATION - Fix historical data inconsistencies
+  static async synchronizeFriendBalancesWithExpenses(groupId: string): Promise<void> {
+    try {
+      console.log('🔄 Synchronizing friend balances with expense splits for group:', groupId);
+      
+      const group = await this.getGroup(groupId);
+      if (!group) {
+        throw new Error('Group not found');
+      }
+      
+      const expenses = await this.getGroupExpenses(groupId);
+      console.log(`📊 Found ${expenses.length} expenses to analyze`);
+      
+      // For each pair of users in the group
+      for (let i = 0; i < group.members.length; i++) {
+        for (let j = i + 1; j < group.members.length; j++) {
+          const user1 = group.members[i].userId;
+          const user2 = group.members[j].userId;
+          const user1Name = group.members[i].userData.fullName;
+          const user2Name = group.members[j].userData.fullName;
+          
+          console.log(`\n🔍 Calculating actual balance: ${user1Name} vs ${user2Name}`);
+          
+          // Calculate actual balance based on expense splits
+          let actualBalance = 0;
+          
+          for (const expense of expenses) {
+            if (expense.isSettlementTransaction) {
+              console.log(`⏭️ Skipping settlement: ${expense.description}`);
+              continue;
+            }
+            
+            if (expense.paidBy === user1) {
+              const user2Split = expense.splitData.find(s => s.userId === user2);
+              if (user2Split) {
+                if (!user2Split.isPaid) {
+                  console.log(`➕ ${expense.description}: ${user2Name} owes ${user2Split.amount} (unpaid)`);
+                  actualBalance += user2Split.amount;
+                } else {
+                  console.log(`✅ ${expense.description}: ${user2Name} paid ${user2Split.amount} (already paid)`);
+                }
+              }
+            } else if (expense.paidBy === user2) {
+              const user1Split = expense.splitData.find(s => s.userId === user1);
+              if (user1Split) {
+                if (!user1Split.isPaid) {
+                  console.log(`➖ ${expense.description}: ${user1Name} owes ${user1Split.amount} (unpaid)`);
+                  actualBalance -= user1Split.amount;
+                } else {
+                  console.log(`✅ ${expense.description}: ${user1Name} paid ${user1Split.amount} (already paid)`);
+                }
+              }
+            }
+          }
+          
+          // Get current friend balance using the correct method
+          const currentBalance = await this.calculatePairwiseBalance(user1, user2, groupId);
+          
+          console.log(`📊 Current friend balance: ${currentBalance}`);
+          console.log(`📊 Calculated balance from expenses: ${actualBalance}`);
+          
+          if (Math.abs(currentBalance - actualBalance) > 0.01) {
+            console.log(`🔧 MISMATCH DETECTED! Updating balance from ${currentBalance} to ${actualBalance}`);
+            
+            // Set the correct balance using updateFriendBalance
+            const adjustment = actualBalance - currentBalance;
+            await this.updateFriendBalance(user1, user2, adjustment);
+            console.log(`✅ Updated ${user1Name} vs ${user2Name} balance to: ${actualBalance}`);
+          } else {
+            console.log(`✅ Balance already correct for ${user1Name} vs ${user2Name}`);
+          }
+        }
+      }
+      
+      console.log('✅ Friend balances synchronized with expense splits');
+    } catch (error) {
+      console.error('❌ Failed to sync balances:', error);
+      throw error;
+    }
+  }
 }
 
 // Export individual functions for testing
