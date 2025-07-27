@@ -16,7 +16,8 @@ import {
   arrayUnion,
   arrayRemove,
   increment,
-  writeBatch
+  writeBatch,
+  Timestamp
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from './config';
@@ -304,6 +305,20 @@ export interface ExpenseTemplate {
 
 
 // SETTLEMENT TRANSACTION INTERFACES
+export interface Settlement {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  currency: string;
+  method: string;
+  groupId?: string;
+  description: string;
+  status: 'pending' | 'completed' | 'failed';
+  createdAt: any;
+  settledAt?: any;
+}
+
 export interface SettlementTransaction {
   id: string;
   fromUserId: string;
@@ -1117,6 +1132,75 @@ static async checkExistingFriendship(userId: string, friendEmail: string): Promi
     return { isFriend: false };
   }
 }
+
+// Ensure friendship exists between two users
+static async ensureFriendship(userId1: string, userId2: string): Promise<void> {
+  try {
+    // Get user data for both users
+    const [user1Doc, user2Doc] = await Promise.all([
+      getDoc(doc(db, 'users', userId1)),
+      getDoc(doc(db, 'users', userId2))
+    ]);
+    
+    if (!user1Doc.exists() || !user2Doc.exists()) {
+      throw new Error('One or both users not found');
+    }
+    
+    const user1Data = user1Doc.data();
+    const user2Data = user2Doc.data();
+    
+    // Check if friendship already exists
+    const existingCheck = await this.checkExistingFriendship(userId1, user2Data.email);
+    
+    if (existingCheck.isFriend) {
+      console.log('Friendship already exists');
+      return;
+    }
+    
+    // Create friendship for both users
+    const friendship1: Omit<Friend, 'id'> = {
+      userId: userId1,
+      friendId: userId2,
+      friendData: {
+        id: userId2,
+        fullName: user2Data.fullName || 'Unknown User',
+        email: user2Data.email || '',
+        mobile: '',
+        avatar: user2Data.profilePicture || '',
+        profilePicture: user2Data.profilePicture || ''
+      },
+      status: 'accepted',
+      balance: 0,
+      lastActivity: new Date(),
+      createdAt: new Date()
+    };
+    
+    const friendship2: Omit<Friend, 'id'> = {
+      userId: userId2,
+      friendId: userId1,
+      friendData: {
+        id: userId1,
+        fullName: user1Data.fullName || 'Unknown User',
+        email: user1Data.email || '',
+        mobile: '',
+        avatar: user1Data.profilePicture || '',
+        profilePicture: user1Data.profilePicture || ''
+      },
+      status: 'accepted',
+      balance: 0,
+      lastActivity: new Date(),
+      createdAt: new Date()
+    };
+    
+    await addDoc(collection(db, 'friends'), friendship1);
+    await addDoc(collection(db, 'friends'), friendship2);
+    
+    console.log('Friendship created between users');
+  } catch (error) {
+    console.error('Ensure friendship error:', error);
+    throw error;
+  }
+}
   
   // GROUPS MANAGEMENT
 static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
@@ -1469,132 +1553,58 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
   }
 }
   
-  static async updateFriendBalance(userId: string, friendId: string, amount: number): Promise<void> {
-    try {
-      console.log(`🔄 Updating friend balance between ${userId} and ${friendId} by ${amount}`);
-      console.log(`📝 Balance semantics: Positive amount means ${friendId} owes ${userId} more`);
+static async updateFriendBalance(
+  userId1: string, 
+  userId2: string, 
+  amount: number,
+  isSettlement: boolean = false
+): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    
+    // For settlements, we need to reduce the debt, not increase it
+    const adjustmentAmount = isSettlement ? -amount : amount;
+    
+    // Update user1's perspective (user1 -> user2)
+    const friendRef1 = doc(db, 'users', userId1, 'friends', userId2);
+    const friendDoc1 = await getDoc(friendRef1);
+    
+    if (friendDoc1.exists()) {
+      const currentBalance = friendDoc1.data().balance || 0;
+      const newBalance = currentBalance + adjustmentAmount;
       
-      // Update both sides of the friendship with opposite amounts
-      const batch = writeBatch(db);
+      console.log(`✅ Updated ${userId1}'s side: ${adjustmentAmount} (friend ${isSettlement ? 'owes less' : 'owes more'})`);
       
-      // Update user's side (amount owed TO user BY friend)
-      // If amount is positive: friend owes user more
-      // If amount is negative: friend owes user less (payment/settlement)
-      const userFriendQuery = query(
-        collection(db, 'friends'),
-        where('userId', '==', userId),
-        where('friendId', '==', friendId),
-        limit(1)
-      );
-      
-      const userSnapshot = await getDocs(userFriendQuery);
-      if (!userSnapshot.empty) {
-        const userFriendDoc = userSnapshot.docs[0];
-        batch.update(userFriendDoc.ref, {
-          balance: increment(amount),
-          lastActivity: new Date()
-        });
-        console.log(`✅ Updated ${userId}'s side: ${amount > 0 ? '+' : ''}${amount} (${amount > 0 ? 'friend owes more' : 'friend owes less'})`);
-      }
-      
-      // Update friend's side (opposite amount)
-      // This maintains the symmetric relationship: if A's balance to B increases, B's balance to A decreases
-      const friendUserQuery = query(
-        collection(db, 'friends'),
-        where('userId', '==', friendId),
-        where('friendId', '==', userId),
-        limit(1)
-      );
-      
-      const friendSnapshot = await getDocs(friendUserQuery);
-      if (!friendSnapshot.empty) {
-        const friendUserDoc = friendSnapshot.docs[0];
-        batch.update(friendUserDoc.ref, {
-          balance: increment(-amount),
-          lastActivity: new Date()
-        });
-        console.log(`✅ Updated ${friendId}'s side: ${-amount > 0 ? '+' : ''}${-amount} (${-amount > 0 ? 'friend owes more' : 'friend owes less'})`);
-      }
-      
-      await batch.commit();
-      console.log('Balance update completed successfully');
-      
-    } catch (error) {
-      console.error('Update friend balance error:', error);
-      throw error;
+      batch.update(friendRef1, { 
+        balance: newBalance,
+        lastUpdated: serverTimestamp()
+      });
     }
-  }
-
-  /**
-   * Enhanced balance update for settlements - ensures both sides decrease correctly
-   */
-  static async updateFriendBalanceForSettlement(
-    fromUserId: string,
-    toUserId: string,
-    amount: number
-  ): Promise<void> {
-    try {
-      console.log(`🔄 Updating friend balance between ${fromUserId} and ${toUserId} by ${-amount}`);
-      console.log(`📝 Balance semantics: Positive amount means ${toUserId} owes ${fromUserId} more`);
+    
+    // Update user2's perspective (user2 -> user1) with opposite amount
+    const friendRef2 = doc(db, 'users', userId2, 'friends', userId1);
+    const friendDoc2 = await getDoc(friendRef2);
+    
+    if (friendDoc2.exists()) {
+      const currentBalance = friendDoc2.data().balance || 0;
+      const newBalance = currentBalance - adjustmentAmount;
       
-      // For settlements, we need to get current balances and update them correctly
-      const batch = writeBatch(db);
+      console.log(`✅ Updated ${userId2}'s side: ${-adjustmentAmount} (friend ${isSettlement ? 'owes more' : 'owes less'})`);
       
-      // Get current balances
-      const [fromFriendQuery, toFriendQuery] = [
-        query(
-          collection(db, 'friends'),
-          where('userId', '==', fromUserId),
-          where('friendId', '==', toUserId),
-          limit(1)
-        ),
-        query(
-          collection(db, 'friends'),
-          where('userId', '==', toUserId),
-          where('friendId', '==', fromUserId),
-          limit(1)
-        )
-      ];
-      
-      const [fromSnapshot, toSnapshot] = await Promise.all([
-        getDocs(fromFriendQuery),
-        getDocs(toFriendQuery)
-      ]);
-      
-      // Update fromUser's side (payer) - they owe less
-      if (!fromSnapshot.empty) {
-        const fromFriendDoc = fromSnapshot.docs[0];
-        const currentFromBalance = fromFriendDoc.data().balance || 0;
-        const newFromBalance = currentFromBalance - amount; // Payer owes less
-        
-        batch.update(fromFriendDoc.ref, {
-          balance: newFromBalance,
-          lastActivity: new Date()
-        });
-        console.log(`✅ Updated ${fromUserId}'s side: ${newFromBalance} (payer owes less)`);
-      }
-      
-      // Update toUser's side (receiver) - they are owed less  
-      if (!toSnapshot.empty) {
-        const toFriendDoc = toSnapshot.docs[0];
-        const currentToBalance = toFriendDoc.data().balance || 0;
-        const newToBalance = currentToBalance - amount; // Receiver is owed less
-        
-        batch.update(toFriendDoc.ref, {
-          balance: newToBalance,
-          lastActivity: new Date()
-        });
-        console.log(`✅ Updated ${toUserId}'s side: ${newToBalance} (receiver is owed less)`);
-      }
-      
-      await batch.commit();
-      console.log('Settlement balance update completed successfully');
-      
-    } catch (error) {
-      console.error('Update friend balance for settlement error:', error);
-      throw error;
+      batch.update(friendRef2, { 
+        balance: newBalance,
+        lastUpdated: serverTimestamp()
+      });
     }
+    
+    await batch.commit();
+    console.log('Balance update completed successfully');
+    
+  } catch (error) {
+    console.error('Error updating friend balance:', error);
+    throw error;
   }
+};
 
   static async getGroupExpenses(groupId: string): Promise<Expense[]> {
   try {
@@ -3457,225 +3467,144 @@ static async sendFriendRequestReminder(fromUserId: string, toUserId: string, not
   }
 }
 
+// Enhanced function to mark payment as paid with full synchronization
+static async markPaymentAsPaidEnhanced(
+  fromUserId: string,
+  toUserId: string,
+  amount: number,
+  groupId?: string
+): Promise<string> {
+  try {
+    console.log('🔄 ENHANCED: Marking payment as paid with full synchronization');
+    console.log(`💰 Payment: ${fromUserId} pays ${toUserId} $${amount}`);
+    
+    // Create settlement transaction
+    const settlementId = await this.createSettlementTransaction(
+      fromUserId,
+      toUserId,
+      amount,
+      'manual_settlement',
+      groupId,
+      'Enhanced settlement with balance sync'
+    );
+    
+    // Additional sync for friend balances
+    console.log('🔄 SYNC FIX: Updating friend balances directly');
+    await this.syncFriendBalanceAfterSettlement(fromUserId, toUserId, amount);
+    
+    // Update any related expense splits
+    console.log('🔄 ENHANCED: Updating expense splits with friend sync');
+    await this.updateExpenseSplitsForSettlement(fromUserId, toUserId, amount, groupId);
+    
+    console.log('✅ ENHANCED: Payment marked as paid with full synchronization');
+    return settlementId;
+  } catch (error) {
+    console.error('❌ ENHANCED: Error marking payment as paid:', error);
+    throw error;
+  }
+};
+
+// Sync friend balance after settlement to ensure consistency
+static async syncFriendBalanceAfterSettlement(
+  fromUserId: string,
+  toUserId: string,
+  amount: number
+): Promise<void> {
+  try {
+    console.log('🔄 SYNC: Updating friend balance for settlement');
+    console.log(`📝 ${fromUserId} pays ${toUserId} $${amount}`);
+    console.log(`💡 This should REDUCE ${fromUserId}'s debt to ${toUserId}`);
+    
+    // Use the existing syncFriendBalanceForSettlement method
+    await this.syncFriendBalanceForSettlement(fromUserId, toUserId, amount);
+    
+    console.log('✅ SYNC: Friend balance updated for settlement');
+  } catch (error) {
+    console.error('❌ SYNC: Error updating friend balance:', error);
+    throw error;
+  }
+};
+
 // SETTLEMENT TRANSACTION METHODS
 // Fix for Settlement Transaction undefined fields error in splitting.ts
 // Replace the createSettlementTransaction method with this fixed version
 
-static async createSettlementTransaction(settlementData: {
-  fromUserId: string;
-  toUserId: string;
-  amount: number;
-  currency: string;
-  description: string;
-  groupId?: string;
-  expenseId?: string;
-  method: 'cash' | 'bank' | 'venmo' | 'paypal' | 'upi' | 'manual_settlement';
-  notes?: string;
-}): Promise<string> {
+static async createSettlementTransaction(
+  fromUserId: string,
+  toUserId: string,
+  amount: number,
+  method: string = 'manual_settlement',
+  groupId?: string,
+  description?: string,
+  currency: string = 'USD'
+): Promise<string> {
   try {
-    console.log('Creating settlement transaction:', settlementData);
+    console.log('Creating settlement transaction:', {
+      fromUserId,
+      toUserId,
+      amount,
+      method,
+      groupId,
+      description,
+      currency
+    });
+
+    // First update the balance
+    console.log(`🔄 Settlement balance update: ${fromUserId} pays ${toUserId} ${amount}`);
+    console.log(`📝 This should REDUCE ${fromUserId}'s debt to ${toUserId}`);
     
-    // Get user data for both users
-    const [fromUserDoc, toUserDoc] = await Promise.all([
-      getDoc(doc(db, 'users', settlementData.fromUserId)),
-      getDoc(doc(db, 'users', settlementData.toUserId))
-    ]);
+    // Check if they are friends first
+    await this.ensureFriendship(fromUserId, toUserId);
     
-    if (!fromUserDoc.exists() || !toUserDoc.exists()) {
-      throw new Error('User data not found');
-    }
-    
-    const fromUserData = fromUserDoc.data();
-    const toUserData = toUserDoc.data();
-    
-    // Get group data if groupId is provided
-    let groupData = undefined;
-    if (settlementData.groupId && settlementData.groupId !== 'personal') {
-      try {
-        const groupDoc = await getDoc(doc(db, 'groups', settlementData.groupId));
-        if (groupDoc.exists()) {
-          const group = groupDoc.data() as Group;
-          groupData = {
-            name: group.name || 'Unknown Group',
-            description: group.description
-          };
-        }
-      } catch (error) {
-        console.log('Failed to fetch group data:', error);
-      }
-    }
-    
-    const batch = writeBatch(db);
-    
-    // 1. Create the settlement transaction record - PROPERLY handle undefined fields
-    // Build the base transaction object without optional fields that might be undefined
-    const settlementTransaction: any = {
-      fromUserId: settlementData.fromUserId,
-      fromUserData: {
-        fullName: fromUserData?.fullName || 'Unknown User',
-        email: fromUserData?.email || '',
-        avatar: fromUserData?.profilePicture || ''
-      },
-      toUserId: settlementData.toUserId,
-      toUserData: {
-        fullName: toUserData?.fullName || 'Unknown User',
-        email: toUserData?.email || '',
-        avatar: toUserData?.profilePicture || ''
-      },
-      amount: settlementData.amount,
-      currency: settlementData.currency,
-      description: settlementData.description || `Settlement payment to ${toUserData?.fullName}`,
-      method: settlementData.method,
+    // Update friend balance - pass true for isSettlement
+    await this.updateFriendBalance(fromUserId, toUserId, amount, true);
+    console.log(`✅ Updated friend balance after settlement: ${fromUserId} paid ${toUserId} ${amount}`);
+
+    // Create the settlement record
+    const settlement: Settlement = {
+      id: '',
+      fromUserId,
+      toUserId,
+      amount,
+      currency,
+      method,
+      description: description || `Settlement for ${method} payment`,
       status: 'completed',
-      notes: settlementData.notes || '',
+      createdAt: Timestamp.now(),
+      settledAt: Timestamp.now()
+    };
+
+    // Only add groupId if it's defined and not null/empty
+    if (groupId && groupId !== 'personal') {
+      (settlement as any).groupId = groupId;
+    }
+
+    const docRef = await addDoc(collection(db, 'settlements'), settlement);
+    
+    // Send notifications
+    await this.sendSettlementNotifications(docRef.id, {
+      fromUserId,
+      toUserId,
+      amount,
+      currency,
+      description: description || settlement.description,
+      method: method as 'manual_settlement' | 'cash' | 'bank' | 'venmo' | 'paypal' | 'upi',
+      groupId,
+      fromUserData: { fullName: 'User', email: '', avatar: '' },
+      toUserData: { fullName: 'User', email: '', avatar: '' },
+      status: 'completed',
       settlementDate: new Date(),
       createdAt: new Date(),
       updatedAt: new Date()
-    };
+    });
     
-    // Only add optional fields if they have actual values (not undefined)
-    if (settlementData.groupId) {
-      settlementTransaction.groupId = settlementData.groupId;
-    }
-    
-    if (groupData) {
-      settlementTransaction.groupData = groupData;
-    }
-    
-    if (settlementData.expenseId) {
-      settlementTransaction.expenseId = settlementData.expenseId;
-    }
-    
-    const settlementRef = doc(collection(db, 'settlementTransactions'));
-    batch.set(settlementRef, settlementTransaction);
-    
-    // 2. Create a special settlement expense record for tracking ONLY (not for balance calculation)
-    const settlementExpense: Omit<Expense, 'id'> = {
-      description: `Settlement: ${settlementData.description || 'Payment'}`,
-      amount: settlementData.amount,
-      currency: settlementData.currency,
-      category: 'settlement',
-      categoryIcon: '💸',
-      groupId: settlementData.groupId || 'personal',
-      paidBy: settlementData.fromUserId,
-      paidByData: {
-        fullName: fromUserData?.fullName || 'Unknown User',
-        email: fromUserData?.email || '',
-        avatar: fromUserData?.profilePicture || ''
-      },
-      splitType: 'equal',
-      splitData: [{
-        userId: settlementData.toUserId,
-        amount: settlementData.amount,
-        percentage: 100,
-        isPaid: true,
-        paidAt: new Date()
-      }],
-      notes: `Settlement payment via ${settlementData.method}${settlementData.notes ? '. ' + settlementData.notes : ''}`,
-      tags: ['settlement', 'payment'],
-      date: new Date(),
-      isSettled: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      // Flag to indicate this is a settlement transaction and shouldn't affect group totals
-      isSettlementTransaction: true
-    };
-    
-    const expenseRef = doc(collection(db, 'expenses'));
-    batch.set(expenseRef, settlementExpense);
-    
-    // 3. Update friend balances - create friendship if it doesn't exist
-    try {
-      // FIXED: When fromUserId pays toUserId, reduce fromUserId's debt to toUserId
-      console.log(`🔄 Settlement balance update: ${settlementData.fromUserId} pays ${settlementData.toUserId} ${settlementData.amount}`);
-      console.log(`📝 This should REDUCE ${settlementData.fromUserId}'s debt to ${settlementData.toUserId}`);
-      
-      // First, ensure friendship exists
-      console.log('🤝 Checking if users are friends for settlement...');
-      const existingCheck = await this.checkExistingFriendship(settlementData.fromUserId, toUserData?.email || '');
-      
-      if (!existingCheck.isFriend) {
-        console.log('🔗 Users are not friends, creating friendship for settlement...');
-        
-        // Create friendship in both directions for settlement
-        const friendship1: Omit<Friend, 'id'> = {
-          userId: settlementData.fromUserId,
-          friendId: settlementData.toUserId,
-          friendData: {
-            id: settlementData.toUserId,
-            fullName: toUserData?.fullName || 'Unknown User',
-            email: toUserData?.email || '',
-            mobile: '',
-            avatar: toUserData?.profilePicture || '',
-            profilePicture: toUserData?.profilePicture || ''
-          },
-          status: 'accepted',
-          balance: 0,
-          lastActivity: new Date(),
-          createdAt: new Date()
-        };
-        
-        const friendship2: Omit<Friend, 'id'> = {
-          userId: settlementData.toUserId,
-          friendId: settlementData.fromUserId,
-          friendData: {
-            id: settlementData.fromUserId,
-            fullName: fromUserData?.fullName || 'Unknown User',
-            email: fromUserData?.email || '',
-            mobile: '',
-            avatar: fromUserData?.profilePicture || '',
-            profilePicture: fromUserData?.profilePicture || ''
-          },
-          status: 'accepted',
-          balance: 0,
-          lastActivity: new Date(),
-          createdAt: new Date()
-        };
-        
-        // Add both friendships
-        await addDoc(collection(db, 'friends'), friendship1);
-        await addDoc(collection(db, 'friends'), friendship2);
-        
-        console.log(`✅ Auto-created friendship for settlement between ${settlementData.fromUserId} and ${settlementData.toUserId}`);
-      } else {
-        console.log('🔗 Users are already friends');
-      }
-      
-      await this.updateFriendBalanceForSettlement(settlementData.fromUserId, settlementData.toUserId, settlementData.amount);
-      console.log(`✅ Updated friend balance after settlement: ${settlementData.fromUserId} paid ${settlementData.toUserId} ${settlementData.amount}`);
-    } catch (error) {
-      console.error(`❌ Friend balance update failed:`, error);
-      console.log(`⚠️ Skipping friend balance update for ${settlementData.fromUserId} -> ${settlementData.toUserId}`);
-    }
-    
-    // 4. Update group member balances if in a group
-    if (settlementData.groupId && settlementData.groupId !== 'personal') {
-      await this.updateGroupMemberBalance(settlementData.groupId, settlementData.fromUserId, -settlementData.amount);
-      await this.updateGroupMemberBalance(settlementData.groupId, settlementData.toUserId, settlementData.amount);
-      
-      // Add settlement message to group chat
-      await this.sendGroupMessage({
-        groupId: settlementData.groupId,
-        userId: settlementData.fromUserId,
-        userName: fromUserData?.fullName || 'Unknown User',
-        message: `💸 Settled ${settlementData.currency} ${settlementData.amount} with ${toUserData?.fullName}`,
-        type: 'system'
-      });
-    }
-    
-    await batch.commit();
-    
-    // 5. Send notifications
-    await this.sendSettlementNotifications(settlementRef.id, settlementTransaction);
-    
-    console.log('✅ Settlement transaction created successfully:', settlementRef.id);
-    return settlementRef.id;
-    
+    console.log(`✅ Settlement transaction created successfully: ${docRef.id}`);
+    return docRef.id;
   } catch (error) {
-    console.error('❌ Create settlement transaction error:', error);
+    console.error('Error creating settlement transaction:', error);
     throw error;
   }
-}
+};
 
 static async sendSettlementNotifications(settlementId: string, settlement: Omit<SettlementTransaction, 'id'>): Promise<void> {
   try {
@@ -4009,8 +3938,8 @@ static async syncFriendBalanceForSettlement(
     }
     
     // Update friend balances with settlement
-    // When fromUserId pays toUserId, both balances should decrease
-    await this.updateFriendBalanceForSettlement(fromUserId, toUserId, settlementAmount);
+    // When fromUserId pays toUserId, we SUBTRACT the amount from the balance
+    await this.updateFriendBalance(fromUserId, toUserId, -settlementAmount);
     console.log(`✅ SYNC: Friend balance updated for settlement`);
     
   } catch (error) {
@@ -4073,7 +4002,15 @@ static async markPaymentAsPaid(
       notes: 'Enhanced settlement with balance sync'
     };
     
-    const settlementId = await this.createSettlementTransaction(settlementData);
+    const settlementId = await this.createSettlementTransaction(
+      fromUserId,
+      toUserId,
+      amount,
+      'manual_settlement',
+      groupId,
+      description || 'Manual settlement',
+      currency
+    );
     
     // 2. 🔥 CRITICAL FIX: Update friend balances DIRECTLY
     console.log('🔄 SYNC FIX: Updating friend balances directly');
