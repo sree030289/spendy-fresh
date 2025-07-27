@@ -1663,99 +1663,162 @@ export default function RealSplittingScreen() {
               <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
                 Friends ({acceptedFriends.length})
               </Text>
-              {acceptedFriends.map((friend, index) => {
-                // Get balance from unified balance system
-                const balanceDetail = friendsBalances.allBalances.find(b => b.userId === friend.friendId);
-                const balance = balanceDetail?.balance || 0;
-                
-                // Safety check for friend data
-                const friendName = friend.friendData?.fullName || 'Unknown Friend';
-                const friendEmail = friend.friendData?.email || '';
-                const friendInitial = friendName.charAt(0).toUpperCase() || '?';
-                
-                return (
-                  <TouchableOpacity
-                    key={`friend-${friend.id}-${index}`}
-                    style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
-                    onPress={() => showFriendActionsMenu(friend)}
-                  >
-                    <View style={styles.balanceItemLeft}>
-                      <View style={[styles.personAvatar, { backgroundColor: theme.colors.primary }]}>
-                        <Text style={styles.personAvatarText}>
-                          {friendInitial}
-                        </Text>
-                      </View>
-                      <View style={styles.personInfo}>
-                        <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
-                          {friendName}
-                        </Text>
-                        <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                          {friendEmail}
-                        </Text>
-                      </View>
-                    </View>
+              {/* Get settlement balances for Friends tab to show per-group entries */}
+              {(() => {
+                // Get settlement-specific balances that include separate group entries
+                const [settlementBalances, setSettlementBalances] = useState<Array<{
+                  userId: string;
+                  name: string;
+                  email: string;
+                  balance: number;
+                  source: string;
+                  groupName?: string;
+                  groupId?: string;
+                }>>([]);
 
-                    <View style={styles.balanceItemRight}>
-                      <View style={styles.balanceDisplay}>
-                        {Math.abs(balance) < 0.01 ? (
-                          <>
-                            <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
-                            <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                              Settled up
+                // Load settlement balances on mount and when friends change
+                useEffect(() => {
+                  const loadSettlementBalances = async () => {
+                    if (!user?.id) return;
+                    try {
+                      const balances = await friendsBalances.calculateSettlementBalances(user.id);
+                      
+                      // Filter to only show friends (accepted friends)
+                      const acceptedFriendIds = new Set(acceptedFriends.map(f => f.friendId));
+                      
+                      const friendSettlementBalances = balances
+                        .filter(balance => acceptedFriendIds.has(balance.userId))
+                        .map(balance => ({
+                          userId: balance.userId,
+                          name: balance.name,
+                          email: balance.email,
+                          balance: balance.balance,
+                          source: balance.source,
+                          groupName: balance.groupName,
+                          groupId: balance.groupId
+                        }));
+                      
+                      setSettlementBalances(friendSettlementBalances);
+                    } catch (error) {
+                      console.error('Failed to load settlement balances for Friends tab:', error);
+                    }
+                  };
+
+                  loadSettlementBalances();
+                }, [acceptedFriends, friendsBalances, user?.id]);
+
+                // Render friend entries - separate entry per group if they're in multiple groups
+                return settlementBalances.map((balanceEntry, index) => {
+                  const friend = acceptedFriends.find(f => f.friendId === balanceEntry.userId);
+                  if (!friend) return null;
+
+                  const balance = balanceEntry.balance;
+                  const friendName = balanceEntry.name || 'Unknown Friend';
+                  const friendEmail = balanceEntry.email || '';
+                  const friendInitial = friendName.charAt(0).toUpperCase() || '?';
+                  
+                  // Create a unique key that includes group info if available
+                  const entryKey = balanceEntry.groupId 
+                    ? `friend-${friend.id}-group-${balanceEntry.groupId}-${index}`
+                    : `friend-${friend.id}-direct-${index}`;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={entryKey}
+                      style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
+                      onPress={() => {
+                        // If this is a group-specific balance, open settlement screen with group filter
+                        if (balanceEntry.groupId) {
+                          openSettlementScreen({ 
+                            filter: 'groups', 
+                            groupId: balanceEntry.groupId,
+                            friendId: friend.friendId 
+                          });
+                        } else {
+                          // For direct friend balances, use friend filter
+                          openSettlementScreen({ 
+                            filter: 'friends', 
+                            friendId: friend.friendId 
+                          });
+                        }
+                      }}
+                    >
+                      <View style={styles.balanceItemLeft}>
+                        <View style={[styles.personAvatar, { backgroundColor: theme.colors.primary }]}>
+                          <Text style={styles.personAvatarText}>
+                            {friendInitial}
+                          </Text>
+                        </View>
+                        <View style={styles.personInfo}>
+                          <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
+                            {friendName}
+                          </Text>
+                          <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                            {friendEmail}
+                          </Text>
+                          {/* Show group name if this is a group-specific balance */}
+                          {balanceEntry.groupName && (
+                            <Text style={[styles.personEmail, { color: theme.colors.primary, fontSize: 12, fontWeight: '500' }]} numberOfLines={1}>
+                              📍 {balanceEntry.groupName}
                             </Text>
-                          </>
-                        ) : balance > 0 ? (
-                          <>
-                            <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
-                            <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                              Owes you {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
-                            </Text>
-                            {balanceDetail?.breakdown && (
+                          )}
+                        </View>
+                      </View>
+
+                      <View style={styles.balanceItemRight}>
+                        <View style={styles.balanceDisplay}>
+                          {Math.abs(balance) < 0.01 ? (
+                            <>
+                              <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                                Settled up
+                              </Text>
+                            </>
+                          ) : balance > 0 ? (
+                            <>
+                              <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
+                              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
+                                Owes you {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
+                              </Text>
                               <Text style={[styles.balanceBreakdown, { color: theme.colors.textSecondary }]}>
-                                {balanceDetail.source === 'mixed' 
-                                  ? `Friends: ${getCurrencySymbol(user?.currency || 'USD')}${balanceDetail.breakdown.fromFriendships.toFixed(2)} + Groups`
-                                  : balanceDetail.source === 'group' 
-                                    ? `From: ${balanceDetail.groupName}`
-                                    : 'Direct friendship'
+                                {balanceEntry.source === 'group' 
+                                  ? `From group: ${balanceEntry.groupName}`
+                                  : 'Direct friendship'
                                 }
                               </Text>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
-                            <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                              You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
-                            </Text>
-                            {balanceDetail?.breakdown && (
+                            </>
+                          ) : (
+                            <>
+                              <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
+                              <Text style={[styles.balanceText, { color: theme.colors.error }]}>
+                                You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
+                              </Text>
                               <Text style={[styles.balanceBreakdown, { color: theme.colors.textSecondary }]}>
-                                {balanceDetail.source === 'mixed' 
-                                  ? `Friends: ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balanceDetail.breakdown.fromFriendships).toFixed(2)} + Groups`
-                                  : balanceDetail.source === 'group' 
-                                    ? `From: ${balanceDetail.groupName}`
-                                    : 'Direct friendship'
+                                {balanceEntry.source === 'group' 
+                                  ? `From group: ${balanceEntry.groupName}`
+                                  : 'Direct friendship'
                                 }
                               </Text>
-                            )}
-                          </>
-                        )}
+                            </>
+                          )}
+                        </View>
+                        <View style={styles.friendActions}>
+                          {Math.abs(balance) >= 0.01 && (
+                            <TouchableOpacity
+                              style={[styles.remindButton, { backgroundColor: theme.colors.warning }]}
+                              onPress={() => handleRemindFriend(friend, balance)}
+                            >
+                              <Ionicons name="notifications" size={14} color="white" />
+                              <Text style={styles.remindButtonText}>Remind</Text>
+                            </TouchableOpacity>
+                          )}
+                          <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                        </View>
                       </View>
-                      <View style={styles.friendActions}>
-                        {Math.abs(balance) >= 0.01 && (
-                          <TouchableOpacity
-                            style={[styles.remindButton, { backgroundColor: theme.colors.warning }]}
-                            onPress={() => handleRemindFriend(friend, balance)}
-                          >
-                            <Ionicons name="notifications" size={14} color="white" />
-                            <Text style={styles.remindButtonText}>Remind</Text>
-                          </TouchableOpacity>
-                        )}
-                        <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                    </TouchableOpacity>
+                  );
+                });
+              })()}
             </View>
           )
         ) : (

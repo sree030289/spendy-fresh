@@ -27,6 +27,18 @@ class ExpenseRefreshService {
     });
   }
 
+  // Notify all listeners that an expense has changed (added, updated, or deleted)
+  notifyExpenseChange() {
+    console.log('Notifying expense change to', this.listeners.size, 'listeners');
+    this.listeners.forEach(listener => {
+      try {
+        listener();
+      } catch (error) {
+        console.error('Error in expense change listener:', error);
+      }
+    });
+  }
+
   // Notify all listeners that group members have been updated
   notifyGroupMembersUpdated() {
     console.log('Notifying group members updated to', this.listeners.size, 'listeners');
@@ -47,6 +59,18 @@ class ExpenseRefreshService {
         listener();
       } catch (error) {
         console.error('Error in group refresh listener:', error);
+      }
+    });
+  }
+
+  // Notify all listeners that balance has changed
+  notifyBalanceChange() {
+    console.log('Notifying balance change to', this.listeners.size, 'listeners');
+    this.listeners.forEach(listener => {
+      try {
+        listener();
+      } catch (error) {
+        console.error('Error in balance change listener:', error);
       }
     });
   }

@@ -6,8 +6,10 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { GRADIENTS } from '@/constants/theme';
+import { SplittingService, Group, Friend } from '@/services/firebase/splitting';
 
 // Import modals
 import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
@@ -55,20 +57,77 @@ const TAB_ROUTES = [
 // Custom Tab Navigator with Working Swipe Support
 function SwipeableTabNavigator() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [showActionModal, setShowActionModal] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
   const [showGmailSync, setShowGmailSync] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const navigation = useNavigation();
   
   // Pan gesture handler for swipe navigation
   const translateX = useRef(new Animated.Value(0)).current;
+  
+  // Fetch groups and friends data
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const [userGroups, userFriends] = await Promise.all([
+          SplittingService.getUserGroups(user.id),
+          SplittingService.getFriends(user.id)
+        ]);
+        
+        setGroups(userGroups);
+        setFriends(userFriends);
+      } catch (error) {
+        console.error('Error loading groups and friends in MainTabNavigator:', error);
+      }
+    };
+    
+    loadData();
+  }, [user?.id]);
+  
+  const handleAddExpense = async (expenseData: any) => {
+    try {
+      if (!user?.id) return;
+      
+      const expenseId = await SplittingService.addExpense({
+        ...expenseData,
+        isSettled: false,
+        date: new Date()
+      });
+      
+      console.log('✅ Expense added successfully from quick action:', expenseId);
+      
+      // Refresh data
+      const [userGroups, userFriends] = await Promise.all([
+        SplittingService.getUserGroups(user.id),
+        SplittingService.getFriends(user.id)
+      ]);
+      
+      setGroups(userGroups);
+      setFriends(userFriends);
+      setShowAddExpense(false);
+      
+    } catch (error) {
+      console.error('❌ Error adding expense from quick action:', error);
+      // Could show an alert here
+    }
+  };
   
   const handleActionSelect = (actionId: string) => {
     console.log('🎯 Handling action in MainTabNavigator:', actionId);
     
     switch (actionId) {
       case 'split-expense':
+        // Refresh data before opening modal
+        if (user?.id) {
+          SplittingService.getUserGroups(user.id).then(setGroups).catch(console.error);
+          SplittingService.getFriends(user.id).then(setFriends).catch(console.error);
+        }
         setShowAddExpense(true);
         break;
       case 'smart-expense':
@@ -281,12 +340,9 @@ function SwipeableTabNavigator() {
       <AddExpenseModal
         visible={showAddExpense}
         onClose={() => setShowAddExpense(false)}
-        onSubmit={(data) => {
-          console.log('Split expense submitted:', data);
-          setShowAddExpense(false);
-        }}
-        groups={[]}
-        friends={[]}
+        onSubmit={handleAddExpense}
+        groups={groups}
+        friends={friends}
       />
       
       <AddReminderModal

@@ -21,6 +21,7 @@ import { useOverviewBalances, useFriendsBalances } from '@/hooks/useBalances';
 import { SplittingService, Friend, Group } from '@/services/firebase/splitting';
 import { getCurrencySymbol } from '@/utils/currency';
 import { friendsManager } from '@/services/FriendsManager';
+import GroupBalanceOverviewModal from '@/components/modals/GroupBalanceOverviewModal';
 
 interface BalanceEntry {
   id: string;
@@ -71,10 +72,12 @@ export default function UnifiedSettlementScreen({
   // Modal states
   const [showSettleModal, setShowSettleModal] = useState(false);
   const [showRemindModal, setShowRemindModal] = useState(false);
+  const [showGroupBalanceOverview, setShowGroupBalanceOverview] = useState(false);
   const [selectedBalance, setSelectedBalance] = useState<BalanceEntry | null>(null);
   const [settlementNote, setSettlementNote] = useState('');
   const [settling, setSettling] = useState(false);
   const [sending, setSending] = useState(false);
+  const [groupBalanceData, setGroupBalanceData] = useState<any>(null);
 
   // Data
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -635,6 +638,29 @@ const confirmSettlement = async () => {
             </TouchableOpacity>
           ))}
         </ScrollView>
+        
+        {/* Group Settlement Overview Button */}
+        {selectedGroupId && (
+          <TouchableOpacity
+            style={[styles.groupOverviewBtn, { backgroundColor: theme.colors.primary }]}
+            onPress={async () => {
+              try {
+                const selectedGroup = groups.find(g => g.id === selectedGroupId);
+                if (selectedGroup) {
+                  const balanceOverview = await SplittingService.getGroupBalanceOverview(selectedGroupId);
+                  setGroupBalanceData(balanceOverview);
+                  setShowGroupBalanceOverview(true);
+                }
+              } catch (error) {
+                console.error('Failed to load group balance overview:', error);
+                Alert.alert('Error', 'Failed to load settlement overview');
+              }
+            }}
+          >
+            <Ionicons name="analytics" size={16} color="white" />
+            <Text style={styles.groupOverviewBtnText}>💰 Settlement Overview</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -1100,6 +1126,16 @@ const confirmSettlement = async () => {
       {/* Modals */}
       {renderSettleModal()}
       {renderRemindModal()}
+      
+      {/* Group Balance Overview Modal */}
+      <GroupBalanceOverviewModal
+        visible={showGroupBalanceOverview}
+        onClose={() => setShowGroupBalanceOverview(false)}
+        groupId={selectedGroupId || ''}
+        groupName={groups.find(g => g.id === selectedGroupId)?.name || ''}
+        currency={groups.find(g => g.id === selectedGroupId)?.currency || 'USD'}
+        balanceData={groupBalanceData}
+      />
     </SafeAreaView>
   );
 }
@@ -1191,6 +1227,21 @@ const styles = StyleSheet.create({
   groupChipText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  groupOverviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8,
+  },
+  groupOverviewBtnText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   summaryCard: {
     padding: 20,
