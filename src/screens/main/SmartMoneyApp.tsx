@@ -29,6 +29,7 @@ import BudgetPlanSection from '@/components/budget/BudgetPlanSection';
 import { AnalyticsService } from '@/services/smartMoney/analyticsService';
 import { DataService } from '@/services/smartMoney/dataService';
 import { MigrationService } from '@/services/smartMoney/migrationService';
+import { FirebaseNotificationService } from '@/services/smartMoney/firebaseNotificationService';
 import { Analytics, Expense, Income, Reminder, ExpenseCategory, IncomeCategory, ReminderCategory } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
@@ -854,6 +855,9 @@ const SmartMoneyScreen: React.FC = () => {
       Alert.alert('Error', 'Failed to mark reminder as paid');
     }
   };
+
+  // Alias for markReminderPaid for compatibility
+  const markReminderAsPaid = markReminderPaid;
 
   const renderAnalyticsSection = () => {
     if (!analytics || (expenses.length === 0 && income.length === 0)) {
