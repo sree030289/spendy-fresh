@@ -300,16 +300,21 @@ export default function RealSplittingScreen() {
   // Load settlement balances for Friends tab (moved to top level to avoid conditional hooks)
   useEffect(() => {
     const loadSettlementBalances = async () => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        console.log('❌ No user ID available for settlement balances');
+        return;
+      }
       try {
+        console.log('🔄 Loading settlement balances for user:', user.id);
         const balances = await friendsBalances.calculateSettlementBalances(user.id);
+        console.log('📊 Raw settlement balances from friendsBalances:', balances);
         
-        // Filter to only show friends (accepted friends)
-        const acceptedFriends = friends.filter(f => f.status === 'accepted');
-        const acceptedFriendIds = new Set(acceptedFriends.map(f => f.friendId));
+        // Create settlement balances from both actual balances AND accepted friends
+        let friendSettlementBalances = [];
         
-        const friendSettlementBalances = balances
-          .filter(balance => acceptedFriendIds.has(balance.userId))
+        // First, add all non-zero balances
+        const nonZeroBalances = balances
+          .filter(balance => Math.abs(balance.balance) > 0.01)
           .map(balance => ({
             userId: balance.userId,
             name: balance.name,
@@ -320,14 +325,89 @@ export default function RealSplittingScreen() {
             groupId: balance.groupId
           }));
         
+        // Then, add accepted friends who don't have balances (settled/no transactions)
+        const acceptedFriends = friends.filter(f => f.status === 'accepted');
+        const balanceUserIds = new Set(balances.map(b => b.userId));
+        
+        const settledFriends = acceptedFriends
+          .filter(friend => !balanceUserIds.has(friend.friendId))
+          .map(friend => ({
+            userId: friend.friendId,
+            name: friend.friendData.fullName,
+            email: friend.friendData.email || '',
+            balance: 0,
+            source: 'direct',
+            groupName: undefined,
+            groupId: undefined
+          }));
+        
+        // Combine and ensure uniqueness by userId-source-groupId combination
+        const allEntries = [...nonZeroBalances, ...settledFriends];
+        
+        // Aggressive deduplication by userId only (keep only ONE entry per user)
+        const finalUnique = new Map();
+        allEntries.forEach(entry => {
+          const existing = finalUnique.get(entry.userId);
+          
+          if (!existing) {
+            // First entry for this user
+            finalUnique.set(entry.userId, entry);
+          } else {
+            // Decide which entry to keep based on priority:
+            // 1. Prefer non-zero balance over zero balance
+            // 2. If both have balances, prefer the one with higher absolute balance
+            // 3. If balances are equal, prefer group over direct
+            
+            const entryHasBalance = Math.abs(entry.balance) > 0.01;
+            const existingHasBalance = Math.abs(existing.balance) > 0.01;
+            
+            if (entryHasBalance && !existingHasBalance) {
+              // Entry has balance, existing doesn't - use entry
+              finalUnique.set(entry.userId, entry);
+            } else if (!entryHasBalance && existingHasBalance) {
+              // Existing has balance, entry doesn't - keep existing
+              // Do nothing
+            } else if (entryHasBalance && existingHasBalance) {
+              // Both have balances - use the one with higher absolute balance
+              if (Math.abs(entry.balance) > Math.abs(existing.balance)) {
+                finalUnique.set(entry.userId, entry);
+              }
+            } else {
+              // Both are settled (zero balance) - prefer group over direct
+              if (entry.source !== 'direct' && existing.source === 'direct') {
+                finalUnique.set(entry.userId, entry);
+              }
+            }
+          }
+        });
+        
+        friendSettlementBalances = Array.from(finalUnique.values());
+        
+        console.log('👥 Settlement balances after processing:', friendSettlementBalances.length, 'entries');
+        console.log('👥 Non-zero balances:', nonZeroBalances.length);
+        console.log('👥 Settled friends added:', settledFriends.length);
+        console.log('👥 Detailed settlement balances:', friendSettlementBalances);
         setSettlementBalances(friendSettlementBalances);
       } catch (error) {
         console.error('Failed to load settlement balances for Friends tab:', error);
+        // Fallback to showing just accepted friends with zero balances
+        console.log('⚠️ Error occurred, showing accepted friends as fallback');
+        const acceptedFriends = friends.filter(f => f.status === 'accepted');
+        const fallbackBalances = acceptedFriends.map(friend => ({
+          userId: friend.friendId,
+          name: friend.friendData.fullName,
+          email: friend.friendData.email || '',
+          balance: 0,
+          source: 'direct',
+          groupName: undefined,
+          groupId: undefined
+        }));
+        setSettlementBalances(fallbackBalances);
       }
     };
 
     loadSettlementBalances();
-  }, [friends, friendsBalances, user?.id]);
+  }, [friendsBalances, friends, user?.id]); // Added friends dependency back since we're using it
   
   // FIXED: Unified balance change notification
   const notifyBalanceChange = useCallback(() => {
@@ -1627,6 +1707,8 @@ export default function RealSplittingScreen() {
     // Debug logging for friends tab
     console.log('👥 Friends tab rendering with data:', {
       friendsLength: friends.length,
+      settlementBalancesLength: settlementBalances.length,
+      settlementBalances: settlementBalances,
       friendBalances: friendsBalances.friendBalances,
       groupMemberBalances: friendsBalances.groupMemberBalances,
       allBalances: friendsBalances.allBalances,
@@ -1635,6 +1717,12 @@ export default function RealSplittingScreen() {
 
     const acceptedFriends = friends.filter(f => f.status === 'accepted');
     const invitedFriends = friends.filter(f => f.status === 'invited' || f.status === 'pending');
+
+    console.log('👥 Friend counts:', {
+      acceptedFriends: acceptedFriends.length,
+      invitedFriends: invitedFriends.length,
+      settlementBalances: settlementBalances.length
+    });
 
     return (
       <ScrollView 
@@ -1648,7 +1736,7 @@ export default function RealSplittingScreen() {
           <View style={styles.headerTitleSection}>
             <Text style={[styles.cleanTabTitle, { color: theme.colors.text }]}>Friends</Text>
             <Text style={[styles.cleanTabSubtitle, { color: theme.colors.textSecondary }]}>
-              {acceptedFriends.length} active • {invitedFriends.length} pending
+              {settlementBalances.length} active • {invitedFriends.length} pending
             </Text>
           </View>
           <View style={styles.cleanHeaderActions}>
@@ -1690,7 +1778,7 @@ export default function RealSplittingScreen() {
                 styles.modernTabBadgeText,
                 { color: activeFriendsTab === 'accepted' ? 'white' : 'white' }
               ]}>
-                {acceptedFriends.length}
+                {settlementBalances.length}
               </Text>
             </View>
           </TouchableOpacity>
@@ -1723,7 +1811,7 @@ export default function RealSplittingScreen() {
 
         {activeFriendsTab === 'accepted' ? (
           // Clean Accepted Friends Design
-          acceptedFriends.length === 0 ? (
+          settlementBalances.length === 0 ? (
             <View style={[styles.cleanEmptyState, { backgroundColor: theme.colors.surface }]}>
               <View style={[styles.cleanEmptyIcon, { backgroundColor: `${theme.colors.primary}10` }]}>
                 <Ionicons name="people-outline" size={32} color={theme.colors.primary} />
@@ -1737,19 +1825,13 @@ export default function RealSplittingScreen() {
             <View style={styles.cleanFriendsList}>
               {/* Use settlement balances from top-level state (no conditional hooks) */}
               {settlementBalances.map((balanceEntry, index) => {
-                const acceptedFriends = friends.filter(f => f.status === 'accepted');
-                const friend = acceptedFriends.find(f => f.friendId === balanceEntry.userId);
-                if (!friend) return null;
-
                 const balance = balanceEntry.balance;
-                const friendName = balanceEntry.name || 'Unknown Friend';
+                const friendName = balanceEntry.name || 'Unknown User';
                 const friendEmail = balanceEntry.email || '';
                 const friendInitial = friendName.charAt(0).toUpperCase() || '?';
                 
-                // Create a unique key that includes group info if available
-                const entryKey = balanceEntry.groupId 
-                  ? `friend-${friend.id}-group-${balanceEntry.groupId}-${index}`
-                  : `friend-${friend.id}-direct-${index}`;
+                // Create a completely unique key using multiple identifiers
+                const entryKey = `friend-settlement-${balanceEntry.userId}-${index}-${Date.now()}`;
                 
                 // Determine balance status for clean display
                 const isSettled = Math.abs(balance) < 0.01;
@@ -1767,13 +1849,13 @@ export default function RealSplittingScreen() {
                         openSettlementScreen({ 
                           filter: 'groups', 
                           groupId: balanceEntry.groupId,
-                          friendId: friend.friendId 
+                          friendId: balanceEntry.userId 
                         });
                       } else {
                         // For direct friend balances, use friend filter
                         openSettlementScreen({ 
                           filter: 'friends', 
-                          friendId: friend.friendId 
+                          friendId: balanceEntry.userId 
                         });
                       }
                     }}
@@ -1831,7 +1913,27 @@ export default function RealSplittingScreen() {
                           </View>
                           <TouchableOpacity
                             style={[styles.cleanRemindButton, { backgroundColor: theme.colors.warning }]}
-                            onPress={() => handleRemindFriend(friend, balance)}
+                            onPress={() => {
+                              if (!user?.id) return;
+                              // Create a temporary friend object for the reminder function
+                              const tempFriend: Friend = {
+                                id: `temp-${balanceEntry.userId}`,
+                                userId: user.id,
+                                friendId: balanceEntry.userId,
+                                status: 'accepted',
+                                inviteMethod: 'email',
+                                requestType: 'sent',
+                                balance: balance,
+                                lastActivity: new Date(),
+                                createdAt: new Date(),
+                                friendData: {
+                                  fullName: friendName,
+                                  email: friendEmail,
+                                  id: balanceEntry.userId
+                                }
+                              };
+                              handleRemindFriend(tempFriend, balance);
+                            }}
                           >
                             <Ionicons name="notifications" size={12} color="white" />
                           </TouchableOpacity>

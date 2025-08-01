@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { SplittingService } from '@/services/firebase/splitting';
 import { getCurrencySymbol } from '@/utils/currency';
+import { useAuth } from '@/hooks/useAuth';
 
 const { width, height } = Dimensions.get('window');
 
@@ -36,79 +37,76 @@ export default function GroupBalanceOverviewModal({
   balanceData
 }: GroupBalanceOverviewModalProps) {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [overviewData, setOverviewData] = useState<any>(null);
   const [settlementSuggestions, setSettlementSuggestions] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'relationships' | 'suggestions'>('relationships');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (visible && groupId) {
-      loadBalanceOverview();
+      loadGroupSettlementData();
     }
   }, [visible, groupId]);
 
-  const loadBalanceOverview = async () => {
+  const loadGroupSettlementData = async () => {
     try {
       setLoading(true);
       
-      // Use provided balance data or fetch fresh data
-      const overview = balanceData || await SplittingService.getGroupBalanceOverview(groupId);
+      // Get group-specific balance data only
+      const overview = await SplittingService.getGroupBalanceOverview(groupId);
       const suggestions = await SplittingService.getGroupSettlementSuggestions(groupId);
+      
+      console.log('🔄 GroupBalanceOverviewModal: Settlement suggestions received:', suggestions);
+      suggestions.forEach((suggestion, index) => {
+        console.log(`💸 Settlement ${index + 1}: ${suggestion.fromUserName} pays $${suggestion.amount} to ${suggestion.toUserName}`);
+        console.log(`   fromUserId: ${suggestion.fromUserId}, toUserId: ${suggestion.toUserId}`);
+      });
       
       setOverviewData(overview);
       setSettlementSuggestions(suggestions);
     } catch (error) {
-      console.error('Failed to load balance overview:', error);
+      console.error('Failed to load group settlement data:', error);
       Alert.alert('Error', 'Failed to load settlement data');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSettlement = async (fromUserId: string, toUserId: string, amount: number) => {
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadGroupSettlementData();
+    setRefreshing(false);
+  };
+
+  const handleMarkAsPaid = async (suggestion: any) => {
     try {
       Alert.alert(
-        'Confirm Settlement',
-        `Mark ${getCurrencySymbol(currency)}${amount.toFixed(2)} as paid?`,
+        'Mark Payment as Complete',
+        `Confirm that ${suggestion.fromUserName} has paid ${getCurrencySymbol(currency)}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Confirm',
+            text: 'Mark as Paid',
+            style: 'default',
             onPress: async () => {
               try {
-                // Analyze impact first
-                const impact = await SplittingService.analyzeCrossGroupSettlementImpact(
-                  fromUserId,
-                  toUserId,
-                  amount
+                await SplittingService.markPaymentAsPaid(
+                  suggestion.fromUserId,
+                  suggestion.toUserId,
+                  suggestion.amount,
+                  groupId,
+                  `Settlement payment in ${groupName}`
                 );
                 
-                Alert.alert(
-                  'Settlement Impact',
-                  impact.summary,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Proceed',
-                      onPress: async () => {
-                        await SplittingService.markPaymentAsPaid(
-                          fromUserId,
-                          toUserId,
-                          amount,
-                          groupId,
-                          `Settlement in ${groupName}`
-                        );
-                        
-                        // Refresh data
-                        await loadBalanceOverview();
-                        Alert.alert('Success', 'Settlement recorded successfully!');
-                      }
-                    }
-                  ]
-                );
+                // Refresh the data
+                await loadGroupSettlementData();
+                
+                Alert.alert('Success! 🎉', 'Payment has been marked as complete and balances updated.');
+                
               } catch (error) {
-                console.error('Settlement error:', error);
-                Alert.alert('Error', 'Failed to process settlement');
+                console.error('Mark payment error:', error);
+                Alert.alert('Error', 'Failed to mark payment as complete. Please try again.');
               }
             }
           }
@@ -119,80 +117,6 @@ export default function GroupBalanceOverviewModal({
     }
   };
 
-  const renderRelationshipCard = (relationship: any, index: number) => (
-    <View key={index} style={[styles.relationshipCard, { backgroundColor: theme.colors.surface }]}>
-      <View style={styles.relationshipHeader}>
-        <View style={styles.memberInfo}>
-          <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
-            <Text style={styles.avatarText}>
-              {relationship.memberName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <View>
-            <Text style={[styles.memberName, { color: theme.colors.text }]}>
-              {relationship.memberName}
-            </Text>
-            <Text style={[styles.memberEmail, { color: theme.colors.textSecondary }]}>
-              {relationship.memberEmail}
-            </Text>
-          </View>
-        </View>
-        
-        <View style={styles.balanceContainer}>
-          <Text style={[
-            styles.balanceAmount,
-            { color: relationship.balance > 0 ? '#10B981' : relationship.balance < 0 ? '#EF4444' : theme.colors.textSecondary }
-          ]}>
-            {relationship.balance > 0 ? '+' : ''}
-            {getCurrencySymbol(currency)}{Math.abs(relationship.balance).toFixed(2)}
-          </Text>
-          <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
-            {relationship.balance > 0 ? 'You are owed' : relationship.balance < 0 ? 'You owe' : 'Settled'}
-          </Text>
-        </View>
-      </View>
-      
-      <View style={styles.relationshipDetails}>
-        <Text style={[styles.otherMemberTitle, { color: theme.colors.text }]}>
-          vs {relationship.otherMemberName}:
-        </Text>
-        <Text style={[
-          styles.relationshipBalance,
-          { color: relationship.balance > 0 ? '#10B981' : relationship.balance < 0 ? '#EF4444' : theme.colors.textSecondary }
-        ]}>
-          {relationship.balance > 0 
-            ? `${relationship.otherMemberName} owes you ${getCurrencySymbol(currency)}${Math.abs(relationship.balance).toFixed(2)}`
-            : relationship.balance < 0 
-            ? `You owe ${relationship.otherMemberName} ${getCurrencySymbol(currency)}${Math.abs(relationship.balance).toFixed(2)}`
-            : 'All settled up! 🎉'
-          }
-        </Text>
-      </View>
-    </View>
-  );
-
-  const renderSettlementSuggestion = (suggestion: any, index: number) => (
-    <View key={index} style={[styles.suggestionCard, { backgroundColor: theme.colors.surface }]}>
-      <View style={styles.suggestionHeader}>
-        <View style={styles.suggestionInfo}>
-          <Text style={[styles.suggestionText, { color: theme.colors.text }]}>
-            {suggestion.fromUserName} pays {suggestion.toUserName}
-          </Text>
-          <Text style={[styles.suggestionAmount, { color: theme.colors.primary }]}>
-            {getCurrencySymbol(currency)}{suggestion.amount.toFixed(2)}
-          </Text>
-        </View>
-        
-        <TouchableOpacity
-          style={[styles.settleBtn, { backgroundColor: theme.colors.primary }]}
-          onPress={() => handleSettlement(suggestion.fromUserId, suggestion.toUserId, suggestion.amount)}
-        >
-          <Text style={styles.settleBtnText}>Mark as Paid</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
   if (!visible) return null;
 
   return (
@@ -200,83 +124,29 @@ export default function GroupBalanceOverviewModal({
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color={theme.colors.text} />
           </TouchableOpacity>
           
           <View style={styles.headerContent}>
             <Text style={[styles.title, { color: theme.colors.text }]}>
-              Settlement Overview
+              Group Settlement
             </Text>
             <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
               {groupName}
             </Text>
           </View>
           
-          <TouchableOpacity onPress={loadBalanceOverview} style={styles.refreshBtn}>
-            <Ionicons name="refresh" size={20} color={theme.colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Summary */}
-        {overviewData && (
-          <View style={[styles.summaryContainer, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
-                Total Group Debt
-              </Text>
-              <Text style={[styles.summaryValue, { color: '#EF4444' }]}>
-                {getCurrencySymbol(currency)}{overviewData.totalGroupDebt?.toFixed(2) || '0.00'}
-              </Text>
-            </View>
-            
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
-                Total Group Credit
-              </Text>
-              <Text style={[styles.summaryValue, { color: '#10B981' }]}>
-                {getCurrencySymbol(currency)}{overviewData.totalGroupCredit?.toFixed(2) || '0.00'}
-              </Text>
-            </View>
-            
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
-                Status
-              </Text>
-              <Text style={[
-                styles.summaryValue, 
-                { color: overviewData.isBalanced ? '#10B981' : '#F59E0B' }
-              ]}>
-                {overviewData.isBalanced ? '✅ Balanced' : '⚖️ Needs Settlement'}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Tabs */}
-        <View style={[styles.tabs, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'relationships' && { borderBottomColor: theme.colors.primary }]}
-            onPress={() => setActiveTab('relationships')}
+          <TouchableOpacity 
+            onPress={handleRefresh} 
+            style={styles.refreshButton}
+            disabled={refreshing}
           >
-            <Text style={[
-              styles.tabText,
-              { color: activeTab === 'relationships' ? theme.colors.primary : theme.colors.textSecondary }
-            ]}>
-              All Relationships
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'suggestions' && { borderBottomColor: theme.colors.primary }]}
-            onPress={() => setActiveTab('suggestions')}
-          >
-            <Text style={[
-              styles.tabText,
-              { color: activeTab === 'suggestions' ? theme.colors.primary : theme.colors.textSecondary }
-            ]}>
-              Settlement Suggestions ({settlementSuggestions.length})
-            </Text>
+            <Ionicons 
+              name="refresh" 
+              size={20} 
+              color={refreshing ? theme.colors.textSecondary : theme.colors.primary} 
+            />
           </TouchableOpacity>
         </View>
 
@@ -291,52 +161,61 @@ export default function GroupBalanceOverviewModal({
             </View>
           ) : (
             <>
-              {activeTab === 'relationships' && (
-                <View style={styles.relationshipsContainer}>
-                  {overviewData?.memberRelationships?.length > 0 ? (
-                    overviewData.memberRelationships.map((relationship: any, index: number) => 
-                      renderRelationshipCard(relationship, index)
-                    )
-                  ) : (
-                    <View style={styles.emptyState}>
-                      <Text style={styles.emptyIcon}>🤝</Text>
-                      <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                        All Settled Up!
-                      </Text>
-                      <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                        No outstanding balances in this group
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {activeTab === 'suggestions' && (
-                <View style={styles.suggestionsContainer}>
-                  {settlementSuggestions.length > 0 ? (
-                    <>
-                      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                        💡 Optimal Settlement Plan
-                      </Text>
-                      <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
-                        These {settlementSuggestions.length} payment(s) will settle all debts in the group
-                      </Text>
+              {/* Simple Settlement Display */}
+              {settlementSuggestions && settlementSuggestions.length > 0 ? (
+                <View style={styles.simpleSettlementContainer}>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                    To be paid
+                  </Text>
+                  
+                  {settlementSuggestions.map((suggestion, index) => (
+                    <View key={index} style={[styles.simpleSettlementCard, { backgroundColor: theme.colors.surface }]}>
+                      <View style={styles.paymentFlow}>
+                        <View style={styles.payerContainer}>
+                          <Text style={[styles.payerName, { color: theme.colors.text }]}>
+                            {suggestion.fromUserName}
+                          </Text>
+                          <Text style={[styles.payerLabel, { color: theme.colors.textSecondary }]}>
+                            needs to pay
+                          </Text>
+                        </View>
+                        
+                        <View style={styles.amountContainer}>
+                          <Text style={[styles.simpleAmount, { color: theme.colors.success }]}>
+                            {getCurrencySymbol(currency)}{suggestion.amount.toFixed(0)}
+                          </Text>
+                        </View>
+                        
+                        <Ionicons name="arrow-forward" size={20} color={theme.colors.textSecondary} />
+                        
+                        <View style={styles.payeeContainer}>
+                          <Text style={[styles.payeeName, { color: theme.colors.text }]}>
+                            {suggestion.toUserName}
+                          </Text>
+                        </View>
+                      </View>
                       
-                      {settlementSuggestions.map((suggestion, index) => 
-                        renderSettlementSuggestion(suggestion, index)
-                      )}
-                    </>
-                  ) : (
-                    <View style={styles.emptyState}>
-                      <Text style={styles.emptyIcon}>✅</Text>
-                      <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                        All Settled!
-                      </Text>
-                      <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                        No settlements needed in this group
-                      </Text>
+                      <TouchableOpacity
+                        style={[styles.simpleMarkPaidButton, { backgroundColor: theme.colors.primary }]}
+                        onPress={() => handleMarkAsPaid(suggestion)}
+                      >
+                        <Ionicons name="checkmark-circle" size={16} color="white" />
+                        <Text style={styles.simpleMarkPaidText}>Mark as Paid</Text>
+                      </TouchableOpacity>
                     </View>
-                  )}
+                  ))}
+                </View>
+              ) : (
+                <View style={[styles.allSettledContainer, { backgroundColor: theme.colors.surface }]}>
+                  <View style={[styles.settledIcon, { backgroundColor: `${theme.colors.success}15` }]}>
+                    <Ionicons name="checkmark-circle" size={48} color={theme.colors.success} />
+                  </View>
+                  <Text style={[styles.allSettledTitle, { color: theme.colors.text }]}>
+                    All Settled! 🎉
+                  </Text>
+                  <Text style={[styles.allSettledSubtitle, { color: theme.colors.textSecondary }]}>
+                    Everyone is even in this group
+                  </Text>
                 </View>
               )}
             </>
@@ -358,7 +237,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
-  closeBtn: {
+  closeButton: {
     padding: 4,
   },
   headerContent: {
@@ -373,43 +252,8 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
   },
-  refreshBtn: {
+  refreshButton: {
     padding: 4,
-  },
-  summaryContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginVertical: 16,
-  },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
   },
   content: {
     flex: 1,
@@ -425,127 +269,108 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
   },
-  relationshipsContainer: {
-    gap: 16,
-  },
-  relationshipCard: {
-    borderRadius: 12,
-    padding: 16,
-  },
-  relationshipHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  memberInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  memberName: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  memberEmail: {
-    fontSize: 12,
-  },
-  balanceContainer: {
-    alignItems: 'flex-end',
-  },
-  balanceAmount: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  balanceLabel: {
-    fontSize: 12,
-  },
-  relationshipDetails: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-  },
-  otherMemberTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  relationshipBalance: {
-    fontSize: 14,
-  },
-  suggestionsContainer: {
-    gap: 16,
-  },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    marginBottom: 20,
-  },
-  suggestionCard: {
-    borderRadius: 12,
-    padding: 16,
-  },
-  suggestionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  suggestionInfo: {
-    flex: 1,
-  },
-  suggestionText: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  suggestionAmount: {
-    fontSize: 18,
     fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
   },
-  settleBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+  // Simple settlement styles
+  simpleSettlementContainer: {
+    marginTop: 20,
   },
-  settleBtnText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
+  simpleSettlementCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  emptyState: {
+  paymentFlow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 48,
+    justifyContent: 'space-between',
     marginBottom: 16,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
+  payerName: {
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
   },
-  emptySubtitle: {
+  amountContainer: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginHorizontal: 12,
+  },
+  simpleAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  payeeName: {
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
+  },
+  simpleMarkPaidButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  simpleMarkPaidText: {
+    color: 'white',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  // All settled styles
+  allSettledContainer: {
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  settledIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  allSettledTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 8,
     textAlign: 'center',
+  },
+  allSettledSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  // New container styles for clearer payment direction
+  payerContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  payerLabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  payeeContainer: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  payeeLabel: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });

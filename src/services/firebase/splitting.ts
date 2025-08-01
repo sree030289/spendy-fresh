@@ -1499,8 +1499,11 @@ static async addExpense(expenseData: Omit<Expense, 'id' | 'createdAt' | 'updated
       console.log(`🔍 Processing split for ${split.userId}, amount: ${split.amount}`);
       if (split.userId !== expenseData.paidBy) {
         console.log(`🔍 ${split.userId} != ${expenseData.paidBy}, updating balances`);
-        await this.updateGroupMemberBalance(expenseData.groupId, split.userId, split.amount);
-        await this.updateGroupMemberBalance(expenseData.groupId, expenseData.paidBy, -split.amount);
+        // FIXED: Correct balance direction
+        // Split members OWE money (negative balance)
+        await this.updateGroupMemberBalance(expenseData.groupId, split.userId, -split.amount);
+        // Payer is OWED money (positive balance)
+        await this.updateGroupMemberBalance(expenseData.groupId, expenseData.paidBy, split.amount);
         
         // Also update friend balances if they are friends
         try {
@@ -2398,6 +2401,148 @@ static async getUserExpenses(userId: string, limitCount: number = 20): Promise<E
       return null;
     }
   }
+
+  static async getGroupBalanceOverview(groupId: string): Promise<{
+    memberRelationships: Array<{
+      memberId: string;
+      memberName: string;
+      memberEmail: string;
+      memberAvatar?: string;
+      balance: number;
+      otherMemberName?: string;
+    }>;
+    totalGroupDebt: number;
+    totalGroupCredit: number;
+    netBalance: number;
+    isBalanced: boolean;
+    groupName: string;
+    memberCount: number;
+  }> {
+    try {
+      console.log('🔄 Getting group balance overview for group:', groupId);
+      
+      // Get group data
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (!groupDoc.exists()) {
+        throw new Error('Group not found');
+      }
+      
+      const groupData = groupDoc.data() as Group;
+      
+      // Get all expenses for this specific group only
+      const expenses = await this.getGroupExpenses(groupId);
+
+      console.log(`💰 Found ${expenses.length} expenses in group ${groupData.name}`);
+      
+      // Get active members only from this group
+      const allMembers = groupData.members || [];
+      const activeMembers = allMembers.filter(member => member.isActive !== false);
+      
+      console.log('👥 Active members in group:', activeMembers.length);
+      
+      if (activeMembers.length === 0) {
+        console.warn('⚠️ No active members found in group');
+        return {
+          memberRelationships: [],
+          totalGroupDebt: 0,
+          totalGroupCredit: 0,
+          netBalance: 0,
+          isBalanced: true,
+          groupName: groupData.name,
+          memberCount: 0
+        };
+      }
+      
+      // Calculate balances from expenses for this group only
+      const memberBalances = new Map<string, number>();
+      
+      // Initialize all members with 0 balance
+      activeMembers.forEach(member => {
+        memberBalances.set(member.userId, 0);
+      });
+      
+      // Process each expense for this group
+      expenses.forEach(expense => {
+        const totalAmount = expense.amount || 0;
+        const paidBy = expense.paidBy;
+        const splitMembers = expense.splitData || [];
+        
+        if (splitMembers.length === 0) return;
+        
+        console.log(`� Processing expense: ${expense.description} - $${totalAmount} paid by ${paidBy}`);
+        console.log(`📊 Split data:`, splitMembers.map(s => `${s.userId}: ${s.amount} (paid: ${s.isPaid})`));
+        
+        // The payer is owed the total amount
+        if (memberBalances.has(paidBy)) {
+          memberBalances.set(paidBy, (memberBalances.get(paidBy) || 0) + totalAmount);
+        }
+        
+        // Each split member owes their share
+        splitMembers.forEach((split) => {
+          if (memberBalances.has(split.userId)) {
+            memberBalances.set(split.userId, (memberBalances.get(split.userId) || 0) - split.amount);
+          }
+        });
+      });
+      
+      console.log('💰 Calculated member balances:');
+      memberBalances.forEach((balance, userId) => {
+        const member = activeMembers.find(m => m.userId === userId);
+        console.log(`  ${member?.userData?.fullName || userId}: $${balance.toFixed(2)}`);
+      });
+      
+      // Create member relationships with proper structure for the modal
+      const memberRelationships = activeMembers.map(member => {
+        const balance = memberBalances.get(member.userId) || 0;
+        const roundedBalance = Math.round(balance * 100) / 100;
+        
+        return {
+          memberId: member.userId,
+          memberName: member.userData?.fullName || 'Unknown',
+          memberEmail: member.userData?.email || '',
+          memberAvatar: member.userData?.avatar || '',
+          balance: roundedBalance,
+          otherMemberName: 'undefined' // This will be shown in the "vs" line
+        };
+      });
+      
+      // Calculate totals for the group
+      const totalGroupCredit = memberRelationships
+        .filter(member => member.balance > 0.01)
+        .reduce((sum, member) => sum + member.balance, 0);
+      
+      const totalGroupDebt = Math.abs(memberRelationships
+        .filter(member => member.balance < -0.01)
+        .reduce((sum, member) => sum + member.balance, 0));
+      
+      const netBalance = totalGroupCredit - totalGroupDebt;
+      const isBalanced = Math.abs(netBalance) < 0.01;
+      
+      console.log('✅ Group balance overview calculated from expenses:', {
+        groupName: groupData.name,
+        memberCount: activeMembers.length,
+        totalGroupCredit: Math.round(totalGroupCredit * 100) / 100,
+        totalGroupDebt: Math.round(totalGroupDebt * 100) / 100,
+        netBalance: Math.round(netBalance * 100) / 100,
+        isBalanced,
+        memberBalances: memberRelationships.map(m => ({ name: m.memberName, balance: m.balance }))
+      });
+      
+      return {
+        memberRelationships,
+        totalGroupCredit: Math.round(totalGroupCredit * 100) / 100,
+        totalGroupDebt: Math.round(totalGroupDebt * 100) / 100,
+        netBalance: Math.round(netBalance * 100) / 100,
+        isBalanced,
+        groupName: groupData.name,
+        memberCount: activeMembers.length
+      };
+      
+    } catch (error) {
+      console.error('Get group balance overview error:', error);
+      throw error;
+    }
+  }
   // REAL TIME MESSAGE LISTENERS
   static onGroupMessages(groupId: string, callback: (messages: ChatMessage[]) => void): () => void {
   const messagesQuery = query(
@@ -2751,9 +2896,9 @@ static async updateGroupMemberBalance(groupId: string, userId: string, amount: n
         // First, reverse the old balance calculations
         for (const oldSplit of currentExpense.splitData) {
           if (oldSplit.userId !== currentExpense.paidBy) {
-            // Reverse group member balance
-            await this.updateGroupMemberBalance(currentExpense.groupId, oldSplit.userId, -oldSplit.amount);
-            await this.updateGroupMemberBalance(currentExpense.groupId, currentExpense.paidBy, oldSplit.amount);
+            // Reverse group member balance (undo the wrong signs)
+            await this.updateGroupMemberBalance(currentExpense.groupId, oldSplit.userId, oldSplit.amount);
+            await this.updateGroupMemberBalance(currentExpense.groupId, currentExpense.paidBy, -oldSplit.amount);
             
             // Reverse friend balance if they are friends
             try {
@@ -2768,9 +2913,11 @@ static async updateGroupMemberBalance(groupId: string, userId: string, amount: n
         // Then, apply the new balance calculations
         for (const newSplit of expenseData.splitData) {
           if (newSplit.userId !== expenseData.paidBy) {
-            // Update group member balance
-            await this.updateGroupMemberBalance(expenseData.groupId, newSplit.userId, newSplit.amount);
-            await this.updateGroupMemberBalance(expenseData.groupId, expenseData.paidBy, -newSplit.amount);
+            // FIXED: Correct balance direction
+            // Split members OWE money (negative balance)
+            await this.updateGroupMemberBalance(expenseData.groupId, newSplit.userId, -newSplit.amount);
+            // Payer is OWED money (positive balance)
+            await this.updateGroupMemberBalance(expenseData.groupId, expenseData.paidBy, newSplit.amount);
             
             // Update friend balance if they are friends
             try {
@@ -2861,9 +3008,9 @@ static async deleteExpense(expenseId: string, deletedBy: string): Promise<void> 
     // 3. Reverse all balance calculations
     for (const split of expense.splitData) {
       if (split.userId !== expense.paidBy) {
-        // Reverse group member balances
-        await this.updateGroupMemberBalance(expense.groupId, split.userId, -split.amount);
-        await this.updateGroupMemberBalance(expense.groupId, expense.paidBy, split.amount);
+        // Reverse group member balances (undo the wrong signs)
+        await this.updateGroupMemberBalance(expense.groupId, split.userId, split.amount);
+        await this.updateGroupMemberBalance(expense.groupId, expense.paidBy, -split.amount);
         
         // Reverse friend balances if they are friends
         try {
@@ -3938,8 +4085,7 @@ static async getGroupSettlementTransactions(groupId: string): Promise<Settlement
 }
 
 // GROUP SETTLEMENT SUGGESTIONS - Calculate optimal settlement suggestions for all group members
-// Fix for Settlement Suggestions in splitting.ts
-// Replace the getGroupSettlementSuggestions method with this corrected version
+// FIXED: Use consolidated friend balances instead of raw group calculations to match UnifiedSettlementScreen
 
 static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
   fromUserId: string;
@@ -3951,7 +4097,7 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
   amount: number;
 }>> {
   try {
-    console.log('🔄 Calculating settlement suggestions for group:', groupId);
+    console.log('🔄 DEBUG: Group settlement calculation for group:', groupId);
     
     // Get group data
     const groupDoc = await getDoc(doc(db, 'groups', groupId));
@@ -3961,38 +4107,135 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
     
     const groupData = groupDoc.data() as Group;
     const activeMembers = groupData.members.filter(member => member.isActive);
+    console.log(`👥 DEBUG: Found ${activeMembers.length} active members in group`);
     
-    // Filter out members with zero balances and create debt matrix
-    const membersWithBalances = activeMembers.filter(member => Math.abs(member.balance) > 0.01);
+    // NEW APPROACH: Use consolidated friend balances instead of raw group calculations
+    // This matches the logic used by UnifiedSettlementScreen for consistency
+    console.log('🔧 DEBUG: Using consolidated friend balances (matching UnifiedSettlementScreen logic)');
+    
+    const memberBalances = new Map<string, { balance: number; name: string; avatar?: string; email: string }>();
+    
+    // For each group member, get their consolidated balance with every other member
+    for (const member of activeMembers) {
+      const userId = member.userId;
+      console.log(`🔍 DEBUG: Getting consolidated balances for user ${member.userData.fullName} (${userId})`);
+      
+      // Get all friends for this user to find consolidated balances
+      const userFriends = await this.getFriends(userId);
+      console.log(`📊 DEBUG: User has ${userFriends.length} friends total`);
+      
+      // Initialize member balance
+      if (!memberBalances.has(userId)) {
+        memberBalances.set(userId, {
+          balance: 0,
+          name: member.userData.fullName,
+          avatar: member.userData.avatar,
+          email: member.userData.email
+        });
+      }
+      
+      // Calculate net balance with other group members using consolidated friend relationships
+      for (const otherMember of activeMembers) {
+        if (otherMember.userId === userId) continue;
+        
+        // Find friendship with this other member
+        const friendship = userFriends.find(f => 
+          f.friendId === otherMember.userId && f.status === 'accepted'
+        );
+        
+        if (friendship) {
+          // Use consolidated friendship balance (includes all expenses between these users)
+          console.log(`🤝 DEBUG: Found friendship balance between ${member.userData.fullName} and ${otherMember.userData.fullName}: ${friendship.balance}`);
+          
+          const currentBalance = memberBalances.get(userId)!;
+          currentBalance.balance += friendship.balance;
+          console.log(`📊 DEBUG: Updated ${member.userData.fullName} total balance to: ${currentBalance.balance}`);
+        } else {
+          // No direct friendship - calculate group-specific balance for this pair
+          console.log(`💭 DEBUG: No friendship found between ${member.userData.fullName} and ${otherMember.userData.fullName}, calculating group-specific balance`);
+          
+          // Get expenses where both users participated in this group
+          const expenses = await this.getGroupExpenses(groupId);
+          let pairwiseBalance = 0;
+          
+          expenses.forEach((expense) => {
+            const userSplit = expense.splitData?.find(s => s.userId === userId);
+            const otherSplit = expense.splitData?.find(s => s.userId === otherMember.userId);
+            
+            // Only process if both users participated in this expense
+            if (userSplit && otherSplit) {
+              if (expense.paidBy === userId) {
+                // User paid, they should get credit
+                pairwiseBalance += otherSplit.amount;
+              } else if (expense.paidBy === otherMember.userId) {
+                // Other user paid, user owes them
+                pairwiseBalance -= userSplit.amount;
+              }
+            }
+          });
+          
+          console.log(`📊 DEBUG: Group-specific balance between ${member.userData.fullName} and ${otherMember.userData.fullName}: ${pairwiseBalance}`);
+          
+          const currentBalance = memberBalances.get(userId)!;
+          currentBalance.balance += pairwiseBalance;
+          console.log(`📊 DEBUG: Updated ${member.userData.fullName} total balance to: ${currentBalance.balance}`);
+        }
+      }
+    }
+    
+    console.log('📊 DEBUG: Final consolidated balances:');
+    memberBalances.forEach((memberData, userId) => {
+      console.log(`  ${memberData.name}: $${memberData.balance.toFixed(2)}`);
+    });
+    
+    // Filter out members with zero balances
+    const membersWithBalances = activeMembers.filter(member => {
+      const memberData = memberBalances.get(member.userId);
+      const balance = memberData?.balance || 0;
+      return Math.abs(balance) > 0.01;
+    });
     
     if (membersWithBalances.length === 0) {
+      console.log('✅ DEBUG: All members are settled - no settlements needed');
       return [];
     }
     
-    // FIXED: Correct interpretation of balances
-    // Positive balance = they are OWED money (creditor)
-    // Negative balance = they OWE money (debtor)
+    // Generate settlement suggestions using consolidated balances
     const creditors = membersWithBalances
-      .filter(member => member.balance > 0.01) // People who are OWED money
-      .map(member => ({
-        userId: member.userId,
-        userName: member.userData.fullName,
-        userAvatar: member.userData.avatar,
-        amount: member.balance // Amount they are owed
-      }))
-      .sort((a, b) => b.amount - a.amount); // Largest creditor first
+      .filter(member => {
+        const memberData = memberBalances.get(member.userId);
+        const balance = memberData?.balance || 0;
+        return balance > 0.01;
+      })
+      .map(member => {
+        const memberData = memberBalances.get(member.userId)!;
+        return {
+          userId: member.userId,
+          userName: memberData.name,
+          userAvatar: memberData.avatar,
+          amount: memberData.balance
+        };
+      })
+      .sort((a, b) => b.amount - a.amount);
     
     const debtors = membersWithBalances
-      .filter(member => member.balance < -0.01) // People who OWE money
-      .map(member => ({
-        userId: member.userId,
-        userName: member.userData.fullName,
-        userAvatar: member.userData.avatar,
-        amount: Math.abs(member.balance) // Amount they owe (convert negative to positive)
-      }))
-      .sort((a, b) => b.amount - a.amount); // Largest debtor first
+      .filter(member => {
+        const memberData = memberBalances.get(member.userId);
+        const balance = memberData?.balance || 0;
+        return balance < -0.01;
+      })
+      .map(member => {
+        const memberData = memberBalances.get(member.userId)!;
+        return {
+          userId: member.userId,
+          userName: memberData.name,
+          userAvatar: memberData.avatar,
+          amount: Math.abs(memberData.balance)
+        };
+      })
+      .sort((a, b) => b.amount - a.amount);
     
-    console.log('Creditors (people owed money):', creditors.length, 'Debtors (people who owe):', debtors.length);
+    console.log(`💰 DEBUG: Found ${creditors.length} creditors (owed money) and ${debtors.length} debtors (owe money)`);
     
     // Generate optimal settlement suggestions using debt minimization algorithm
     const settlements: Array<{
@@ -4018,7 +4261,6 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
       const settlementAmount = Math.min(creditor.amount, debtor.amount);
       
       if (settlementAmount > 0.01) { // Only create settlements for amounts > 1 cent
-        // FIXED: Correct direction - FROM debtor TO creditor
         settlements.push({
           fromUserId: debtor.userId, // Person who owes (pays)
           fromUserName: debtor.userName,
@@ -4028,6 +4270,8 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
           toUserAvatar: creditor.userAvatar,
           amount: parseFloat(settlementAmount.toFixed(2))
         });
+        
+        console.log(`💸 DEBUG: Settlement suggestion: ${debtor.userName} pays $${settlementAmount.toFixed(2)} to ${creditor.userName}`);
       }
       
       // Update balances
@@ -4043,7 +4287,7 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
       }
     }
     
-    console.log(`✅ Generated ${settlements.length} settlement suggestions`);
+    console.log(`✅ DEBUG: Generated ${settlements.length} settlement suggestions using consolidated balances`);
     return settlements;
     
   } catch (error) {

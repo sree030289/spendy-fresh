@@ -197,72 +197,49 @@ export default function UnifiedSettlementScreen({
         groups: settlementBalances.filter(b => b.source === 'group').length
       });
       
-      // Convert settlement balance data to settlement entries and consolidate duplicates
+      // Convert settlement balance data to settlement entries
+      // IMPORTANT: Don't consolidate group balances - keep them separate for filtering
       if (settlementBalances && Array.isArray(settlementBalances)) {
-        const userBalanceMap = new Map<string, BalanceEntry>();
-        
-        settlementBalances
+        balanceEntries = settlementBalances
           .filter(balance => Math.abs(balance.balance || 0) > 0.01)
-          .forEach(balance => {
-            const userId = balance.userId;
+          .map((balance, index) => {
             const amount = Math.abs(balance.balance || 0);
             const isOwed = (balance.balance || 0) > 0;
             
-            if (userBalanceMap.has(userId)) {
-              // Combine with existing entry
-              const existing = userBalanceMap.get(userId)!;
-              
-              // For friend+group consolidation, don't add amounts - they represent the same debt
-              // Just track that this person has both friend and group relationships
-              // The settlement amount should be the total amount owed, not duplicated
-              
-              // If this is a group balance, add group info to description
-              if (balance.source === 'group' && balance.groupName) {
-                if (!existing.description.includes(balance.groupName)) {
-                  existing.description = `Friend balance + Group: ${balance.groupName}`;
-                }
-                // Track group info for filtering
-                if (!existing.groupId && balance.groupId) {
-                  existing.groupId = balance.groupId;
-                  existing.groupName = balance.groupName;
-                }
-                // For groups filter to work, set type to group when group is involved
-                existing.type = 'group';
-              }
-              
-              // Update source to mixed if combining friend + group
-              if (existing.source !== balance.source) {
-                existing.source = 'mixed';
-              }
-            } else {
-              // Create new entry
-              const entry: BalanceEntry = {
-                id: `combined-${userId}`,
-                type: balance.source === 'group' ? 'group' : 'friend',
-                userId: userId,
-                name: balance.name || 'Unknown',
-                email: balance.email || '',
-                amount: amount,
-                isOwed: isOwed,
-                groupName: balance.groupName,
-                groupId: balance.groupId,
-                description: balance.source === 'group' 
-                  ? `Group: ${balance.groupName}` 
-                  : 'Friend balance',
-                source: balance.source
-              };
-              
-              userBalanceMap.set(userId, entry);
-            }
+            // Create unique ID that includes group info for proper filtering
+            const uniqueId = balance.source === 'group' 
+              ? `${balance.userId}-${balance.groupId}` 
+              : `${balance.userId}-friend`;
+            
+            const entry: BalanceEntry = {
+              id: uniqueId,
+              type: balance.source === 'group' ? 'group' : 'friend',
+              userId: balance.userId,
+              name: balance.name || 'Unknown',
+              email: balance.email || '',
+              amount: amount,
+              isOwed: isOwed,
+              groupName: balance.groupName,
+              groupId: balance.groupId,
+              description: balance.source === 'group' 
+                ? `Group: ${balance.groupName}` 
+                : 'Friend balance',
+              source: balance.source
+            };
+            
+            return entry;
           });
-        
-        balanceEntries = Array.from(userBalanceMap.values());
       }
 
-      console.log('📊 Generated consolidated balance entries:', balanceEntries.length);
+      console.log('📊 Generated individual balance entries (no consolidation):', balanceEntries.length);
 
       // Store all balances for stable counting
       setAllBalanceEntries(balanceEntries);
+      
+      console.log('🔄 UnifiedSettlement: All balance entries before filtering:', balanceEntries.length);
+      balanceEntries.forEach((entry, index) => {
+        console.log(`  Entry ${index}: ${entry.name} (${entry.source}) - groupId: ${entry.groupId || 'none'}, amount: ${entry.amount}, isOwed: ${entry.isOwed}`);
+      });
 
       // Apply filters for display
       let filtered = [...balanceEntries];
@@ -289,7 +266,18 @@ export default function UnifiedSettlementScreen({
         
         // If specific group selected, filter further
         if (selectedGroupId) {
+          console.log('🔍 Filtering by specific group:', selectedGroupId);
+          console.log('📊 Before group filter:', filtered.length, 'entries');
+          filtered.forEach((entry, index) => {
+            console.log(`  Entry ${index}: groupId=${entry.groupId}, name=${entry.name}, balance=${entry.amount}`);
+          });
+          
           filtered = filtered.filter(entry => entry.groupId === selectedGroupId);
+          
+          console.log('📊 After group filter:', filtered.length, 'entries');
+          filtered.forEach((entry, index) => {
+            console.log(`  Filtered Entry ${index}: groupId=${entry.groupId}, name=${entry.name}, balance=${entry.amount}`);
+          });
         }
       } else if (activeFilter === 'friend' && initialFriendId) {
         // Specific friend filter
@@ -590,10 +578,8 @@ const confirmSettlement = async () => {
   const renderGroupSelector = () => {
     if (activeFilter !== 'groups') return null;
     
-    // Get available groups from all balance entries, not filtered ones
-    const availableGroups = groups.filter(group => 
-      allBalanceEntries.some(balance => balance.groupId === group.id)
-    );
+    // Show all groups that user is a member of (getUserGroups already filters this)
+    const availableGroups = groups;
     
     if (availableGroups.length === 0) return null;
     
