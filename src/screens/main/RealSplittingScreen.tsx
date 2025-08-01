@@ -227,6 +227,17 @@ export default function RealSplittingScreen() {
   const [groupBalances, setGroupBalances] = useState<Map<string, number>>(new Map());
   const { calculateGroupBalance } = useOverviewBalances();
 
+  // Settlement balances state for Friends tab (moved to top level to avoid conditional hooks)
+  const [settlementBalances, setSettlementBalances] = useState<Array<{
+    userId: string;
+    name: string;
+    email: string;
+    balance: number;
+    source: string;
+    groupName?: string;
+    groupId?: string;
+  }>>([]);
+
   // Set up subscription helper when component mounts
   useEffect(() => {
     if ((global as any).showSubscriptionModal) {
@@ -285,6 +296,38 @@ export default function RealSplittingScreen() {
     const timeoutId = setTimeout(calculateAllGroupBalances, 500);
     return () => clearTimeout(timeoutId);
   }, [groups, user?.id, calculateGroupBalance]);
+
+  // Load settlement balances for Friends tab (moved to top level to avoid conditional hooks)
+  useEffect(() => {
+    const loadSettlementBalances = async () => {
+      if (!user?.id) return;
+      try {
+        const balances = await friendsBalances.calculateSettlementBalances(user.id);
+        
+        // Filter to only show friends (accepted friends)
+        const acceptedFriends = friends.filter(f => f.status === 'accepted');
+        const acceptedFriendIds = new Set(acceptedFriends.map(f => f.friendId));
+        
+        const friendSettlementBalances = balances
+          .filter(balance => acceptedFriendIds.has(balance.userId))
+          .map(balance => ({
+            userId: balance.userId,
+            name: balance.name,
+            email: balance.email,
+            balance: balance.balance,
+            source: balance.source,
+            groupName: balance.groupName,
+            groupId: balance.groupId
+          }));
+        
+        setSettlementBalances(friendSettlementBalances);
+      } catch (error) {
+        console.error('Failed to load settlement balances for Friends tab:', error);
+      }
+    };
+
+    loadSettlementBalances();
+  }, [friends, friendsBalances, user?.id]);
   
   // FIXED: Unified balance change notification
   const notifyBalanceChange = useCallback(() => {
@@ -1600,268 +1643,244 @@ export default function RealSplittingScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View style={styles.tabHeader}>
-          <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Friends & Balances</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity onPress={friendsBalances.refresh} style={styles.refreshButton}>
-              <Ionicons name="refresh" size={16} color={theme.colors.primary} />
+        {/* Simplified header with clean action buttons */}
+        <View style={styles.cleanTabHeader}>
+          <View style={styles.headerTitleSection}>
+            <Text style={[styles.cleanTabTitle, { color: theme.colors.text }]}>Friends</Text>
+            <Text style={[styles.cleanTabSubtitle, { color: theme.colors.textSecondary }]}>
+              {acceptedFriends.length} active • {invitedFriends.length} pending
+            </Text>
+          </View>
+          <View style={styles.cleanHeaderActions}>
+            <TouchableOpacity 
+              onPress={friendsBalances.refresh} 
+              style={[styles.cleanActionButton, { backgroundColor: theme.colors.surface }]}
+            >
+              <Ionicons name="refresh" size={18} color={theme.colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+              style={[styles.cleanActionButton, { backgroundColor: theme.colors.primary }]}
               onPress={() => setShowAddFriend(true)}
             >
-              <Ionicons name="person-add" size={20} color="white" />
-              <Text style={styles.headerButtonText}>Add</Text>
+              <Ionicons name="person-add" size={18} color="white" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Friends Subtabs */}
-        <View style={[styles.subTabContainer, { backgroundColor: theme.colors.surface }]}>
+        {/* Subtle tab switcher */}
+        <View style={[styles.modernTabContainer, { backgroundColor: theme.colors.surface }]}>
           <TouchableOpacity
             style={[
-              styles.subTab,
+              styles.modernTab,
               activeFriendsTab === 'accepted' && { backgroundColor: theme.colors.primary }
             ]}
             onPress={() => setActiveFriendsTab('accepted')}
           >
             <Text style={[
-              styles.subTabText,
-              { color: activeFriendsTab === 'accepted' ? 'white' : theme.colors.text }
+              styles.modernTabText,
+              { color: activeFriendsTab === 'accepted' ? 'white' : theme.colors.textSecondary }
             ]}>
-              Accepted ({acceptedFriends.length})
+              Active
             </Text>
+            <View style={[
+              styles.modernTabBadge,
+              { backgroundColor: activeFriendsTab === 'accepted' ? 'rgba(255,255,255,0.2)' : theme.colors.primary }
+            ]}>
+              <Text style={[
+                styles.modernTabBadgeText,
+                { color: activeFriendsTab === 'accepted' ? 'white' : 'white' }
+              ]}>
+                {acceptedFriends.length}
+              </Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
-              styles.subTab,
+              styles.modernTab,
               activeFriendsTab === 'invited' && { backgroundColor: theme.colors.primary }
             ]}
             onPress={() => setActiveFriendsTab('invited')}
           >
             <Text style={[
-              styles.subTabText,
-              { color: activeFriendsTab === 'invited' ? 'white' : theme.colors.text }
+              styles.modernTabText,
+              { color: activeFriendsTab === 'invited' ? 'white' : theme.colors.textSecondary }
             ]}>
-              Invited ({invitedFriends.length})
+              Pending
             </Text>
+            <View style={[
+              styles.modernTabBadge,
+              { backgroundColor: activeFriendsTab === 'invited' ? 'rgba(255,255,255,0.2)' : theme.colors.warning }
+            ]}>
+              <Text style={[
+                styles.modernTabBadgeText,
+                { color: 'white' }
+              ]}>
+                {invitedFriends.length}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
 
         {activeFriendsTab === 'accepted' ? (
-          // Accepted Friends Content
+          // Clean Accepted Friends Design
           acceptedFriends.length === 0 ? (
-            <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
-              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Accepted Friends Yet</Text>
-              <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                Friends you've accepted will appear here
+            <View style={[styles.cleanEmptyState, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.cleanEmptyIcon, { backgroundColor: `${theme.colors.primary}10` }]}>
+                <Ionicons name="people-outline" size={32} color={theme.colors.primary} />
+              </View>
+              <Text style={[styles.cleanEmptyTitle, { color: theme.colors.text }]}>No friends yet</Text>
+              <Text style={[styles.cleanEmptySubtitle, { color: theme.colors.textSecondary }]}>
+                Add friends to start splitting expenses together
               </Text>
             </View>
           ) : (
-            <View style={styles.section}>
-              <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
-                Friends ({acceptedFriends.length})
-              </Text>
-              {/* Get settlement balances for Friends tab to show per-group entries */}
-              {(() => {
-                // Get settlement-specific balances that include separate group entries
-                const [settlementBalances, setSettlementBalances] = useState<Array<{
-                  userId: string;
-                  name: string;
-                  email: string;
-                  balance: number;
-                  source: string;
-                  groupName?: string;
-                  groupId?: string;
-                }>>([]);
+            <View style={styles.cleanFriendsList}>
+              {/* Use settlement balances from top-level state (no conditional hooks) */}
+              {settlementBalances.map((balanceEntry, index) => {
+                const acceptedFriends = friends.filter(f => f.status === 'accepted');
+                const friend = acceptedFriends.find(f => f.friendId === balanceEntry.userId);
+                if (!friend) return null;
 
-                // Load settlement balances on mount and when friends change
-                useEffect(() => {
-                  const loadSettlementBalances = async () => {
-                    if (!user?.id) return;
-                    try {
-                      const balances = await friendsBalances.calculateSettlementBalances(user.id);
-                      
-                      // Filter to only show friends (accepted friends)
-                      const acceptedFriendIds = new Set(acceptedFriends.map(f => f.friendId));
-                      
-                      const friendSettlementBalances = balances
-                        .filter(balance => acceptedFriendIds.has(balance.userId))
-                        .map(balance => ({
-                          userId: balance.userId,
-                          name: balance.name,
-                          email: balance.email,
-                          balance: balance.balance,
-                          source: balance.source,
-                          groupName: balance.groupName,
-                          groupId: balance.groupId
-                        }));
-                      
-                      setSettlementBalances(friendSettlementBalances);
-                    } catch (error) {
-                      console.error('Failed to load settlement balances for Friends tab:', error);
-                    }
-                  };
-
-                  loadSettlementBalances();
-                }, [acceptedFriends, friendsBalances, user?.id]);
-
-                // Render friend entries - separate entry per group if they're in multiple groups
-                return settlementBalances.map((balanceEntry, index) => {
-                  const friend = acceptedFriends.find(f => f.friendId === balanceEntry.userId);
-                  if (!friend) return null;
-
-                  const balance = balanceEntry.balance;
-                  const friendName = balanceEntry.name || 'Unknown Friend';
-                  const friendEmail = balanceEntry.email || '';
-                  const friendInitial = friendName.charAt(0).toUpperCase() || '?';
-                  
-                  // Create a unique key that includes group info if available
-                  const entryKey = balanceEntry.groupId 
-                    ? `friend-${friend.id}-group-${balanceEntry.groupId}-${index}`
-                    : `friend-${friend.id}-direct-${index}`;
-                  
-                  return (
-                    <TouchableOpacity
-                      key={entryKey}
-                      style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
-                      onPress={() => {
-                        // If this is a group-specific balance, open settlement screen with group filter
-                        if (balanceEntry.groupId) {
-                          openSettlementScreen({ 
-                            filter: 'groups', 
-                            groupId: balanceEntry.groupId,
-                            friendId: friend.friendId 
-                          });
-                        } else {
-                          // For direct friend balances, use friend filter
-                          openSettlementScreen({ 
-                            filter: 'friends', 
-                            friendId: friend.friendId 
-                          });
-                        }
-                      }}
-                    >
-                      <View style={styles.balanceItemLeft}>
-                        <View style={[styles.personAvatar, { backgroundColor: theme.colors.primary }]}>
-                          <Text style={styles.personAvatarText}>
-                            {friendInitial}
-                          </Text>
-                        </View>
-                        <View style={styles.personInfo}>
-                          <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
-                            {friendName}
-                          </Text>
-                          <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                            {friendEmail}
-                          </Text>
-                          {/* Show group name if this is a group-specific balance */}
-                          {balanceEntry.groupName && (
-                            <Text style={[styles.personEmail, { color: theme.colors.primary, fontSize: 12, fontWeight: '500' }]} numberOfLines={1}>
-                              📍 {balanceEntry.groupName}
+                const balance = balanceEntry.balance;
+                const friendName = balanceEntry.name || 'Unknown Friend';
+                const friendEmail = balanceEntry.email || '';
+                const friendInitial = friendName.charAt(0).toUpperCase() || '?';
+                
+                // Create a unique key that includes group info if available
+                const entryKey = balanceEntry.groupId 
+                  ? `friend-${friend.id}-group-${balanceEntry.groupId}-${index}`
+                  : `friend-${friend.id}-direct-${index}`;
+                
+                // Determine balance status for clean display
+                const isSettled = Math.abs(balance) < 0.01;
+                const owesYou = balance > 0;
+                const youOwe = balance < 0;
+                const amount = Math.abs(balance);
+                
+                return (
+                  <TouchableOpacity
+                    key={entryKey}
+                    style={[styles.cleanFriendCard, { backgroundColor: theme.colors.surface }]}
+                    onPress={() => {
+                      // If this is a group-specific balance, open settlement screen with group filter
+                      if (balanceEntry.groupId) {
+                        openSettlementScreen({ 
+                          filter: 'groups', 
+                          groupId: balanceEntry.groupId,
+                          friendId: friend.friendId 
+                        });
+                      } else {
+                        // For direct friend balances, use friend filter
+                        openSettlementScreen({ 
+                          filter: 'friends', 
+                          friendId: friend.friendId 
+                        });
+                      }
+                    }}
+                  >
+                    {/* Left section: Avatar + Info */}
+                    <View style={styles.cleanFriendLeft}>
+                      <View style={[styles.cleanAvatar, { 
+                        backgroundColor: isSettled ? theme.colors.success : (owesYou ? theme.colors.success : theme.colors.error)
+                      }]}>
+                        <Text style={styles.cleanAvatarText}>{friendInitial}</Text>
+                      </View>
+                      <View style={styles.cleanFriendInfo}>
+                        <Text style={[styles.cleanFriendName, { color: theme.colors.text }]} numberOfLines={1}>
+                          {friendName}
+                        </Text>
+                        {balanceEntry.groupName ? (
+                          <View style={styles.cleanGroupIndicator}>
+                            <Ionicons name="people" size={12} color={theme.colors.primary} />
+                            <Text style={[styles.cleanGroupText, { color: theme.colors.primary }]} numberOfLines={1}>
+                              {balanceEntry.groupName}
                             </Text>
-                          )}
-                        </View>
+                          </View>
+                        ) : (
+                          <Text style={[styles.cleanDirectText, { color: theme.colors.textSecondary }]}>
+                            Direct friendship
+                          </Text>
+                        )}
                       </View>
+                    </View>
 
-                      <View style={styles.balanceItemRight}>
-                        <View style={styles.balanceDisplay}>
-                          {Math.abs(balance) < 0.01 ? (
-                            <>
-                              <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
-                              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                                Settled up
-                              </Text>
-                            </>
-                          ) : balance > 0 ? (
-                            <>
-                              <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
-                              <Text style={[styles.balanceText, { color: theme.colors.success }]}>
-                                Owes you {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
-                              </Text>
-                              <Text style={[styles.balanceBreakdown, { color: theme.colors.textSecondary }]}>
-                                {balanceEntry.source === 'group' 
-                                  ? `From group: ${balanceEntry.groupName}`
-                                  : 'Direct friendship'
-                                }
-                              </Text>
-                            </>
-                          ) : (
-                            <>
-                              <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
-                              <Text style={[styles.balanceText, { color: theme.colors.error }]}>
-                                You owe {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(balance).toFixed(2)}
-                              </Text>
-                              <Text style={[styles.balanceBreakdown, { color: theme.colors.textSecondary }]}>
-                                {balanceEntry.source === 'group' 
-                                  ? `From group: ${balanceEntry.groupName}`
-                                  : 'Direct friendship'
-                                }
-                              </Text>
-                            </>
-                          )}
+                    {/* Right section: Balance + Actions */}
+                    <View style={styles.cleanFriendRight}>
+                      {isSettled ? (
+                        <View style={styles.cleanSettledBadge}>
+                          <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                          <Text style={[styles.cleanSettledText, { color: theme.colors.success }]}>
+                            Settled
+                          </Text>
                         </View>
-                        <View style={styles.friendActions}>
-                          {Math.abs(balance) >= 0.01 && (
-                            <TouchableOpacity
-                              style={[styles.remindButton, { backgroundColor: theme.colors.warning }]}
-                              onPress={() => handleRemindFriend(friend, balance)}
-                            >
-                              <Ionicons name="notifications" size={14} color="white" />
-                              <Text style={styles.remindButtonText}>Remind</Text>
-                            </TouchableOpacity>
-                          )}
-                          <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                });
-              })()}
+                      ) : (
+                        <>
+                          <View style={[styles.cleanBalanceBadge, { 
+                            backgroundColor: owesYou ? `${theme.colors.success}15` : `${theme.colors.error}15`
+                          }]}>
+                            <Text style={[styles.cleanBalanceAmount, { 
+                              color: owesYou ? theme.colors.success : theme.colors.error 
+                            }]}>
+                              {getCurrencySymbol(user?.currency || 'USD')}{amount.toFixed(2)}
+                            </Text>
+                            <Text style={[styles.cleanBalanceLabel, { 
+                              color: owesYou ? theme.colors.success : theme.colors.error 
+                            }]}>
+                              {owesYou ? 'owes you' : 'you owe'}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={[styles.cleanRemindButton, { backgroundColor: theme.colors.warning }]}
+                            onPress={() => handleRemindFriend(friend, balance)}
+                          >
+                            <Ionicons name="notifications" size={12} color="white" />
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )
         ) : (
-          // Invited Friends Content
+          // Clean Pending Invitations Design
           invitedFriends.length === 0 ? (
-            <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="mail-outline" size={64} color={theme.colors.textSecondary} />
-              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Pending Invitations</Text>
-              <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                Friends you've invited will appear here
+            <View style={[styles.cleanEmptyState, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.cleanEmptyIcon, { backgroundColor: `${theme.colors.warning}15` }]}>
+                <Ionicons name="mail-outline" size={32} color={theme.colors.warning} />
+              </View>
+              <Text style={[styles.cleanEmptyTitle, { color: theme.colors.text }]}>No pending invitations</Text>
+              <Text style={[styles.cleanEmptySubtitle, { color: theme.colors.textSecondary }]}>
+                Friend invitations will appear here
               </Text>
             </View>
           ) : (
-            <View style={styles.section}>
-              <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
-                Pending Invitations ({invitedFriends.length})
-              </Text>
+            <View style={styles.cleanFriendsList}>
               {invitedFriends.map((friend, index) => {
                 // Determine if this is a received friend request or sent invitation
                 const isReceivedRequest = friend.requestType === 'received' && friend.status === 'pending';
+                const friendName = friend.friendData.fullName;
+                const friendInitial = friendName.charAt(0).toUpperCase();
                 
                 return (
                   <TouchableOpacity
                     key={`invited-${friend.id}-${index}`}
-                    style={[styles.balanceItemFull, { backgroundColor: theme.colors.surface }]}
+                    style={[styles.cleanFriendCard, { backgroundColor: theme.colors.surface }]}
                     onPress={() => showPendingFriendActionsMenu(friend)}
                   >
-                    <View style={styles.balanceItemLeft}>
-                      <View style={[styles.personAvatar, { 
+                    {/* Left section: Avatar + Info */}
+                    <View style={styles.cleanFriendLeft}>
+                      <View style={[styles.cleanAvatar, { 
                         backgroundColor: isReceivedRequest ? theme.colors.success : theme.colors.warning 
                       }]}>
-                        <Text style={styles.personAvatarText}>
-                          {friend.friendData.fullName.charAt(0).toUpperCase()}
-                        </Text>
+                        <Text style={styles.cleanAvatarText}>{friendInitial}</Text>
                       </View>
-                      <View style={styles.personInfo}>
-                        <Text style={[styles.personName, { color: theme.colors.text }]} numberOfLines={1}>
-                          {friend.friendData.fullName}
+                      <View style={styles.cleanFriendInfo}>
+                        <Text style={[styles.cleanFriendName, { color: theme.colors.text }]} numberOfLines={1}>
+                          {friendName}
                         </Text>
-                        <Text style={[styles.personEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                          {friend.friendData.email || friend.friendData.mobile}
-                        </Text>
-                        <Text style={[styles.statusText, { 
+                        <Text style={[styles.cleanDirectText, { 
                           color: isReceivedRequest ? theme.colors.success : theme.colors.warning 
                         }]}>
                           {isReceivedRequest 
@@ -1871,11 +1890,11 @@ export default function RealSplittingScreen() {
                       </View>
                     </View>
 
-                    <View style={styles.balanceItemRight}>
+                    {/* Right section: Action Button */}
+                    <View style={styles.cleanFriendRight}>
                       {isReceivedRequest ? (
-                        // Show Respond button for received requests - opens existing modal
                         <TouchableOpacity
-                          style={[styles.respondButton, { backgroundColor: theme.colors.success }]}
+                          style={[styles.cleanActionButton, { backgroundColor: theme.colors.success }]}
                           onPress={() => {
                             // Create friend request data and open existing modal
                             const friendRequestData = {
@@ -1894,17 +1913,14 @@ export default function RealSplittingScreen() {
                             setShowFriendRequest(true);
                           }}
                         >
-                          <Ionicons name="chatbubble" size={14} color="white" />
-                          <Text style={styles.respondButtonText}>Respond</Text>
+                          <Ionicons name="chatbubble" size={16} color="white" />
                         </TouchableOpacity>
                       ) : (
-                        // Show Resend button for sent invitations
                         <TouchableOpacity
-                          style={[styles.resendButton, { backgroundColor: theme.colors.primary }]}
+                          style={[styles.cleanActionButton, { backgroundColor: theme.colors.primary }]}
                           onPress={() => handleResendInvitation(friend)}
                         >
                           <Ionicons name="send" size={16} color="white" />
-                          <Text style={styles.resendButtonText}>Resend</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -3977,5 +3993,223 @@ modalTitle: {
   fontWeight: '600',
   flex: 1,
   textAlign: 'center',
+},
+
+// NEW: Clean Friends Tab Styles
+cleanTabHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  marginBottom: 8,
+},
+headerTitleSection: {
+  flex: 1,
+},
+cleanTabTitle: {
+  fontSize: 24,
+  fontWeight: '700',
+  marginBottom: 2,
+},
+cleanTabSubtitle: {
+  fontSize: 14,
+  fontWeight: '400',
+},
+cleanHeaderActions: {
+  flexDirection: 'row',
+  gap: 10,
+},
+cleanActionButton: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  justifyContent: 'center',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+},
+
+// Modern tab container
+modernTabContainer: {
+  flexDirection: 'row',
+  marginHorizontal: 20,
+  marginBottom: 20,
+  padding: 4,
+  borderRadius: 12,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.05,
+  shadowRadius: 2,
+  elevation: 1,
+},
+modernTab: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  borderRadius: 8,
+  gap: 8,
+},
+modernTabText: {
+  fontSize: 14,
+  fontWeight: '600',
+},
+modernTabBadge: {
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  borderRadius: 10,
+  minWidth: 20,
+  alignItems: 'center',
+},
+modernTabBadgeText: {
+  fontSize: 12,
+  fontWeight: '600',
+},
+
+// Clean empty state
+cleanEmptyState: {
+  alignItems: 'center',
+  paddingVertical: 60,
+  paddingHorizontal: 40,
+  marginHorizontal: 20,
+  borderRadius: 16,
+  marginBottom: 20,
+},
+cleanEmptyIcon: {
+  width: 80,
+  height: 80,
+  borderRadius: 40,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 16,
+},
+cleanEmptyTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  marginBottom: 8,
+  textAlign: 'center',
+},
+cleanEmptySubtitle: {
+  fontSize: 14,
+  textAlign: 'center',
+  lineHeight: 20,
+},
+
+// Clean friends list
+cleanFriendsList: {
+  paddingHorizontal: 20,
+  gap: 12,
+},
+
+// Clean friend card
+cleanFriendCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 16,
+  borderRadius: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.05,
+  shadowRadius: 3,
+  elevation: 2,
+  marginBottom: 4,
+},
+cleanFriendLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+  marginRight: 12,
+},
+cleanAvatar: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 12,
+},
+cleanAvatarText: {
+  color: 'white',
+  fontSize: 18,
+  fontWeight: '700',
+},
+cleanFriendInfo: {
+  flex: 1,
+  minWidth: 0,
+},
+cleanFriendName: {
+  fontSize: 16,
+  fontWeight: '600',
+  marginBottom: 4,
+  lineHeight: 20,
+},
+cleanGroupIndicator: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+},
+cleanGroupText: {
+  fontSize: 13,
+  fontWeight: '500',
+},
+cleanDirectText: {
+  fontSize: 13,
+  fontWeight: '400',
+},
+
+// Clean friend right section
+cleanFriendRight: {
+  alignItems: 'flex-end',
+  gap: 8,
+  minWidth: 100,
+},
+cleanSettledBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 8,
+},
+cleanSettledText: {
+  fontSize: 13,
+  fontWeight: '600',
+},
+cleanBalanceBadge: {
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 12,
+  alignItems: 'center',
+  minWidth: 80,
+},
+cleanBalanceAmount: {
+  fontSize: 14,
+  fontWeight: '700',
+  textAlign: 'center',
+},
+cleanBalanceLabel: {
+  fontSize: 11,
+  fontWeight: '500',
+  textAlign: 'center',
+  marginTop: 2,
+},
+cleanRemindButton: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  justifyContent: 'center',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.2,
+  shadowRadius: 2,
+  elevation: 2,
 },
 });
