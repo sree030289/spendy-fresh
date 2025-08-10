@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart, PieChart, BarChart } from 'react-native-chart-kit';
 import { useTheme } from '@/hooks/useTheme';
-import { SplittingService, ExpenseAnalytics } from '@/services/firebase/splitting';
+import { SplittingService, ExpenseAnalytics } from '@/services/firebase/splitting-disabled';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
 import FullscreenModal from '@/components/common/FullscreenModal';

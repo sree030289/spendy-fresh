@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { Friend, SplittingService } from '@/services/firebase/splitting';
+import { Friend } from '@/services/firebase/splitting-disabled';
 import { InviteService } from '@/services/payments/PaymentService';
 
 interface CreateGroupModalProps {
@@ -65,7 +65,11 @@ const [selectedFriends, setSelectedFriends] = useState<string[]>([]); // Keep th
 
 
 const handleCreateGroup = async () => {
-  if (!validateGroupName(groupName)) return;
+  console.log('🚀 DEBUG: CreateGroupModal handleCreateGroup called');
+  if (!validateGroupName(groupName)) {
+    console.log('❌ Group name validation failed');
+    return;
+  }
 
   setLoading(true);
   try {
@@ -79,7 +83,9 @@ const handleCreateGroup = async () => {
       inviteMethod: inviteMethod,
     };
 
+    console.log('🚀 DEBUG: About to call onSubmit with:', groupData);
     await onSubmit(groupData);
+    console.log('✅ DEBUG: onSubmit completed successfully');
 
     // Reset form
     setGroupName('');

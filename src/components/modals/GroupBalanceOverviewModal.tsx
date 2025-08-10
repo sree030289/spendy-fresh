@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { SplittingService } from '@/services/firebase/splitting';
+import { ApiService } from '@/services/api/ApiService';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -38,6 +38,7 @@ export default function GroupBalanceOverviewModal({
 }: GroupBalanceOverviewModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const apiService = ApiService.getInstance();
   const [loading, setLoading] = useState(false);
   const [overviewData, setOverviewData] = useState<any>(null);
   const [settlementSuggestions, setSettlementSuggestions] = useState<any[]>([]);
@@ -53,12 +54,77 @@ export default function GroupBalanceOverviewModal({
     try {
       setLoading(true);
       
-      // Get group-specific balance data only
-      const overview = await SplittingService.getGroupBalanceOverview(groupId);
-      const suggestions = await SplittingService.getGroupSettlementSuggestions(groupId);
+      // Get group-specific balance data with error handling
+      let overview = null;
+      try {
+        overview = await apiService.getGroupBalanceOverview(groupId);
+        console.log('🔄 GroupBalanceOverviewModal: Group overview data:', overview);
+      } catch (apiError) {
+        console.log('⚠️ GroupBalanceOverviewModal: API failed, will use fallback data:', apiError);
+        overview = null; // Ensure overview is null for fallback logic
+      }
       
-      console.log('🔄 GroupBalanceOverviewModal: Settlement suggestions received:', suggestions);
-      suggestions.forEach((suggestion, index) => {
+      console.log('🔄 GroupBalanceOverviewModal: Passed balance data:', balanceData);
+      
+      // Calculate settlement suggestions from the balance data
+      let suggestions: any[] = [];
+      
+      if (overview && overview.balances && Array.isArray(overview.balances)) {
+        // Convert balance data to settlement suggestions
+        suggestions = overview.balances
+          .filter((balance: any) => Math.abs(balance.amount || 0) > 0.01) // Only non-zero balances
+          .map((balance: any) => ({
+            fromUserId: balance.amount < 0 ? balance.userId : balance.otherUserId,
+            toUserId: balance.amount > 0 ? balance.userId : balance.otherUserId,
+            fromUserName: balance.amount < 0 ? balance.userName : balance.otherUserName,
+            toUserName: balance.amount > 0 ? balance.userName : balance.otherUserName,
+            amount: Math.abs(balance.amount || 0),
+            groupId: groupId,
+            groupName: balance.groupName || groupName
+          }));
+        console.log('🔄 GroupBalanceOverviewModal: Using API overview data for suggestions');
+      } else if (balanceData && Array.isArray(balanceData)) {
+        // Fallback to passed balance data if API doesn't return proper format
+        console.log('🔄 GroupBalanceOverviewModal: API failed, trying fallback balance data...');
+        suggestions = balanceData
+          .filter((balance: any) => Math.abs(balance.balance || 0) > 0.01)
+          .map((balance: any) => ({
+            fromUserId: balance.balance < 0 ? balance.userId : user?.id,
+            toUserId: balance.balance > 0 ? balance.userId : user?.id,
+            fromUserName: balance.balance < 0 ? balance.name : (user?.fullName || user?.email || 'You'),
+            toUserName: balance.balance > 0 ? balance.name : (user?.fullName || user?.email || 'You'),
+            amount: Math.abs(balance.balance || 0),
+            groupId: groupId,
+            groupName: balance.groupName || groupName
+          }));
+        console.log('🔄 GroupBalanceOverviewModal: Using fallback balance data for suggestions');
+      } else {
+        // Last resort: try to calculate dynamic suggestions based on current balances
+        console.log('🔄 GroupBalanceOverviewModal: No API or balance data, calculating dynamic suggestions...');
+        console.log('🔄 GroupBalanceOverviewModal: Current user ID:', user?.id);
+        console.log('🔄 GroupBalanceOverviewModal: Balance data:', balanceData);
+        
+        // Try to use the balance data to create dynamic suggestions
+        if (balanceData && balanceData.length > 0) {
+          suggestions = balanceData
+            .filter((balance: any) => Math.abs(balance.balance) > 0.01)
+            .map((balance: any) => ({
+              fromUserId: balance.balance < 0 ? user?.id || '' : balance.userId,
+              toUserId: balance.balance < 0 ? balance.userId : user?.id || '',
+              fromUserName: balance.balance < 0 ? 'You' : balance.name,
+              toUserName: balance.balance < 0 ? balance.name : 'You',
+              amount: Math.abs(balance.balance),
+              groupId: groupId,
+              groupName: groupName
+            }));
+          console.log('🔄 GroupBalanceOverviewModal: Created dynamic suggestions from balance data');
+        } else {
+          console.log('🔄 GroupBalanceOverviewModal: No balance data available for dynamic suggestions');
+        }
+      }
+      
+      console.log('🔄 GroupBalanceOverviewModal: Settlement suggestions calculated:', suggestions.length);
+      suggestions.forEach((suggestion: any, index: number) => {
         console.log(`💸 Settlement ${index + 1}: ${suggestion.fromUserName} pays $${suggestion.amount} to ${suggestion.toUserName}`);
         console.log(`   fromUserId: ${suggestion.fromUserId}, toUserId: ${suggestion.toUserId}`);
       });
@@ -91,13 +157,18 @@ export default function GroupBalanceOverviewModal({
             style: 'default',
             onPress: async () => {
               try {
-                await SplittingService.markPaymentAsPaid(
-                  suggestion.fromUserId,
-                  suggestion.toUserId,
-                  suggestion.amount,
-                  groupId,
-                  `Settlement payment in ${groupName}`
-                );
+                // TODO: Add markPaymentAsPaid method to ApiService
+                // For now, use updateExpense to mark settlement
+                Alert.alert('Feature Coming Soon', 'Mark as paid functionality will be available in the next update.');
+                
+                // Placeholder for when API method is implemented:
+                // await apiService.markPaymentAsPaid(
+                //   suggestion.fromUserId,
+                //   suggestion.toUserId,
+                //   suggestion.amount,
+                //   groupId,
+                //   `Settlement payment in ${groupName}`
+                // );
                 
                 // Refresh the data
                 await loadGroupSettlementData();

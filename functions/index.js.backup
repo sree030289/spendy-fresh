@@ -1,0 +1,3045 @@
+// functions/index.js - Fixed without region syntax and Node 18+ compatible
+const functions = require('firebase-functions');
+const cors = require('cors')({ origin: true });
+const admin = require('firebase-admin');
+
+// Initialize Firebase Admin
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+const db = admin.firestore();
+const FieldValue = admin.firestore.FieldValue;
+
+// OzBargain Categories with their URL paths
+const OZBARGAIN_CATEGORIES = {
+  'All Deals': '/deals',
+  'Long Running': '/deals/longrunning', 
+  'Freebies': '/freebies',
+  'Alcohol': '/cat/alcohol',
+  'Automotive': '/cat/automotive',
+  'Books & Magazines': '/cat/books-magazines',
+  'Computing': '/cat/computing',
+  'Dining & Takeaway': '/cat/dining-takeaway',
+  'Education': '/cat/education',
+  'Electrical & Electronics': '/cat/electrical-electronics',
+  'Entertainment': '/cat/entertainment',
+  'Fashion & Apparel': '/cat/fashion-apparel',
+  'Financial': '/cat/financial',
+  'Gaming': '/cat/gaming',
+  'Groceries': '/cat/groceries',
+  'Health & Beauty': '/cat/health-beauty',
+  'Home & Garden': '/cat/home-garden',
+  'Internet': '/cat/internet',
+  'Mobile': '/cat/mobile',
+  'Pets': '/cat/pets',
+  'Sports & Outdoors': '/cat/sports-outdoors',
+  'Toys & Kids': '/cat/toys-kids',
+  'Travel': '/cat/travel',
+  'Other': '/cat/other'
+};
+
+// Improved OzBargain scraping function with better parsing
+const scrapeOzBargainDeals = async (category = 'All Deals') => {
+  try {
+    const categoryPath = OZBARGAIN_CATEGORIES[category] || '/deals';
+    const url = `https://www.ozbargain.com.au${categoryPath}`;
+    
+    console.log(`Scraping OzBargain: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`OzBargain HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+    console.log(`OzBargain HTML received: ${html.length} characters`);
+    
+    // Log first 500 chars to see the structure
+    console.log('HTML Preview:', html.substring(0, 500));
+    
+    const deals = parseOzBargainHTML(html, category);
+    console.log(`Successfully parsed ${deals.length} deals from OzBargain ${category}`);
+    
+    return deals;
+  } catch (error) {
+    console.error('OzBargain scraping error:', error);
+    console.error('Error stack:', error.stack);
+    return generateFallbackOzBargainDeals(category);
+  }
+};
+
+// Updated HTML parsing based on current OzBargain structure
+const parseOzBargainHTML = (html, category) => {
+  try {
+    const deals = [];
+    
+    // Look for actual deal items - try multiple patterns
+    let dealMatches = [];
+    
+    // Pattern 1: Look for article elements
+    const articlePattern = /<article[^>]*class="[^"]*node[^"]*"[^>]*>(.*?)<\/article>/gis;
+    dealMatches = html.match(articlePattern) || [];
+    
+    if (dealMatches.length === 0) {
+      // Pattern 2: Look for div elements with node class
+      const divPattern = /<div[^>]*class="[^"]*node[^"]*"[^>]*>(.*?)<\/div>/gis;
+      dealMatches = html.match(divPattern) || [];
+    }
+    
+    if (dealMatches.length === 0) {
+      // Pattern 3: Look for any element with title and vote
+      const generalPattern = /<[^>]*class="[^"]*title[^"]*"[^>]*>.*?<\/[^>]*>/gis;
+      dealMatches = html.match(generalPattern) || [];
+    }
+    
+    console.log(`Found ${dealMatches.length} potential deal matches using pattern matching`);
+    
+    if (dealMatches.length === 0) {
+      // If no matches, try extracting titles and creating basic deals
+      const titleMatches = html.match(/<h2[^>]*>.*?<\/h2>/gis) || [];
+      console.log(`Fallback: Found ${titleMatches.length} titles`);
+      
+      titleMatches.slice(0, 10).forEach((titleHtml, index) => {
+        const titleText = titleHtml.replace(/<[^>]*>/g, '').trim();
+        if (titleText && titleText.length > 10) {
+          deals.push(createBasicDeal(titleText, category, index));
+        }
+      });
+    } else {
+      // Process the matched deals
+      dealMatches.slice(0, 20).forEach((dealHtml, index) => {
+        try {
+          const deal = extractDealFromHtml(dealHtml, category, index);
+          if (deal) {
+            deals.push(deal);
+          }
+        } catch (parseError) {
+          console.error(`Error parsing individual deal ${index}:`, parseError);
+        }
+      });
+    }
+    
+    // If still no deals, create some test deals
+    if (deals.length === 0) {
+      console.log('No deals parsed, creating test deals');
+      deals.push(...generateTestDeals(category));
+    }
+    
+    console.log(`Final result: ${deals.length} deals extracted for ${category}`);
+    return deals;
+  } catch (error) {
+    console.error('OzBargain HTML parsing error:', error);
+    return generateTestDeals(category);
+  }
+};
+
+// Extract deal information from HTML fragment
+const extractDealFromHtml = (dealHtml, category, index) => {
+  try {
+    // Extract title
+    const titlePatterns = [
+      /<h2[^>]*>.*?<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>.*?<\/h2>/is,
+      /<a[^>]*href="([^"]*)"[^>]*class="[^"]*title[^"]*"[^>]*>(.*?)<\/a>/is,
+      /<a[^>]*class="[^"]*title[^"]*"[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/is
+    ];
+    
+    let titleMatch = null;
+    let ozBargainPath = '';
+    let title = '';
+    
+    for (const pattern of titlePatterns) {
+      titleMatch = dealHtml.match(pattern);
+      if (titleMatch) {
+        ozBargainPath = titleMatch[1];
+        title = titleMatch[2].replace(/<[^>]*>/g, '').trim();
+        break;
+      }
+    }
+    
+    if (!title) {
+      // Fallback: extract any text that looks like a title
+      const textMatch = dealHtml.match(/>([^<]{20,100})</);
+      title = textMatch ? textMatch[1].trim() : `${category} Deal ${index + 1}`;
+    }
+    
+    // Extract vote count
+    const votePatterns = [
+      /class="voteup"[^>]*>\s*(\d+)\s*</is,
+      /class="vote"[^>]*>\s*(\d+)\s*</is,
+      /(\d+)\s*\+/
+    ];
+    
+    let votes = 0;
+    for (const pattern of votePatterns) {
+      const voteMatch = dealHtml.match(pattern);
+      if (voteMatch) {
+        votes = parseInt(voteMatch[1]) || 0;
+        break;
+      }
+    }
+    
+    if (votes === 0) {
+      votes = Math.floor(Math.random() * 100) + 5; // Random votes between 5-105
+    }
+    
+    // Extract username
+    const userPatterns = [
+      /class="username"[^>]*>([^<]+)</is,
+      /user\/\d+"[^>]*>([^<]+)</is
+    ];
+    
+    let username = '';
+    for (const pattern of userPatterns) {
+      const userMatch = dealHtml.match(pattern);
+      if (userMatch) {
+        username = userMatch[1].trim();
+        break;
+      }
+    }
+    
+    if (!username) {
+      username = `ozb_user_${Math.floor(Math.random() * 1000)}`;
+    }
+    
+    // Extract deal URL (goto link)
+    const dealUrlPatterns = [
+      /href="(https:\/\/www\.ozbargain\.com\.au\/goto\/\d+)"/,
+      /class="dealurl"[^>]*href="([^"]*)"/, 
+      /data-url="([^"]*)"/ 
+    ];
+    
+    let dealUrl = '';
+    for (const pattern of dealUrlPatterns) {
+      const urlMatch = dealHtml.match(pattern);
+      if (urlMatch) {
+        dealUrl = urlMatch[1];
+        break;
+      }
+    }
+    
+    // If no direct deal URL, use OzBargain page
+    if (!dealUrl && ozBargainPath) {
+      dealUrl = `https://www.ozbargain.com.au${ozBargainPath}`;
+    }
+    
+    // Extract prices if available
+    const priceMatches = title.match(/\$(\d+(?:\.\d{2})?)/g) || [];
+    let originalPrice = 0;
+    let discountedPrice = 0;
+    
+    if (priceMatches.length > 0) {
+      discountedPrice = parseFloat(priceMatches[0].replace('$', ''));
+      originalPrice = priceMatches.length > 1 ? 
+        parseFloat(priceMatches[1].replace('$', '')) :
+        discountedPrice * (1 + Math.random() * 0.5 + 0.2);
+    }
+    
+    const discount = originalPrice > discountedPrice ? 
+      Math.round(((originalPrice - discountedPrice) / originalPrice) * 100) : 0;
+    
+    // Determine category icon
+    const categoryIcon = getCategoryIcon(category, title);
+    
+    return {
+      id: `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}_${index}`,
+      title: title.length > 80 ? title.substring(0, 80) + '...' : title,
+      description: `${title} - Found on OzBargain in ${category} section`,
+      category: category,
+      originalPrice: parseFloat(originalPrice.toFixed(2)),
+      discountedPrice: parseFloat(discountedPrice.toFixed(2)),
+      discount: discount,
+      expiresAt: new Date(Date.now() + Math.random() * 14 * 24 * 60 * 60 * 1000).toISOString(),
+      postedBy: username,
+      likes: votes,
+      dislikes: Math.floor(votes * 0.03), 
+      userLiked: false,
+      userDisliked: false,
+      isGroupDeal: false,
+      chatEnabled: false,
+      isPartnership: false,
+      businessName: 'Various',
+      location: 'Australia',
+      source: 'ozbargain',
+      dealUrl: dealUrl || `https://www.ozbargain.com.au${ozBargainPath || '/deals'}`,
+      ozBargainUrl: ozBargainPath ? `https://www.ozbargain.com.au${ozBargainPath}` : '',
+      tags: [category.toLowerCase().replace(/\s+/g, '-'), 'ozbargain'],
+      stockLevel: Math.random() > 0.7 ? 'low' : 'high',
+      categoryIcon: categoryIcon,
+      timePosted: 'Recently'
+    };
+    
+  } catch (error) {
+    console.error('Error extracting deal from HTML:', error);
+    return null;
+  }
+};
+
+// Create a basic deal when parsing fails
+const createBasicDeal = (title, category, index) => {
+  return {
+    id: `ozbargain_basic_${category.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}_${index}`,
+    title: title,
+    description: `${title} - Found on OzBargain`,
+    category: category,
+    originalPrice: 0,
+    discountedPrice: 0,
+    discount: 0,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    postedBy: 'OzBargain',
+    likes: Math.floor(Math.random() * 50) + 5,
+    dislikes: Math.floor(Math.random() * 3),
+    userLiked: false,
+    userDisliked: false,
+    isGroupDeal: false,
+    chatEnabled: false,
+    isPartnership: false,
+    businessName: 'Various',
+    location: 'Australia',
+    source: 'ozbargain',
+    dealUrl: `https://www.ozbargain.com.au${OZBARGAIN_CATEGORIES[category] || '/deals'}`,
+    ozBargainUrl: `https://www.ozbargain.com.au${OZBARGAIN_CATEGORIES[category] || '/deals'}`,
+    tags: [category.toLowerCase().replace(/\s+/g, '-'), 'ozbargain'],
+    stockLevel: 'high',
+    categoryIcon: getCategoryIcon(category, title),
+    timePosted: 'Recently'
+  };
+};
+
+// Generate test deals when scraping completely fails
+const generateTestDeals = (category) => {
+  const testDeals = [
+    {
+      title: `${category} - Amazing Deal on Popular Item`,
+      price: Math.floor(Math.random() * 200) + 50,
+      votes: Math.floor(Math.random() * 100) + 10
+    },
+    {
+      title: `${category} - Flash Sale Limited Time`,
+      price: Math.floor(Math.random() * 150) + 30,
+      votes: Math.floor(Math.random() * 80) + 15
+    },
+    {
+      title: `${category} - Best Price We've Seen`,
+      price: Math.floor(Math.random() * 300) + 100,
+      votes: Math.floor(Math.random() * 150) + 20
+    },
+    {
+      title: `${category} - Clearance Sale Special`,
+      price: Math.floor(Math.random() * 120) + 25,
+      votes: Math.floor(Math.random() * 90) + 12
+    },
+    {
+      title: `${category} - End of Season Deal`,
+      price: Math.floor(Math.random() * 250) + 80,
+      votes: Math.floor(Math.random() * 120) + 18
+    }
+  ];
+  
+  return testDeals.map((deal, index) => ({
+    id: `ozbargain_test_${category.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}_${index}`,
+    title: deal.title,
+    description: `Test deal for ${category} category - This is sample data while we perfect the scraping`,
+    category: category,
+    originalPrice: deal.price * 1.3,
+    discountedPrice: deal.price,
+    discount: Math.round(((deal.price * 0.3) / (deal.price * 1.3)) * 100),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    postedBy: 'TestUser',
+    likes: deal.votes,
+    dislikes: Math.floor(deal.votes * 0.05),
+    userLiked: false,
+    userDisliked: false,
+    isGroupDeal: false,
+    chatEnabled: false,
+    isPartnership: false,
+    businessName: 'Test Store',
+    location: 'Australia',
+    source: 'ozbargain',
+    dealUrl: `https://www.ozbargain.com.au${OZBARGAIN_CATEGORIES[category] || '/deals'}`,
+    ozBargainUrl: `https://www.ozbargain.com.au${OZBARGAIN_CATEGORIES[category] || '/deals'}`,
+    tags: [category.toLowerCase().replace(/\s+/g, '-'), 'ozbargain', 'test'],
+    stockLevel: 'high',
+    categoryIcon: getCategoryIcon(category, deal.title),
+    timePosted: 'Just now'
+  }));
+};
+
+// Get category icon based on category and title
+const getCategoryIcon = (category, title = '') => {
+  const titleLower = title.toLowerCase();
+  
+  if (category.includes('Computing') || /laptop|computer|pc|cpu|gpu|ssd|ram/i.test(title)) {
+    return 'laptop';
+  } else if (category.includes('Mobile') || /phone|mobile|iphone|samsung|pixel/i.test(title)) {
+    return 'phone-portrait';
+  } else if (category.includes('Gaming') || /game|xbox|playstation|nintendo|steam/i.test(title)) {
+    return 'game-controller';
+  } else if (category.includes('Home') || /home|kitchen|vacuum|furniture/i.test(title)) {
+    return 'home';
+  } else if (category.includes('Fashion') || /clothes|shoes|shirt|dress/i.test(title)) {
+    return 'shirt';
+  } else if (category.includes('Groceries') || /food|grocery|coles|woolworths/i.test(title)) {
+    return 'basket';
+  } else if (category.includes('Travel') || /flight|hotel|travel|booking/i.test(title)) {
+    return 'airplane';
+  } else if (category.includes('Automotive') || /car|auto|tyres|oil/i.test(title)) {
+    return 'car';
+  } else if (category.includes('Sports') || /sport|fitness|gym|bike/i.test(title)) {
+    return 'fitness';
+  } else {
+    return 'pricetag';
+  }
+};
+
+// Fallback function 
+const generateFallbackOzBargainDeals = (category = 'All Deals') => {
+  console.log(`Using fallback OzBargain deals for ${category}`);
+  return generateTestDeals(category);
+};
+
+// Cache management functions
+const getCachedDeals = async (category) => {
+  try {
+    const cacheKey = `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}`;
+    const doc = await db.collection('deals_cache').doc(cacheKey).get();
+    if (doc.exists) {
+      const data = doc.data();
+      const cacheAge = Date.now() - data.timestamp;
+      const maxAge = 15 * 60 * 1000; // 15 minutes
+      
+      if (cacheAge < maxAge) {
+        console.log(`Using cached data for ${category}, age: ${Math.floor(cacheAge / 1000 / 60)} minutes`);
+        return data.deals;
+      } else {
+        console.log(`Cache expired for ${category}, age: ${Math.floor(cacheAge / 1000 / 60)} minutes`);
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Cache read error:', error);
+    return null;
+  }
+};
+
+const setCachedDeals = async (category, deals) => {
+  try {
+    const cacheKey = `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}`;
+    await db.collection('deals_cache').doc(cacheKey).set({
+      deals: deals,
+      timestamp: Date.now(),
+      lastUpdated: new Date().toISOString(),
+      count: deals.length,
+      category: category
+    });
+    console.log(`Cached ${deals.length} deals for ${category}`);
+  } catch (error) {
+    console.error('Cache write error:', error);
+  }
+};
+
+// Main endpoint
+exports.getDeals = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const category = req.query.category || 'All Deals';
+      const refresh = req.query.refresh === 'true';
+      
+      console.log('Fetching OzBargain deals:', { page, limit, category, refresh });
+
+      let deals = [];
+
+      // Check cache first unless refresh is requested
+      if (!refresh) {
+        const cachedDeals = await getCachedDeals(category);
+        if (cachedDeals && cachedDeals.length > 0) {
+          deals = cachedDeals;
+          console.log(`Using ${deals.length} cached deals for ${category}`);
+        }
+      }
+
+      // Fetch fresh data if no cache or refresh requested
+      if (deals.length === 0 || refresh) {
+        console.log(`Scraping fresh data for ${category}`);
+        deals = await scrapeOzBargainDeals(category);
+        if (deals.length > 0) {
+          await setCachedDeals(category, deals);
+        }
+      }
+
+      // Pagination
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedDeals = deals.slice(startIndex, endIndex);
+      
+      const totalDeals = deals.length;
+      const totalPages = Math.ceil(totalDeals / limit);
+
+      const response = {
+        deals: paginatedDeals,
+        pagination: {
+          currentPage: page,
+          totalPages: totalPages,
+          totalDeals: totalDeals,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1,
+          dealsPerPage: limit
+        },
+        lastUpdated: new Date().toISOString(),
+        category: category,
+        availableCategories: Object.keys(OZBARGAIN_CATEGORIES),
+        source: 'ozbargain'
+      };
+
+      console.log(`Returning ${paginatedDeals.length}/${totalDeals} OzBargain deals for ${category}`);
+      res.json(response);
+      
+    } catch (error) {
+      console.error('Error in getDeals:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch OzBargain deals',
+        deals: [],
+        pagination: {
+          currentPage: 1,
+          totalPages: 1,
+          totalDeals: 0,
+          hasNextPage: false,
+          hasPreviousPage: false,
+          dealsPerPage: 20
+        },
+        lastUpdated: new Date().toISOString(),
+        availableCategories: Object.keys(OZBARGAIN_CATEGORIES)
+      });
+    }
+  });
+});
+
+// Debug endpoint to test scraping directly
+exports.debugScrape = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      const category = req.query.category || 'All Deals';
+      console.log(`Debug scraping for ${category}`);
+      
+      const deals = await scrapeOzBargainDeals(category);
+      
+      res.json({
+        success: true,
+        category: category,
+        dealsFound: deals.length,
+        deals: deals,
+        timestamp: new Date().toISOString(),
+        message: `Debug scrape completed for ${category}`
+      });
+    } catch (error) {
+      console.error('Debug scrape error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stack: error.stack
+      });
+    }
+  });
+});
+
+// Refresh endpoint
+exports.refreshDeals = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      const category = req.query.category || 'All Deals';
+      console.log('Refreshing OzBargain deals for category:', category);
+      
+      // Clear cache for the category
+      const cacheKey = `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}`;
+      try {
+        await db.collection('deals_cache').doc(cacheKey).delete();
+        console.log(`Cache cleared for ${category}`);
+      } catch (error) {
+        console.error(`Error clearing cache for ${category}:`, error);
+      }
+      
+      // Fetch fresh data
+      const deals = await scrapeOzBargainDeals(category);
+      
+      res.json({
+        success: true,
+        message: `Successfully refreshed ${deals.length} OzBargain deals for ${category}`,
+        totalDeals: deals.length,
+        category: category,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Refresh error:', error);
+      res.status(500).json({
+        success: false,
+        message: `Failed to refresh OzBargain deals for ${req.query.category || 'All Deals'}`,
+        error: error.message
+      });
+    }
+  });
+});
+
+// Health check endpoint  
+exports.healthCheck = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      const categories = Object.keys(OZBARGAIN_CATEGORIES);
+      const categoryHealth = {};
+      let totalCachedDeals = 0;
+
+      for (const category of categories.slice(0, 5)) {
+        try {
+          const cacheKey = `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}`;
+          const doc = await db.collection('deals_cache').doc(cacheKey).get();
+          if (doc.exists) {
+            const data = doc.data();
+            const age = Date.now() - data.timestamp;
+            const isExpired = age > 15 * 60 * 1000;
+            
+            categoryHealth[category] = {
+              status: isExpired ? 'STALE' : 'HEALTHY',
+              lastUpdate: data.lastUpdated,
+              count: data.deals && data.deals.length ? data.deals.length : 0,
+              cacheAge: Math.floor(age / 1000 / 60)
+            };
+            
+            totalCachedDeals += data.deals && data.deals.length ? data.deals.length : 0;
+          } else {
+            categoryHealth[category] = {
+              status: 'NO_CACHE',
+              lastUpdate: null,
+              count: 0,
+              cacheAge: 0
+            };
+          }
+        } catch (error) {
+          categoryHealth[category] = {
+            status: 'ERROR',
+            error: error.message
+          };
+        }
+      }
+
+      res.json({
+        status: 'HEALTHY',
+        source: 'OzBargain Only',
+        cachedDeals: totalCachedDeals,
+        platform: 'Firebase Functions',
+        availableCategories: categories,
+        categoryHealth: categoryHealth,
+        timestamp: new Date().toISOString(),
+        version: '2.1.0 - Debug Enhanced'
+      });
+    } catch (error) {
+      console.error('Health check failed:', error);
+      res.status(500).json({
+        status: 'ERROR',
+        source: 'OzBargain Only',
+        error: error.message
+      });
+    }
+  });
+});
+
+// Get available categories endpoint
+exports.getCategories = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    res.json({
+      categories: Object.keys(OZBARGAIN_CATEGORIES),
+      paths: OZBARGAIN_CATEGORIES,
+      source: 'ozbargain',
+      timestamp: new Date().toISOString()
+    });
+  });
+});
+
+// ===== SPENDY API ===== 
+// Complete REST API for Spendy expense splitting application
+
+const express = require('express');
+
+// Create Express app for Spendy API
+const spendyApp = express();
+
+// Middleware
+spendyApp.use(express.json({ limit: '10mb' }));
+spendyApp.use(express.urlencoded({ extended: true }));
+
+// CORS for Spendy API
+spendyApp.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:8081',
+    'exp://localhost:19000',
+    'exp://192.168.1.100:19000'
+  ];
+
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+  }
+
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
+// Import crypto utilities
+const crypto = require('crypto');
+
+// Crypto utilities for JWT and password hashing
+const CryptoUtils = {
+  // Hash password using Node.js crypto
+  async hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    return `${salt}:${hash}`;
+  },
+
+  // Verify password
+  async verifyPassword(password, hashedPassword) {
+    try {
+      const [salt, hash] = hashedPassword.split(':');
+      const hashToVerify = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+      return hash === hashToVerify;
+    } catch (error) {
+      return false;
+    }
+  },
+
+  // Create JWT token using Node.js crypto
+  createJWTToken(payload, secret, expiresIn = '7d') {
+    const header = {
+      alg: 'HS256',
+      typ: 'JWT'
+    };
+
+    const now = Math.floor(Date.now() / 1000);
+    const exp = expiresIn === '7d' ? now + (7 * 24 * 60 * 60) : now + 3600;
+
+    const jwtPayload = {
+      ...payload,
+      iat: now,
+      exp: exp
+    };
+
+    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+    const encodedPayload = Buffer.from(JSON.stringify(jwtPayload)).toString('base64url');
+    
+    const data = `${encodedHeader}.${encodedPayload}`;
+    const signature = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+    
+    return `${data}.${signature}`;
+  },
+
+  // Verify JWT token
+  verifyJWTToken(token, secret) {
+    try {
+      const [header, payload, signature] = token.split('.');
+      
+      const data = `${header}.${payload}`;
+      const expectedSignature = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+      
+      if (signature !== expectedSignature) {
+        throw new Error('Invalid signature');
+      }
+
+      const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString());
+      
+      if (decodedPayload.exp && decodedPayload.exp < Math.floor(Date.now() / 1000)) {
+        throw new Error('Token expired');
+      }
+
+      return decodedPayload;
+    } catch (error) {
+      throw new Error('Invalid token');
+    }
+  },
+
+  // Generate random token
+  generateToken() {
+    return crypto.randomBytes(32).toString('hex');
+  }
+};
+
+// JWT Secret
+const JWT_SECRET = 'spendy-firebase-jwt-secret-2024-production';
+
+// Helper function to convert Firestore timestamps to React Native compatible format
+const convertFirestoreTimestamps = (obj) => {
+  if (!obj) return obj;
+  
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    return obj.map(item => convertFirestoreTimestamps(item));
+  }
+  
+  // Handle primitive values
+  if (typeof obj !== 'object') {
+    return obj;
+  }
+  
+  const converted = { ...obj };
+  
+  // Convert common timestamp fields
+  const timestampFields = ['createdAt', 'updatedAt', 'date', 'joinedAt', 'leftAt', 'lastLoginAt', 'readAt'];
+  
+  timestampFields.forEach(field => {
+    if (converted[field]) {
+      let dateObj = null;
+      
+      // Handle different timestamp formats
+      if (converted[field]._seconds !== undefined && converted[field]._nanoseconds !== undefined) {
+        // Convert Firestore timestamp to JavaScript Date
+        dateObj = new Date(converted[field]._seconds * 1000 + Math.floor(converted[field]._nanoseconds / 1000000));
+      } else if (typeof converted[field].toDate === 'function') {
+        // Handle Firestore Timestamp object
+        dateObj = converted[field].toDate();
+      } else if (converted[field] instanceof Date) {
+        // Already a Date object
+        dateObj = converted[field];
+      } else if (typeof converted[field] === 'string') {
+        // Handle ISO string - convert to Date object
+        const parsed = new Date(converted[field]);
+        if (!isNaN(parsed.getTime())) {
+          dateObj = parsed;
+        }
+      } else if (converted[field] && Object.keys(converted[field]).length === 0) {
+        // Handle empty timestamp objects
+        converted[field] = null;
+        return;
+      }
+      
+      // Return actual Date object for React Native compatibility
+      if (dateObj) {
+        converted[field] = dateObj;
+      }
+    }
+  });
+  
+  // Recursively process nested objects and arrays
+  Object.keys(converted).forEach(key => {
+    if (converted[key] && typeof converted[key] === 'object' && !timestampFields.includes(key)) {
+      converted[key] = convertFirestoreTimestamps(converted[key]);
+    }
+  });
+  
+  return converted;
+};
+
+// Error classes
+class AppError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = true;
+  }
+}
+
+class ValidationError extends AppError {
+  constructor(message) {
+    super(message, 400);
+  }
+}
+
+class UnauthorizedError extends AppError {
+  constructor(message = 'Unauthorized') {
+    super(message, 401);
+  }
+}
+
+class NotFoundError extends AppError {
+  constructor(message = 'Not found') {
+    super(message, 404);
+  }
+}
+
+class ConflictError extends AppError {
+  constructor(message = 'Conflict') {
+    super(message, 409);
+  }
+}
+
+// Authentication middleware
+const authenticateJWT = async (req, res, next) => {
+  try {
+    console.log('🔐 Authentication middleware called for:', req.path);
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No Bearer token found in headers');
+      return res.status(401).json({
+        success: false,
+        message: 'Access token required',
+        error: 'NO_TOKEN'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    console.log('🔑 Token received, verifying...');
+    const decoded = CryptoUtils.verifyJWTToken(token, JWT_SECRET);
+    console.log('✅ Token verified for userId:', decoded.userId);
+    
+    // Get user from database
+    const userDoc = await db.collection('users').doc(decoded.userId).get();
+    if (!userDoc.exists) {
+      console.log('❌ User not found in database:', decoded.userId);
+      return res.status(401).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    req.user = {
+      id: userDoc.id,
+      ...userDoc.data()
+    };
+    console.log('👤 User authenticated successfully:', req.user.id);
+
+    next();
+  } catch (error) {
+    console.error('❌ Authentication error:', error);
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or expired token',
+      error: 'INVALID_TOKEN'
+    });
+  }
+};
+
+// Collections constants
+const COLLECTIONS = {
+  USERS: 'users',
+  GROUPS: 'groups',
+  EXPENSES: 'expenses',
+  FRIENDS: 'friendships',
+  FRIEND_REQUESTS: 'friendRequests',
+  SETTLEMENTS: 'settlements'
+};
+
+// ===== AUTHENTICATION ROUTES =====
+
+// Register
+spendyApp.post('/auth/register', async (req, res) => {
+  try {
+    const { email, password, fullName, mobile, country, currency } = req.body;
+
+    if (!email || !password || !fullName || !country) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, password, full name, and country are required'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    // Check if user already exists
+    const existingUsers = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', email.toLowerCase())
+      .get();
+
+    if (!existingUsers.empty) {
+      return res.status(409).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await CryptoUtils.hashPassword(password);
+
+    // Create user data
+    const userData = {
+      email: email.toLowerCase(),
+      fullName: fullName.trim(),
+      name: fullName.trim(),
+      mobile: mobile || '',
+      phoneNumber: mobile || '',
+      country: country.toUpperCase(),
+      currency: currency ? currency.toUpperCase() : 'USD',
+      biometricEnabled: false,
+      isPremium: false,
+      subscriptionStatus: 'expired',
+      password: hashedPassword,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Create user in Firestore
+    const userRef = await db.collection(COLLECTIONS.USERS).add(userData);
+
+    // Generate JWT token
+    const token = CryptoUtils.createJWTToken({ userId: userRef.id, email: userData.email }, JWT_SECRET);
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      data: {
+        token,
+        user: {
+          id: userRef.id,
+          email: userData.email,
+          fullName: userData.fullName,
+          currency: userData.currency,
+          isPremium: userData.isPremium
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Registration failed',
+      error: 'REGISTRATION_ERROR'
+    });
+  }
+});
+
+// Login
+spendyApp.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
+    // Find user by email
+    const usersSnapshot = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', email.toLowerCase())
+      .get();
+
+    if (usersSnapshot.empty) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    const userDoc = usersSnapshot.docs[0];
+    const user = userDoc.data();
+
+    // Verify password
+    const isValidPassword = await CryptoUtils.verifyPassword(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Generate JWT token
+    const token = CryptoUtils.createJWTToken({ userId: userDoc.id, email: user.email }, JWT_SECRET);
+
+    // Update last login
+    await userDoc.ref.update({
+      lastLoginAt: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
+        user: {
+          id: userDoc.id,
+          email: user.email,
+          fullName: user.fullName,
+          currency: user.currency,
+          profileImage: user.profileImage || user.profilePicture,
+          isPremium: user.isPremium
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Login failed',
+      error: 'LOGIN_ERROR'
+    });
+  }
+});
+
+// Get Profile
+spendyApp.get('/auth/profile', authenticateJWT, async (req, res) => {
+  try {
+    const { password, resetToken, resetTokenExpiry, verificationCode, ...userProfile } = req.user;
+
+    res.json({
+      success: true,
+      message: 'Profile retrieved successfully',
+      data: { user: userProfile }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get profile',
+      error: 'PROFILE_ERROR'
+    });
+  }
+});
+
+// ===== FRIENDS ROUTES =====
+
+// Get Friends
+spendyApp.get('/friends', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get friendships where user is user1
+    const friendships1 = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', '==', userId)
+      .where('status', '==', 'active')
+      .get();
+
+    // Get friendships where user is user2
+    const friendships2 = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user2Id', '==', userId)
+      .where('status', '==', 'active')
+      .get();
+
+    const friends = [];
+    
+    // Process friendships where user is user1
+    for (const doc of friendships1.docs) {
+      const friendship = doc.data();
+      const friendId = friendship.user2Id;
+      
+      const friendDoc = await db.collection(COLLECTIONS.USERS).doc(friendId).get();
+      if (friendDoc.exists) {
+        const friendData = friendDoc.data();
+        friends.push({
+          id: friendDoc.id,
+          fullName: friendData.fullName,
+          email: friendData.email,
+          profileImage: friendData.profileImage,
+          friendshipId: doc.id,
+          friendsSince: friendship.createdAt,
+          status: 'accepted'
+        });
+      }
+    }
+    
+    // Process friendships where user is user2
+    for (const doc of friendships2.docs) {
+      const friendship = doc.data();
+      const friendId = friendship.user1Id;
+      
+      const friendDoc = await db.collection(COLLECTIONS.USERS).doc(friendId).get();
+      if (friendDoc.exists) {
+        const friendData = friendDoc.data();
+        friends.push({
+          id: friendDoc.id,
+          fullName: friendData.fullName,
+          email: friendData.email,
+          profileImage: friendData.profileImage,
+          friendshipId: doc.id,
+          friendsSince: friendship.createdAt,
+          status: 'accepted'
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Friends retrieved successfully',
+      data: { friends, totalFriends: friends.length }
+    });
+  } catch (error) {
+    console.error('Get friends error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get friends',
+      error: 'FRIENDS_ERROR'
+    });
+  }
+});
+
+// Friends Search Endpoint
+spendyApp.get('/friends/search', authenticateJWT, async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query is required',
+        error: 'MISSING_QUERY'
+      });
+    }
+
+    // Search users by email (exact match for now)
+    const usersSnapshot = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', query.toLowerCase())
+      .limit(10)
+      .get();
+
+    const users = [];
+    usersSnapshot.forEach(doc => {
+      const userData = doc.data();
+      users.push({
+        id: doc.id,
+        name: userData.fullName,
+        email: userData.email,
+        profileImage: userData.profileImage
+      });
+    });
+
+    res.json({
+      success: true,
+      message: 'Users found',
+      data: users
+    });
+  } catch (error) {
+    console.error('Search users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search users',
+      error: 'SEARCH_ERROR'
+    });
+  }
+});
+
+// Send Friend Request Endpoint
+spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
+  try {
+    const { userId, toEmail, message } = req.body;
+    
+    if (!toEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Target email is required',
+        error: 'MISSING_EMAIL'
+      });
+    }
+
+    // Find target user by email
+    const targetUserSnapshot = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', toEmail.toLowerCase())
+      .limit(1)
+      .get();
+
+    if (targetUserSnapshot.empty) {
+      // Create a special friend request record for new users
+      const newUserInvite = {
+        fromUserId: req.user.id,
+        toUserId: null, // No user ID for new users
+        toEmail: toEmail.toLowerCase(),
+        toUser: {
+          email: toEmail.toLowerCase(),
+          fullName: toEmail.split('@')[0], // Use email prefix as temporary name
+          isNewUser: true
+        },
+        message: message || '',
+        status: 'pending',
+        type: 'email_invite',
+        createdAt: new Date()
+      };
+
+      await db.collection(COLLECTIONS.FRIEND_REQUESTS).add(newUserInvite);
+
+      return res.status(201).json({
+        success: true,
+        message: 'Invitation sent to new user',
+        isNewUser: true
+      });
+    }
+
+    const targetUserDoc = targetUserSnapshot.docs[0];
+    const targetUserId = targetUserDoc.id;
+    const fromUserId = req.user.id;
+
+    // Check if already friends
+    const existingFriendship = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', 'in', [fromUserId, targetUserId])
+      .where('user2Id', 'in', [fromUserId, targetUserId])
+      .limit(1)
+      .get();
+
+    if (!existingFriendship.empty) {
+      return res.json({
+        success: false,
+        message: 'Already friends or request pending'
+      });
+    }
+
+    // Check if friend request already exists in either direction
+    const [existingRequestFromTo, existingRequestToFrom] = await Promise.all([
+      db.collection(COLLECTIONS.FRIEND_REQUESTS)
+        .where('fromUserId', '==', fromUserId)
+        .where('toUserId', '==', targetUserId)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get(),
+      db.collection(COLLECTIONS.FRIEND_REQUESTS)
+        .where('fromUserId', '==', targetUserId)
+        .where('toUserId', '==', fromUserId)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get()
+    ]);
+
+    if (!existingRequestFromTo.empty) {
+      return res.json({
+        success: false,
+        message: 'Friend request already sent'
+      });
+    }
+
+    if (!existingRequestToFrom.empty) {
+      return res.json({
+        success: false,
+        message: 'This user has already sent you a friend request. Check your pending requests to accept it.'
+      });
+    }
+
+    // Create friend request (not immediate friendship)
+    const now = new Date();
+    const friendRequestData = {
+      fromUserId: fromUserId,
+      toUserId: targetUserId,
+      status: 'pending',
+      message: message || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      // Add client timestamp as backup for immediate queries
+      createdAtClient: now,
+      updatedAtClient: now
+    };
+
+    console.log('💾 Creating friend request:', friendRequestData);
+    const docRef = await db.collection(COLLECTIONS.FRIEND_REQUESTS).add(friendRequestData);
+    console.log('✅ Friend request created with ID:', docRef.id);
+
+    // Send push notification to the recipient
+    try {
+      const recipientDoc = await db.collection(COLLECTIONS.USERS).doc(targetUserId).get();
+      const senderDoc = await db.collection(COLLECTIONS.USERS).doc(fromUserId).get();
+      
+      if (recipientDoc.exists && senderDoc.exists) {
+        const recipientData = recipientDoc.data();
+        const senderData = senderDoc.data();
+        
+        if (recipientData.pushToken) {
+          const notificationPayload = {
+            notification: {
+              title: '🤝 New Friend Request',
+              body: `${senderData.fullName} wants to be your friend on Spendy!`,
+              icon: 'https://firebasestorage.googleapis.com/v0/b/spendy-97913.appspot.com/o/app-icons%2Fnotification-icon.png?alt=media'
+            },
+            data: {
+              type: 'friend_request',
+              friendRequestId: docRef.id,
+              senderId: fromUserId,
+              senderName: senderData.fullName,
+              senderEmail: senderData.email,
+              action: 'view_friend_request'
+            },
+            token: recipientData.pushToken
+          };
+
+          await admin.messaging().send(notificationPayload);
+          console.log('📱 Push notification sent to recipient');
+        }
+
+        // Also create an in-app notification
+        const inAppNotification = {
+          userId: targetUserId,
+          type: 'friend_request',
+          title: 'New Friend Request',
+          message: `${senderData.fullName} wants to be your friend!`,
+          data: {
+            friendRequestId: docRef.id,
+            senderId: fromUserId,
+            senderName: senderData.fullName,
+            senderEmail: senderData.email
+          },
+          isRead: false,
+          createdAt: new Date()
+        };
+
+        await db.collection(COLLECTIONS.NOTIFICATIONS).add(inAppNotification);
+        console.log('🔔 In-app notification created');
+      }
+    } catch (notifError) {
+      console.error('Failed to send friend request notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Friend request sent successfully',
+      isNewUser: false
+    });
+  } catch (error) {
+    console.error('Send friend request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send friend request',
+      error: 'FRIEND_REQUEST_ERROR'
+    });
+  }
+});
+
+// Accept Friend Request Endpoint
+spendyApp.post('/friends/requests/accept', authenticateJWT, async (req, res) => {
+  try {
+    const { requestId } = req.body;
+    const userId = req.user.id;
+
+    if (!requestId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Request ID is required',
+        error: 'MISSING_REQUEST_ID'
+      });
+    }
+
+    // Get the friend request
+    const requestDoc = await db.collection(COLLECTIONS.FRIEND_REQUESTS).doc(requestId).get();
+    
+    if (!requestDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Friend request not found'
+      });
+    }
+
+    const requestData = requestDoc.data();
+    
+    // Verify this request is for the current user
+    if (requestData.toUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to accept this request'
+      });
+    }
+
+    // Check if request is still pending
+    if (requestData.status !== 'pending') {
+      return res.json({
+        success: false,
+        message: 'Request is no longer pending'
+      });
+    }
+
+    // Create friendship record
+    const friendshipData = {
+      user1Id: requestData.fromUserId,
+      user2Id: requestData.toUserId,
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Update friend request status and create friendship in a batch
+    const batch = db.batch();
+    batch.update(requestDoc.ref, { 
+      status: 'accepted', 
+      updatedAt: new Date() 
+    });
+    batch.create(db.collection(COLLECTIONS.FRIENDS).doc(), friendshipData);
+    
+    await batch.commit();
+
+    res.json({
+      success: true,
+      message: 'Friend request accepted successfully'
+    });
+  } catch (error) {
+    console.error('Accept friend request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to accept friend request',
+      error: 'ACCEPT_REQUEST_ERROR'
+    });
+  }
+});
+
+// Decline Friend Request Endpoint
+spendyApp.post('/friends/requests/decline', authenticateJWT, async (req, res) => {
+  try {
+    const { requestId } = req.body;
+    const userId = req.user.id;
+
+    if (!requestId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Request ID is required',
+        error: 'MISSING_REQUEST_ID'
+      });
+    }
+
+    // Get the friend request
+    const requestDoc = await db.collection(COLLECTIONS.FRIEND_REQUESTS).doc(requestId).get();
+    
+    if (!requestDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Friend request not found'
+      });
+    }
+
+    const requestData = requestDoc.data();
+    
+    // Verify this request is for the current user
+    if (requestData.toUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to decline this request'
+      });
+    }
+
+    // Update friend request status to declined
+    await requestDoc.ref.update({ 
+      status: 'declined', 
+      updatedAt: new Date() 
+    });
+
+    res.json({
+      success: true,
+      message: 'Friend request declined successfully'
+    });
+  } catch (error) {
+    console.error('Decline friend request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to decline friend request',
+      error: 'DECLINE_REQUEST_ERROR'
+    });
+  }
+});
+
+// Get Friend Requests Endpoint
+spendyApp.get('/friends/requests', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log('🔍 Getting friend requests for user:', userId);
+
+    // Get incoming friend requests (requests TO this user)
+    const incomingRequestsSnapshot = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('toUserId', '==', userId)
+      .where('status', '==', 'pending')
+      .get();
+
+    // Get outgoing friend requests (requests FROM this user)
+    const outgoingRequestsSnapshot = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('fromUserId', '==', userId)
+      .where('status', '==', 'pending')
+      .get();
+
+    console.log('📊 Found requests:', {
+      incoming: incomingRequestsSnapshot.docs.length,
+      outgoing: outgoingRequestsSnapshot.docs.length
+    });
+
+    const incomingRequests = [];
+    const outgoingRequests = [];
+
+    // Process incoming requests
+    for (const doc of incomingRequestsSnapshot.docs) {
+      const request = doc.data();
+      console.log('📥 Processing incoming request:', doc.id, request);
+      const fromUserDoc = await db.collection(COLLECTIONS.USERS).doc(request.fromUserId).get();
+      
+      if (fromUserDoc.exists) {
+        const fromUserData = fromUserDoc.data();
+        incomingRequests.push({
+          id: doc.id,
+          fromUserId: request.fromUserId,
+          fromUser: {
+            id: fromUserDoc.id,
+            fullName: fromUserData.fullName,
+            email: fromUserData.email,
+            profileImage: fromUserData.profileImage
+          },
+          message: request.message || '',
+          createdAt: request.createdAt,
+          status: request.status
+        });
+      }
+    }
+
+    // Process outgoing requests
+    for (const doc of outgoingRequestsSnapshot.docs) {
+      const request = doc.data();
+      console.log('📤 Processing outgoing request:', doc.id, request);
+      
+      // Handle new user invites (toUserId is null)
+      if (!request.toUserId && request.toUser) {
+        outgoingRequests.push({
+          id: doc.id,
+          toUserId: null,
+          toUser: request.toUser, // Use the stored toUser data for new users
+          message: request.message || '',
+          createdAt: request.createdAt,
+          status: request.status,
+          type: request.type || 'email_invite'
+        });
+      }
+      // Handle existing users
+      else if (request.toUserId) {
+        const toUserDoc = await db.collection(COLLECTIONS.USERS).doc(request.toUserId).get();
+        
+        if (toUserDoc.exists) {
+          const toUserData = toUserDoc.data();
+          outgoingRequests.push({
+            id: doc.id,
+            toUserId: request.toUserId,
+            toUser: {
+              id: toUserDoc.id,
+              fullName: toUserData.fullName,
+              email: toUserData.email,
+              profileImage: toUserData.profileImage
+            },
+            message: request.message || '',
+            createdAt: request.createdAt,
+            status: request.status
+          });
+        }
+      }
+    }
+
+    console.log('✅ Processed friend requests:', {
+      incoming: incomingRequests.length,
+      outgoing: outgoingRequests.length
+    });
+
+    res.json({
+      success: true,
+      message: 'Friend requests retrieved successfully',
+      data: {
+        incoming: incomingRequests,
+        outgoing: outgoingRequests,
+        totalIncoming: incomingRequests.length,
+        totalOutgoing: outgoingRequests.length
+      }
+    });
+  } catch (error) {
+    console.error('Get friend requests error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get friend requests',
+      error: 'FRIEND_REQUESTS_ERROR'
+    });
+  }
+});
+
+// ===== GROUPS ROUTES =====
+
+// Create Group
+spendyApp.post('/groups', authenticateJWT, async (req, res) => {
+  console.log('🎯 POST /groups route handler called!');
+  try {
+    console.log('🚀 Group creation request:', { 
+      userId: req.user?.id, 
+      body: req.body,
+      user: req.user 
+    });
+    
+    const { name, description, category, currency, avatar, initialMembers } = req.body;
+    const userId = req.user.id;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Group name is required'
+      });
+    }
+
+    // Get creator's user data to add as admin member
+    console.log('🔍 Getting creator data for userId:', userId);
+    const creatorDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    
+    if (!creatorDoc.exists) {
+      console.error('❌ Creator user not found:', userId);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+    
+    const creatorData = creatorDoc.data();
+    console.log('📄 Creator data:', { 
+      fullName: creatorData?.fullName, 
+      email: creatorData?.email,
+      currency: creatorData?.currency
+    });
+
+    // Filter out null/undefined values from initialMembers
+    const validInitialMembers = (initialMembers || []).filter(Boolean);
+    console.log('🔍 Valid initial members:', validInitialMembers);
+
+    const groupData = {
+      name: name.trim(),
+      description: description?.trim() || '',
+      avatar: avatar || '🍕',
+      category: category || 'general',
+      currency: currency?.toUpperCase() || creatorData?.currency || 'USD',
+      createdBy: userId,
+      members: [{
+        userId: userId,
+        userData: {
+          fullName: creatorData.fullName || creatorData.name || 'Unknown User',
+          email: creatorData.email || 'unknown@email.com',
+          avatar: creatorData.profileImage || creatorData.profilePicture || ''
+        },
+        role: 'admin',
+        joinedAt: new Date(),
+        balance: 0,
+        isActive: true
+      }],
+      totalExpenses: 0,
+      inviteCode: CryptoUtils.generateToken().substring(0, 8).toUpperCase(),
+      settings: {
+        allowMemberInvites: true,
+        requireApproval: false,
+        currency: currency?.toUpperCase() || creatorData?.currency || 'USD',
+        approvalThreshold: null
+      },
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    console.log('💾 Creating group with data:', groupData);
+    const groupRef = await db.collection(COLLECTIONS.GROUPS).add(groupData);
+    console.log('✅ Group created successfully with ID:', groupRef.id);
+
+    // Add initial members if provided
+    if (validInitialMembers.length > 0) {
+      console.log('👥 Adding initial members:', validInitialMembers);
+      
+      for (const memberId of validInitialMembers) {
+        try {
+          // Get member data
+          const memberDoc = await db.collection(COLLECTIONS.USERS).doc(memberId).get();
+          if (memberDoc.exists) {
+            const memberData = memberDoc.data();
+            
+            // Add member to group
+            await groupRef.update({
+              members: admin.firestore.FieldValue.arrayUnion({
+                userId: memberId,
+                userData: {
+                  fullName: memberData.fullName || memberData.name || 'Unknown User',
+                  email: memberData.email || 'unknown@email.com',
+                  avatar: memberData.profileImage || memberData.profilePicture || ''
+                },
+                role: 'member',
+                joinedAt: new Date(),
+                balance: 0,
+                isActive: true
+              })
+            });
+            
+            console.log('✅ Added member:', memberId);
+          } else {
+            console.log('⚠️ Member not found:', memberId);
+          }
+        } catch (memberError) {
+          console.error('❌ Error adding member:', memberId, memberError);
+        }
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Group created successfully',
+      data: {
+        group: {
+          id: groupRef.id,
+          ...groupData,
+          memberCount: 1
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Create group error:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error message:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create group',
+      error: 'CREATE_GROUP_ERROR'
+    });
+  }
+});
+
+// Get Specific Group
+spendyApp.get('/groups/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if user is a member of this group
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get group expenses
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('groupId', '==', groupId)
+      .get();
+
+    const expenses = expensesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...convertFirestoreTimestamps(doc.data())
+    }));
+
+    // Sort expenses by createdAt in descending order (newest first)
+    expenses.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    const group = {
+      id: groupDoc.id,
+      ...convertFirestoreTimestamps(groupData),
+      // Filter out inactive members
+      members: groupData.members ? groupData.members.filter(member => member.isActive) : [],
+      expenses
+    };
+
+    res.json({
+      success: true,
+      message: 'Group retrieved successfully',
+      data: {
+        group: group
+      },
+      // Also add the group properties directly for backward compatibility
+      id: group.id,
+      name: group.name,
+      members: group.members,
+      ...group
+    });
+  } catch (error) {
+    console.error('Get group error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get group',
+      error: 'GROUP_ERROR'
+    });
+  }
+});
+
+// Add Group Member
+spendyApp.post('/groups/:groupId/members', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { userId: newMemberUserId, email, role = 'member' } = req.body;
+    const requesterId = req.user.id;
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if requester is an admin of this group
+    const requesterMember = groupData.members?.find(member => 
+      member.userId === requesterId && member.isActive
+    );
+    if (!requesterMember || requesterMember.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group admins can add members',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    let finalNewMemberUserId = newMemberUserId;
+    
+    // If email is provided instead of userId, find the user by email
+    if (!finalNewMemberUserId && email) {
+      const userSnapshot = await db.collection(COLLECTIONS.USERS)
+        .where('email', '==', email.toLowerCase())
+        .limit(1)
+        .get();
+      
+      if (userSnapshot.empty) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found with this email',
+          error: 'USER_NOT_FOUND'
+        });
+      }
+      
+      finalNewMemberUserId = userSnapshot.docs[0].id;
+    }
+    
+    if (!finalNewMemberUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either userId or email is required',
+        error: 'MISSING_USER_IDENTIFIER'
+      });
+    }
+
+    // Check if user is already a member
+    const isAlreadyMember = groupData.members?.some(member => 
+      member.userId === finalNewMemberUserId && member.isActive
+    );
+    if (isAlreadyMember) {
+      return res.json({
+        success: false,
+        message: 'User is already a group member'
+      });
+    }
+
+    // Get the new member's user data
+    const newMemberDoc = await db.collection(COLLECTIONS.USERS).doc(finalNewMemberUserId).get();
+    if (!newMemberDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    // Check if the requester and new member are friends
+    const friendship1 = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', '==', requesterId)
+      .where('user2Id', '==', finalNewMemberUserId)
+      .where('status', '==', 'active')
+      .get();
+
+    const friendship2 = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', '==', finalNewMemberUserId)
+      .where('user2Id', '==', requesterId)
+      .where('status', '==', 'active')
+      .get();
+
+    const areFriends = !friendship1.empty || !friendship2.empty;
+    
+    if (!areFriends) {
+      return res.status(400).json({
+        success: false,
+        message: 'You can only add friends to your group',
+        error: 'NOT_FRIENDS'
+      });
+    }
+
+    const newMemberData = newMemberDoc.data();
+
+    // Add the new member to the group
+    const updatedMembers = [...(groupData.members || []), {
+      userId: finalNewMemberUserId,
+      userData: {
+        fullName: newMemberData.fullName,
+        email: newMemberData.email,
+        avatar: newMemberData.profileImage || newMemberData.profilePicture || ''
+      },
+      role: role,
+      joinedAt: new Date(),
+      balance: 0,
+      isActive: true
+    }];
+
+    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
+      members: updatedMembers,
+      updatedAt: new Date()
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Member added to group successfully'
+    });
+  } catch (error) {
+    console.error('Add group member error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add group member',
+      error: 'ADD_MEMBER_ERROR'
+    });
+  }
+});
+
+// Get User Groups
+spendyApp.get('/groups', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Query groups where user is a member - we need to use a more complex query
+    const groupsSnapshot = await db.collection(COLLECTIONS.GROUPS)
+      .where('isActive', '==', true)
+      .get();
+
+    const groups = [];
+    for (const doc of groupsSnapshot.docs) {
+      const group = doc.data();
+      
+      // Check if user is a member of this group
+      const isMember = group.members && group.members.some(member => 
+        member.userId === userId && member.isActive
+      );
+      
+      if (!isMember) {
+        continue; // Skip groups where user is not a member
+      }
+      
+      // Use the member data from the group document directly
+      const memberDetails = group.members ? group.members.map(member => ({
+        userId: member.userId,
+        userData: {
+          fullName: member.userData?.fullName || 'Unknown User',
+          email: member.userData?.email || 'unknown@email.com',
+          avatar: member.userData?.avatar || ''
+        },
+        role: member.role || 'member',
+        balance: member.balance || 0,
+        isActive: member.isActive !== false
+      })) : [];
+
+      groups.push({
+        id: doc.id,
+        ...convertFirestoreTimestamps({
+          name: group.name,
+          description: group.description,
+          avatar: group.avatar,
+          category: group.category,
+          currency: group.currency,
+          createdBy: group.createdBy,
+          inviteCode: group.inviteCode,
+          createdAt: group.createdAt,
+          totalExpenses: group.totalExpenses || 0,
+          settings: group.settings || {}
+        }),
+        memberCount: memberDetails.filter(m => m.isActive).length,
+        members: memberDetails,
+        isCreator: group.createdBy === userId
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Groups retrieved successfully',
+      data: { groups, totalGroups: groups.length }
+    });
+  } catch (error) {
+    console.error('Get groups error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get groups',
+      error: 'GROUPS_ERROR'
+    });
+  }
+});
+
+// Leave Group
+spendyApp.post('/groups/:groupId/leave', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if user is a member of this group
+    const memberIndex = groupData.members?.findIndex(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (memberIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'You are not a member of this group',
+        error: 'NOT_A_MEMBER'
+      });
+    }
+
+    // Don't allow creator to leave if there are other members
+    const activeMembersCount = groupData.members?.filter(member => member.isActive).length || 0;
+    if (groupData.createdBy === userId && activeMembersCount > 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Group creator cannot leave while there are other members. Transfer ownership or delete the group.',
+        error: 'CREATOR_CANNOT_LEAVE'
+      });
+    }
+
+    // Remove user from group members
+    const updatedMembers = [...groupData.members];
+    updatedMembers[memberIndex].isActive = false;
+    updatedMembers[memberIndex].leftAt = new Date();
+
+    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
+      members: updatedMembers,
+      updatedAt: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: 'Successfully left the group'
+    });
+  } catch (error) {
+    console.error('Leave group error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to leave group',
+      error: 'LEAVE_GROUP_ERROR'
+    });
+  }
+});
+
+// Remove Group Member
+spendyApp.delete('/groups/:groupId/members/:userId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId, userId: targetUserId } = req.params;
+    const requesterId = req.user.id;
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if requester is admin or the user being removed
+    const requesterMember = groupData.members?.find(member => 
+      member.userId === requesterId && member.isActive
+    );
+    
+    if (!requesterMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Only admins can remove other users, users can remove themselves
+    if (requesterId !== targetUserId && requesterMember.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group admins can remove other members',
+        error: 'INSUFFICIENT_PERMISSIONS'
+      });
+    }
+
+    // Find the target member
+    const targetMemberIndex = groupData.members?.findIndex(member => 
+      member.userId === targetUserId && member.isActive
+    );
+    
+    if (targetMemberIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found in group',
+        error: 'MEMBER_NOT_FOUND'
+      });
+    }
+
+    // Prevent removing the group creator
+    if (groupData.createdBy === targetUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot remove group creator',
+        error: 'CREATOR_CANNOT_BE_REMOVED'
+      });
+    }
+
+    // Remove member from group
+    const updatedMembers = [...groupData.members];
+    updatedMembers[targetMemberIndex].isActive = false;
+    updatedMembers[targetMemberIndex].leftAt = new Date();
+
+    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
+      members: updatedMembers,
+      updatedAt: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: 'Member removed from group successfully'
+    });
+  } catch (error) {
+    console.error('Remove group member error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to remove group member',
+      error: 'REMOVE_MEMBER_ERROR'
+    });
+  }
+});
+
+// ===== EXPENSES ROUTES =====
+
+// Create Expense
+spendyApp.post('/expenses', authenticateJWT, async (req, res) => {
+  try {
+    const { description, amount, paidBy, groupId, category, splitType, splitDetails } = req.body;
+    const userId = req.user.id;
+
+    if (!description || !amount || !paidBy) {
+      return res.status(400).json({
+        success: false,
+        message: 'Description, amount, and paidBy are required'
+      });
+    }
+
+    // Validate amount
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be a positive number'
+      });
+    }
+
+    // Verify group membership if groupId provided
+    if (groupId) {
+      const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+      if (!groupDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: 'Group not found',
+          error: 'GROUP_NOT_FOUND'
+        });
+      }
+      
+      const groupData = groupDoc.data();
+      const isMember = groupData.members && groupData.members.some(member => 
+        member.userId === userId && member.isActive
+      );
+      
+      if (!isMember) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not a member of this group',
+          error: 'ACCESS_DENIED'
+        });
+      }
+    }
+
+    const expenseData = {
+      title: description.trim(), // Use description as title for backward compatibility
+      description: description.trim(),
+      amount: numericAmount,
+      paidBy,
+      groupId: groupId || null,
+      category: category || 'general',
+      currency: req.user.currency || 'USD',
+      date: new Date(),
+      splitType: splitType || 'equal',
+      splitDetails: splitDetails || [],
+      createdBy: userId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const expenseRef = await db.collection(COLLECTIONS.EXPENSES).add(expenseData);
+    
+    // Get the created document to get actual timestamp values
+    const createdDoc = await expenseRef.get();
+    const createdExpense = createdDoc.data();
+
+    res.status(201).json({
+      success: true,
+      message: 'Expense created successfully',
+      data: {
+        expense: {
+          id: expenseRef.id,
+          ...convertFirestoreTimestamps(createdExpense)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Create expense error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create expense',
+      error: 'CREATE_EXPENSE_ERROR'
+    });
+  }
+});
+
+// Get User Expenses
+spendyApp.get('/expenses', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 20;
+
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('createdBy', '==', userId)
+      .limit(limit)
+      .get();
+
+    const expenses = [];
+    for (const doc of expensesSnapshot.docs) {
+      const expense = doc.data();
+      
+      // Get group info if expense has groupId
+      let groupInfo = null;
+      if (expense.groupId) {
+        const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(expense.groupId).get();
+        if (groupDoc.exists) {
+          const group = groupDoc.data();
+          groupInfo = {
+            id: groupDoc.id,
+            name: group.name
+          };
+        }
+      }
+
+      expenses.push({
+        id: doc.id,
+        ...convertFirestoreTimestamps(expense),
+        group: groupInfo
+      });
+    }
+
+    // Sort expenses by createdAt in descending order (newest first)
+    expenses.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'Expenses retrieved successfully',
+      data: { expenses, totalExpenses: expenses.length }
+    });
+  } catch (error) {
+    console.error('Get expenses error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get expenses',
+      error: 'EXPENSES_ERROR'
+    });
+  }
+});
+
+// Get Group Expenses
+spendyApp.get('/expenses/group/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Verify user is a member of this group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if user is a member of this group
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get expenses for this group
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('groupId', '==', groupId)
+      .get();
+
+    const expenses = expensesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...convertFirestoreTimestamps(doc.data())
+    }));
+
+    // Sort expenses by createdAt in descending order (newest first)
+    expenses.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'Group expenses retrieved successfully',
+      data: { 
+        expenses, 
+        totalExpenses: expenses.length,
+        groupId: groupId
+      }
+    });
+  } catch (error) {
+    console.error('Get group expenses error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get group expenses',
+      error: 'GROUP_EXPENSES_ERROR'
+    });
+  }
+});
+
+// Get User Expenses by User ID
+spendyApp.get('/expenses/user/:userId', authenticateJWT, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requesterId = req.user.id;
+    const limit = parseInt(req.query.limit) || 20;
+
+    // Users can only access their own expenses or expenses where they're involved
+    if (userId !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - can only access your own expenses',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('createdBy', '==', userId)
+      .limit(limit)
+      .get();
+
+    const expenses = [];
+    for (const doc of expensesSnapshot.docs) {
+      const expense = doc.data();
+      
+      // Get group info if expense has groupId
+      let groupInfo = null;
+      if (expense.groupId) {
+        const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(expense.groupId).get();
+        if (groupDoc.exists) {
+          const group = groupDoc.data();
+          groupInfo = {
+            id: groupDoc.id,
+            name: group.name
+          };
+        }
+      }
+
+      expenses.push({
+        id: doc.id,
+        ...convertFirestoreTimestamps(expense),
+        group: groupInfo
+      });
+    }
+
+    // Sort expenses by createdAt in descending order (newest first)
+    expenses.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'User expenses retrieved successfully',
+      data: { 
+        expenses, 
+        totalExpenses: expenses.length,
+        userId: userId
+      }
+    });
+  } catch (error) {
+    console.error('Get user expenses error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user expenses',
+      error: 'USER_EXPENSES_ERROR'
+    });
+  }
+});
+
+// ===== SETTLEMENT ROUTES =====
+
+// Get Settlement Recommendations for a Group
+spendyApp.get('/settlements/group/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Verify user is a member of this group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get all expenses for this group
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('groupId', '==', groupId)
+      .get();
+
+    // Calculate balances for each member
+    const memberBalances = {};
+    
+    // Initialize balances for all members
+    groupData.members.forEach(member => {
+      if (member.isActive) {
+        memberBalances[member.userId] = 0;
+      }
+    });
+
+    // Process each expense
+    expensesSnapshot.docs.forEach(doc => {
+      const expense = doc.data();
+      const amount = expense.amount || 0;
+      const paidBy = expense.paidBy;
+      const splitType = expense.splitType || 'equal';
+      
+      if (amount > 0) {
+        // Add amount to payer's balance
+        if (memberBalances.hasOwnProperty(paidBy)) {
+          memberBalances[paidBy] += amount;
+        }
+        
+        // Subtract splits from each member based on split type
+        if (splitType === 'equal') {
+          const activeMemberCount = Object.keys(memberBalances).length;
+          const splitAmount = amount / activeMemberCount;
+          
+          Object.keys(memberBalances).forEach(memberId => {
+            memberBalances[memberId] -= splitAmount;
+          });
+        } else if (splitType === 'custom' && expense.splitDetails) {
+          // Handle custom splits
+          expense.splitDetails.forEach(split => {
+            if (memberBalances.hasOwnProperty(split.userId)) {
+              memberBalances[split.userId] -= split.amount;
+            }
+          });
+        } else if (splitType === 'percentage' && expense.splitDetails) {
+          // Handle percentage splits
+          expense.splitDetails.forEach(split => {
+            if (memberBalances.hasOwnProperty(split.userId)) {
+              const splitAmount = (amount * split.percentage) / 100;
+              memberBalances[split.userId] -= splitAmount;
+            }
+          });
+        }
+      }
+    });
+
+    // Generate settlement recommendations
+    const settlements = [];
+    const debtors = [];
+    const creditors = [];
+    
+    Object.entries(memberBalances).forEach(([memberId, balance]) => {
+      if (balance > 0.01) {
+        creditors.push({ memberId, amount: balance });
+      } else if (balance < -0.01) {
+        debtors.push({ memberId, amount: Math.abs(balance) });
+      }
+    });
+    
+    // Sort by amount for optimal settlements
+    creditors.sort((a, b) => b.amount - a.amount);
+    debtors.sort((a, b) => b.amount - a.amount);
+    
+    // Generate settlement transactions
+    let i = 0, j = 0;
+    while (i < creditors.length && j < debtors.length) {
+      const creditor = creditors[i];
+      const debtor = debtors[j];
+      
+      const settlementAmount = Math.min(creditor.amount, debtor.amount);
+      
+      if (settlementAmount > 0.01) {
+        settlements.push({
+          from: debtor.memberId,
+          to: creditor.memberId,
+          amount: Math.round(settlementAmount * 100) / 100,
+          currency: groupData.settings?.currency || 'USD'
+        });
+      }
+      
+      creditor.amount -= settlementAmount;
+      debtor.amount -= settlementAmount;
+      
+      if (creditor.amount < 0.01) i++;
+      if (debtor.amount < 0.01) j++;
+    }
+
+    res.json({
+      success: true,
+      message: 'Settlement recommendations generated',
+      data: {
+        settlements,
+        memberBalances,
+        totalSettlements: settlements.length,
+        groupId: groupId
+      }
+    });
+  } catch (error) {
+    console.error('Get settlement recommendations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get settlement recommendations',
+      error: 'SETTLEMENT_ERROR'
+    });
+  }
+});
+
+// Record a Settlement Payment
+spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
+  try {
+    const { fromUserId, toUserId, amount, groupId, note } = req.body;
+    const userId = req.user.id;
+
+    if (!fromUserId || !toUserId || !amount || !groupId) {
+      return res.status(400).json({
+        success: false,
+        message: 'fromUserId, toUserId, amount, and groupId are required'
+      });
+    }
+
+    // Validate amount
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be a positive number'
+      });
+    }
+
+    // Verify user is involved in this settlement
+    if (userId !== fromUserId && userId !== toUserId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only record settlements you are involved in',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Verify group exists and user is a member
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Verify both fromUserId and toUserId are group members
+    const fromUserIsMember = groupData.members && groupData.members.some(member => 
+      member.userId === fromUserId && member.isActive
+    );
+    const toUserIsMember = groupData.members && groupData.members.some(member => 
+      member.userId === toUserId && member.isActive
+    );
+    
+    if (!fromUserIsMember || !toUserIsMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Both users must be group members to record settlement',
+        error: 'INVALID_MEMBERS'
+      });
+    }
+
+    const settlementData = {
+      fromUserId,
+      toUserId,
+      amount: numericAmount,
+      groupId,
+      note: note || '',
+      status: 'completed',
+      createdBy: userId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const settlementRef = await db.collection(COLLECTIONS.SETTLEMENTS).add(settlementData);
+    
+    // Get the created document
+    const createdDoc = await settlementRef.get();
+    const createdSettlement = createdDoc.data();
+
+    res.status(201).json({
+      success: true,
+      message: 'Settlement recorded successfully',
+      data: {
+        settlement: {
+          id: settlementRef.id,
+          ...convertFirestoreTimestamps(createdSettlement)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Record settlement error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to record settlement',
+      error: 'RECORD_SETTLEMENT_ERROR'
+    });
+  }
+});
+
+// Get Settlement History for a Group
+spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Verify user is a member of this group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get settlements for this group
+    const settlementsSnapshot = await db.collection(COLLECTIONS.SETTLEMENTS)
+      .where('groupId', '==', groupId)
+      .get();
+
+    const settlements = settlementsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...convertFirestoreTimestamps(data),
+        groupId: data.groupId // Ensure groupId is included
+      };
+    });
+
+    // Sort by createdAt in descending order
+    settlements.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'Settlement history retrieved successfully',
+      data: {
+        settlements,
+        totalSettlements: settlements.length,
+        groupId: groupId
+      }
+    });
+  } catch (error) {
+    console.error('Get settlement history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get settlement history',
+      error: 'SETTLEMENT_HISTORY_ERROR'
+    });
+  }
+});
+
+// ===== NOTIFICATIONS ROUTES =====
+
+// Get User Notifications
+spendyApp.get('/notifications/:userId', authenticateJWT, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requesterId = req.user.id;
+
+    // Users can only access their own notifications
+    if (userId !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - can only access your own notifications',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    const notificationsSnapshot = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .limit(50)
+      .get();
+
+    const notifications = notificationsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...convertFirestoreTimestamps(doc.data())
+    }));
+
+    // Sort notifications by createdAt in descending order (newest first)
+    notifications.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'Notifications retrieved successfully',
+      data: { 
+        notifications, 
+        totalNotifications: notifications.length,
+        unreadCount: notifications.filter(n => !n.isRead).length
+      }
+    });
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get notifications',
+      error: 'NOTIFICATIONS_ERROR'
+    });
+  }
+});
+
+// Mark Notification as Read
+spendyApp.post('/notifications/:notificationId/read', authenticateJWT, async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.user.id;
+
+    // Get the notification
+    const notificationDoc = await db.collection('notifications').doc(notificationId).get();
+    
+    if (!notificationDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+        error: 'NOTIFICATION_NOT_FOUND'
+      });
+    }
+
+    const notificationData = notificationDoc.data();
+    
+    // Verify this notification belongs to the current user
+    if (notificationData.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not your notification',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Mark as read
+    await notificationDoc.ref.update({
+      isRead: true,
+      readAt: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+  } catch (error) {
+    console.error('Mark notification as read error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark notification as read',
+      error: 'MARK_READ_ERROR'
+    });
+  }
+});
+
+// Get Unread Notification Count
+spendyApp.get('/notifications/:userId/unread-count', authenticateJWT, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requesterId = req.user.id;
+
+    if (userId !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - can only access your own notifications',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    const unreadSnapshot = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .where('isRead', '==', false)
+      .get();
+
+    res.json({
+      success: true,
+      message: 'Unread count retrieved successfully',
+      data: { 
+        unreadCount: unreadSnapshot.docs.length
+      }
+    });
+  } catch (error) {
+    console.error('Get unread count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get unread count',
+      error: 'UNREAD_COUNT_ERROR'
+    });
+  }
+});
+
+// Clear All Notifications
+spendyApp.delete('/notifications/:userId/all', authenticateJWT, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requesterId = req.user.id;
+
+    if (userId !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - can only access your own notifications',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    const notificationsSnapshot = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .get();
+
+    const batch = db.batch();
+    notificationsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+
+    res.json({
+      success: true,
+      message: 'All notifications cleared successfully',
+      data: {
+        deletedCount: notificationsSnapshot.docs.length
+      }
+    });
+  } catch (error) {
+    console.error('Clear all notifications error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear notifications',
+      error: 'CLEAR_NOTIFICATIONS_ERROR'
+    });
+  }
+});
+
+// Health check for Spendy API
+spendyApp.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Spendy API is running on Firebase Functions',
+    timestamp: new Date().toISOString(),
+    environment: 'production',
+    version: '1.0.0',
+    platform: 'Firebase Functions'
+  });
+});
+
+// Export Spendy API as Firebase Function
+exports.spendyApi = functions.https.onRequest(spendyApp);

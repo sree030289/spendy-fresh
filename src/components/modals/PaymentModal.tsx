@@ -15,7 +15,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { PaymentService } from '@/services/payments/PaymentService';
-import { Friend, SplittingService } from '@/services/firebase/splitting';
+import { Friend } from '@/services/firebase/splitting-disabled';
+import { ApiService } from '@/services/api/ApiService';
 
 interface PaymentModalProps {
   visible: boolean;
@@ -36,6 +37,7 @@ export default function PaymentModal({
 }: PaymentModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const apiService = ApiService.getInstance();
   const [step, setStep] = useState<'amount' | 'method' | 'confirm'>('amount');
   const [amount, setAmount] = useState('');
   const [customAmount, setCustomAmount] = useState(false);
@@ -116,13 +118,22 @@ export default function PaymentModal({
 
     setLoading(true);
     try {
-      // Create payment request with notification system
-      await SplittingService.createPaymentRequest({
-        fromUserId: user?.id || '',
-        toUserId: friend.friendId,
-        amount: parseFloat(amount),
-        currency: userCurrency,
-        message: note.trim() || undefined
+      // TODO: Add createPaymentRequest method to ApiService
+      // For now, use createNotification as an alternative
+      await apiService.createNotification({
+        userId: friend.friendId,
+        type: 'payment_request',
+        title: 'Payment Request',
+        message: `${user?.fullName || 'Someone'} sent you a payment request for ${userCurrency}${parseFloat(amount).toFixed(2)}`,
+        data: {
+          fromUserId: user?.id || '',
+          amount: parseFloat(amount),
+          currency: userCurrency,
+          method: selectedMethod,
+          message: note.trim() || undefined
+        },
+        isRead: false,
+        createdAt: new Date()
       });
       
       Alert.alert(

@@ -12,7 +12,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
-import { Expense, ExpenseSplit, SplittingService } from '@/services/firebase/splitting';
+import { Expense, ExpenseSplit } from '@/services/firebase/splitting-disabled';
+import { ApiService } from '@/services/api/ApiService';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
 import FullscreenModal from '@/components/common/FullscreenModal';
@@ -45,6 +46,7 @@ export default function ExpenseSettlementModal({
   onSettlementComplete
 }: ExpenseSettlementModalProps) {
   const { theme } = useTheme();
+  const apiService = ApiService.getInstance();
   const [settlementItems, setSettlementItems] = useState<SettlementItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [settlementMethod, setSettlementMethod] = useState<'cash' | 'bank' | 'venmo' | 'paypal' | 'other'>('cash');
@@ -144,7 +146,7 @@ export default function ExpenseSettlementModal({
         split.userId === expense.paidBy || split.isPaid
       );
 
-      await SplittingService.updateExpenseSettlement(expense.id, {
+      await apiService.updateExpense(expense.id, {
         splitData: updatedSplitData,
         isSettled: isFullySettled,
         lastSettlementDate: new Date()
@@ -152,7 +154,7 @@ export default function ExpenseSettlementModal({
 
       // Create settlement notifications
       for (const item of settledItems) {
-        await SplittingService.createNotification({
+        await apiService.createNotification({
           userId: expense.paidBy,
           type: 'payment_received',
           title: 'Payment Received',
@@ -167,7 +169,7 @@ export default function ExpenseSettlementModal({
           createdAt: new Date()
         });
 
-        await SplittingService.createNotification({
+        await apiService.createNotification({
           userId: item.userId,
           type: 'expense_settled',
           title: 'Payment Confirmed',
@@ -187,13 +189,14 @@ export default function ExpenseSettlementModal({
         ? `${settledItems[0].userName} settled $${settledItems[0].amountToPay.toFixed(2)}`
         : `${settledItems.length} members settled payments`;
 
-      await SplittingService.sendGroupMessage({
-        groupId: expense.groupId,
-        userId: currentUser.id,
-        userName: currentUser.fullName,
-        message: `💰 ${settlementMessage} for "${expense.description}"`,
-        type: 'system'
-      });
+      // TODO: Add group message functionality to ApiService
+      // await apiService.sendGroupMessage({
+      //   groupId: expense.groupId,
+      //   userId: currentUser.id,
+      //   userName: currentUser.fullName,
+      //   message: `💰 ${settlementMessage} for "${expense.description}"`,
+      //   type: 'system'
+      // });
 
       Alert.alert(
         'Settlement Recorded',
@@ -232,19 +235,20 @@ export default function ExpenseSettlementModal({
                 paidAt: new Date()
               }));
 
-              await SplittingService.updateExpenseSettlement(expense.id, {
+              await apiService.updateExpense(expense.id, {
                 splitData: updatedSplitData,
                 isSettled: true,
                 lastSettlementDate: new Date()
               });
 
-              await SplittingService.sendGroupMessage({
-                groupId: expense.groupId,
-                userId: currentUser!.id,
-                userName: currentUser!.fullName,
-                message: `✅ Marked "${expense.description}" as fully settled`,
-                type: 'system'
-              });
+              // TODO: Add group message functionality to ApiService
+              // await apiService.sendGroupMessage({
+              //   groupId: expense.groupId,
+              //   userId: currentUser!.id,
+              //   userName: currentUser!.fullName,
+              //   message: `✅ Marked "${expense.description}" as fully settled`,
+              //   type: 'system'
+              // });
 
               Alert.alert('Success', 'Expense marked as fully settled!', [
                 { text: 'OK', onPress: () => {

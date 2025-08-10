@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
-import { Friend } from '@/services/firebase/splitting';
+import { Friend } from '@/services/firebase/splitting-disabled';
 import { getCurrencySymbol } from '@/utils/currency';
 
 interface RemindModalProps {

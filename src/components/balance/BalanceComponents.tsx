@@ -1,6 +1,6 @@
 // src/components/balance/BalanceComponents.tsx - FIXED Reusable Balance Display Components
 
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
@@ -20,7 +20,7 @@ interface BalanceCardProps {
   showNet?: boolean;
 }
 
-export const BalanceCard: React.FC<BalanceCardProps> = ({
+export const BalanceCard: React.FC<BalanceCardProps> = memo(({
   totalOwed,
   totalOwing,
   netBalance,

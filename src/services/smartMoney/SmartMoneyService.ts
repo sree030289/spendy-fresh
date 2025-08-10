@@ -657,7 +657,7 @@ export class SmartMoneyService {
       const transaction = transactionDoc.data() as SmartTransaction;
       
       // Use existing splitting service
-      const { SplittingService } = await import('../firebase/splitting');
+      const { SplittingService } = await import('../firebase/splitting-disabled');
       
       // Find user's groups to determine where to split
       const userGroups = await SplittingService.getUserGroups(transaction.userId);

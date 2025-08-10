@@ -3,7 +3,8 @@
  * Handles Issue #5: Friends List Refresh Issues
  */
 
-import { SplittingService, Friend } from '@/services/firebase/splitting';
+import { Friend } from '@/services/firebase/splitting-disabled';
+import { ApiService } from '@/services/api/ApiService';
 
 interface FriendsState {
   friends: Friend[];
@@ -21,6 +22,7 @@ type FriendsUpdateListener = (state: FriendsState) => void;
 
 export class FriendsManager {
   private static instance: FriendsManager;
+  private apiService: ApiService = ApiService.getInstance();
   private state: FriendsState = {
     friends: [],
     lastUpdated: 0,
@@ -62,15 +64,16 @@ export class FriendsManager {
     
     this.userId = userId;
     
+    // TODO: Implement real-time listener for automatic updates with API
     // Set up real-time listener for automatic updates
-    this.realtimeUnsubscribe = SplittingService.onFriends(
-      userId,
-      (updatedFriends) => {
-        console.log('🔄 FriendsManager: Real-time friends update received', updatedFriends.length);
-        this.updateFriendsState(updatedFriends);
-        this.updateCache(userId, updatedFriends);
-      }
-    );
+    this.realtimeUnsubscribe = null; // SplittingService.onFriends(
+    //   userId,
+    //   (updatedFriends) => {
+    //     console.log('🔄 FriendsManager: Real-time friends update received', updatedFriends.length);
+    //     this.updateFriendsState(updatedFriends);
+    //     this.updateCache(userId, updatedFriends);
+    //   }
+    // );
 
     // Load initial data
     await this.refreshFriends(true);
@@ -204,13 +207,82 @@ export class FriendsManager {
     this.updateLoadingState(true);
 
     try {
-      console.log('🔄 FriendsManager: Fetching fresh friends data from Firebase');
-      const friends = await SplittingService.getFriends(this.userId);
+      console.log('🔄 FriendsManager: Fetching fresh friends and friend requests from API');
       
-      this.updateFriendsState(friends);
-      this.updateCache(this.userId, friends);
+      // Load both friends and friend requests in parallel
+      const [friends, friendRequests] = await Promise.all([
+        this.apiService.getFriends(),
+        this.apiService.getFriendRequests()
+      ]);
       
-      console.log('✅ FriendsManager: Friends data refreshed successfully', friends.length);
+      console.log('🔍 FriendsManager: Raw API responses:', {
+        friends: friends?.length || 0,
+        friendRequests,
+        incomingCount: friendRequests?.incoming?.length || 0,
+        outgoingCount: friendRequests?.outgoing?.length || 0
+      });
+      
+      // Handle the case where friends is undefined (graceful 404 handling)
+      const friendsArray = Array.isArray(friends) ? friends : [];
+      
+      // Convert friend requests to Friend format for UI compatibility
+      const allFriends = [...friendsArray];
+      
+      // Add incoming friend requests (requests TO this user)
+      if (friendRequests.incoming?.length > 0) {
+        const incomingFriends = friendRequests.incoming.map((request: any) => ({
+          id: request.id,
+          userId: this.userId!,
+          friendId: request.fromUserId,
+          friendData: {
+            id: request.fromUser.id,
+            fullName: request.fromUser.fullName,
+            email: request.fromUser.email,
+            profilePicture: request.fromUser.profileImage
+          },
+          status: 'pending' as const,
+          balance: 0,
+          lastActivity: new Date(),
+          createdAt: request.createdAt || new Date(),
+          updatedAt: new Date(),
+          requestId: request.id,
+          requestType: 'received' as const
+        }));
+        allFriends.push(...incomingFriends);
+      }
+      
+      // Add outgoing friend requests (requests FROM this user)
+      if (friendRequests.outgoing?.length > 0) {
+        const outgoingFriends = friendRequests.outgoing.map((request: any) => ({
+          id: request.id,
+          userId: this.userId!,
+          friendId: request.toUserId,
+          friendData: {
+            id: request.toUser.id,
+            fullName: request.toUser.fullName,
+            email: request.toUser.email,
+            profilePicture: request.toUser.profileImage
+          },
+          status: 'invited' as const,
+          balance: 0,
+          lastActivity: new Date(),
+          createdAt: request.createdAt || new Date(),
+          updatedAt: new Date(),
+          requestId: request.id,
+          requestType: 'sent' as const
+        }));
+        allFriends.push(...outgoingFriends);
+      }
+      
+      this.updateFriendsState(allFriends);
+      this.updateCache(this.userId, allFriends);
+      
+      console.log('✅ FriendsManager: Friends data refreshed successfully', {
+        acceptedFriends: friendsArray.length,
+        incomingRequests: friendRequests.incoming?.length || 0,
+        outgoingRequests: friendRequests.outgoing?.length || 0,
+        totalFriends: allFriends.length
+      });
     } catch (error) {
       console.error('❌ FriendsManager: Error refreshing friends', error);
       this.updateErrorState(error instanceof Error ? error.message : 'Failed to refresh friends');
@@ -250,7 +322,17 @@ export class FriendsManager {
     this.notifyListeners();
   }
 
-  private calculateBalances(friends: Friend[]) {
+  private calculateBalances(friends: Friend[] | undefined | null) {
+    // Safety check: ensure friends is an array
+    if (!Array.isArray(friends)) {
+      console.log('⚠️  FriendsManager: calculateBalances received non-array friends:', friends);
+      return {
+        totalOwed: 0,
+        totalOwing: 0,
+        netBalance: 0
+      };
+    }
+    
     const acceptedFriends = friends.filter(friend => friend.status === 'accepted');
     
     const totalOwed = acceptedFriends.reduce((sum, friend) => 

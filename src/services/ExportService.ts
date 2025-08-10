@@ -1,5 +1,5 @@
 // src/services/ExportService.ts
-import { Group, Expense, SplittingService } from '@/services/firebase/splitting';
+import { Group, Expense, SplittingService } from '@/services/firebase/splitting-disabled';
 import { getCurrencySymbol } from '@/utils/currency';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';

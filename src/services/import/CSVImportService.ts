@@ -1,5 +1,5 @@
 // src/services/import/CSVImportService.ts
-import { SplittingService, Expense, ExpenseSplit } from '@/services/firebase/splitting';
+import { SplittingService, Expense, ExpenseSplit } from '@/services/firebase/splitting-disabled';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 

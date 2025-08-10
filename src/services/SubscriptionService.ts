@@ -461,7 +461,7 @@ export class SubscriptionService {
     try {
       // This would typically query the groups collection
       // For now, return 0 - you'll need to implement this based on your data structure
-      const { SplittingService } = await import('./firebase/splitting');
+      const { SplittingService } = await import('./firebase/splitting-disabled');
       const groups = await SplittingService.getUserGroups(userId);
       return groups.length;
     } catch (error) {

@@ -16,14 +16,16 @@ export class SubscriptionHelper {
   private showSubscriptionModal: ((
     reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature',
     feature?: string,
-    canClose?: boolean
+    canClose?: boolean,
+    autoCloseAfter?: number
   ) => void) | null = null;
 
   setShowSubscriptionModal(
     fn: (
       reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature',
       feature?: string,
-      canClose?: boolean
+      canClose?: boolean,
+      autoCloseAfter?: number
     ) => void
   ) {
     this.showSubscriptionModal = fn;
@@ -88,11 +90,12 @@ export class SubscriptionHelper {
       if (!result.allowed) {
         console.log('🚫 Daily transaction limit reached:', result);
         
-        // For transactions, allow closing after 5 seconds
+        // For transactions, allow closing after 10 seconds
         this.showSubscriptionModal?.(
           'transactionLimit',
           'Unlimited Daily Transactions',
-          false
+          false,
+          10
         );
         
         return false;

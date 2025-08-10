@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { Friend, SplittingService } from '@/services/firebase/splitting';
+import { Friend, SplittingService } from '@/services/firebase/splitting-disabled';
 import { CSVImportService, ImportResult } from '@/services/import/CSVImportService';
 
 interface ImportExpensesModalProps {

@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { Friend, Group, Expense, ExpenseSplit, SplittingService } from '@/services/firebase/splitting';
+import { Friend, Group, Expense, ExpenseSplit, SplittingService } from '@/services/firebase/splitting-disabled';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebase/config';
 import * as DocumentPicker from 'expo-document-picker';

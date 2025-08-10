@@ -9,6 +9,7 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+const FieldValue = admin.firestore.FieldValue;
 
 // OzBargain Categories with their URL paths
 const OZBARGAIN_CATEGORIES = {
@@ -609,11 +610,11 @@ exports.healthCheck = functions.https.onRequest((req, res) => {
             categoryHealth[category] = {
               status: isExpired ? 'STALE' : 'HEALTHY',
               lastUpdate: data.lastUpdated,
-              count: data.deals?.length || 0,
+              count: data.deals && data.deals.length ? data.deals.length : 0,
               cacheAge: Math.floor(age / 1000 / 60)
             };
             
-            totalCachedDeals += data.deals?.length || 0;
+            totalCachedDeals += data.deals && data.deals.length ? data.deals.length : 0;
           } else {
             categoryHealth[category] = {
               status: 'NO_CACHE',
@@ -662,3 +663,2625 @@ exports.getCategories = functions.https.onRequest((req, res) => {
     });
   });
 });
+
+// ===== SPENDY API ===== 
+// Complete REST API for Spendy expense splitting application
+
+const express = require('express');
+
+// Create Express app for Spendy API
+const spendyApp = express();
+
+// Middleware
+spendyApp.use(express.json({ limit: '10mb' }));
+spendyApp.use(express.urlencoded({ extended: true }));
+
+// CORS for Spendy API
+spendyApp.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:8081',
+    'exp://localhost:19000',
+    'exp://192.168.1.100:19000'
+  ];
+
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+  }
+
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
+// Import crypto utilities
+const crypto = require('crypto');
+
+// Crypto utilities for JWT and password hashing
+const CryptoUtils = {
+  // Hash password using Node.js crypto
+  async hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    return `${salt}:${hash}`;
+  },
+
+  // Verify password
+  async verifyPassword(password, hashedPassword) {
+    try {
+      const [salt, hash] = hashedPassword.split(':');
+      const hashToVerify = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+      return hash === hashToVerify;
+    } catch (error) {
+      return false;
+    }
+  },
+
+  // Create JWT token using Node.js crypto
+  createJWTToken(payload, secret, expiresIn = '7d') {
+    const header = {
+      alg: 'HS256',
+      typ: 'JWT'
+    };
+
+    const now = Math.floor(Date.now() / 1000);
+    const exp = expiresIn === '7d' ? now + (7 * 24 * 60 * 60) : now + 3600;
+
+    const jwtPayload = {
+      ...payload,
+      iat: now,
+      exp: exp
+    };
+
+    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+    const encodedPayload = Buffer.from(JSON.stringify(jwtPayload)).toString('base64url');
+    
+    const data = `${encodedHeader}.${encodedPayload}`;
+    const signature = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+    
+    return `${data}.${signature}`;
+  },
+
+  // Verify JWT token
+  verifyJWTToken(token, secret) {
+    try {
+      const [header, payload, signature] = token.split('.');
+      
+      const data = `${header}.${payload}`;
+      const expectedSignature = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+      
+      if (signature !== expectedSignature) {
+        throw new Error('Invalid signature');
+      }
+
+      const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString());
+      
+      if (decodedPayload.exp && decodedPayload.exp < Math.floor(Date.now() / 1000)) {
+        throw new Error('Token expired');
+      }
+
+      return decodedPayload;
+    } catch (error) {
+      throw new Error('Invalid token');
+    }
+  },
+
+  // Generate random token
+  generateToken() {
+    return crypto.randomBytes(32).toString('hex');
+  }
+};
+
+// JWT Secret
+const JWT_SECRET = 'spendy-firebase-jwt-secret-2024-production';
+
+// Helper function to convert Firestore timestamps to React Native compatible format
+const convertFirestoreTimestamps = (obj) => {
+  if (!obj) return obj;
+  
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    return obj.map(item => convertFirestoreTimestamps(item));
+  }
+  
+  // Handle primitive values
+  if (typeof obj !== 'object') {
+    return obj;
+  }
+  
+  const converted = { ...obj };
+  
+  // Convert common timestamp fields
+  const timestampFields = ['createdAt', 'updatedAt', 'date', 'joinedAt', 'leftAt', 'lastLoginAt', 'readAt'];
+  
+  timestampFields.forEach(field => {
+    if (converted[field]) {
+      let dateObj = null;
+      
+      // Handle different timestamp formats
+      if (converted[field]._seconds !== undefined && converted[field]._nanoseconds !== undefined) {
+        // Convert Firestore timestamp to JavaScript Date
+        dateObj = new Date(converted[field]._seconds * 1000 + Math.floor(converted[field]._nanoseconds / 1000000));
+      } else if (typeof converted[field].toDate === 'function') {
+        // Handle Firestore Timestamp object
+        dateObj = converted[field].toDate();
+      } else if (converted[field] instanceof Date) {
+        // Already a Date object
+        dateObj = converted[field];
+      } else if (typeof converted[field] === 'string') {
+        // Handle ISO string - convert to Date object
+        const parsed = new Date(converted[field]);
+        if (!isNaN(parsed.getTime())) {
+          dateObj = parsed;
+        }
+      } else if (converted[field] && Object.keys(converted[field]).length === 0) {
+        // Handle empty timestamp objects
+        converted[field] = null;
+        return;
+      }
+      
+      // Convert to ISO string for consistent JSON serialization
+      if (dateObj) {
+        converted[field] = dateObj.toISOString();
+      }
+    }
+  });
+  
+  // Recursively process nested objects and arrays
+  Object.keys(converted).forEach(key => {
+    if (converted[key] && typeof converted[key] === 'object' && !timestampFields.includes(key)) {
+      converted[key] = convertFirestoreTimestamps(converted[key]);
+    }
+  });
+  
+  return converted;
+};
+
+// Error classes
+class AppError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = true;
+  }
+}
+
+class ValidationError extends AppError {
+  constructor(message) {
+    super(message, 400);
+  }
+}
+
+class UnauthorizedError extends AppError {
+  constructor(message = 'Unauthorized') {
+    super(message, 401);
+  }
+}
+
+class NotFoundError extends AppError {
+  constructor(message = 'Not found') {
+    super(message, 404);
+  }
+}
+
+class ConflictError extends AppError {
+  constructor(message = 'Conflict') {
+    super(message, 409);
+  }
+}
+
+// Authentication middleware
+const authenticateJWT = async (req, res, next) => {
+  try {
+    console.log('🔐 Authentication middleware called for:', req.path);
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No Bearer token found in headers');
+      return res.status(401).json({
+        success: false,
+        message: 'Access token required',
+        error: 'NO_TOKEN'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    console.log('🔑 Token received, verifying...');
+    const decoded = CryptoUtils.verifyJWTToken(token, JWT_SECRET);
+    console.log('✅ Token verified for userId:', decoded.userId);
+    
+    // Get user from database
+    const userDoc = await db.collection('users').doc(decoded.userId).get();
+    if (!userDoc.exists) {
+      console.log('❌ User not found in database:', decoded.userId);
+      return res.status(401).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    req.user = {
+      id: userDoc.id,
+      ...userDoc.data()
+    };
+    console.log('👤 User authenticated successfully:', req.user.id);
+
+    next();
+  } catch (error) {
+    console.error('❌ Authentication error:', error);
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or expired token',
+      error: 'INVALID_TOKEN'
+    });
+  }
+};
+
+// Collections constants
+const COLLECTIONS = {
+  USERS: 'users',
+  GROUPS: 'groups',
+  EXPENSES: 'expenses',
+  FRIENDS: 'friendships',
+  FRIEND_REQUESTS: 'friendRequests',
+  SETTLEMENTS: 'settlements'
+};
+
+// ===== AUTHENTICATION ROUTES =====
+
+// Register
+spendyApp.post('/auth/register', async (req, res) => {
+  try {
+    const { email, password, fullName, mobile, country, currency } = req.body;
+
+    if (!email || !password || !fullName || !country) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, password, full name, and country are required'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    // Check if user already exists
+    const existingUsers = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', email.toLowerCase())
+      .get();
+
+    if (!existingUsers.empty) {
+      return res.status(409).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await CryptoUtils.hashPassword(password);
+
+    // Create user data
+    const userData = {
+      email: email.toLowerCase(),
+      fullName: fullName.trim(),
+      name: fullName.trim(),
+      mobile: mobile || '',
+      phoneNumber: mobile || '',
+      country: country.toUpperCase(),
+      currency: currency ? currency.toUpperCase() : 'USD',
+      biometricEnabled: false,
+      isPremium: false,
+      subscriptionStatus: 'expired',
+      password: hashedPassword,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Create user in Firestore
+    const userRef = await db.collection(COLLECTIONS.USERS).add(userData);
+
+    // Generate JWT token
+    const token = CryptoUtils.createJWTToken({ userId: userRef.id, email: userData.email }, JWT_SECRET);
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      data: {
+        token,
+        user: {
+          id: userRef.id,
+          email: userData.email,
+          fullName: userData.fullName,
+          currency: userData.currency,
+          isPremium: userData.isPremium
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Registration failed',
+      error: 'REGISTRATION_ERROR'
+    });
+  }
+});
+
+// Login
+spendyApp.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
+    // Find user by email
+    const usersSnapshot = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', email.toLowerCase())
+      .get();
+
+    if (usersSnapshot.empty) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    const userDoc = usersSnapshot.docs[0];
+    const user = userDoc.data();
+
+    // Verify password
+    const isValidPassword = await CryptoUtils.verifyPassword(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Generate JWT token
+    const token = CryptoUtils.createJWTToken({ userId: userDoc.id, email: user.email }, JWT_SECRET);
+
+    // Update last login
+    await userDoc.ref.update({
+      lastLoginAt: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
+        user: {
+          id: userDoc.id,
+          email: user.email,
+          fullName: user.fullName,
+          currency: user.currency,
+          profileImage: user.profileImage || user.profilePicture,
+          isPremium: user.isPremium
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Login failed',
+      error: 'LOGIN_ERROR'
+    });
+  }
+});
+
+// Get Profile
+spendyApp.get('/auth/profile', authenticateJWT, async (req, res) => {
+  try {
+    const { password, resetToken, resetTokenExpiry, verificationCode, ...userProfile } = req.user;
+
+    res.json({
+      success: true,
+      message: 'Profile retrieved successfully',
+      data: { user: userProfile }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get profile',
+      error: 'PROFILE_ERROR'
+    });
+  }
+});
+
+// ===== FRIENDS ROUTES =====
+
+// Get Friends
+spendyApp.get('/friends', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get friendships where user is user1
+    const friendships1 = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', '==', userId)
+      .where('status', '==', 'active')
+      .get();
+
+    // Get friendships where user is user2
+    const friendships2 = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user2Id', '==', userId)
+      .where('status', '==', 'active')
+      .get();
+
+    const friends = [];
+    
+    // Process friendships where user is user1
+    for (const doc of friendships1.docs) {
+      const friendship = doc.data();
+      const friendId = friendship.user2Id;
+      
+      const friendDoc = await db.collection(COLLECTIONS.USERS).doc(friendId).get();
+      if (friendDoc.exists) {
+        const friendData = friendDoc.data();
+        friends.push({
+          id: friendDoc.id,
+          fullName: friendData.fullName,
+          email: friendData.email,
+          profileImage: friendData.profileImage,
+          friendshipId: doc.id,
+          friendsSince: friendship.createdAt,
+          status: 'accepted'
+        });
+      }
+    }
+    
+    // Process friendships where user is user2
+    for (const doc of friendships2.docs) {
+      const friendship = doc.data();
+      const friendId = friendship.user1Id;
+      
+      const friendDoc = await db.collection(COLLECTIONS.USERS).doc(friendId).get();
+      if (friendDoc.exists) {
+        const friendData = friendDoc.data();
+        friends.push({
+          id: friendDoc.id,
+          fullName: friendData.fullName,
+          email: friendData.email,
+          profileImage: friendData.profileImage,
+          friendshipId: doc.id,
+          friendsSince: friendship.createdAt,
+          status: 'accepted'
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Friends retrieved successfully',
+      data: { friends, totalFriends: friends.length }
+    });
+  } catch (error) {
+    console.error('Get friends error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get friends',
+      error: 'FRIENDS_ERROR'
+    });
+  }
+});
+
+// Friends Search Endpoint
+spendyApp.get('/friends/search', authenticateJWT, async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query is required',
+        error: 'MISSING_QUERY'
+      });
+    }
+
+    // Search users by email (exact match for now)
+    const usersSnapshot = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', query.toLowerCase())
+      .limit(10)
+      .get();
+
+    const users = [];
+    usersSnapshot.forEach(doc => {
+      const userData = doc.data();
+      users.push({
+        id: doc.id,
+        name: userData.fullName,
+        email: userData.email,
+        profileImage: userData.profileImage
+      });
+    });
+
+    res.json({
+      success: true,
+      message: 'Users found',
+      data: users
+    });
+  } catch (error) {
+    console.error('Search users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search users',
+      error: 'SEARCH_ERROR'
+    });
+  }
+});
+
+// Send Friend Request Endpoint
+spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
+  try {
+    const { userId, toEmail, message } = req.body;
+    
+    if (!toEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Target email is required',
+        error: 'MISSING_EMAIL'
+      });
+    }
+
+    // Find target user by email
+    const targetUserSnapshot = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', toEmail.toLowerCase())
+      .limit(1)
+      .get();
+
+    if (targetUserSnapshot.empty) {
+      // Create a special friend request record for new users
+      const newUserInvite = {
+        fromUserId: req.user.id,
+        toUserId: null, // No user ID for new users
+        toEmail: toEmail.toLowerCase(),
+        toUser: {
+          email: toEmail.toLowerCase(),
+          fullName: toEmail.split('@')[0], // Use email prefix as temporary name
+          isNewUser: true
+        },
+        message: message || '',
+        status: 'pending',
+        type: 'email_invite',
+        createdAt: new Date()
+      };
+
+      await db.collection(COLLECTIONS.FRIEND_REQUESTS).add(newUserInvite);
+
+      return res.status(201).json({
+        success: true,
+        message: 'Invitation sent to new user',
+        isNewUser: true
+      });
+    }
+
+    const targetUserDoc = targetUserSnapshot.docs[0];
+    const targetUserId = targetUserDoc.id;
+    const fromUserId = req.user.id;
+
+    // Check if already friends
+    const existingFriendship = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', 'in', [fromUserId, targetUserId])
+      .where('user2Id', 'in', [fromUserId, targetUserId])
+      .limit(1)
+      .get();
+
+    if (!existingFriendship.empty) {
+      return res.json({
+        success: false,
+        message: 'Already friends or request pending'
+      });
+    }
+
+    // Check if friend request already exists in either direction
+    const [existingRequestFromTo, existingRequestToFrom] = await Promise.all([
+      db.collection(COLLECTIONS.FRIEND_REQUESTS)
+        .where('fromUserId', '==', fromUserId)
+        .where('toUserId', '==', targetUserId)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get(),
+      db.collection(COLLECTIONS.FRIEND_REQUESTS)
+        .where('fromUserId', '==', targetUserId)
+        .where('toUserId', '==', fromUserId)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get()
+    ]);
+
+    if (!existingRequestFromTo.empty) {
+      return res.json({
+        success: false,
+        message: 'Friend request already sent'
+      });
+    }
+
+    if (!existingRequestToFrom.empty) {
+      return res.json({
+        success: false,
+        message: 'This user has already sent you a friend request. Check your pending requests to accept it.'
+      });
+    }
+
+    // Create friend request (not immediate friendship)
+    const now = new Date();
+    const friendRequestData = {
+      fromUserId: fromUserId,
+      toUserId: targetUserId,
+      status: 'pending',
+      message: message || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      // Add client timestamp as backup for immediate queries
+      createdAtClient: now,
+      updatedAtClient: now
+    };
+
+    console.log('💾 Creating friend request:', friendRequestData);
+    const docRef = await db.collection(COLLECTIONS.FRIEND_REQUESTS).add(friendRequestData);
+    console.log('✅ Friend request created with ID:', docRef.id);
+
+    // Send push notification to the recipient
+    try {
+      const recipientDoc = await db.collection(COLLECTIONS.USERS).doc(targetUserId).get();
+      const senderDoc = await db.collection(COLLECTIONS.USERS).doc(fromUserId).get();
+      
+      if (recipientDoc.exists && senderDoc.exists) {
+        const recipientData = recipientDoc.data();
+        const senderData = senderDoc.data();
+        
+        if (recipientData.pushToken) {
+          const notificationPayload = {
+            notification: {
+              title: '🤝 New Friend Request',
+              body: `${senderData.fullName} wants to be your friend on Spendy!`,
+              icon: 'https://firebasestorage.googleapis.com/v0/b/spendy-97913.appspot.com/o/app-icons%2Fnotification-icon.png?alt=media'
+            },
+            data: {
+              type: 'friend_request',
+              friendRequestId: docRef.id,
+              senderId: fromUserId,
+              senderName: senderData.fullName,
+              senderEmail: senderData.email,
+              action: 'view_friend_request'
+            },
+            token: recipientData.pushToken
+          };
+
+          await admin.messaging().send(notificationPayload);
+          console.log('📱 Push notification sent to recipient');
+        }
+
+        // Also create an in-app notification
+        const inAppNotification = {
+          userId: targetUserId,
+          type: 'friend_request',
+          title: 'New Friend Request',
+          message: `${senderData.fullName} wants to be your friend!`,
+          data: {
+            friendRequestId: docRef.id,
+            senderId: fromUserId,
+            senderName: senderData.fullName,
+            senderEmail: senderData.email
+          },
+          isRead: false,
+          createdAt: new Date()
+        };
+
+        await db.collection(COLLECTIONS.NOTIFICATIONS).add(inAppNotification);
+        console.log('🔔 In-app notification created');
+      }
+    } catch (notifError) {
+      console.error('Failed to send friend request notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Friend request sent successfully',
+      isNewUser: false
+    });
+  } catch (error) {
+    console.error('Send friend request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send friend request',
+      error: 'FRIEND_REQUEST_ERROR'
+    });
+  }
+});
+
+// Accept Friend Request Endpoint
+spendyApp.post('/friends/requests/accept', authenticateJWT, async (req, res) => {
+  try {
+    const { requestId } = req.body;
+    const userId = req.user.id;
+
+    if (!requestId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Request ID is required',
+        error: 'MISSING_REQUEST_ID'
+      });
+    }
+
+    // Get the friend request
+    const requestDoc = await db.collection(COLLECTIONS.FRIEND_REQUESTS).doc(requestId).get();
+    
+    if (!requestDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Friend request not found'
+      });
+    }
+
+    const requestData = requestDoc.data();
+    
+    // Verify this request is for the current user
+    if (requestData.toUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to accept this request'
+      });
+    }
+
+    // Check if request is still pending
+    if (requestData.status !== 'pending') {
+      return res.json({
+        success: false,
+        message: 'Request is no longer pending'
+      });
+    }
+
+    // Create friendship record
+    const friendshipData = {
+      user1Id: requestData.fromUserId,
+      user2Id: requestData.toUserId,
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Update friend request status and create friendship in a batch
+    const batch = db.batch();
+    batch.update(requestDoc.ref, { 
+      status: 'accepted', 
+      updatedAt: new Date() 
+    });
+    batch.create(db.collection(COLLECTIONS.FRIENDS).doc(), friendshipData);
+    
+    await batch.commit();
+
+    res.json({
+      success: true,
+      message: 'Friend request accepted successfully'
+    });
+  } catch (error) {
+    console.error('Accept friend request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to accept friend request',
+      error: 'ACCEPT_REQUEST_ERROR'
+    });
+  }
+});
+
+// Decline Friend Request Endpoint
+spendyApp.post('/friends/requests/decline', authenticateJWT, async (req, res) => {
+  try {
+    const { requestId } = req.body;
+    const userId = req.user.id;
+
+    if (!requestId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Request ID is required',
+        error: 'MISSING_REQUEST_ID'
+      });
+    }
+
+    // Get the friend request
+    const requestDoc = await db.collection(COLLECTIONS.FRIEND_REQUESTS).doc(requestId).get();
+    
+    if (!requestDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Friend request not found'
+      });
+    }
+
+    const requestData = requestDoc.data();
+    
+    // Verify this request is for the current user
+    if (requestData.toUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to decline this request'
+      });
+    }
+
+    // Update friend request status to declined
+    await requestDoc.ref.update({ 
+      status: 'declined', 
+      updatedAt: new Date() 
+    });
+
+    res.json({
+      success: true,
+      message: 'Friend request declined successfully'
+    });
+  } catch (error) {
+    console.error('Decline friend request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to decline friend request',
+      error: 'DECLINE_REQUEST_ERROR'
+    });
+  }
+});
+
+// Get Friend Requests Endpoint
+spendyApp.get('/friends/requests', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log('🔍 Getting friend requests for user:', userId);
+
+    // Get incoming friend requests (requests TO this user)
+    const incomingRequestsSnapshot = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('toUserId', '==', userId)
+      .where('status', '==', 'pending')
+      .get();
+
+    // Get outgoing friend requests (requests FROM this user)
+    const outgoingRequestsSnapshot = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('fromUserId', '==', userId)
+      .where('status', '==', 'pending')
+      .get();
+
+    console.log('📊 Found requests:', {
+      incoming: incomingRequestsSnapshot.docs.length,
+      outgoing: outgoingRequestsSnapshot.docs.length
+    });
+
+    const incomingRequests = [];
+    const outgoingRequests = [];
+
+    // Process incoming requests
+    for (const doc of incomingRequestsSnapshot.docs) {
+      const request = doc.data();
+      console.log('📥 Processing incoming request:', doc.id, request);
+      const fromUserDoc = await db.collection(COLLECTIONS.USERS).doc(request.fromUserId).get();
+      
+      if (fromUserDoc.exists) {
+        const fromUserData = fromUserDoc.data();
+        incomingRequests.push({
+          id: doc.id,
+          fromUserId: request.fromUserId,
+          fromUser: {
+            id: fromUserDoc.id,
+            fullName: fromUserData.fullName,
+            email: fromUserData.email,
+            profileImage: fromUserData.profileImage
+          },
+          message: request.message || '',
+          createdAt: request.createdAt,
+          status: request.status
+        });
+      }
+    }
+
+    // Process outgoing requests
+    for (const doc of outgoingRequestsSnapshot.docs) {
+      const request = doc.data();
+      console.log('📤 Processing outgoing request:', doc.id, request);
+      
+      // Handle new user invites (toUserId is null)
+      if (!request.toUserId && request.toUser) {
+        outgoingRequests.push({
+          id: doc.id,
+          toUserId: null,
+          toUser: request.toUser, // Use the stored toUser data for new users
+          message: request.message || '',
+          createdAt: request.createdAt,
+          status: request.status,
+          type: request.type || 'email_invite'
+        });
+      }
+      // Handle existing users
+      else if (request.toUserId) {
+        const toUserDoc = await db.collection(COLLECTIONS.USERS).doc(request.toUserId).get();
+        
+        if (toUserDoc.exists) {
+          const toUserData = toUserDoc.data();
+          outgoingRequests.push({
+            id: doc.id,
+            toUserId: request.toUserId,
+            toUser: {
+              id: toUserDoc.id,
+              fullName: toUserData.fullName,
+              email: toUserData.email,
+              profileImage: toUserData.profileImage
+            },
+            message: request.message || '',
+            createdAt: request.createdAt,
+            status: request.status
+          });
+        }
+      }
+    }
+
+    console.log('✅ Processed friend requests:', {
+      incoming: incomingRequests.length,
+      outgoing: outgoingRequests.length
+    });
+
+    res.json({
+      success: true,
+      message: 'Friend requests retrieved successfully',
+      data: {
+        incoming: incomingRequests,
+        outgoing: outgoingRequests,
+        totalIncoming: incomingRequests.length,
+        totalOutgoing: outgoingRequests.length
+      }
+    });
+  } catch (error) {
+    console.error('Get friend requests error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get friend requests',
+      error: 'FRIEND_REQUESTS_ERROR'
+    });
+  }
+});
+
+// ===== GROUPS ROUTES =====
+
+// Create Group
+spendyApp.post('/groups', authenticateJWT, async (req, res) => {
+  console.log('🎯 POST /groups route handler called!');
+  try {
+    console.log('🚀 Group creation request:', { 
+      userId: req.user ? req.user.id : null, 
+      body: req.body,
+      user: req.user 
+    });
+    
+    const { name, description, category, currency, avatar, initialMembers } = req.body;
+    const userId = req.user.id;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Group name is required'
+      });
+    }
+
+    // Get creator's user data to add as admin member
+    console.log('🔍 Getting creator data for userId:', userId);
+    const creatorDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    
+    if (!creatorDoc.exists) {
+      console.error('❌ Creator user not found:', userId);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+    
+    const creatorData = creatorDoc.data();
+    console.log('📄 Creator data:', { 
+      fullName: creatorData ? creatorData.fullName : null, 
+      email: creatorData ? creatorData.email : null,
+      currency: creatorData ? creatorData.currency : null
+    });
+
+    // Filter out null/undefined values from initialMembers
+    const validInitialMembers = (initialMembers || []).filter(Boolean);
+    console.log('🔍 Valid initial members:', validInitialMembers);
+
+    const groupData = {
+      name: name.trim(),
+      description: description ? description.trim() : "" || '',
+      avatar: avatar || '🍕',
+      category: category || 'general',
+      currency: currency?.toUpperCase() || (creatorData ? creatorData.currency : null) || 'USD',
+      createdBy: userId,
+      members: [{
+        userId: userId,
+        userData: {
+          fullName: creatorData.fullName || creatorData.name || 'Unknown User',
+          email: creatorData.email || 'unknown@email.com',
+          avatar: creatorData.profileImage || creatorData.profilePicture || ''
+        },
+        role: 'admin',
+        joinedAt: new Date(),
+        balance: 0,
+        isActive: true
+      }],
+      totalExpenses: 0,
+      inviteCode: CryptoUtils.generateToken().substring(0, 8).toUpperCase(),
+      settings: {
+        allowMemberInvites: true,
+        requireApproval: false,
+        currency: currency?.toUpperCase() || creatorData ? creatorData.currency : null || 'USD',
+        approvalThreshold: null
+      },
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    console.log('💾 Creating group with data:', groupData);
+    const groupRef = await db.collection(COLLECTIONS.GROUPS).add(groupData);
+    console.log('✅ Group created successfully with ID:', groupRef.id);
+
+    // Add initial members if provided
+    if (validInitialMembers.length > 0) {
+      console.log('👥 Adding initial members:', validInitialMembers);
+      
+      for (const memberId of validInitialMembers) {
+        try {
+          // Get member data
+          const memberDoc = await db.collection(COLLECTIONS.USERS).doc(memberId).get();
+          if (memberDoc.exists) {
+            const memberData = memberDoc.data();
+            
+            // Add member to group
+            await groupRef.update({
+              members: admin.firestore.FieldValue.arrayUnion({
+                userId: memberId,
+                userData: {
+                  fullName: memberData.fullName || memberData.name || 'Unknown User',
+                  email: memberData.email || 'unknown@email.com',
+                  avatar: memberData.profileImage || memberData.profilePicture || ''
+                },
+                role: 'member',
+                joinedAt: new Date(),
+                balance: 0,
+                isActive: true
+              })
+            });
+            
+            console.log('✅ Added member:', memberId);
+          } else {
+            console.log('⚠️ Member not found:', memberId);
+          }
+        } catch (memberError) {
+          console.error('❌ Error adding member:', memberId, memberError);
+        }
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Group created successfully',
+      data: {
+        group: {
+          id: groupRef.id,
+          ...groupData,
+          memberCount: 1
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Create group error:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error message:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create group',
+      error: 'CREATE_GROUP_ERROR'
+    });
+  }
+});
+
+// Get Specific Group
+spendyApp.get('/groups/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if user is a member of this group
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get group expenses
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('groupId', '==', groupId)
+      .get();
+
+    const expenses = expensesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...convertFirestoreTimestamps(doc.data())
+    }));
+
+    // Sort expenses by createdAt in descending order (newest first)
+    expenses.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    const group = {
+      id: groupDoc.id,
+      ...convertFirestoreTimestamps(groupData),
+      // Filter out inactive members
+      members: groupData.members ? groupData.members.filter(member => member.isActive) : [],
+      expenses
+    };
+
+    res.json({
+      success: true,
+      message: 'Group retrieved successfully',
+      data: {
+        group: group
+      },
+      // Also add the group properties directly for backward compatibility
+      id: group.id,
+      name: group.name,
+      members: group.members,
+      ...group
+    });
+  } catch (error) {
+    console.error('Get group error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get group',
+      error: 'GROUP_ERROR'
+    });
+  }
+});
+
+// Add Group Member
+spendyApp.post('/groups/:groupId/members', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { userId: newMemberUserId, email, role = 'member' } = req.body;
+    const requesterId = req.user.id;
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if requester is an admin of this group
+    const requesterMember = groupData.members?.find(member => 
+      member.userId === requesterId && member.isActive
+    );
+    if (!requesterMember || requesterMember.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group admins can add members',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    let finalNewMemberUserId = newMemberUserId;
+    
+    // If email is provided instead of userId, find the user by email
+    if (!finalNewMemberUserId && email) {
+      const userSnapshot = await db.collection(COLLECTIONS.USERS)
+        .where('email', '==', email.toLowerCase())
+        .limit(1)
+        .get();
+      
+      if (userSnapshot.empty) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found with this email',
+          error: 'USER_NOT_FOUND'
+        });
+      }
+      
+      finalNewMemberUserId = userSnapshot.docs[0].id;
+    }
+    
+    if (!finalNewMemberUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either userId or email is required',
+        error: 'MISSING_USER_IDENTIFIER'
+      });
+    }
+
+    // Check if user is already a member
+    const isAlreadyMember = groupData.members?.some(member => 
+      member.userId === finalNewMemberUserId && member.isActive
+    );
+    if (isAlreadyMember) {
+      return res.json({
+        success: false,
+        message: 'User is already a group member'
+      });
+    }
+
+    // Get the new member's user data
+    const newMemberDoc = await db.collection(COLLECTIONS.USERS).doc(finalNewMemberUserId).get();
+    if (!newMemberDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    // Check if the requester and new member are friends
+    const friendship1 = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', '==', requesterId)
+      .where('user2Id', '==', finalNewMemberUserId)
+      .where('status', '==', 'active')
+      .get();
+
+    const friendship2 = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', '==', finalNewMemberUserId)
+      .where('user2Id', '==', requesterId)
+      .where('status', '==', 'active')
+      .get();
+
+    const areFriends = !friendship1.empty || !friendship2.empty;
+    
+    if (!areFriends) {
+      return res.status(400).json({
+        success: false,
+        message: 'You can only add friends to your group',
+        error: 'NOT_FRIENDS'
+      });
+    }
+
+    const newMemberData = newMemberDoc.data();
+
+    // Add the new member to the group
+    const updatedMembers = [...(groupData.members || []), {
+      userId: finalNewMemberUserId,
+      userData: {
+        fullName: newMemberData.fullName,
+        email: newMemberData.email,
+        avatar: newMemberData.profileImage || newMemberData.profilePicture || ''
+      },
+      role: role,
+      joinedAt: new Date(),
+      balance: 0,
+      isActive: true
+    }];
+
+    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
+      members: updatedMembers,
+      updatedAt: new Date()
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Member added to group successfully'
+    });
+  } catch (error) {
+    console.error('Add group member error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add group member',
+      error: 'ADD_MEMBER_ERROR'
+    });
+  }
+});
+
+// Get User Groups
+spendyApp.get('/groups', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Query groups where user is a member - we need to use a more complex query
+    const groupsSnapshot = await db.collection(COLLECTIONS.GROUPS)
+      .where('isActive', '==', true)
+      .get();
+
+    const groups = [];
+    for (const doc of groupsSnapshot.docs) {
+      const group = doc.data();
+      
+      // Check if user is a member of this group
+      const isMember = group.members && group.members.some(member => 
+        member.userId === userId && member.isActive
+      );
+      
+      if (!isMember) {
+        continue; // Skip groups where user is not a member
+      }
+      
+      // Use the member data from the group document directly
+      const memberDetails = group.members ? group.members.map(member => ({
+        userId: member.userId,
+        userData: {
+          fullName: member.userData?.fullName || 'Unknown User',
+          email: member.userData?.email || 'unknown@email.com',
+          avatar: member.userData?.avatar || ''
+        },
+        role: member.role || 'member',
+        balance: member.balance || 0,
+        isActive: member.isActive !== false
+      })) : [];
+
+      groups.push({
+        id: doc.id,
+        ...convertFirestoreTimestamps({
+          name: group.name,
+          description: group.description,
+          avatar: group.avatar,
+          category: group.category,
+          currency: group.currency,
+          createdBy: group.createdBy,
+          inviteCode: group.inviteCode,
+          createdAt: group.createdAt,
+          totalExpenses: group.totalExpenses || 0,
+          settings: group.settings || {}
+        }),
+        memberCount: memberDetails.filter(m => m.isActive).length,
+        members: memberDetails,
+        isCreator: group.createdBy === userId
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Groups retrieved successfully',
+      data: { groups, totalGroups: groups.length }
+    });
+  } catch (error) {
+    console.error('Get groups error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get groups',
+      error: 'GROUPS_ERROR'
+    });
+  }
+});
+
+// Leave Group
+spendyApp.post('/groups/:groupId/leave', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if user is a member of this group
+    const memberIndex = groupData.members?.findIndex(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (memberIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'You are not a member of this group',
+        error: 'NOT_A_MEMBER'
+      });
+    }
+
+    // Don't allow creator to leave if there are other members
+    const activeMembersCount = groupData.members?.filter(member => member.isActive).length || 0;
+    if (groupData.createdBy === userId && activeMembersCount > 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Group creator cannot leave while there are other members. Transfer ownership or delete the group.',
+        error: 'CREATOR_CANNOT_LEAVE'
+      });
+    }
+
+    // Remove user from group members
+    const updatedMembers = [...groupData.members];
+    updatedMembers[memberIndex].isActive = false;
+    updatedMembers[memberIndex].leftAt = new Date();
+
+    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
+      members: updatedMembers,
+      updatedAt: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: 'Successfully left the group'
+    });
+  } catch (error) {
+    console.error('Leave group error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to leave group',
+      error: 'LEAVE_GROUP_ERROR'
+    });
+  }
+});
+
+// Delete Group (entire group)
+spendyApp.delete('/groups/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if user is a member of this group
+    const member = groupData.members?.find(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!member) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Only group creator or admin can delete the group, OR if user is the only member left
+    const activeMembersCount = groupData.members?.filter(member => member.isActive).length || 0;
+    const isCreator = groupData.createdBy === userId;
+    const isAdmin = member.role === 'admin';
+    const isOnlyMemberLeft = activeMembersCount === 1 && member.userId === userId;
+
+    if (!isCreator && !isAdmin && !isOnlyMemberLeft) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group creator, admin, or the last member can delete the group',
+        error: 'INSUFFICIENT_PERMISSIONS'
+      });
+    }
+
+    // Mark group as inactive instead of deleting (for data integrity)
+    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
+      isActive: false,
+      deletedAt: new Date(),
+      deletedBy: userId,
+      updatedAt: new Date()
+    });
+
+    // Optionally: Mark all group expenses as inactive too
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('groupId', '==', groupId)
+      .get();
+
+    const batch = db.batch();
+    expensesSnapshot.docs.forEach(expenseDoc => {
+      batch.update(expenseDoc.ref, {
+        isActive: false,
+        deletedAt: new Date(),
+        updatedAt: new Date()
+      });
+    });
+
+    await batch.commit();
+
+    res.json({
+      success: true,
+      message: 'Group successfully deleted',
+      data: {
+        deletedGroupId: groupId,
+        deletedExpenses: expensesSnapshot.docs.length
+      }
+    });
+  } catch (error) {
+    console.error('Delete group error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete group',
+      error: 'DELETE_GROUP_ERROR'
+    });
+  }
+});
+
+// Remove Group Member
+spendyApp.delete('/groups/:groupId/members/:userId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId, userId: targetUserId } = req.params;
+    const requesterId = req.user.id;
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if requester is admin or the user being removed
+    const requesterMember = groupData.members?.find(member => 
+      member.userId === requesterId && member.isActive
+    );
+    
+    if (!requesterMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Only admins can remove other users, users can remove themselves
+    if (requesterId !== targetUserId && requesterMember.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group admins can remove other members',
+        error: 'INSUFFICIENT_PERMISSIONS'
+      });
+    }
+
+    // Find the target member
+    const targetMemberIndex = groupData.members?.findIndex(member => 
+      member.userId === targetUserId && member.isActive
+    );
+    
+    if (targetMemberIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found in group',
+        error: 'MEMBER_NOT_FOUND'
+      });
+    }
+
+    // Prevent removing the group creator
+    if (groupData.createdBy === targetUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot remove group creator',
+        error: 'CREATOR_CANNOT_BE_REMOVED'
+      });
+    }
+
+    // Remove member from group
+    const updatedMembers = [...groupData.members];
+    updatedMembers[targetMemberIndex].isActive = false;
+    updatedMembers[targetMemberIndex].leftAt = new Date();
+
+    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
+      members: updatedMembers,
+      updatedAt: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: 'Member removed from group successfully'
+    });
+  } catch (error) {
+    console.error('Remove group member error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to remove group member',
+      error: 'REMOVE_MEMBER_ERROR'
+    });
+  }
+});
+
+// ===== EXPENSES ROUTES =====
+
+// Create Expense
+spendyApp.post('/expenses', authenticateJWT, async (req, res) => {
+  try {
+    const { 
+      description, 
+      amount, 
+      paidBy, 
+      groupId, 
+      category, 
+      categoryIcon,
+      splitType, 
+      splits,  // NEW: Accept splits field instead of splitDetails
+      splitDetails, // LEGACY: Keep for backward compatibility
+      currency,
+      date,
+      receiptUrl,
+      notes
+    } = req.body;
+    const userId = req.user.id;
+
+    if (!description || !amount || !paidBy) {
+      return res.status(400).json({
+        success: false,
+        message: 'Description, amount, and paidBy are required'
+      });
+    }
+
+    // Validate amount
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be a positive number'
+      });
+    }
+
+    // Verify group membership if groupId provided
+    if (groupId) {
+      const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+      if (!groupDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: 'Group not found',
+          error: 'GROUP_NOT_FOUND'
+        });
+      }
+      
+      const groupData = groupDoc.data();
+      const isMember = groupData.members && groupData.members.some(member => 
+        member.userId === userId && member.isActive
+      );
+      
+      if (!isMember) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not a member of this group',
+          error: 'ACCESS_DENIED'
+        });
+      }
+    }
+
+    // Process splits data (NEW LOGIC)
+    let processedSplits = [];
+    if (splits && Array.isArray(splits)) {
+      // NEW: Process splits field with enhanced structure
+      for (const split of splits) {
+        // Get user data for split
+        const userDoc = await db.collection(COLLECTIONS.USERS).doc(split.userId).get();
+        const userData = userDoc.exists ? userDoc.data() : null;
+        
+        processedSplits.push({
+          userId: split.userId,
+          userData: userData ? {
+            fullName: userData.fullName || userData.name,
+            email: userData.email,
+            avatar: userData.profileImage || userData.profilePicture || ''
+          } : null,
+          amount: split.amount,
+          percentage: split.percentage,
+          isPaid: split.userId === paidBy, // Payer is automatically marked as paid
+          paidAt: split.userId === paidBy ? new Date() : null
+        });
+      }
+    } else if (splitDetails && Array.isArray(splitDetails)) {
+      // LEGACY: Keep backward compatibility with splitDetails
+      processedSplits = splitDetails;
+    }
+
+    // Get payer data
+    const payerDoc = await db.collection(COLLECTIONS.USERS).doc(paidBy).get();
+    const payerData = payerDoc.exists ? payerDoc.data() : null;
+
+    const expenseData = {
+      title: description.trim(), // Use description as title for backward compatibility
+      description: description.trim(),
+      amount: numericAmount,
+      paidBy,
+      paidByData: payerData ? {
+        fullName: payerData.fullName || payerData.name,
+        email: payerData.email,
+        avatar: payerData.profileImage || payerData.profilePicture || ''
+      } : null,
+      groupId: groupId || null,
+      category: category || 'general',
+      categoryIcon: categoryIcon || '💳',
+      currency: currency || req.user.currency || 'USD',
+      date: date ? new Date(date) : new Date(),
+      splitType: splitType || 'equal',
+      splits: processedSplits, // NEW: Store as splits field
+      splitDetails: processedSplits, // LEGACY: Also store as splitDetails for backward compatibility
+      receiptUrl: receiptUrl || null,
+      notes: notes || null,
+      isSettled: false,
+      createdBy: userId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const expenseRef = await db.collection(COLLECTIONS.EXPENSES).add(expenseData);
+    
+    // Get the created document to get actual timestamp values
+    const createdDoc = await expenseRef.get();
+    const createdExpense = createdDoc.data();
+
+    res.status(201).json({
+      success: true,
+      message: 'Expense created successfully',
+      data: {
+        expense: {
+          id: expenseRef.id,
+          ...convertFirestoreTimestamps(createdExpense)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Create expense error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create expense',
+      error: 'CREATE_EXPENSE_ERROR'
+    });
+  }
+});
+
+// Get User Expenses
+spendyApp.get('/expenses', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 20;
+
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('createdBy', '==', userId)
+      .limit(limit)
+      .get();
+
+    const expenses = [];
+    for (const doc of expensesSnapshot.docs) {
+      const expense = doc.data();
+      
+      // Get group info if expense has groupId
+      let groupInfo = null;
+      if (expense.groupId) {
+        const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(expense.groupId).get();
+        if (groupDoc.exists) {
+          const group = groupDoc.data();
+          groupInfo = {
+            id: groupDoc.id,
+            name: group.name
+          };
+        }
+      }
+
+      expenses.push({
+        id: doc.id,
+        ...convertFirestoreTimestamps(expense),
+        group: groupInfo
+      });
+    }
+
+    // Sort expenses by createdAt in descending order (newest first)
+    expenses.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'Expenses retrieved successfully',
+      data: { expenses, totalExpenses: expenses.length }
+    });
+  } catch (error) {
+    console.error('Get expenses error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get expenses',
+      error: 'EXPENSES_ERROR'
+    });
+  }
+});
+
+// Get Group Expenses
+spendyApp.get('/expenses/group/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Verify user is a member of this group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if user is a member of this group
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get expenses for this group
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('groupId', '==', groupId)
+      .get();
+
+    const expenses = expensesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...convertFirestoreTimestamps(doc.data())
+    }));
+
+    // Sort expenses by createdAt in descending order (newest first)
+    expenses.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'Group expenses retrieved successfully',
+      data: { 
+        expenses, 
+        totalExpenses: expenses.length,
+        groupId: groupId
+      }
+    });
+  } catch (error) {
+    console.error('Get group expenses error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get group expenses',
+      error: 'GROUP_EXPENSES_ERROR'
+    });
+  }
+});
+
+// Get User Expenses by User ID
+spendyApp.get('/expenses/user/:userId', authenticateJWT, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requesterId = req.user.id;
+    const limit = parseInt(req.query.limit) || 20;
+
+    // Users can only access their own expenses or expenses where they're involved
+    if (userId !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - can only access your own expenses',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get all expenses where user is involved (created by them, paid by them, or in splitData)
+    const allExpenses = [];
+    
+    // 1. Get expenses created by the user
+    const createdExpensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('createdBy', '==', userId)
+      .get();
+    
+    for (const doc of createdExpensesSnapshot.docs) {
+      allExpenses.push({ id: doc.id, ...doc.data() });
+    }
+    
+    // 2. Get expenses paid by the user (but not created by them)
+    const paidExpensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('paidBy', '==', userId)
+      .get();
+    
+    for (const doc of paidExpensesSnapshot.docs) {
+      const expense = { id: doc.id, ...doc.data() };
+      // Avoid duplicates
+      if (!allExpenses.some(e => e.id === doc.id)) {
+        allExpenses.push(expense);
+      }
+    }
+    
+    // 3. Get expenses where user is in splitData (this is more complex, so we'll get from user's groups)
+    // FIXED: Use simpler query since array-contains-any requires exact object matching
+    // Get all groups and filter in memory for user membership
+    const allGroupsSnapshot = await db.collection(COLLECTIONS.GROUPS).get();
+    const userGroupDocs = allGroupsSnapshot.docs.filter(doc => {
+      const groupData = doc.data();
+      return groupData.members && groupData.members.some(member => 
+        member.userId === userId && member.isActive !== false
+      );
+    });
+    
+    for (const groupDoc of userGroupDocs) {
+      const groupExpensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+        .where('groupId', '==', groupDoc.id)
+        .get();
+      
+      for (const expenseDoc of groupExpensesSnapshot.docs) {
+        const expense = { id: expenseDoc.id, ...expenseDoc.data() };
+        
+        // Check if user is in splitData or involved in this expense
+        const isInvolved = expense.createdBy === userId || 
+                          expense.paidBy === userId ||
+                          (expense.splitData && expense.splitData.some(split => split.userId === userId)) ||
+                          (expense.splitDetails && expense.splitDetails.some(split => split.userId === userId));
+        
+        // For expenses without split data, assume equal split if user is in the group
+        if (!expense.splitData && !expense.splitDetails && expense.splitType === 'equal') {
+          // User is involved if they're in the group
+          const groupData = groupDoc.data();
+          const isGroupMember = groupData.members && groupData.members.some(member => 
+            member.userId === userId && member.isActive
+          );
+          if (isGroupMember) {
+            // User is involved in equal split expenses in their groups
+            if (!allExpenses.some(e => e.id === expenseDoc.id)) {
+              allExpenses.push(expense);
+            }
+          }
+        } else if (isInvolved) {
+          // Avoid duplicates
+          if (!allExpenses.some(e => e.id === expenseDoc.id)) {
+            allExpenses.push(expense);
+          }
+        }
+      }
+    }
+
+    // Sort by createdAt descending and limit
+    allExpenses.sort((a, b) => {
+      const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+      const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+      return bTime - aTime;
+    });
+    
+    const limitedExpenses = allExpenses.slice(0, limit);
+
+    // Enhance expenses with group info
+    const expenses = [];
+    for (const expense of limitedExpenses) {
+      // Get group info if expense has groupId
+      let groupInfo = null;
+      if (expense.groupId) {
+        const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(expense.groupId).get();
+        if (groupDoc.exists) {
+          const group = groupDoc.data();
+          groupInfo = {
+            id: groupDoc.id,
+            name: group.name
+          };
+        }
+      }
+
+      expenses.push({
+        id: expense.id,
+        ...convertFirestoreTimestamps(expense),
+        group: groupInfo
+      });
+    }
+
+    // Sort expenses by createdAt in descending order (newest first)
+    expenses.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'User expenses retrieved successfully',
+      data: { 
+        expenses, 
+        totalExpenses: expenses.length,
+        userId: userId
+      }
+    });
+  } catch (error) {
+    console.error('Get user expenses error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user expenses',
+      error: 'USER_EXPENSES_ERROR'
+    });
+  }
+});
+
+// ===== SETTLEMENT ROUTES =====
+
+// Get Settlement Recommendations for a Group
+spendyApp.get('/settlements/group/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Verify user is a member of this group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get all expenses for this group
+    const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+      .where('groupId', '==', groupId)
+      .get();
+
+    // Get all existing settlements for this group
+    const settlementsSnapshot = await db.collection(COLLECTIONS.SETTLEMENTS)
+      .where('groupId', '==', groupId)
+      .get();
+
+    // Calculate balances for each member
+    const memberBalances = {};
+    
+    // Initialize balances for all members
+    groupData.members.forEach(member => {
+      if (member.isActive) {
+        memberBalances[member.userId] = 0;
+      }
+    });
+
+    // Process each expense
+    expensesSnapshot.docs.forEach(doc => {
+      const expense = doc.data();
+      const amount = expense.amount || 0;
+      const paidBy = expense.paidBy;
+      const splitType = expense.splitType || 'equal';
+      
+      if (amount > 0) {
+        // Add amount to payer's balance
+        if (memberBalances.hasOwnProperty(paidBy)) {
+          memberBalances[paidBy] += amount;
+        }
+        
+        // Subtract splits from each member based on split type
+        if (splitType === 'equal') {
+          const activeMemberCount = Object.keys(memberBalances).length;
+          const splitAmount = amount / activeMemberCount;
+          
+          Object.keys(memberBalances).forEach(memberId => {
+            memberBalances[memberId] -= splitAmount;
+          });
+        } else if (splitType === 'custom' && expense.splitDetails) {
+          // Handle custom splits
+          expense.splitDetails.forEach(split => {
+            if (memberBalances.hasOwnProperty(split.userId)) {
+              memberBalances[split.userId] -= split.amount;
+            }
+          });
+        } else if (splitType === 'percentage' && expense.splitDetails) {
+          // Handle percentage splits
+          expense.splitDetails.forEach(split => {
+            if (memberBalances.hasOwnProperty(split.userId)) {
+              const splitAmount = (amount * split.percentage) / 100;
+              memberBalances[split.userId] -= splitAmount;
+            }
+          });
+        }
+      }
+    });
+
+    // Process existing settlements to adjust balances
+    settlementsSnapshot.docs.forEach(doc => {
+      const settlement = doc.data();
+      const amount = settlement.amount || 0;
+      const fromUserId = settlement.fromUserId;
+      const toUserId = settlement.toUserId;
+      
+      if (amount > 0) {
+        // When a settlement is recorded, it means fromUser paid toUser
+        // So we need to adjust balances to reflect this payment
+        if (memberBalances.hasOwnProperty(fromUserId)) {
+          memberBalances[fromUserId] += amount; // fromUser gets credit for paying
+        }
+        if (memberBalances.hasOwnProperty(toUserId)) {
+          memberBalances[toUserId] -= amount; // toUser owes less now
+        }
+      }
+    });
+
+    // Generate settlement recommendations
+    const settlements = [];
+    const debtors = [];
+    const creditors = [];
+    
+    Object.entries(memberBalances).forEach(([memberId, balance]) => {
+      if (balance > 0.01) {
+        creditors.push({ memberId, amount: balance });
+      } else if (balance < -0.01) {
+        debtors.push({ memberId, amount: Math.abs(balance) });
+      }
+    });
+    
+    // Sort by amount for optimal settlements
+    creditors.sort((a, b) => b.amount - a.amount);
+    debtors.sort((a, b) => b.amount - a.amount);
+    
+    // Generate settlement transactions
+    let i = 0, j = 0;
+    while (i < creditors.length && j < debtors.length) {
+      const creditor = creditors[i];
+      const debtor = debtors[j];
+      
+      const settlementAmount = Math.min(creditor.amount, debtor.amount);
+      
+      if (settlementAmount > 0.01) {
+        settlements.push({
+          from: debtor.memberId,
+          to: creditor.memberId,
+          amount: Math.round(settlementAmount * 100) / 100,
+          currency: groupData.settings?.currency || 'USD'
+        });
+      }
+      
+      creditor.amount -= settlementAmount;
+      debtor.amount -= settlementAmount;
+      
+      if (creditor.amount < 0.01) i++;
+      if (debtor.amount < 0.01) j++;
+    }
+
+    res.json({
+      success: true,
+      message: 'Settlement recommendations generated',
+      data: {
+        settlements,
+        memberBalances,
+        totalSettlements: settlements.length,
+        groupId: groupId
+      }
+    });
+  } catch (error) {
+    console.error('Get settlement recommendations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get settlement recommendations',
+      error: 'SETTLEMENT_ERROR'
+    });
+  }
+});
+
+// Record a Settlement Payment
+spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
+  try {
+    const { fromUserId, toUserId, amount, groupId, note } = req.body;
+    const userId = req.user.id;
+
+    if (!fromUserId || !toUserId || !amount || !groupId) {
+      return res.status(400).json({
+        success: false,
+        message: 'fromUserId, toUserId, amount, and groupId are required'
+      });
+    }
+
+    // Validate amount
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be a positive number'
+      });
+    }
+
+    // Verify user is involved in this settlement
+    if (userId !== fromUserId && userId !== toUserId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only record settlements you are involved in',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Verify group exists and user is a member
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Verify both fromUserId and toUserId are group members
+    const fromUserIsMember = groupData.members && groupData.members.some(member => 
+      member.userId === fromUserId && member.isActive
+    );
+    const toUserIsMember = groupData.members && groupData.members.some(member => 
+      member.userId === toUserId && member.isActive
+    );
+    
+    if (!fromUserIsMember || !toUserIsMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Both users must be group members to record settlement',
+        error: 'INVALID_MEMBERS'
+      });
+    }
+
+    const settlementData = {
+      fromUserId,
+      toUserId,
+      amount: numericAmount,
+      groupId,
+      note: note || '',
+      status: 'completed',
+      createdBy: userId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const settlementRef = await db.collection(COLLECTIONS.SETTLEMENTS).add(settlementData);
+    
+    // Get the created document
+    const createdDoc = await settlementRef.get();
+    const createdSettlement = createdDoc.data();
+
+    res.status(201).json({
+      success: true,
+      message: 'Settlement recorded successfully',
+      data: {
+        settlement: {
+          id: settlementRef.id,
+          ...convertFirestoreTimestamps(createdSettlement)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Record settlement error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to record settlement',
+      error: 'RECORD_SETTLEMENT_ERROR'
+    });
+  }
+});
+
+// Get Settlement History for a Group
+spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    // Verify user is a member of this group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Get settlements for this group
+    const settlementsSnapshot = await db.collection(COLLECTIONS.SETTLEMENTS)
+      .where('groupId', '==', groupId)
+      .get();
+
+    const settlements = settlementsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...convertFirestoreTimestamps(data),
+        groupId: data.groupId // Ensure groupId is included
+      };
+    });
+
+    // Sort by createdAt in descending order
+    settlements.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'Settlement history retrieved successfully',
+      data: {
+        settlements,
+        totalSettlements: settlements.length,
+        groupId: groupId
+      }
+    });
+  } catch (error) {
+    console.error('Get settlement history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get settlement history',
+      error: 'SETTLEMENT_HISTORY_ERROR'
+    });
+  }
+});
+
+// ===== NOTIFICATIONS ROUTES =====
+
+// Get User Notifications
+spendyApp.get('/notifications/:userId', authenticateJWT, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requesterId = req.user.id;
+
+    // Users can only access their own notifications
+    if (userId !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - can only access your own notifications',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    const notificationsSnapshot = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .limit(50)
+      .get();
+
+    const notifications = notificationsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...convertFirestoreTimestamps(doc.data())
+    }));
+
+    // Sort notifications by createdAt in descending order (newest first)
+    notifications.sort((a, b) => {
+      const aTime = a.createdAt?.getTime ? a.createdAt.getTime() : 0;
+      const bTime = b.createdAt?.getTime ? b.createdAt.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      message: 'Notifications retrieved successfully',
+      data: { 
+        notifications, 
+        totalNotifications: notifications.length,
+        unreadCount: notifications.filter(n => !n.isRead).length
+      }
+    });
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get notifications',
+      error: 'NOTIFICATIONS_ERROR'
+    });
+  }
+});
+
+// Mark Notification as Read
+spendyApp.post('/notifications/:notificationId/read', authenticateJWT, async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.user.id;
+
+    // Get the notification
+    const notificationDoc = await db.collection('notifications').doc(notificationId).get();
+    
+    if (!notificationDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+        error: 'NOTIFICATION_NOT_FOUND'
+      });
+    }
+
+    const notificationData = notificationDoc.data();
+    
+    // Verify this notification belongs to the current user
+    if (notificationData.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not your notification',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Mark as read
+    await notificationDoc.ref.update({
+      isRead: true,
+      readAt: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+  } catch (error) {
+    console.error('Mark notification as read error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark notification as read',
+      error: 'MARK_READ_ERROR'
+    });
+  }
+});
+
+// Get Unread Notification Count
+spendyApp.get('/notifications/:userId/unread-count', authenticateJWT, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requesterId = req.user.id;
+
+    if (userId !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - can only access your own notifications',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    const unreadSnapshot = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .where('isRead', '==', false)
+      .get();
+
+    res.json({
+      success: true,
+      message: 'Unread count retrieved successfully',
+      data: { 
+        unreadCount: unreadSnapshot.docs.length
+      }
+    });
+  } catch (error) {
+    console.error('Get unread count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get unread count',
+      error: 'UNREAD_COUNT_ERROR'
+    });
+  }
+});
+
+// Clear All Notifications
+spendyApp.delete('/notifications/:userId/all', authenticateJWT, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requesterId = req.user.id;
+
+    if (userId !== requesterId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - can only access your own notifications',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    const notificationsSnapshot = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .get();
+
+    const batch = db.batch();
+    notificationsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+
+    res.json({
+      success: true,
+      message: 'All notifications cleared successfully',
+      data: {
+        deletedCount: notificationsSnapshot.docs.length
+      }
+    });
+  } catch (error) {
+    console.error('Clear all notifications error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear notifications',
+      error: 'CLEAR_NOTIFICATIONS_ERROR'
+    });
+  }
+});
+
+// Health check for Spendy API
+spendyApp.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Spendy API is running on Firebase Functions',
+    timestamp: new Date().toISOString(),
+    environment: 'production',
+    version: '1.0.0',
+    platform: 'Firebase Functions'
+  });
+});
+
+// Export Spendy API as Firebase Function
+exports.spendyApi = functions.https.onRequest(spendyApp);

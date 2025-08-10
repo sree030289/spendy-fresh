@@ -1,11 +1,12 @@
 // App.tsx - Test with simplified modal
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { View, ActivityIndicator, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FirebaseNotificationService } from './src/services/smartMoney/firebaseNotificationService';
+import { CrossPlatformAlert } from './src/utils/alertUtils';
 
 // Import providers
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
@@ -25,7 +26,7 @@ import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { RealNotificationService } from './src/services/notifications/RealNotificationService';
-import { SplittingService } from '@/services/firebase/splitting';
+import { ApiService } from '@/services/api/ApiService';
 import { notificationManager } from '@/services/NotificationManager';
 import SmartMoneyApp from '@/screens/main/SmartMoneyApp';
 
@@ -153,20 +154,26 @@ const AppNavigator = () => {
     // Initialize Smart Money notifications
     const initializeSmartMoney = async () => {
       if (user?.id) {
-        const notificationService = FirebaseNotificationService.getInstance();
-        const initialized = await notificationService.initialize();
-        
-        if (initialized) {
-          console.log('✅ Smart Money notifications initialized');
+        try {
+          console.log('🚀 Initializing Smart Money notifications for user:', user.id);
+          const notificationService = FirebaseNotificationService.getInstance();
+          const initialized = await notificationService.initialize();
           
-          // Schedule all Smart Money notifications
-          await notificationService.scheduleDailyExpenseReminder();
-          await notificationService.scheduleWeeklyAnalytics();
-          
-          // Save token for user
-          await notificationService.saveTokenToServer(user.id);
-        } else {
-          console.log('❌ Failed to initialize Smart Money notifications');
+          if (initialized) {
+            console.log('✅ Smart Money notifications initialized');
+            
+            // Schedule all Smart Money notifications
+            await notificationService.scheduleDailyExpenseReminder();
+            await notificationService.scheduleWeeklyAnalytics();
+            
+            // Save token for user
+            await notificationService.saveTokenToServer(user.id);
+          } else {
+            console.log('⚠️ Smart Money notifications not initialized (may be on web platform or permissions denied)');
+          }
+        } catch (error) {
+          console.error('❌ Failed to initialize notifications:', error);
+          // Don't block app initialization if notifications fail
         }
       }
     };
@@ -244,7 +251,8 @@ const AppNavigator = () => {
   useEffect(() => {
     const processRecurring = async () => {
       if (user?.id) {
-        await SplittingService.processRecurringExpenses();
+        const apiService = ApiService.getInstance();
+        await apiService.processRecurringExpenses();
       }
     };
 
@@ -268,7 +276,7 @@ const AppNavigator = () => {
       setSubscriptionCountdown(0);
       setSubscriptionCanClose(true);
       
-      Alert.alert('Success! 🎉', 'Mock subscription completed', [
+      CrossPlatformAlert.alert('Success! 🎉', 'Mock subscription completed', [
         {
           text: 'Awesome!',
           onPress: () => {
@@ -288,7 +296,7 @@ const AppNavigator = () => {
       ]);
     } catch (error) {
       console.error('Subscription purchase error:', error);
-      Alert.alert('Error', 'Failed to process subscription. Please try again.');
+      CrossPlatformAlert.alert('Error', 'Failed to process subscription. Please try again.');
     }
   };
 
@@ -296,14 +304,15 @@ const AppNavigator = () => {
   const showSubscriptionModalForReason = (
     reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature',
     feature?: string,
-    canClose: boolean = true
+    canClose: boolean = true,
+    autoCloseAfter?: number
   ) => {
-    console.log('🎯 Showing subscription modal for reason:', reason, 'feature:', feature, 'canClose:', canClose);
+    console.log('🎯 Showing subscription modal for reason:', reason, 'feature:', feature, 'canClose:', canClose, 'autoCloseAfter:', autoCloseAfter);
     
     setSubscriptionReason(reason);
     setFeatureName(feature || '');
     setSubscriptionCanClose(canClose);
-    setSubscriptionCountdown(canClose ? 0 : 5);
+    setSubscriptionCountdown(canClose ? 0 : (autoCloseAfter || 5));
     setShowSubscriptionModal(true);
   };
 
@@ -313,6 +322,21 @@ const AppNavigator = () => {
     setShowSubscriptionModal(false);
     setSubscriptionCountdown(0);
     setSubscriptionCanClose(true);
+    
+    // Check if there's pending expense data to process after the countdown
+    if ((window as any).pendingExpenseData && subscriptionReason === 'transactionLimit') {
+      const { expenseData, fromGroupDetails } = (window as any).pendingExpenseData;
+      console.log('📋 Processing pending expense after countdown:', expenseData);
+      
+      // Clear the pending data
+      (window as any).pendingExpenseData = null;
+      
+      // Process the expense - we need to call the proceedWithExpenseCreation function
+      // This should be handled by the RealSplittingScreen component
+      if ((window as any).processPendingExpense) {
+        (window as any).processPendingExpense(expenseData, fromGroupDetails);
+      }
+    }
     
     // If we should show tour after subscription and user hasn't seen it yet
     if (shouldShowTourAfterSubscription && !hasShownTour) {
@@ -332,10 +356,11 @@ const AppNavigator = () => {
     (global as any).showSubscriptionModal = (
       reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature',
       feature?: string,
-      canClose: boolean = true
+      canClose: boolean = true,
+      autoCloseAfter?: number
     ) => {
-      console.log('🔔 Global showSubscriptionModal called:', { reason, feature, canClose });
-      showSubscriptionModalForReason(reason, feature, canClose);
+      console.log('🔔 Global showSubscriptionModal called:', { reason, feature, canClose, autoCloseAfter });
+      showSubscriptionModalForReason(reason, feature, canClose, autoCloseAfter);
     };
     
     return () => {

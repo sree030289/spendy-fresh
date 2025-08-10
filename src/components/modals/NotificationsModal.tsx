@@ -15,7 +15,7 @@ import FullscreenModal from '@/components/common/FullscreenModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
-import { Notification } from '@/services/firebase/splitting';
+import { Notification } from '@/services/firebase/splitting-disabled';
 
 interface NotificationsModalProps {
   visible: boolean;

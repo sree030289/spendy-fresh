@@ -13,7 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
-import { Expense, SplittingService } from '@/services/firebase/splitting';
+import { Expense } from '@/services/firebase/splitting-disabled';
+import { ApiService } from '@/services/api/ApiService';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
 
@@ -43,6 +44,7 @@ export default function ExpenseDeletionModal({
   isUserAdmin = false
 }: ExpenseDeletionModalProps) {
   const { theme } = useTheme();
+  const apiService = ApiService.getInstance();
   const [loading, setLoading] = useState(false);
   const [confirmationStep, setConfirmationStep] = useState(1);
   const [balanceImpacts, setBalanceImpacts] = useState<BalanceImpact[]>([]);
@@ -58,14 +60,14 @@ export default function ExpenseDeletionModal({
 
     try {
       // Get current group data to calculate impact
-      const group = await SplittingService.getGroup(expense.groupId);
+      const group = await apiService.getGroup(expense.groupId);
       if (!group) return;
 
       const impacts: BalanceImpact[] = [];
 
       // Calculate impact for each person involved in the expense
       for (const split of expense.splitData) {
-        const member = group.members.find(m => m.userId === split.userId);
+        const member = group.members.find((m: any) => m.userId === split.userId);
         if (member) {
           let impactAmount = 0;
           
@@ -79,7 +81,7 @@ export default function ExpenseDeletionModal({
 
           impacts.push({
             userId: split.userId,
-            userName: split.userId === currentUser.id ? 'You' : member.userData.fullName,
+            userName: split.userId === currentUser.id ? 'You' : (member.userData?.fullName || 'Unknown'),
             currentBalance: member.balance,
             impactAmount,
             newBalance: member.balance - impactAmount
@@ -139,16 +141,16 @@ export default function ExpenseDeletionModal({
 
     setLoading(true);
     try {
-      await SplittingService.deleteExpense(expense.id, currentUser.id);
+      await apiService.deleteExpense(expense.id, currentUser.id);
 
-      // Send notification to group
-      await SplittingService.sendGroupMessage({
-        groupId: expense.groupId,
-        userId: currentUser.id,
-        userName: currentUser.fullName,
-        message: `🗑️ Deleted expense: "${expense.description}" (${getCurrencySymbol(expense.currency)}${expense.amount.toFixed(2)})`,
-        type: 'system'
-      });
+      // TODO: Add group message functionality to ApiService
+      // await apiService.sendGroupMessage({
+      //   groupId: expense.groupId,
+      //   userId: currentUser.id,
+      //   userName: currentUser.fullName,
+      //   message: `🗑️ Deleted expense: "${expense.description}" (${getCurrencySymbol(expense.currency)}${expense.amount.toFixed(2)})`,
+      //   type: 'system'
+      // });
 
       Alert.alert(
         'Expense Deleted',

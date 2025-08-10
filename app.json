@@ -43,7 +43,7 @@
           ]
         },
         {
-          "action": "VIEW", 
+          "action": "VIEW",
           "data": [
             {
               "scheme": "com.svaag.spendy"
@@ -56,18 +56,20 @@
         }
       ],
       "permissions": [
-              "android.permission.VIBRATE",
-              "android.permission.WAKE_LOCK",
-              "android.permission.RECEIVE_BOOT_COMPLETED",
-              "android.permission.SCHEDULE_EXACT_ALARM",
-              "android.permission.CAMERA"
-            ]
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.CAMERA"
+      ]
     },
     "notification": {
-      "icon": "./assets/notification-icon.png", 
+      "icon": "./assets/notification-icon.png",
       "color": "#10B981",
       "androidMode": "default",
-      "androidCollapsedTitle": "#{unread_notifications} new Smart Money notification(s)"
+      "androidCollapsedTitle": "#{unread_notifications} new Smart Money notification(s)",
+      "vapidPublicKey": "BCKn6-hFFrk_G2HzxtJ5u8_BfvwFjhSyBh2DQEG1Y0tPd8yJM1ZZCf7Cz9Hy5KVBEo1vVQb",
+      "serviceWorkerPath": "./public/firebase-messaging-sw.js"
     },
     "plugins": [
       [
@@ -80,7 +82,8 @@
             "./assets/notification_sound.wav"
           ]
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

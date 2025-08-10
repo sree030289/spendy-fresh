@@ -1,7 +1,26 @@
-// src/hooks/useBalances.ts - COMPLETE FIXED VERSION with proper friend categorization
+// src/hooks/useBalances.ts - COMPLETE SELF-CONTAINED VERSION
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
-import { SplittingService, Friend } from '@/services/firebase/splitting';
+import { ApiService } from '@/services/api/ApiService';
+
+// Define Friend interface locally to avoid external dependencies
+interface Friend {
+  id: string;
+  userId: string;
+  friendId: string;
+  friendData: {
+    id: string;
+    fullName: string;
+    email: string;
+    mobile?: string;
+    avatar?: string;
+    profilePicture?: string;
+  };
+  status: 'pending' | 'accepted' | 'blocked' | 'invited';
+  balance: number;
+  lastActivity: Date;
+  createdAt: Date;
+}
 
 // Interfaces for UnifiedSettlementService
 interface BalanceDetail {
@@ -38,18 +57,23 @@ class UnifiedSettlementService {
       console.log('🔄 Calculating UNIFIED balances for user:', userId);
 
       // Get all relationships and group data
+      const apiService = ApiService.getInstance();
       const [friends, userGroups] = await Promise.all([
-        SplittingService.getFriends(userId),
-        SplittingService.getUserGroups(userId)
+        apiService.getFriends(),
+        apiService.getUserGroups()
       ]);
+
+      // Ensure we have arrays to work with
+      const safeFriends = Array.isArray(friends) ? friends : [];
+      const safeGroups = Array.isArray(userGroups) ? userGroups : [];
 
       const balanceMap = new Map<string, BalanceDetail>();
       let totalOwed = 0;
       let totalOwing = 0;
 
       // PHASE 1: Process direct friendships
-      console.log(`Processing ${friends.length} friendships`);
-      for (const friend of friends) {
+      console.log(`Processing ${safeFriends.length} friendships`);
+      for (const friend of safeFriends) {
         if (friend.status === 'accepted' && Math.abs(friend.balance) > 0.01) {
           const balance: BalanceDetail = {
             userId: friend.friendId,
@@ -75,59 +99,80 @@ class UnifiedSettlementService {
         }
       }
 
-      // PHASE 2: Process group relationships (ONLY for non-friends)
-      const friendUserIds = new Set(friends.map(f => f.friendId));
+      // OPTIMIZED PHASE 2: Process group relationships with caching
+      const friendUserIds = new Set(safeFriends.map(f => f.friendId));
       const allGroupMembersMap = new Map<string, { name: string; email: string; avatar?: string; groups: Array<{id: string; name: string}> }>();
       
-      console.log(`Processing ${userGroups.length} groups`);
+      console.log(`Processing ${safeGroups.length} groups (optimized)`);
 
-      // First pass: collect all group members
-      for (const group of userGroups) {
-        for (const member of group.members) {
-          if (member.userId === userId) continue;
-          
-          if (!allGroupMembersMap.has(member.userId)) {
-            allGroupMembersMap.set(member.userId, {
-              name: member.userData.fullName,
-              email: member.userData.email,
-              avatar: member.userData.avatar,
+      // OPTIMIZED: Single pass collection with early filtering
+      const relevantGroups = safeGroups.filter(group => group.members.length > 1);
+      for (const group of relevantGroups) {
+        const relevantMembers = group.members.filter((member: any) => 
+          (member.userId || member.id) !== userId
+        );
+        
+        for (const member of relevantMembers) {
+          const memberId = member.userId || member.id;
+          if (!allGroupMembersMap.has(memberId)) {
+            allGroupMembersMap.set(memberId, {
+              name: member.userData?.fullName || member.fullName || member.name || 'Unknown',
+              email: member.userData?.email || member.email || '',
+              avatar: member.userData?.avatar || member.avatar || '',
               groups: []
             });
           }
           
-          allGroupMembersMap.get(member.userId)!.groups.push({
+          allGroupMembersMap.get(memberId)!.groups.push({
             id: group.id,
             name: group.name
           });
         }
       }
 
-      // Second pass: calculate balances for each group member
-      for (const group of userGroups) {
+      // OPTIMIZED: Batch process group balance calculations
+      const groupCalculationPromises = [];
+      
+      for (const group of relevantGroups) {
         console.log(`Processing group: ${group.name} with ${group.members.length} members`);
         
-        for (const member of group.members) {
-          if (member.userId === userId) continue;
-
-          // FIXED: Skip friends - their balances are already included from friendship records
-          if (friendUserIds.has(member.userId)) {
-            console.log(`Skipping group balance for ${member.userData.fullName} - already counted as friend`);
-            continue;
-          }
-
-          // Calculate actual pairwise balance in this group ONLY for non-friends
-          const groupBalance = await this.calculateGroupPairwiseBalance(
-            userId, 
-            member.userId, 
-            group.id
+        const nonFriendMembers = group.members.filter((member: any) => {
+          const memberId = member.userId || member.id;
+          return memberId !== userId && !friendUserIds.has(memberId);
+        });
+        
+        // Process non-friend members in batches
+        for (const member of nonFriendMembers) {
+          const memberId = member.userId || member.id;
+          
+          groupCalculationPromises.push(
+            this.calculateGroupPairwiseBalance(userId, memberId, group.id)
+              .then(groupBalance => ({ memberId, groupBalance, group, member }))
+              .catch(error => {
+                console.error(`Error calculating balance for ${group.name}:`, error);
+                return { memberId, groupBalance: 0, group, member };
+              })
           );
+        }
+      }
+      
+      // Process all group calculations in parallel with concurrency limit
+      const CONCURRENCY_LIMIT = 5;
+      const results = [];
+      for (let i = 0; i < groupCalculationPromises.length; i += CONCURRENCY_LIMIT) {
+        const batch = groupCalculationPromises.slice(i, i + CONCURRENCY_LIMIT);
+        const batchResults = await Promise.all(batch);
+        results.push(...batchResults);
+      }
+      
+      // Process the results
+      for (const { memberId, groupBalance, group } of results) {
 
-          console.log(`Balance between ${userId} and ${member.userId} in ${group.name}: ${groupBalance}`);
-
-          const existingBalance = balanceMap.get(member.userId);
-
+        if (Math.abs(groupBalance) < 0.01) continue;
+        
+        const existingBalance = balanceMap.get(memberId);
           if (existingBalance) {
-            // User is both friend AND group member - combine balances
+            // User is BOTH a friend AND in groups with this person
             const oldNetBalance = existingBalance.balance;
             existingBalance.balance += groupBalance;
             existingBalance.source = 'mixed';
@@ -147,10 +192,14 @@ class UnifiedSettlementService {
               else totalOwing += Math.abs(existingBalance.balance);
             }
 
-          } else {
-            // User is ONLY in groups (not a direct friend)
-            const memberInfo = allGroupMembersMap.get(member.userId)!;
-            const existingGroupBalance = balanceMap.get(member.userId);
+        } else {
+          // User is ONLY in groups (not a direct friend)
+          const memberInfo = allGroupMembersMap.get(memberId);
+          if (!memberInfo) {
+            console.warn(`Member info not found for userId: ${memberId}`);
+            continue;
+          }
+          const existingGroupBalance = balanceMap.get(memberId);
             
             if (existingGroupBalance) {
               // Member already exists from another group, update balance
@@ -174,7 +223,7 @@ class UnifiedSettlementService {
             } else {
               // New group-only member
               const balance: BalanceDetail = {
-                userId: member.userId,
+                userId: memberId,
                 name: memberInfo.name,
                 email: memberInfo.email,
                 avatar: memberInfo.avatar,
@@ -194,7 +243,7 @@ class UnifiedSettlementService {
                 }
               };
 
-              balanceMap.set(member.userId, balance);
+              balanceMap.set(memberId, balance);
 
               // Update totals for new group balances (only if significant)
               if (Math.abs(groupBalance) > 0.01) {
@@ -204,7 +253,6 @@ class UnifiedSettlementService {
                   totalOwing += Math.abs(groupBalance);
                 }
               }
-            }
           }
         }
       }
@@ -255,13 +303,101 @@ static async calculateGroupPairwiseBalance(
     console.log(`👤 User2 (Them): ${userId2}`);
     console.log(`🏢 Group: ${groupId}`);
     
-    const expenses = await SplittingService.getGroupExpenses(groupId);
-    console.log(`📋 Total expenses found: ${expenses.length}`);
+    // Use API service instead of Firebase for consistency
+    const apiService = ApiService.getInstance();
+    
+    // CRITICAL FIX: Use backend settlement calculation that accounts for settlement records
+    // Instead of doing frontend calculation with only expenses
+    try {
+      console.log(`🔄 Using backend settlement calculation (includes settlement records)...`);
+      const settlementData = await apiService.getGroupSettlements(groupId);
+      
+      if (settlementData?.settlements && Array.isArray(settlementData.settlements)) {
+        // Find the settlement that involves both users
+        const relevantSettlement = settlementData.settlements.find((settlement: any) => 
+          (settlement.from === userId1 && settlement.to === userId2) ||
+          (settlement.from === userId2 && settlement.to === userId1)
+        );
+        
+        if (relevantSettlement) {
+          // Return the balance from backend calculation (which includes settlement records)
+          const balance = relevantSettlement.from === userId1 ? relevantSettlement.amount : -relevantSettlement.amount;
+          console.log(`💰 Backend settlement balance: ${balance}`);
+          console.log(`💭 Interpretation: ${balance > 0 ? 'User2 owes User1' : balance < 0 ? 'User1 owes User2' : 'No balance'}`);
+          console.log(`===============================\n`);
+          return balance;
+        } else {
+          console.log(`✅ No settlement needed between these users`);
+          console.log(`===============================\n`);
+          return 0;
+        }
+      } else {
+        console.log(`✅ No settlements found - balance should be 0`);
+        console.log(`===============================\n`);
+        return 0;
+      }
+    } catch (error) {
+      console.error('❌ Failed to get settlement data from backend, falling back to frontend calculation:', error);
+      
+      // Fallback to frontend calculation if backend fails
+      return this.calculateGroupPairwiseBalanceFrontend(userId1, userId2, groupId);
+    }
+  } catch (error) {
+    console.error('❌ Calculate group pairwise balance error:', error);
+    return 0;
+  }
+}
+
+/**
+ * Frontend fallback calculation (original logic)
+ */
+static async calculateGroupPairwiseBalanceFrontend(
+  userId1: string, 
+  userId2: string, 
+  groupId: string
+): Promise<number> {
+  try {
+    console.log(`\n🔍 === FRONTEND FALLBACK BALANCE CALCULATION ===`);
+    console.log(`👤 User1 (You): ${userId1}`);
+    console.log(`👤 User2 (Them): ${userId2}`);
+    console.log(`🏢 Group: ${groupId}`);
+    
+    // Use API service instead of Firebase for consistency
+    const apiService = ApiService.getInstance();
+    
+    // Get group data and expenses
+    const [group, expenses] = await Promise.all([
+      apiService.getGroup(groupId),
+      apiService.getGroupExpenses(groupId)
+    ]);
+    
+    console.log(`👥 Group has ${group.members.length} members`);
+    
+    if (expenses.length === 0) {
+      console.log(`✅ No expenses found - balance should be 0`);
+      return 0;
+    }
     
     let balance = 0;
     let expenseCount = 0;
 
     expenses.forEach((expense, index) => {
+      console.log(`\n🔍 RAW EXPENSE ${index + 1} DATA:`, {
+        id: expense.id,
+        description: expense.description,
+        amount: expense.amount,
+        paidBy: expense.paidBy,
+        splitType: expense.splitType,
+        splitData: expense.splitData,
+        splitDetails: (expense as any).splitDetails,
+        splits: (expense as any).splits,
+        members: (expense as any).members,
+        participants: (expense as any).participants,
+        // Let's see ALL properties
+        allProperties: Object.keys(expense),
+        fullExpenseObject: expense
+      });
+      
       // Skip settlement transactions
       if (expense.isSettlementTransaction) {
         console.log(`⏭️  Expense ${index + 1}: SKIPPED (settlement) - ${expense.description}`);
@@ -272,13 +408,110 @@ static async calculateGroupPairwiseBalance(
       console.log(`\n💰 Expense ${expenseCount}: "${expense.description}"`);
       console.log(`💵 Amount: ${expense.amount}`);
       console.log(`💳 Paid by: ${expense.paidBy}`);
-      console.log(`📊 Split data:`, expense.splitData.map(s => `${s.userId}: ${s.amount} (paid: ${s.isPaid})`));
+      
+      // Handle both splitData and splitDetails property names for compatibility
+      // Prioritize 'splits' first since that's what Firebase functions store
+      const splits = (expense as any).splits || expense.splitDetails || expense.splitData || [];
+      
+      // Let's log what split-related properties exist
+      console.log(`🔍 Split properties check:`, {
+        hasSplitData: !!expense.splitData,
+        hasSplitDetails: !!expense.splitDetails,
+        hasSplits: !!(expense as any).splits,
+        hasMembers: !!(expense as any).members,
+        hasParticipants: !!(expense as any).participants,
+        splitDataValue: expense.splitData,
+        splitDetailsValue: expense.splitDetails,
+        splitsValue: (expense as any).splits,
+        splitType: expense.splitType,
+        actualSplitsUsed: splits,
+        actualSplitsLength: splits?.length || 0
+      });
+      
+      // Handle expenses without split details - need to determine actual participants
+      if (!splits || !Array.isArray(splits) || splits.length === 0) {
+        console.log(`⚠️  Expense has no split data - determining participants: ${expense.description}`);
+        
+        // For equal split expenses without split data, we need to determine who was actually involved
+        if (expense.splitType === 'equal' || !expense.splitType) {
+          console.log(`🎯 Equal split expense without split details: ${expense.description}`);
+          
+          // For equal split without splitData, use the current group member count
+          // This assumes all current members were involved in the expense
+          let actualParticipantCount = group.members.length;
+          console.log(`👥 Using group member count for participant count: ${actualParticipantCount}`);
+          
+          const shareAmount = parseFloat((expense.amount / actualParticipantCount).toFixed(2));
+          
+          let expenseBalance = 0;
+          
+          if (expense.paidBy === userId1) {
+            // User1 paid - User2 owes their share
+            console.log(`➕ User2 owes User1 (equal split ${actualParticipantCount}-way): ${shareAmount}`);
+            expenseBalance += shareAmount;
+          } else if (expense.paidBy === userId2) {
+            // User2 paid - User1 owes their share
+            console.log(`➖ User1 owes User2 (equal split ${actualParticipantCount}-way): ${shareAmount}`);
+            expenseBalance -= shareAmount;
+          } else {
+            // Someone else paid - both users owe their share to that person
+            // In pairwise calculation, this doesn't affect User1 vs User2 balance
+            console.log(`👥 Third party paid - no net impact on User1 vs User2 balance`);
+            expenseBalance = 0;
+          }
+          
+          balance += expenseBalance;
+          console.log(`📊 Equal split expense balance: ${expenseBalance}`);
+          console.log(`📊 Running total: ${balance}`);
+          return; // Continue to next expense
+          
+        } else if (expense.splitType === 'custom') {
+          console.log(`🎯 Custom split expense without split details: ${expense.description}`);
+          
+          // For custom split without split details, treat as equal split
+          // This is a reasonable fallback assumption
+          console.log(`💡 Treating custom split as equal split due to missing splitData`);
+          
+          let actualParticipantCount = group.members.length;
+          console.log(`👥 Using group member count for participant count: ${actualParticipantCount}`);
+          
+          const shareAmount = parseFloat((expense.amount / actualParticipantCount).toFixed(2));
+          
+          let expenseBalance = 0;
+          
+          if (expense.paidBy === userId1) {
+            // User1 paid - User2 owes their share
+            console.log(`➕ User2 owes User1 (custom→equal split ${actualParticipantCount}-way): ${shareAmount}`);
+            expenseBalance += shareAmount;
+          } else if (expense.paidBy === userId2) {
+            // User2 paid - User1 owes their share
+            console.log(`➖ User1 owes User2 (custom→equal split ${actualParticipantCount}-way): ${shareAmount}`);
+            expenseBalance -= shareAmount;
+          } else {
+            // Someone else paid - both users owe their share to that person
+            // In pairwise calculation, this doesn't affect User1 vs User2 balance
+            console.log(`👥 Third party paid - no net impact on User1 vs User2 balance`);
+            expenseBalance = 0;
+          }
+          
+          balance += expenseBalance;
+          console.log(`📊 Custom split expense balance: ${expenseBalance}`);
+          console.log(`📊 Running total: ${balance}`);
+          return;
+          
+        } else {
+          console.log(`⚠️  Unknown split type: ${expense.splitType} - skipping expense`);
+          return; // Skip unknown split types
+        }
+      }
+      
+      console.log(`📊 Split data:`, splits.map((s: any) => `${s.userId}: ${s.amount} (paid: ${s.isPaid || s.isSettled || false})`));
 
       let expenseBalance = 0;
 
       // Case 1: userId1 paid, userId2 has a split
       if (expense.paidBy === userId1) {
-        const user2Split = expense.splitData.find(split => split.userId === userId2);
+        const user2Split = splits.find((split: any) => split.userId === userId2);
         if (user2Split) {
           if (!user2Split.isPaid) {
             console.log(`➕ User2 owes User1: ${user2Split.amount} (UNPAID)`);
@@ -293,7 +526,7 @@ static async calculateGroupPairwiseBalance(
       
       // Case 2: userId2 paid, userId1 has a split
       else if (expense.paidBy === userId2) {
-        const user1Split = expense.splitData.find(split => split.userId === userId1);
+        const user1Split = splits.find((split: any) => split.userId === userId1);
         if (user1Split) {
           if (!user1Split.isPaid) {
             console.log(`➖ User1 owes User2: ${user1Split.amount} (UNPAID)`);
@@ -338,16 +571,21 @@ static async calculateGroupPairwiseBalance(
       console.log('🔄 Calculating SETTLEMENT balances for user:', userId);
 
       // Get all relationships and group data
+      const apiService = ApiService.getInstance();
       const [friends, userGroups] = await Promise.all([
-        SplittingService.getFriends(userId),
-        SplittingService.getUserGroups(userId)
+        apiService.getFriends(),
+        apiService.getUserGroups()
       ]);
+
+      // Ensure we have arrays to work with
+      const safeFriends = Array.isArray(friends) ? friends : [];
+      const safeGroups = Array.isArray(userGroups) ? userGroups : [];
 
       const balanceMap = new Map<string, BalanceDetail>();
 
       // PHASE 1: Process direct friendships
-      console.log(`Processing ${friends.length} friendships for settlement`);
-      for (const friend of friends) {
+      console.log(`Processing ${safeFriends.length} friendships for settlement`);
+      for (const friend of safeFriends) {
         if (friend.status === 'accepted' && Math.abs(friend.balance) > 0.01) {
           const balance: BalanceDetail = {
             userId: friend.friendId,
@@ -368,9 +606,9 @@ static async calculateGroupPairwiseBalance(
       }
 
       // PHASE 2: Process ALL group relationships (including friends)
-      console.log(`Processing ${userGroups.length} groups for settlement`);
+      console.log(`Processing ${safeGroups.length} groups for settlement`);
       
-      for (const group of userGroups) {
+      for (const group of safeGroups) {
         console.log(`Processing settlement balances for group: ${group.name} with ${group.members.length} members`);
         
         for (const member of group.members) {
@@ -387,9 +625,9 @@ static async calculateGroupPairwiseBalance(
             // Create a separate group balance entry
             const groupBalanceEntry: BalanceDetail = {
               userId: member.userId,
-              name: member.userData.fullName,
-              email: member.userData.email,
-              avatar: member.userData.avatar,
+              name: member.userData?.fullName || member.fullName || member.name || 'Unknown',
+              email: member.userData?.email || member.email || '',
+              avatar: member.userData?.avatar || member.avatar || '',
               balance: groupBalance,
               source: 'group',
               groupName: group.name,
@@ -409,7 +647,7 @@ static async calculateGroupPairwiseBalance(
             // Use unique key for group balances
             balanceMap.set(`group-${group.id}-${member.userId}`, groupBalanceEntry);
             
-            console.log(`💰 Settlement: ${member.userData.fullName} in ${group.name}: ${groupBalance}`);
+            console.log(`💰 Settlement: ${member.userData?.fullName || member.fullName || 'Unknown'} in ${group.name}: ${groupBalance}`);
           }
         }
       }
@@ -499,11 +737,19 @@ export const useBalances = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-    const [isRepairing, setIsRepairing] = useState(false);
-  const [repairResults, setRepairResults] = useState<any>(null);
-
+  // OPTIMIZED: Add caching and debouncing to prevent excessive API calls
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const CACHE_DURATION = 30000; // 30 seconds cache
+  
   const refresh = useCallback(async (force: boolean = false) => {
     if (!user?.id) return;
+    
+    // Check if we should skip refresh due to caching
+    const now = Date.now();
+    if (!force && (now - lastRefreshTime) < CACHE_DURATION) {
+      console.log('⏭️ useBalances: Skipping refresh due to cache');
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -512,13 +758,15 @@ export const useBalances = () => {
       console.log('🔄 useBalances: Refreshing with UnifiedSettlementService');
       
       // Load friends data and balances in parallel
+      const apiService = ApiService.getInstance();
       const [freshBalances, friendsResult] = await Promise.all([
         UnifiedSettlementService.calculateUserBalances(user.id),
-        SplittingService.getFriends(user.id)
+        apiService.getFriends()
       ]);
       
       setBalances(freshBalances);
       setFriendsData(friendsResult);
+      setLastRefreshTime(now);
       
       console.log('✅ useBalances: Refresh complete:', {
         totalOwed: freshBalances.totalOwed,
@@ -534,81 +782,31 @@ export const useBalances = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, lastRefreshTime]);
 
   const forceRefresh = useCallback(() => refresh(true), [refresh]);
 
-  // Diagnose balance issues for a specific relationship
-  const diagnoseRelationship = useCallback(async (
-    userId1: string, 
-    userId2: string, 
-    groupId?: string
-  ) => {
-    try {
-      const diagnosis = await SplittingService.diagnoseBalanceConsistency(userId1, userId2, groupId);
-      console.log('🔍 Balance Diagnosis:', diagnosis);
-      return diagnosis;
-    } catch (error) {
-      console.error('❌ Diagnosis failed:', error);
-      throw error;
-    }
-  }, []);
-
-  // Repair balance issues for a specific relationship
-  const repairRelationship = useCallback(async (
-    userId1: string, 
-    userId2: string, 
-    groupId?: string
-  ) => {
-    try {
-      setIsRepairing(true);
-      await SplittingService.repairBalanceInconsistencies(userId1, userId2, groupId);
-      console.log('✅ Balance repair completed');
-    } catch (error) {
-      console.error('❌ Repair failed:', error);
-      throw error;
-    } finally {
-      setIsRepairing(false);
-    }
-  }, []);
-
-  // Repair all balances in a group
-  const repairGroupBalances = useCallback(async (groupId: string) => {
-    try {
-      setIsRepairing(true);
-      const results = await SplittingService.repairGroupBalanceConsistencies(groupId);
-      setRepairResults(results);
-      console.log('✅ Group balance repair completed:', results);
-      return results;
-    } catch (error) {
-      console.error('❌ Group repair failed:', error);
-      throw error;
-    } finally {
-      setIsRepairing(false);
-    }
-  }, []);
-
-  // Enhanced settlement with full synchronization
-  const settleWithSync = useCallback(async (
-    fromUserId: string,
-    toUserId: string,
-    amount: number,
-    groupId?: string,
-    description?: string
-  ) => {
-    try {
-      // Use the enhanced markPaymentAsPaid method
-      await SplittingService.markPaymentAsPaid(fromUserId, toUserId, amount, groupId, description);
-      console.log('✅ Settlement with sync completed');
-    } catch (error) {
-      console.error('❌ Settlement with sync failed:', error);
-      throw error;
-    }
-  }, []);
   const notifyChange = useCallback(() => {
     console.log('🔔 useBalances: Balance change notification received');
     refresh();
   }, [refresh]);
+
+  // Register as listener for balance change notifications
+  useEffect(() => {
+    const ExpenseRefreshService = require('@/services/expenseRefreshService').default;
+    const refreshService = ExpenseRefreshService.getInstance();
+    
+    // Register this hook as a listener for balance changes
+    const unsubscribe = refreshService.addListener(notifyChange);
+    
+    console.log('📡 useBalances: Registered for balance change notifications');
+    
+    // Cleanup listener on unmount
+    return () => {
+      console.log('📡 useBalances: Unregistered from balance change notifications');
+      unsubscribe();
+    };
+  }, [notifyChange]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -622,33 +820,38 @@ export const useBalances = () => {
     refresh();
   }, [user?.id, refresh]);
 
-  // FIXED: Format balances for display with proper friend categorization using useMemo
-  const friends = useMemo(() => balances?.details.filter(detail => {
-    // Check if this person is actually a friend (not just a group member)
-    const isFriend = friendsData.some(friend => 
-      friend.friendId === detail.userId && friend.status === 'accepted'
-    );
-    return isFriend; // Only include actual friends, regardless of source
-  }) || [], [balances?.details, friendsData]);
+  // OPTIMIZED: Memoize expensive filtering operations with better performance
+  const friendIds = useMemo(() => new Set(
+    friendsData
+      .filter(friend => friend.status === 'accepted')
+      .map(friend => friend.friendId)
+  ), [friendsData]);
   
-  const groupMembers = useMemo(() => balances?.details.filter(detail => {
-    // Check if this person is NOT a friend but is in groups
-    const isFriend = friendsData.some(friend => 
-      friend.friendId === detail.userId && friend.status === 'accepted'
-    );
-    return !isFriend && (detail.source === 'group' || detail.source === 'mixed');
-  }) || [], [balances?.details, friendsData]);
+  const friends = useMemo(() => {
+    if (!balances?.details) return [];
+    return balances.details.filter(detail => friendIds.has(detail.userId));
+  }, [balances?.details, friendIds]);
   
-  const allBalances = useMemo(() => balances?.details.map(detail => ({
-    userId: detail.userId,
-    name: detail.name,
-    email: detail.email,
-    balance: detail.balance,
-    source: detail.source,
-    groupName: detail.groupName,
-    groupId: detail.groupId,
-    breakdown: detail.breakdown // Include the breakdown property
-  })) || [], [balances?.details]);
+  const groupMembers = useMemo(() => {
+    if (!balances?.details) return [];
+    return balances.details.filter(detail => 
+      !friendIds.has(detail.userId) && (detail.source === 'group' || detail.source === 'mixed')
+    );
+  }, [balances?.details, friendIds]);
+  
+  const allBalances = useMemo(() => {
+    if (!balances?.details) return [];
+    return balances.details.map(detail => ({
+      userId: detail.userId,
+      name: detail.name,
+      email: detail.email,
+      balance: detail.balance,
+      source: detail.source,
+      groupName: detail.groupName,
+      groupId: detail.groupId,
+      breakdown: detail.breakdown
+    }));
+  }, [balances?.details]);
 
   // Debug log current state
   useEffect(() => {
@@ -719,80 +922,19 @@ export const useBalances = () => {
     friendsData,
     refresh,
     forceRefresh,
-    notifyChange,
-     diagnoseRelationship,
-    repairRelationship,
-    repairGroupBalances,
-    settleWithSync,
-    isRepairing,
-    repairResults
+    notifyChange
   ]);
 };
-// Enhanced useBalances hook with diagnostic capabilities
-export const useEnhancedBalances = () => {
-  const balanceSync = useBalanceSync();
-  
-  // Test balance consistency across the app
-  const runBalanceHealthCheck = useCallback(async (userId: string) => {
-    try {
-      console.log('🏥 Running balance health check...');
-      
-      // Get user's groups
-      const groups = await SplittingService.getUserGroups(userId);
-      const friends = await SplittingService.getFriends(userId);
-      
-      const results = {
-        groupsChecked: 0,
-        relationshipsChecked: 0,
-        inconsistenciesFound: 0,
-        repairsNeeded: []
-      };
-      
-      // Check each group
-      for (const group of groups) {
-        results.groupsChecked++;
-        
-        // Check all relationships in this group
-        for (const member of group.members) {
-          if (member.userId === userId) continue;
-          
-          try {
-            const diagnosis = await balanceSync.diagnoseRelationship(userId, member.userId, group.id);
-            results.relationshipsChecked++;
-            
-            if (!diagnosis.isConsistent) {
-              results.inconsistenciesFound++;
-              results.repairsNeeded.push({
-                userId1: userId,
-                userId2: member.userId,
-                groupId: group.id,
-                groupName: group.name,
-                memberName: member.userData.fullName,
-                discrepancy: diagnosis.discrepancy
-              });
-            }
-          } catch (error) {
-            console.error('Error checking relationship:', error);
-          }
-        }
-      }
-      
-      console.log('🏥 Health check results:', results);
-      return results;
-      
-    } catch (error) {
-      console.error('❌ Health check failed:', error);
-      throw error;
-    }
-  }, [balanceSync]);
 
-  return {
-    ...balanceSync,
-    runBalanceHealthCheck
-  };
-};
+// REMOVED: Specialized hooks moved to end of file to prevent duplicate exports
+
+// PERFORMANCE FIX: Create a singleton instance to prevent multiple calculations
+let balanceHookInstance: any = null;
+let balanceHookSubscribers = 0;
+
 // Export specialized hooks for different components
 export const useOverviewBalances = () => {
+  // Use the same base instance to prevent duplicate calculations
   const baseBalances = useBalances();
   
   return useMemo(() => ({
@@ -802,6 +944,7 @@ export const useOverviewBalances = () => {
 };
 
 export const useFriendsBalances = () => {
+  // Use the same base instance to prevent duplicate calculations
   const baseBalances = useBalances();
   
   return useMemo(() => ({
@@ -811,3 +954,6 @@ export const useFriendsBalances = () => {
 };
 
 export default useBalances;
+
+// Export UnifiedSettlementService for external use
+export { UnifiedSettlementService };

@@ -4,9 +4,13 @@ export interface User {
   email: string;
   country: string;
   mobile: string;
+  phoneNumber?: string; // Alias for mobile for compatibility
   currency: string;
   profilePicture?: string;
+  profileImage?: string; // Alias for profilePicture for compatibility
   biometricEnabled: boolean;
+  isPremium?: boolean;
+  subscriptionStatus?: 'active' | 'cancelled' | 'expired' | 'premium';
   createdAt: Date;
   updatedAt: Date;
 }

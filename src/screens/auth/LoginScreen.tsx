@@ -10,6 +10,7 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +19,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
-import { AuthService } from '@/services/firebase/auth';
+import { ApiService } from '@/services/api/ApiService';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
@@ -34,6 +35,7 @@ export default function LoginScreen() {
   const [passwordError, setPasswordError] = useState('');
   const [lastUserEmail, setLastUserEmail] = useState<string | null>(null);
   const [lastUserBiometric, setLastUserBiometric] = useState(false);
+  const apiService = ApiService.getInstance();
 
   useEffect(() => {
     initializeScreen();
@@ -51,8 +53,8 @@ export default function LoginScreen() {
       setBiometricAvailable(available);
 
       // Get last user's email and biometric setting
-      const lastEmail = await AuthService.getLastEmail();
-      const lastBiometric = await AuthService.getLastBiometricSetting();
+      const lastEmail = await apiService.getLastEmail();
+      const lastBiometric = await apiService.getLastBiometricSetting();
       
       console.log('🔍 Last user session:', { lastEmail, lastBiometric });
       
@@ -114,7 +116,7 @@ export default function LoginScreen() {
   const handleClearSession = async () => {
     try {
       console.log('🧹 Clearing previous user session...');
-      await AuthService.clearUserSession();
+      await apiService.clearUserSession();
       setEmail('');
       setLastUserEmail(null);
       setLastUserBiometric(false);
@@ -151,26 +153,24 @@ export default function LoginScreen() {
     return true;
   };
 
-  const getFirebaseErrorMessage = (errorCode: string): string => {
-    switch (errorCode) {
-      case 'auth/user-not-found':
-        return 'No account found with this email. Please register first.';
-      case 'auth/wrong-password':
-      case 'auth/invalid-password':
-        return 'Incorrect password. Please try again.';
-      case 'auth/invalid-email':
-        return 'Please enter a valid email address.';
-      case 'auth/user-disabled':
-        return 'This account has been disabled. Contact support.';
-      case 'auth/too-many-requests':
-        return 'Too many failed attempts. Please try again later.';
-      case 'auth/network-request-failed':
-        return 'Network error. Please check your connection.';
-      case 'auth/invalid-credential':
+  const getApiErrorMessage = (error: any): string => {
+    // Handle API error responses
+    if (error.message) {
+      if (error.message.includes('Invalid email or password')) {
         return 'Invalid email or password. Please check your credentials.';
-      default:
-        return 'Login failed. Please check your email and password.';
+      }
+      if (error.message.includes('User not found')) {
+        return 'No account found with this email. Please register first.';
+      }
+      if (error.message.includes('Network')) {
+        return 'Network error. Please check your connection.';
+      }
+      if (error.message.includes('HTTP 429')) {
+        return 'Too many failed attempts. Please try again later.';
+      }
+      return error.message;
     }
+    return 'Login failed. Please check your email and password.';
   };
 
   const handleLogin = async () => {
@@ -195,18 +195,8 @@ export default function LoginScreen() {
     } catch (error: any) {
       console.log('LoginScreen: Login error:', error);
       
-      // Extract Firebase error code
-      let errorMessage = 'Login failed. Please try again.';
-      if (error.message && error.message.includes('Firebase:')) {
-        const firebaseErrorMatch = error.message.match(/\(([^)]+)\)/);
-        if (firebaseErrorMatch) {
-          const errorCode = firebaseErrorMatch[1];
-          errorMessage = getFirebaseErrorMessage(errorCode);
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
+      // Use API error handling
+      const errorMessage = getApiErrorMessage(error);
       Alert.alert('Login Failed', errorMessage);
     } finally {
       setLoading(false);
@@ -251,17 +241,39 @@ export default function LoginScreen() {
   };
 
   const dismissKeyboard = () => {
-    Keyboard.dismiss();
+    if (Platform.OS === 'web') {
+      // On web, blur the active element to dismiss virtual keyboard
+      const activeElement = document.activeElement as HTMLElement;
+      if (activeElement && activeElement.blur) {
+        activeElement.blur();
+      }
+    } else {
+      Keyboard.dismiss();
+    }
   };
 
   return (
-    <TouchableWithoutFeedback onPress={dismissKeyboard}>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <TouchableWithoutFeedback onPress={Platform.OS !== 'web' ? dismissKeyboard : undefined}>
         <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+          behavior={Platform.select({ ios: 'padding', android: 'height', web: 'height' })}
+          style={[styles.keyboardView, Platform.OS === 'web' && { flex: 1 }]}
+          enabled={true} // Enable on all platforms
         >
-          <View style={styles.content}>
+          <ScrollView 
+            contentContainerStyle={[
+              styles.content,
+              Platform.OS === 'web' && { minHeight: '100%', justifyContent: 'center' }
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            bounces={Platform.OS !== 'web'}
+            {...(Platform.OS === 'web' && {
+              // Web-specific ScrollView props
+              scrollEnabled: true,
+              contentContainerStyle: { flexGrow: 1, justifyContent: 'center' }
+            })}
+          >
             <View style={styles.header}>
               <Text style={[styles.title, { color: theme.colors.text }]}>Welcome Back</Text>
               <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
@@ -305,6 +317,12 @@ export default function LoginScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  {...(Platform.OS === 'web' && {
+                    // Web-specific props
+                    autoComplete: 'email',
+                    inputMode: 'email' as any,
+                  })}
                 />
                 <Ionicons 
                   name="mail-outline" 
@@ -340,6 +358,12 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   returnKeyType="done"
                   onSubmitEditing={handleLogin}
+                  blurOnSubmit={true}
+                  {...(Platform.OS === 'web' && {
+                    // Web-specific props
+                    autoComplete: 'current-password',
+                    inputMode: 'text' as any,
+                  })}
                 />
                 <Ionicons 
                   name="lock-closed-outline" 
@@ -400,10 +424,10 @@ export default function LoginScreen() {
                 <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Sign Up</Text>
               </Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 

@@ -15,7 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
-import { Group, SplittingService } from '@/services/firebase/splitting';
+import { Group, SplittingService } from '@/services/firebase/splitting-disabled';
 import { User } from '@/types';
 import { getCurrencySymbol } from '@/utils/currency';
 import FullscreenModal from '@/components/common/FullscreenModal';

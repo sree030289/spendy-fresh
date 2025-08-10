@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
-import { SplittingService, Expense } from '@/services/firebase/splitting';
+import { SplittingService, Expense } from '@/services/firebase/splitting-disabled';
 
 interface ExpenseModalProps {
   visible: boolean;

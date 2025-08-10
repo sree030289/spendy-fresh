@@ -128,21 +128,24 @@ export default function RegisterScreen() {
     return isNameValid && isEmailValid && isMobileValid && isPasswordValid;
   };
 
-  const getFirebaseErrorMessage = (errorCode: string): string => {
-    switch (errorCode) {
-      case 'auth/email-already-in-use':
+  const getApiErrorMessage = (error: any): string => {
+    // Handle API error responses
+    if (error.message) {
+      if (error.message.includes('User with this email already exists')) {
         return 'An account with this email already exists. Please use a different email or try logging in.';
-      case 'auth/weak-password':
+      }
+      if (error.message.includes('Password must be at least')) {
         return 'Password is too weak. Please choose a stronger password.';
-      case 'auth/invalid-email':
-        return 'Please enter a valid email address.';
-      case 'auth/operation-not-allowed':
-        return 'Email registration is not enabled. Please contact support.';
-      case 'auth/network-request-failed':
+      }
+      if (error.message.includes('required')) {
+        return error.message;
+      }
+      if (error.message.includes('Network')) {
         return 'Network error. Please check your connection and try again.';
-      default:
-        return 'Registration failed. Please try again.';
+      }
+      return error.message;
     }
+    return 'Registration failed. Please try again.';
   };
 
   const checkDuplicateUser = async (email: string, mobile: string) => {
@@ -171,30 +174,23 @@ export default function RegisterScreen() {
     } catch (error: any) {
       console.log('Registration error:', error);
       
-      let errorMessage = 'Registration failed. Please try again.';
-      if (error.message && error.message.includes('Firebase:')) {
-        const firebaseErrorMatch = error.message.match(/\(([^)]+)\)/);
-        if (firebaseErrorMatch) {
-          const errorCode = firebaseErrorMatch[1];
-          errorMessage = getFirebaseErrorMessage(errorCode);
-          
-          // Handle specific duplicate email case
-          if (errorCode === 'auth/email-already-in-use') {
-            Alert.alert(
-              'Account Exists',
-              'An account with this email already exists. Would you like to login instead?',
-              [
-                { text: 'Try Different Email', style: 'cancel' },
-                { 
-                  text: 'Go to Login', 
-                  onPress: () => navigation.navigate('Login' as never)
-                }
-              ]
-            );
-            setLoading(false);
-            return;
-          }
-        }
+      const errorMessage = getApiErrorMessage(error);
+      
+      // Handle specific duplicate email case
+      if (error.message && error.message.includes('User with this email already exists')) {
+        Alert.alert(
+          'Account Exists',
+          'An account with this email already exists. Would you like to login instead?',
+          [
+            { text: 'Try Different Email', style: 'cancel' },
+            { 
+              text: 'Go to Login', 
+              onPress: () => navigation.navigate('Login' as never)
+            }
+          ]
+        );
+        setLoading(false);
+        return;
       }
       
       Alert.alert('Registration Failed', errorMessage);
@@ -219,23 +215,22 @@ export default function RegisterScreen() {
       // Navigation happens in useEffect when user state changes
     } catch (error: any) {
       console.log('Complete registration error:', error);
-      let errorMessage = 'Registration failed. Please try again.';
-      
-      if (error.message && error.message.includes('Firebase:')) {
-        const firebaseErrorMatch = error.message.match(/\(([^)]+)\)/);
-        if (firebaseErrorMatch) {
-          const errorCode = firebaseErrorMatch[1];
-          errorMessage = getFirebaseErrorMessage(errorCode);
-        }
-      }
-      
+      const errorMessage = getApiErrorMessage(error);
       Alert.alert('Registration Failed', errorMessage);
       setShowBiometricPrompt(false);
     }
   };
 
   const dismissKeyboard = () => {
-    Keyboard.dismiss();
+    if (Platform.OS === 'web') {
+      // On web, blur the active element to dismiss virtual keyboard
+      const activeElement = document.activeElement as HTMLElement;
+      if (activeElement && activeElement.blur) {
+        activeElement.blur();
+      }
+    } else {
+      Keyboard.dismiss();
+    }
   };
 
   const CountryPicker = () => (
@@ -377,16 +372,26 @@ export default function RegisterScreen() {
   );
 
   return (
-    <TouchableWithoutFeedback onPress={dismissKeyboard}>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <TouchableWithoutFeedback onPress={Platform.OS !== 'web' ? dismissKeyboard : undefined}>
         <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+          behavior={Platform.select({ ios: 'padding', android: 'height', web: 'height' })}
+          style={[styles.keyboardView, Platform.OS === 'web' && { flex: 1 }]}
+          enabled={true} // Enable on all platforms
         >
           <ScrollView 
-            contentContainerStyle={styles.scrollContent} 
+            contentContainerStyle={[
+              styles.scrollContent,
+              Platform.OS === 'web' && { minHeight: '100%' }
+            ]} 
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            bounces={Platform.OS !== 'web'}
+            {...(Platform.OS === 'web' && {
+              // Web-specific ScrollView props
+              scrollEnabled: true,
+              nestedScrollEnabled: true,
+            })}
           >
             <View style={styles.header}>
               <TouchableOpacity
@@ -420,6 +425,12 @@ export default function RegisterScreen() {
                     if (errors.fullName) validateFullName(text);
                   }}
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  {...(Platform.OS === 'web' && {
+                    // Web-specific props
+                    autoComplete: 'name',
+                    inputMode: 'text' as any,
+                  })}
                 />
                 <Ionicons 
                   name="person-outline" 
@@ -455,6 +466,12 @@ export default function RegisterScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  {...(Platform.OS === 'web' && {
+                    // Web-specific props
+                    autoComplete: 'email',
+                    inputMode: 'email' as any,
+                  })}
                 />
                 <Ionicons 
                   name="mail-outline" 
@@ -515,6 +532,12 @@ export default function RegisterScreen() {
                     keyboardType="phone-pad"
                     returnKeyType="next"
                     maxLength={10}
+                    blurOnSubmit={false}
+                    {...(Platform.OS === 'web' && {
+                      // Web-specific props
+                      autoComplete: 'tel',
+                      inputMode: 'numeric' as any,
+                    })}
                   />
                   <Ionicons 
                     name="call-outline" 
@@ -566,6 +589,12 @@ export default function RegisterScreen() {
                   secureTextEntry={!showPassword}
                   returnKeyType="done"
                   onSubmitEditing={handleRegister}
+                  blurOnSubmit={true}
+                  {...(Platform.OS === 'web' && {
+                    // Web-specific props
+                    autoComplete: 'new-password',
+                    inputMode: 'text' as any,
+                  })}
                 />
                 <Ionicons 
                   name="lock-closed-outline" 
@@ -609,12 +638,12 @@ export default function RegisterScreen() {
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
 
-        <CountryPicker />
-        <CurrencyPicker />
-        <BiometricPrompt />
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+      <CountryPicker />
+      <CurrencyPicker />
+      <BiometricPrompt />
+    </SafeAreaView>
   );
 }
 
@@ -784,10 +813,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     maxWidth: 320,
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
+    boxShadow: '0px 10px 20px rgba(0, 0, 0, 0.25)',
     elevation: 10,
   },
   biometricIcon: {

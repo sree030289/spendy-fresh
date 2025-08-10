@@ -1,5 +1,5 @@
 // src/services/qr/QRScannerManager.ts
-import { Alert } from 'react-native';
+import { CrossPlatformAlert } from '@/utils/alertUtils';
 import { QRCodeService } from './QRCodeService';
 
 export interface QRScannerState {
@@ -167,7 +167,7 @@ export class QRScannerManager {
       error,
     });
 
-    Alert.alert(
+    CrossPlatformAlert.alert(
       'QR Code Error',
       error,
       [
@@ -192,7 +192,7 @@ export class QRScannerManager {
 
   // Show success feedback
   showSuccessMessage(message: string, onClose?: () => void): void {
-    Alert.alert(
+    CrossPlatformAlert.alert(
       'Success',
       message,
       [{

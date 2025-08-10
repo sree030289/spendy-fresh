@@ -1,6 +1,7 @@
 // src/services/payments/PaymentService.ts
-import { Linking, Alert, Platform } from 'react-native';
-import { SplittingService } from '../firebase/splitting';
+import { Linking, Platform } from 'react-native';
+import { CrossPlatformAlert } from '@/utils/alertUtils';
+import { SplittingService } from '../firebase/splitting-disabled';
 
 interface PaymentProvider {
   id: string;
@@ -263,7 +264,7 @@ export class PaymentService {
         }
       } else {
         // Show options to install app or use web
-        Alert.alert(
+        CrossPlatformAlert.alert(
           `${provider.name} Not Installed`,
           `Would you like to install ${provider.name} or continue with web browser?`,
           [

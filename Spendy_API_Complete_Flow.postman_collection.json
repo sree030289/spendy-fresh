@@ -1,0 +1,1109 @@
+{
+  "info": {
+    "name": "Spendy API - Complete Flow",
+    "description": "Complete end-to-end flow testing for Spendy API with dynamic data passing and validation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://us-central1-spendy-97913.cloudfunctions.net/spendyApi",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "test{{$randomInt}}@example.com",
+      "type": "string"
+    },
+    {
+      "key": "testPassword",
+      "value": "test123456",
+      "type": "string"
+    },
+    {
+      "key": "friendEmail",
+      "value": "friend{{$randomInt}}@example.com",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "friendToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "friendId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "friendRequestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "groupId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "expenseId1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "expenseId2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "expenseId3",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Register User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"fullName\": \"Test User\",\n  \"mobile\": \"+1234567890\",\n  \"country\": \"US\",\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "register"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Registration successful\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"Response has required fields\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.token).to.exist;",
+              "    pm.expect(responseJson.data.user.id).to.exist;",
+              "    pm.expect(responseJson.data.user.email).to.eql(pm.collectionVariables.get(\"testEmail\"));",
+              "});",
+              "",
+              "// Store token and user ID for subsequent requests",
+              "if (pm.response.code === 201) {",
+              "    const responseJson = pm.response.json();",
+              "    pm.collectionVariables.set(\"authToken\", responseJson.data.token);",
+              "    pm.collectionVariables.set(\"userId\", responseJson.data.user.id);",
+              "    console.log(\"Stored token:\", responseJson.data.token);",
+              "    console.log(\"Stored userId:\", responseJson.data.user.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Login User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Login successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has valid token\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.token).to.exist;",
+              "    pm.expect(responseJson.data.user.email).to.eql(pm.collectionVariables.get(\"testEmail\"));",
+              "});",
+              "",
+              "// Update token from login response",
+              "if (pm.response.code === 200) {",
+              "    const responseJson = pm.response.json();",
+              "    pm.collectionVariables.set(\"authToken\", responseJson.data.token);",
+              "    console.log(\"Updated token from login:\", responseJson.data.token);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Get Friends (Initial - Should be 0)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/friends",
+          "host": ["{{baseUrl}}"],
+          "path": ["friends"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get friends successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Initially no friends\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.friends).to.be.an('array');",
+              "    pm.expect(responseJson.data.friends.length).to.eql(0);",
+              "    pm.expect(responseJson.data.totalFriends).to.eql(0);",
+              "});",
+              "",
+              "console.log(\"Initial friends count:\", pm.response.json().data.totalFriends);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Get Groups (Initial - Should be 0)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/groups",
+          "host": ["{{baseUrl}}"],
+          "path": ["groups"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get groups successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Initially no groups\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.groups).to.be.an('array');",
+              "    pm.expect(responseJson.data.groups.length).to.eql(0);",
+              "    pm.expect(responseJson.data.totalGroups).to.eql(0);",
+              "});",
+              "",
+              "console.log(\"Initial groups count:\", pm.response.json().data.totalGroups);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Register Friend User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{friendEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"fullName\": \"Friend User\",\n  \"mobile\": \"+1234567891\",\n  \"country\": \"US\",\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "register"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Friend registration successful\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"Friend response has required fields\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.token).to.exist;",
+              "    pm.expect(responseJson.data.user.id).to.exist;",
+              "});",
+              "",
+              "// Store friend token and ID",
+              "if (pm.response.code === 201) {",
+              "    const responseJson = pm.response.json();",
+              "    pm.collectionVariables.set(\"friendToken\", responseJson.data.token);",
+              "    pm.collectionVariables.set(\"friendId\", responseJson.data.user.id);",
+              "    console.log(\"Stored friend token:\", responseJson.data.token);",
+              "    console.log(\"Stored friendId:\", responseJson.data.user.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Send Friend Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"toEmail\": \"{{friendEmail}}\",\n  \"message\": \"Let's be friends on Spendy!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/friends/requests/send",
+          "host": ["{{baseUrl}}"],
+          "path": ["friends", "requests", "send"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Friend request sent successfully\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Friend request response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.message).to.include('sent');",
+              "    pm.expect(responseJson.isNewUser).to.be.false;",
+              "});",
+              "",
+              "console.log(\"Friend request sent to:\", pm.collectionVariables.get(\"friendEmail\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Get Friends After Request (Should still be 0)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/friends",
+          "host": ["{{baseUrl}}"],
+          "path": ["friends"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get friends after request successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Still no accepted friends\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.friends).to.be.an('array');",
+              "    pm.expect(responseJson.data.friends.length).to.eql(0);",
+              "});",
+              "",
+              "console.log(\"Friends count after request:\", pm.response.json().data.totalFriends);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Get Friend Requests (As Friend)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{friendToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/friends/requests",
+          "host": ["{{baseUrl}}"],
+          "path": ["friends", "requests"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get friend requests successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Has incoming friend request\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.incoming).to.be.an('array');",
+              "    pm.expect(responseJson.data.incoming.length).to.be.greaterThan(0);",
+              "});",
+              "",
+              "// Store friend request ID for acceptance",
+              "if (pm.response.code === 200) {",
+              "    const responseJson = pm.response.json();",
+              "    if (responseJson.data.incoming.length > 0) {",
+              "        pm.collectionVariables.set(\"friendRequestId\", responseJson.data.incoming[0].id);",
+              "        console.log(\"Stored friend request ID:\", responseJson.data.incoming[0].id);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Accept Friend Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{friendToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"requestId\": \"{{friendRequestId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/friends/requests/accept",
+          "host": ["{{baseUrl}}"],
+          "path": ["friends", "requests", "accept"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Friend request accepted successfully\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Accept response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.message).to.include('accepted');",
+              "});",
+              "",
+              "console.log(\"Friend request accepted:\", pm.collectionVariables.get(\"friendRequestId\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Get Friends After Accept (Should be 1)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/friends",
+          "host": ["{{baseUrl}}"],
+          "path": ["friends"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get friends after accept successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Now has 1 friend\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.friends).to.be.an('array');",
+              "    pm.expect(responseJson.data.friends.length).to.eql(1);",
+              "    pm.expect(responseJson.data.totalFriends).to.eql(1);",
+              "});",
+              "",
+              "console.log(\"Friends count after accept:\", pm.response.json().data.totalFriends);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Create Group with Friend",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Test Group\",\n  \"description\": \"A test group for API testing\",\n  \"category\": \"general\",\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/groups",
+          "host": ["{{baseUrl}}"],
+          "path": ["groups"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Group created successfully\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"Group response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.group.id).to.exist;",
+              "    pm.expect(responseJson.data.group.name).to.eql('Test Group');",
+              "    pm.expect(responseJson.data.group.memberCount).to.eql(1);",
+              "});",
+              "",
+              "// Store group ID",
+              "if (pm.response.code === 201) {",
+              "    const responseJson = pm.response.json();",
+              "    pm.collectionVariables.set(\"groupId\", responseJson.data.group.id);",
+              "    console.log(\"Stored group ID:\", responseJson.data.group.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Add Friend to Group",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{friendId}}\",\n  \"role\": \"member\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/groups/{{groupId}}/members",
+          "host": ["{{baseUrl}}"],
+          "path": ["groups", "{{groupId}}", "members"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Friend added to group successfully\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Add member response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.message).to.include('added');",
+              "});",
+              "",
+              "console.log(\"Friend added to group:\", pm.collectionVariables.get(\"friendId\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Add Expense 1 (I pay, split equally)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Dinner at Restaurant\",\n  \"amount\": 100.00,\n  \"paidBy\": \"{{userId}}\",\n  \"groupId\": \"{{groupId}}\",\n  \"category\": \"food\",\n  \"description\": \"Dinner for two people\",\n  \"splitType\": \"equal\",\n  \"splitDetails\": []\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/expenses",
+          "host": ["{{baseUrl}}"],
+          "path": ["expenses"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Expense 1 created successfully\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"Expense 1 response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.expense.id).to.exist;",
+              "    pm.expect(responseJson.data.expense.amount).to.eql(100);",
+              "    pm.expect(responseJson.data.expense.paidBy).to.eql(pm.collectionVariables.get(\"userId\"));",
+              "});",
+              "",
+              "// Store expense ID",
+              "if (pm.response.code === 201) {",
+              "    const responseJson = pm.response.json();",
+              "    pm.collectionVariables.set(\"expenseId1\", responseJson.data.expense.id);",
+              "    console.log(\"Stored expense 1 ID:\", responseJson.data.expense.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Get Group Balances After Expense 1",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/groups/{{groupId}}/balances",
+          "host": ["{{baseUrl}}"],
+          "path": ["groups", "{{groupId}}", "balances"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get balances successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Balance calculation correct\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    // Friend should owe me $50 (half of $100)",
+              "    console.log(\"Balances after expense 1:\", JSON.stringify(responseJson.data, null, 2));",
+              "});",
+              "",
+              "console.log(\"Balances after first expense:\", pm.response.json().data);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. Mark Expense 1 as Paid",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{friendToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/expenses/{{expenseId1}}/mark-paid",
+          "host": ["{{baseUrl}}"],
+          "path": ["expenses", "{{expenseId1}}", "mark-paid"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Expense 1 marked as paid successfully\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Mark paid response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "});",
+              "",
+              "console.log(\"Expense 1 marked as paid by friend\");"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16. Add Expense 2 (I pay, custom split)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Grocery Shopping\",\n  \"amount\": 80.00,\n  \"paidBy\": \"{{userId}}\",\n  \"groupId\": \"{{groupId}}\",\n  \"category\": \"groceries\",\n  \"description\": \"Weekly groceries\",\n  \"splitType\": \"custom\",\n  \"splitDetails\": [\n    {\n      \"userId\": \"{{userId}}\",\n      \"amount\": 30.00\n    },\n    {\n      \"userId\": \"{{friendId}}\",\n      \"amount\": 50.00\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/expenses",
+          "host": ["{{baseUrl}}"],
+          "path": ["expenses"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Expense 2 created successfully\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"Expense 2 response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.expense.amount).to.eql(80);",
+              "    pm.expect(responseJson.data.expense.splitType).to.eql('custom');",
+              "});",
+              "",
+              "// Store expense ID",
+              "if (pm.response.code === 201) {",
+              "    const responseJson = pm.response.json();",
+              "    pm.collectionVariables.set(\"expenseId2\", responseJson.data.expense.id);",
+              "    console.log(\"Stored expense 2 ID:\", responseJson.data.expense.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17. Add Expense 3 (Friend pays, split equally)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{friendToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Movie Tickets\",\n  \"amount\": 60.00,\n  \"paidBy\": \"{{friendId}}\",\n  \"groupId\": \"{{groupId}}\",\n  \"category\": \"entertainment\",\n  \"description\": \"Movie night\",\n  \"splitType\": \"equal\",\n  \"splitDetails\": []\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/expenses",
+          "host": ["{{baseUrl}}"],
+          "path": ["expenses"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Expense 3 created successfully\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"Expense 3 response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.expense.amount).to.eql(60);",
+              "    pm.expect(responseJson.data.expense.paidBy).to.eql(pm.collectionVariables.get(\"friendId\"));",
+              "});",
+              "",
+              "// Store expense ID",
+              "if (pm.response.code === 201) {",
+              "    const responseJson = pm.response.json();",
+              "    pm.collectionVariables.set(\"expenseId3\", responseJson.data.expense.id);",
+              "    console.log(\"Stored expense 3 ID:\", responseJson.data.expense.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18. Get Final Group Balances",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/groups/{{groupId}}/balances",
+          "host": ["{{baseUrl}}"],
+          "path": ["groups", "{{groupId}}", "balances"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get final balances successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Final balance calculation\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    // Complex calculation: ",
+              "    // Expense 1: I paid $100, split equally = Friend owes me $50 (settled)",
+              "    // Expense 2: I paid $80, custom split (I: $30, Friend: $50) = Friend owes me $50",
+              "    // Expense 3: Friend paid $60, split equally = I owe friend $30",
+              "    // Net: Friend owes me $20",
+              "    console.log(\"Final balances:\", JSON.stringify(responseJson.data, null, 2));",
+              "});",
+              "",
+              "console.log(\"Final balances calculation:\", pm.response.json().data);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19. Mark Final Settlement",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{friendToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/expenses/{{expenseId2}}/mark-paid",
+          "host": ["{{baseUrl}}"],
+          "path": ["expenses", "{{expenseId2}}", "mark-paid"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Final settlement successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "console.log(\"Final settlement completed\");"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20. Remove Friend",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/friends/{{friendId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["friends", "{{friendId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Friend removed successfully\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Remove friend response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "});",
+              "",
+              "console.log(\"Friend removed:\", pm.collectionVariables.get(\"friendId\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21. Delete Group",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/groups/{{groupId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["groups", "{{groupId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Group deleted successfully\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Delete group response valid\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "});",
+              "",
+              "console.log(\"Group deleted:\", pm.collectionVariables.get(\"groupId\"));",
+              "",
+              "// Clean up collection variables",
+              "pm.collectionVariables.clear();"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22. Verify Clean State - No Friends",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/friends",
+          "host": ["{{baseUrl}}"],
+          "path": ["friends"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Clean state verified - no friends\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Back to zero friends\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.friends.length).to.eql(0);",
+              "    pm.expect(responseJson.data.totalFriends).to.eql(0);",
+              "});",
+              "",
+              "console.log(\"✅ Test flow completed successfully! Back to clean state.\");"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23. Verify Clean State - No Groups",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/groups",
+          "host": ["{{baseUrl}}"],
+          "path": ["groups"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Clean state verified - no groups\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Back to zero groups\", function () {",
+              "    const responseJson = pm.response.json();",
+              "    pm.expect(responseJson.success).to.be.true;",
+              "    pm.expect(responseJson.data.groups.length).to.eql(0);",
+              "    pm.expect(responseJson.data.totalGroups).to.eql(0);",
+              "});",
+              "",
+              "console.log(\"🎉 Complete API flow test finished successfully!\");"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "console.log('🚀 Running request:', pm.info.requestName);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "pm.test('Response time is reasonable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(10000);",
+          "});",
+          "",
+          "pm.test('No 5xx errors', function () {",
+          "    pm.response.to.not.have.status(500);",
+          "    pm.response.to.not.have.status(502);",
+          "    pm.response.to.not.have.status(503);",
+          "    pm.response.to.not.have.status(504);",
+          "});"
+        ]
+      }
+    }
+  ]
+}

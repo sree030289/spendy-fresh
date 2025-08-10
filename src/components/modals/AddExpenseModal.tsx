@@ -16,17 +16,34 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
-import { Friend, Group } from '@/services/firebase/splitting';
+import { Friend, Group } from '@/services/firebase/splitting-disabled';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
 import ReceiptScannerModal from './ReceiptScannerModal';
+
+// Local interface to match ReceiptScannerModal
+interface ReceiptData {
+  merchant?: string;
+  total?: number;
+  date?: string;
+  items?: Array<{
+    name: string;
+    price: number;
+    quantity?: number;
+  }>;
+  tax?: number;
+  subtotal?: number;
+  paymentMethod?: string;
+  category?: string;
+  confidence?: number;
+}
 
 interface AddExpenseModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (expenseData: any) => void;
-  groups: Group[];
-  friends: Friend[];
+  groups?: Group[];
+  friends?: Friend[];
   preSelectedGroup?: Group | null;
 }
 
@@ -44,12 +61,23 @@ const EXPENSE_CATEGORIES = [
   { id: 'other', name: 'Other', icon: '💰' },
 ];
 
-export default function AddExpenseModal({ visible, onClose, onSubmit, groups, friends, preSelectedGroup }: AddExpenseModalProps) {
+export default function AddExpenseModal({ 
+  visible, 
+  onClose, 
+  onSubmit, 
+  groups = [], 
+  friends = [], 
+  preSelectedGroup 
+}: AddExpenseModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [activeStep, setActiveStep] = useState<'details' | 'split' | 'review'>('details');
   const [loading, setLoading] = useState(false);
   const [isSwipeActive, setIsSwipeActive] = useState(false);
+  
+  // Safety checks for props
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  const safeFriends = Array.isArray(friends) ? friends : [];
   
   // Form data
   const [description, setDescription] = useState('');
@@ -105,11 +133,17 @@ export default function AddExpenseModal({ visible, onClose, onSubmit, groups, fr
 const initializeSplitData = () => {
   if (!selectedGroup || !amount) return;
   
+  // Safety check for members array
+  if (!Array.isArray(selectedGroup.members)) {
+    console.log('⚠️  selectedGroup.members is not an array:', selectedGroup.members);
+    return;
+  }
+  
   console.log('🔍 DEBUGGING SPLIT DATA');
   console.log('selectedGroup.members:', selectedGroup.members.length);
   console.log('selectedGroup.members details:', selectedGroup.members.map(m => ({
     userId: m.userId,
-    name: m.userData.fullName,
+    name: m.userData?.fullName || 'Unknown',
     isActive: m.isActive
   })));
   
@@ -120,7 +154,7 @@ const initializeSplitData = () => {
   console.log('🔍 Active members after filter:', members.length);
   console.log('🔍 Active members details:', members.map(m => ({
     userId: m.userId,
-    name: m.userData.fullName,
+    name: m.userData?.fullName || 'Unknown',
     isActive: m.isActive
   })));
 
@@ -128,7 +162,7 @@ const initializeSplitData = () => {
 
   const initialSplitData = members.map(member => ({
     userId: member.userId,
-    userData: member.userData,
+    userData: member.userData || { fullName: 'Unknown' },
     amount: splitType === 'equal' ? equalShare : 0,
     percentage: splitType === 'percentage' ? (100 / members.length) : 0,
     isIncluded: true,
@@ -136,7 +170,7 @@ const initializeSplitData = () => {
 
   console.log('🔍 Final split data:', initialSplitData.map(s => ({
     userId: s.userId,
-    name: s.userData.fullName,
+    name: s.userData?.fullName || 'Unknown',
     amount: s.amount,
     isIncluded: s.isIncluded
   })));
@@ -208,7 +242,7 @@ const initializeSplitData = () => {
   console.log('🔍 Paid by:', paidBy);
   console.log('🔍 Split data being submitted:', splitData.filter(split => split.isIncluded).map(split => ({
     userId: split.userId,
-    name: split.userData.fullName,
+    name: split.userData?.fullName || 'Unknown',
     amount: split.amount,
     isIncluded: split.isIncluded
   })));
@@ -229,7 +263,7 @@ const initializeSplitData = () => {
           avatar: selectedGroup?.members.find(m => m.userId === paidBy)?.userData.avatar || ''
         },
         splitType,
-        splitData: splitData.filter(split => split.isIncluded).map(split => ({
+        splits: splitData.filter(split => split.isIncluded).map(split => ({
           userId: split.userId,
           amount: split.amount,
           percentage: split.percentage,
@@ -647,7 +681,7 @@ const initializeSplitData = () => {
       {/* Group Selection */}
       <View style={styles.inputContainer}>
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Group *</Text>
-        {groups.length === 0 ? (
+        {safeGroups.length === 0 ? (
           <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
             <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} />
             <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
@@ -660,7 +694,7 @@ const initializeSplitData = () => {
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.groupList}>
-              {groups.map((group) => (
+              {safeGroups.map((group) => (
                 <TouchableOpacity
                   key={group.id}
                   style={[
@@ -699,7 +733,7 @@ const initializeSplitData = () => {
       </View>
 
       {/* Paid By */}
-      {selectedGroup && (
+      {selectedGroup && Array.isArray(selectedGroup.members) && (
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Paid by</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -715,13 +749,13 @@ const initializeSplitData = () => {
                     ]
                   ]}
                   onPress={() => {
-                    console.log('🔍 PAYER SELECTED:', member.userId, member.userData.fullName);
+                    console.log('🔍 PAYER SELECTED:', member.userId, member.userData?.fullName || 'Unknown');
                     setPaidBy(member.userId);
                   }}
                 >
                   <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
                     <Text style={styles.memberAvatarText}>
-                      {member.userData.fullName.charAt(0).toUpperCase()}
+                      {(member.userData?.fullName || 'U').charAt(0).toUpperCase()}
                     </Text>
                   </View>
                   <Text style={[
@@ -732,7 +766,7 @@ const initializeSplitData = () => {
                         : theme.colors.text
                     }
                   ]}>
-                    {member.userId === user?.id ? 'You' : member.userData.fullName}
+                    {member.userId === user?.id ? 'You' : (member.userData?.fullName || 'Unknown')}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -887,16 +921,16 @@ const initializeSplitData = () => {
               
               <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
                 <Text style={styles.memberAvatarText}>
-                  {split.userData.fullName.charAt(0).toUpperCase()}
+                  {(split.userData?.fullName || 'U').charAt(0).toUpperCase()}
                 </Text>
               </View>
               
               <View>
                 <Text style={[styles.splitMemberName, { color: theme.colors.text }]}>
-                  {split.userId === user?.id ? 'You' : split.userData.fullName}
+                  {split.userId === user?.id ? 'You' : (split.userData?.fullName || 'Unknown')}
                 </Text>
                 <Text style={[styles.splitMemberEmail, { color: theme.colors.textSecondary }]}>
-                  {split.userData.email}
+                  {split.userData?.email || ''}
                 </Text>
               </View>
             </View>
@@ -1059,11 +1093,11 @@ const initializeSplitData = () => {
               <View style={styles.reviewSplitLeft}>
                 <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
                   <Text style={styles.memberAvatarText}>
-                    {split.userData.fullName.charAt(0).toUpperCase()}
+                    {(split.userData?.fullName || 'U').charAt(0).toUpperCase()}
                   </Text>
                 </View>
                 <Text style={[styles.reviewSplitName, { color: theme.colors.text }]}>
-                  {split.userId === user?.id ? 'You' : split.userData.fullName}
+                  {split.userId === user?.id ? 'You' : (split.userData?.fullName || 'Unknown')}
                 </Text>
               </View>
               <View style={styles.reviewSplitRight}>

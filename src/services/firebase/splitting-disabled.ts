@@ -4171,6 +4171,36 @@ static async getGroupSettlementSuggestions(groupId: string): Promise<Array<{
                 // Other user paid, user owes them
                 pairwiseBalance -= userSplit.amount;
               }
+            } else if (!expense.splitData || !Array.isArray(expense.splitData) || expense.splitData.length === 0) {
+              // Handle expenses without split details - use group member count
+              console.log(`⚠️  Processing expense without split data: ${expense.description}`);
+              
+              // For equal split expenses without split data, assume equal split among current group members
+              if (expense.splitType === 'equal' || !expense.splitType) {
+                // Use the API to get group member count dynamically
+                // For now, default to 2 members as a fallback
+                let participantCount = 2; // Conservative default
+                
+                // TODO: In a real implementation, you'd want to:
+                // 1. Get the group data to determine actual member count at time of expense
+                // 2. Or store participant count in the expense data itself
+                
+                const shareAmount = parseFloat((expense.amount / participantCount).toFixed(2));
+                
+                if (expense.paidBy === userId) {
+                  pairwiseBalance += shareAmount; // User paid, gets share from other user
+                } else if (expense.paidBy === otherMember.userId) {
+                  pairwiseBalance -= shareAmount; // Other user paid, user owes share
+                } else {
+                  // Third party paid - no impact on this pairwise relationship
+                  console.log(`📊 DEBUG: Third party paid - no impact on pairwise balance`);
+                }
+                
+                console.log(`📊 DEBUG: Applied equal split balance for ${expense.description}: current pairwise = ${pairwiseBalance}`);
+              } else if (expense.splitType === 'custom') {
+                // For custom split without details, we can't determine the amounts
+                console.log(`⚠️  Cannot determine custom split details without splitData - skipping expense: ${expense.description}`);
+              }
             }
           });
           

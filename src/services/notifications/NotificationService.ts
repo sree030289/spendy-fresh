@@ -4,8 +4,9 @@ import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { Reminder } from '@/types/reminder';
+import { CrossPlatformAlert } from '@/utils/alertUtils';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -121,7 +122,7 @@ export class NotificationService {
       }
 
       if (finalStatus !== 'granted') {
-        Alert.alert(
+        CrossPlatformAlert.alert(
           'Notification Permission Required',
           'To receive bill reminders, please enable notifications in your device settings.',
           [
@@ -406,7 +407,7 @@ export class NotificationService {
       const settings = await this.getNotificationSettings(userId);
       
       if (!settings.enabled || !settings.pushEnabled) {
-        Alert.alert('Notifications Disabled', 'Please enable notifications in your settings first.');
+        CrossPlatformAlert.alert('Notifications Disabled', 'Please enable notifications in your settings first.');
         return;
       }
 
@@ -416,10 +417,10 @@ export class NotificationService {
         { type: 'test' }
       );
 
-      Alert.alert('Test Sent', 'Test notification sent successfully!');
+      CrossPlatformAlert.alert('Test Sent', 'Test notification sent successfully!');
     } catch (error) {
       console.error('❌ Failed to send test notification:', error);
-      Alert.alert('Test Failed', 'Failed to send test notification. Please check your notification settings.');
+      CrossPlatformAlert.alert('Test Failed', 'Failed to send test notification. Please check your notification settings.');
     }
   }
 

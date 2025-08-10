@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
-import { RecurringExpense, SplittingService, Group } from '@/services/firebase/splitting';
+import { RecurringExpense, SplittingService, Group } from '@/services/firebase/splitting-disabled';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
 

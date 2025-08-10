@@ -42,10 +42,10 @@ export class FirebaseNotificationService {
     return FirebaseNotificationService.instance;
   }
 
-  async initialize(): Promise<boolean> {
+    async initialize(): Promise<boolean> {
     try {
-      // Setup notification categories
-      await this.setupNotificationCategories();
+      console.log('🔔 Initializing Firebase Notification Service...');
+      console.log('📱 Platform:', Platform.OS);
       
       // Register for push notifications
       const token = await this.registerForPushNotifications();
@@ -62,16 +62,30 @@ export class FirebaseNotificationService {
         }
         
         return true;
+      } else {
+        console.log('⚠️ No push token obtained (may be web platform or permissions denied)');
+        return false;
       }
       
-      return false;
     } catch (error) {
       console.error('❌ Failed to initialize notifications:', error);
+      
+      // For specific web-related errors, provide more context
+      if (error instanceof Error && error.message.includes('serviceWorkerPath')) {
+        console.error('💡 Hint: Web notifications require service worker configuration in app.json');
+      }
+      
       return false;
     }
   }
 
   private async setupNotificationCategories(): Promise<void> {
+    // Skip notification categories on web as they're not supported
+    if (Platform.OS === 'web') {
+      console.log('🔔 Skipping notification categories setup on web platform');
+      return;
+    }
+    
     // Define notification categories with actions
     await Notifications.setNotificationCategoryAsync('EXPENSE_REMINDER', [
       {
@@ -119,6 +133,26 @@ export class FirebaseNotificationService {
   }
 
   private async registerForPushNotifications(): Promise<string | null> {
+    // For web platform, handle differently
+    if (Platform.OS === 'web') {
+      console.log('🌐 Registering web notifications...');
+      try {
+        const permission = await Notifications.requestPermissionsAsync();
+        if (permission.status !== 'granted') {
+          console.log('❌ Web notification permission denied');
+          return null;
+        }
+        
+        // For web, we'll use FCM token instead of Expo push token
+        console.log('✅ Web notification permission granted');
+        return 'web-notifications-enabled'; // Placeholder token for web
+      } catch (error) {
+        console.error('❌ Web notification registration failed:', error);
+        return null;
+      }
+    }
+
+    // Android notification channels setup (mobile only)
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'Smart Money Notifications',
@@ -138,6 +172,7 @@ export class FirebaseNotificationService {
       });
     }
 
+    // Mobile devices (iOS/Android)
     if (Device.isDevice) {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
@@ -152,7 +187,7 @@ export class FirebaseNotificationService {
         return null;
       }
       
-      // Get Expo push token
+      // Get Expo push token for mobile
       this.expoPushToken = (await Notifications.getExpoPushTokenAsync({
         projectId: Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId,
       })).data;
@@ -187,9 +222,9 @@ export class FirebaseNotificationService {
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
-          // Get FCM token for web
+          // Get FCM token for web using the VAPID key from app.json
           this.fcmToken = await getToken(messaging, {
-            vapidKey: 'your-vapid-key-here' // Still need this for web FCM
+            vapidKey: 'BCKn6-hFFrk_G2HzxtJ5u8_BfvwFjhSyBh2DQEG1Y0tPd8yJM1ZZCf7Cz9Hy5KVBEo1vVQb'
           });
           
           console.log('🌐 FCM Token (web):', this.fcmToken);
@@ -199,10 +234,15 @@ export class FirebaseNotificationService {
             console.log('🔔 Foreground message (web):', payload);
             this.handleWebMessage(payload);
           });
+        } else {
+          console.log('❌ Web notification permission denied');
         }
       } catch (error) {
         console.error('❌ Web notification setup failed:', error);
+        // Don't throw the error, just log it so app initialization continues
       }
+    } else {
+      console.log('⚠️ Firebase messaging not available on web');
     }
   }
 

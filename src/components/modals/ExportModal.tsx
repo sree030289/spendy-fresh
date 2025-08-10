@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
-import { Group } from '@/services/firebase/splitting';
+import { Group } from '@/services/firebase/splitting-disabled';
 import { SubscriptionService } from '@/services/SubscriptionService';
 
 interface ExportModalProps {

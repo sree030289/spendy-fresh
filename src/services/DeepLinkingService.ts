@@ -1,5 +1,6 @@
-// services/DeepLinkingService.ts
-import { Linking, Platform, Alert } from 'react-native';
+// src/services/DeepLinkingService.ts
+import { Linking, Platform } from 'react-native';
+import { CrossPlatformAlert } from '@/utils/alertUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Deep linking configuration
@@ -196,7 +197,7 @@ export class DeepLinkingService {
 
     } catch (error) {
       console.error('Error sharing deal:', error);
-      Alert.alert('Share Failed', 'Unable to share this deal. Please try again.');
+      CrossPlatformAlert.alert('Share Failed', 'Unable to share this deal. Please try again.');
     }
   }
 
@@ -284,7 +285,7 @@ Download Spendy to never miss a deal!`;
       this.trackShareEvent('category', category, source);
     } catch (error) {
       console.error('Error sharing category:', error);
-      Alert.alert('Share Failed', 'Unable to share this category. Please try again.');
+      CrossPlatformAlert.alert('Share Failed', 'Unable to share this category. Please try again.');
     }
   }
 
@@ -324,7 +325,7 @@ Download Spendy to access deals from ${sourceName} and hundreds of other Austral
       this.trackShareEvent('source', source);
     } catch (error) {
       console.error('Error sharing source:', error);
-      Alert.alert('Share Failed', 'Unable to share this store. Please try again.');
+      CrossPlatformAlert.alert('Share Failed', 'Unable to share this store. Please try again.');
     }
   }
 
@@ -354,7 +355,7 @@ Download Spendy to search thousands of deals from Australian retailers!`;
       this.trackShareEvent('search', query);
     } catch (error) {
       console.error('Error sharing search:', error);
-      Alert.alert('Share Failed', 'Unable to share search results. Please try again.');
+      CrossPlatformAlert.alert('Share Failed', 'Unable to share search results. Please try again.');
     }
   }
 
@@ -362,7 +363,7 @@ Download Spendy to search thousands of deals from Australian retailers!`;
   static async openDealUrl(deal: any): Promise<void> {
     try {
       if (!deal.dealUrl) {
-        Alert.alert('No Link Available', 'This deal does not have a direct link.');
+        CrossPlatformAlert.alert('No Link Available', 'This deal does not have a direct link.');
         return;
       }
 
@@ -373,11 +374,11 @@ Download Spendy to search thousands of deals from Australian retailers!`;
         // Track deal click
         this.trackClickEvent(deal.id, deal.source, deal.dealUrl);
       } else {
-        Alert.alert('Cannot Open Link', 'Unable to open this deal link.');
+        CrossPlatformAlert.alert('Cannot Open Link', 'Unable to open this deal link.');
       }
     } catch (error) {
       console.error('Error opening deal URL:', error);
-      Alert.alert('Error', 'Failed to open deal link. Please try again.');
+      CrossPlatformAlert.alert('Error', 'Failed to open deal link. Please try again.');
     }
   }
 

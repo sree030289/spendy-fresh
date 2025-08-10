@@ -1,7 +1,8 @@
 // src/services/NotificationManager.ts
 import { PushNotificationService, PushNotificationData } from './notifications/PushNotificationService';
-import { SplittingService } from './firebase/splitting';
-import { Expense, Group, Friend } from './firebase/splitting';
+import { SplittingService } from './firebase/splitting-disabled';
+import { Expense, Group, Friend } from './firebase/splitting-disabled';
+import { ApiService } from './api/ApiService';
 
 /**
  * NotificationManager - Centralized manager for handling group activity notifications
@@ -15,12 +16,14 @@ import { Expense, Group, Friend } from './firebase/splitting';
 export class NotificationManager {
   private static instance: NotificationManager;
   private pushService: PushNotificationService;
+  private apiService: ApiService;
   private currentUserId: string | null = null;
   private notificationCache: Set<string> = new Set(); // Prevent duplicate notifications
   private cacheTimeout: number = 5000; // 5 seconds to prevent immediate duplicates
 
   private constructor() {
     this.pushService = PushNotificationService.getInstance();
+    this.apiService = ApiService.getInstance();
   }
 
   static getInstance(): NotificationManager {
@@ -117,7 +120,7 @@ export class NotificationManager {
           continue;
         }
 
-        await SplittingService.createNotification({
+        await this.apiService.createNotification({
           userId: member.userId,
           type: 'expense_added',
           title: 'New Expense Added',
@@ -208,7 +211,7 @@ export class NotificationManager {
       await PushNotificationService.sendNotificationToUser(invitedUserId, notification);
 
       // Create in-app notification record with validated data
-      await SplittingService.createNotification({
+      await this.apiService.createNotification({
         userId: invitedUserId,
         type: 'group_invite',
         title: 'Group Invitation',
@@ -256,9 +259,10 @@ export class NotificationManager {
       console.log('🔔 Sending payment settlement notifications');
 
       // Get user data
+      // TODO: Add getUserById to ApiService
       const [fromUserData, toUserData] = await Promise.all([
-        SplittingService.getUserById(fromUserId),
-        SplittingService.getUserById(toUserId)
+        Promise.resolve({ fullName: 'User', id: fromUserId, profilePicture: undefined }), // SplittingService.getUserById(fromUserId),
+        Promise.resolve({ fullName: 'User', id: toUserId, profilePicture: undefined })   // SplittingService.getUserById(toUserId)
       ]);
 
       if (!fromUserData || !toUserData) {
@@ -293,7 +297,7 @@ export class NotificationManager {
       await PushNotificationService.sendNotificationToUser(toUserId, notification);
 
       // Create in-app notification record
-      await SplittingService.createNotification({
+      await this.apiService.createNotification({
         userId: toUserId,
         type: 'expense_settled',
         title: 'Payment Received',

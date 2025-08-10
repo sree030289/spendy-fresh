@@ -15,7 +15,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { Friend, Group, Expense, SplittingService } from '@/services/firebase/splitting';
+import { Friend, Group, Expense } from '@/services/firebase/splitting-disabled';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
 import ExpenseDeletionModal from './ExpenseDeletionModal';
@@ -142,7 +142,8 @@ export default function EditExpenseModal({
               amount: 0,
               percentage: 0,
               isIncluded: false,
-              isPaid: false
+              isPaid: false,
+              paidAt: undefined
             });
           }
         });
@@ -301,7 +302,7 @@ export default function EditExpenseModal({
           avatar: selectedGroup?.members.find(m => m.userId === paidBy)?.userData.avatar || ''
         },
         splitType,
-        splitData: splitData.filter(split => split.isIncluded).map(split => ({
+        splits: splitData.filter(split => split.isIncluded).map(split => ({
           userId: split.userId,
           amount: split.amount,
           percentage: split.percentage,
@@ -704,7 +705,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
                 >
                   <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
                     <Text style={styles.memberAvatarText}>
-                      {member.userData.fullName.charAt(0).toUpperCase()}
+                      {(member.userData?.fullName || 'U').charAt(0).toUpperCase()}
                     </Text>
                   </View>
                   <Text style={[
@@ -715,7 +716,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
                         : theme.colors.text
                     }
                   ]}>
-                    {member.userId === user?.id ? 'You' : member.userData.fullName}
+                    {member.userId === user?.id ? 'You' : (member.userData?.fullName || 'Unknown')}
                   </Text>
                 </TouchableOpacity>
               ))}

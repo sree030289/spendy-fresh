@@ -1,11 +1,12 @@
 // src/services/notifications/RealNotificationService.ts
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Reminder } from '@/types/reminder';
+import { CrossPlatformAlert } from '@/utils/alertUtils';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -77,7 +78,7 @@ export class RealNotificationService {
       
       if (finalStatus !== 'granted') {
         console.log('❌ Notification permissions not granted');
-        Alert.alert(
+        CrossPlatformAlert.alert(
           'Notifications Disabled',
           'To receive bill reminders, please enable notifications in Settings.',
           [{ text: 'OK' }]
@@ -220,6 +221,12 @@ export class RealNotificationService {
   // Setup notification categories with actions
   private static async setupNotificationCategories(): Promise<void> {
     try {
+      // Skip notification categories on web as they're not supported
+      if (Platform.OS === 'web') {
+        console.log('🔔 Skipping notification categories setup on web platform');
+        return;
+      }
+      
       await Notifications.setNotificationCategoryAsync('bill_reminder', [
         {
           identifier: 'mark_paid',
@@ -526,7 +533,7 @@ export class RealNotificationService {
       });
     } catch (error) {
       console.error('Failed to mark as paid:', error);
-      Alert.alert('Error', 'Failed to mark bill as paid');
+      CrossPlatformAlert.alert('Error', 'Failed to mark bill as paid');
     }
   }
 
@@ -564,12 +571,12 @@ export class RealNotificationService {
       
       if (!currentUser) {
         console.error('No current user found');
-        Alert.alert('Error', 'Please log in to join the group.');
+        CrossPlatformAlert.alert('Error', 'Please log in to join the group.');
         return;
       }
       
       // Import and use SplittingService to join the group
-      const { SplittingService } = await import('@/services/firebase/splitting');
+      const { SplittingService } = await import('@/services/firebase/splitting-disabled');
       await SplittingService.joinGroupByInviteCode(inviteCode, currentUser.id);
       
       // Show success notification
@@ -592,7 +599,7 @@ export class RealNotificationService {
       
     } catch (error) {
       console.error('Failed to join group:', error);
-      Alert.alert('Error', 'Failed to join group. Please try again.');
+      CrossPlatformAlert.alert('Error', 'Failed to join group. Please try again.');
     }
   }
 
@@ -657,7 +664,7 @@ export class RealNotificationService {
       console.log('Accepting friend request:', friendRequestId);
       
       // Import and use SplittingService to accept the friend request
-      const { SplittingService } = await import('@/services/firebase/splitting');
+      const { SplittingService } = await import('@/services/firebase/splitting-disabled');
       await SplittingService.acceptFriendRequest(friendRequestId);
       
       // Show success notification
@@ -675,7 +682,7 @@ export class RealNotificationService {
       
     } catch (error) {
       console.error('Failed to accept friend request:', error);
-      Alert.alert('Error', 'Failed to accept friend request');
+      CrossPlatformAlert.alert('Error', 'Failed to accept friend request');
     }
   }
 
@@ -684,7 +691,7 @@ export class RealNotificationService {
       console.log('Declining friend request:', friendRequestId);
       
       // Import and use SplittingService to decline the friend request
-      const { SplittingService } = await import('@/services/firebase/splitting');
+      const { SplittingService } = await import('@/services/firebase/splitting-disabled');
       await SplittingService.declineFriendRequest(friendRequestId);
       
       // Show confirmation notification
@@ -699,7 +706,7 @@ export class RealNotificationService {
       
     } catch (error) {
       console.error('Failed to decline friend request:', error);
-      Alert.alert('Error', 'Failed to decline friend request');
+      CrossPlatformAlert.alert('Error', 'Failed to decline friend request');
     }
   }
 
@@ -939,7 +946,7 @@ export class RealNotificationService {
       const settings = await this.getNotificationSettings(userId);
       
       if (!settings.enabled || !settings.pushEnabled) {
-        Alert.alert('Notifications Disabled', 'Please enable notifications in your settings first.');
+        CrossPlatformAlert.alert('Notifications Disabled', 'Please enable notifications in your settings first.');
         return;
       }
 
@@ -949,10 +956,10 @@ export class RealNotificationService {
         { type: 'test' }
       );
 
-      Alert.alert('Test Sent', 'Test notification sent successfully!');
+      CrossPlatformAlert.alert('Test Sent', 'Test notification sent successfully!');
     } catch (error) {
       console.error('❌ Failed to send test notification:', error);
-      Alert.alert('Test Failed', 'Failed to send test notification. Please check your notification settings.');
+      CrossPlatformAlert.alert('Test Failed', 'Failed to send test notification. Please check your notification settings.');
     }
   }
 

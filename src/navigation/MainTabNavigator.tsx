@@ -9,7 +9,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { GRADIENTS } from '@/constants/theme';
-import { SplittingService, Group, Friend } from '@/services/firebase/splitting';
+import { Group, Friend } from '@/services/firebase/splitting-disabled';
+import { ApiService } from '@/services/api/ApiService';
 
 // Import modals
 import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
@@ -58,6 +59,7 @@ const TAB_ROUTES = [
 function SwipeableTabNavigator() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const apiService = ApiService.getInstance();
   const [showActionModal, setShowActionModal] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
@@ -76,14 +78,18 @@ function SwipeableTabNavigator() {
       
       try {
         const [userGroups, userFriends] = await Promise.all([
-          SplittingService.getUserGroups(user.id),
-          SplittingService.getFriends(user.id)
+          apiService.getUserGroups(),
+          apiService.getFriends()
         ]);
         
-        setGroups(userGroups);
-        setFriends(userFriends);
+        // Ensure we always set arrays
+        setGroups(Array.isArray(userGroups) ? userGroups : []);
+        setFriends(Array.isArray(userFriends) ? userFriends : []);
       } catch (error) {
         console.error('Error loading groups and friends in MainTabNavigator:', error);
+        // Set empty arrays to ensure components don't get undefined props
+        setGroups([]);
+        setFriends([]);
       }
     };
     
@@ -94,26 +100,40 @@ function SwipeableTabNavigator() {
     try {
       if (!user?.id) return;
       
-      const expenseId = await SplittingService.addExpense({
+      const response = await apiService.addExpense({
         ...expenseData,
         isSettled: false,
         date: new Date()
       });
       
-      console.log('✅ Expense added successfully from quick action:', expenseId);
+      console.log('✅ Expense added successfully from quick action:', response.id);
       
       // Refresh data
       const [userGroups, userFriends] = await Promise.all([
-        SplittingService.getUserGroups(user.id),
-        SplittingService.getFriends(user.id)
+        apiService.getUserGroups(),
+        apiService.getFriends()
       ]);
       
-      setGroups(userGroups);
-      setFriends(userFriends);
+      // Ensure we always set arrays
+      setGroups(Array.isArray(userGroups) ? userGroups : []);
+      setFriends(Array.isArray(userFriends) ? userFriends : []);
       setShowAddExpense(false);
       
     } catch (error) {
       console.error('❌ Error adding expense from quick action:', error);
+      // Ensure arrays are set even on error
+      try {
+        const [userGroups, userFriends] = await Promise.all([
+          apiService.getUserGroups(),
+          apiService.getFriends()
+        ]);
+        setGroups(Array.isArray(userGroups) ? userGroups : []);
+        setFriends(Array.isArray(userFriends) ? userFriends : []);
+      } catch (refreshError) {
+        console.error('❌ Error refreshing data after expense error:', refreshError);
+        setGroups([]);
+        setFriends([]);
+      }
       // Could show an alert here
     }
   };
@@ -125,8 +145,8 @@ function SwipeableTabNavigator() {
       case 'split-expense':
         // Refresh data before opening modal
         if (user?.id) {
-          SplittingService.getUserGroups(user.id).then(setGroups).catch(console.error);
-          SplittingService.getFriends(user.id).then(setFriends).catch(console.error);
+          apiService.getUserGroups().then(setGroups).catch(console.error);
+          apiService.getFriends().then(setFriends).catch(console.error);
         }
         setShowAddExpense(true);
         break;

@@ -16,7 +16,7 @@ import FullscreenModal from '@/components/common/FullscreenModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { InviteService } from '@/services/payments/PaymentService';
 import { User } from '@/types';
-import { Group } from '@/services/firebase/splitting';
+import { Group } from '@/services/firebase/splitting-disabled';
 import QRCodeScanner from '@/components/QRCodeScanner';
 import QRScannerManager, { QRScannerState } from '@/services/qr/QRScannerManager';
 

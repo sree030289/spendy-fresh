@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Share,
   TextInput,
@@ -18,16 +17,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import useBalances from '@/hooks/useBalances';
 import { Button } from '@/components/common/Button';
-import { Group, Expense, SplittingService, Friend } from '@/services/firebase/splitting';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/services/firebase/config';
+import { Group, Expense, Friend } from '@/services/firebase/splitting-disabled';
 import ExpenseRefreshService from '@/services/expenseRefreshService';
 import * as Contacts from 'expo-contacts';
+import { ApiService } from '@/services/api/ApiService';
 import QRCodeModal from './QRCodeModal';
 import EditExpenseModal from './EditExpenseModal';
 import ExpenseModal from './ExpenseModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { getCurrencySymbol } from '@/utils/currency';
+import { formatTimestamp } from '@/utils/timestamp';
+import { CrossPlatformAlert } from '@/utils/alertUtils';
+import { safeGetTime } from '@/utils/timestamp';
 import { User } from '@/types';
 import ExpenseSettlementModal from './ExpenseSettlementModal';
 import SimpleExpenseListModal from './SimpleExpenseListModal';
@@ -36,6 +37,20 @@ import { ExportService } from '@/services/ExportService';
 import ExportModal from './ExportModal';
 
 const { width, height } = Dimensions.get('window');
+
+// Expense categories for icon lookup
+const EXPENSE_CATEGORIES = [
+  { id: 'all', name: 'All Categories', icon: '📋', color: '#667eea' },
+  { id: 'food', name: 'Food', icon: '🍕', color: '#F59E0B' },
+  { id: 'transport', name: 'Transport', icon: '🚗', color: '#3B82F6' },
+  { id: 'entertainment', name: 'Entertainment', icon: '🎬', color: '#8B5CF6' },
+  { id: 'shopping', name: 'Shopping', icon: '🛍️', color: '#EC4899' },
+  { id: 'utilities', name: 'Utilities', icon: '⚡', color: '#F59E0B' },
+  { id: 'healthcare', name: 'Healthcare', icon: '🏥', color: '#EF4444' },
+  { id: 'travel', name: 'Travel', icon: '✈️', color: '#06B6D4' },
+  { id: 'settlement', name: 'Settlement', icon: '💸', color: '#10B981' },
+  { id: 'other', name: 'Other', icon: '📝', color: '#6B7280' },
+];
 
 interface GroupDetailsModalProps {
   visible: boolean;
@@ -64,6 +79,15 @@ export default function GroupDetailsModal({
 }: GroupDetailsModalProps) {
   const { theme } = useTheme();
   const { calculateGroupBalance } = useBalances();
+  
+  // Initialize API service
+  const apiService = ApiService.getInstance();
+  
+  // Helper function to get category icon
+  const getCategoryIcon = (categoryId: string) => {
+    return EXPENSE_CATEGORIES.find(cat => cat.id === categoryId)?.icon || '💰';
+  };
+  
   const [groupExpenses, setGroupExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'expenses' | 'members' | 'settings'>('expenses');
@@ -89,11 +113,20 @@ export default function GroupDetailsModal({
   const [localGroupData, setLocalGroupData] = useState<Group | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
+  // Calculate total expenses
+  const totalExpenses = groupExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+  const perPersonAmount = localGroupData && localGroupData.members && localGroupData.members.length > 0 ? totalExpenses / localGroupData.members.length : 0;
   const subscriptionHelper = SubscriptionHelper.getInstance();
 
   const isUserAdmin = localGroupData?.members?.find(member => 
     member.userId === currentUser?.id
   )?.role === 'admin';
+
+  const isGroupCreator = localGroupData?.createdBy === currentUser?.id;
+
+  // Check if user is the only active member left in the group
+  const activeMembers = localGroupData?.members?.filter(member => member.isActive !== false) || [];
+  const isOnlyMemberLeft = activeMembers.length === 1 && activeMembers[0]?.userId === currentUser?.id;
 
   const loadGroupExpenses = useCallback(async () => {
     if (!localGroupData) return;
@@ -101,9 +134,28 @@ export default function GroupDetailsModal({
     setLoading(true);
     try {
       console.log('Loading expenses for group:', localGroupData.id);
-      const expenses = await SplittingService.getGroupExpenses(localGroupData.id);
-      console.log('Loaded expenses:', expenses.length);
-      setGroupExpenses(expenses);
+      const expenses = await apiService.getGroupExpenses(localGroupData.id);
+      console.log('Loaded expenses:', expenses?.length || 0);
+      
+      // Process and validate expense data
+      const processedExpenses = Array.isArray(expenses) ? expenses.map(expense => ({
+        ...expense,
+        amount: typeof expense.amount === 'number' ? expense.amount : parseFloat(expense.amount) || 0,
+        date: expense.date || new Date().toISOString(),
+      })) : [];
+      
+      console.log('Processed expenses:', processedExpenses);
+      if (processedExpenses.length > 0) {
+        console.log('First expense sample:', {
+          id: processedExpenses[0].id,
+          description: processedExpenses[0].description,
+          amount: processedExpenses[0].amount,
+          date: processedExpenses[0].date,
+          paidBy: processedExpenses[0].paidBy,
+          paidByData: processedExpenses[0].paidByData
+        });
+      }
+      setGroupExpenses(processedExpenses);
     } catch (error) {
       console.error('Load group expenses error:', error);
       setGroupExpenses([]);
@@ -116,14 +168,47 @@ export default function GroupDetailsModal({
     if (!group?.id) return;
     
     try {
-      console.log('Loading fresh group data for:', group.id);
-      const freshGroupData = await SplittingService.getGroup(group.id);
+      console.log('🔄 Loading fresh group data for:', group.id);
+      
+      // Force a complete fresh API call by creating a new ApiService instance
+      const freshApiService = ApiService.getInstance();
+      const freshGroupData = await freshApiService.getGroup(group.id);
+      
       if (freshGroupData) {
-        setLocalGroupData(freshGroupData);
-        console.log('Updated local group data with', freshGroupData.members.length, 'members');
+        // Ensure members array exists and is valid
+        if (!freshGroupData.members || !Array.isArray(freshGroupData.members)) {
+          console.log('⚠️ API response missing members array, setting empty array');
+          freshGroupData.members = [];
+        }
+        
+        console.log('📥 Fresh data received:', {
+          id: freshGroupData.id,
+          name: freshGroupData.name,
+          memberCount: freshGroupData.members.length,
+          members: freshGroupData.members.map((m: any) => ({
+            userId: m.userId,
+            fullName: m.userData?.fullName,
+            isActive: m.isActive
+          }))
+        });
+        
+        // Force re-render by setting to null first, then the new data
+        setLocalGroupData(null);
+        
+        // Use setTimeout to ensure state update happens in next tick
+        setTimeout(() => {
+          setLocalGroupData(freshGroupData);
+          console.log('✅ Updated local group data with', freshGroupData.members.length, 'members');
+          
+          // Force recalculation of member balances
+          setMemberBalances(new Map());
+          
+          // Force component re-render with new key
+          setRenderKey(prev => prev + 1);
+        }, 50);
       }
     } catch (error) {
-      console.error('Load group data error:', error);
+      console.error('❌ Load group data error:', error);
       setLocalGroupData(group);
     }
   }, [group]);
@@ -139,27 +224,33 @@ export default function GroupDetailsModal({
     }
     
     console.log('🔄 Calculating member balances for group:', localGroupData.name);
-    console.log('👥 Group has', localGroupData.members.length, 'members');
+    console.log('👥 Group has', (localGroupData.members || []).length, 'members');
     
     const newBalances = new Map<string, number>();
     
-    for (const member of localGroupData.members) {
+    for (const member of (localGroupData.members || [])) {
       if (member.userId === currentUser.id) {
         // Current user's balance is always 0 from their own perspective
         newBalances.set(member.userId, 0);
-        console.log(`⏭️  Current user (${member.userData.fullName}): 0`);
+        console.log(`⏭️  Current user (${member.userData?.fullName || 'Unknown'}): 0`);
         continue;
       }
       
       try {
-        console.log(`🔍 Calculating balance with ${member.userData.fullName} (${member.userId})`);
+        console.log(`🔍 Calculating balance with ${member.userData?.fullName || 'Unknown'} (${member.userId})`);
         const balance = await calculateGroupBalance(currentUser.id, member.userId, localGroupData.id);
         newBalances.set(member.userId, balance);
-        console.log(`💰 Balance with ${member.userData.fullName}: ${balance}`);
+        console.log(`💰 Balance with ${member.userData?.fullName || 'Unknown'}: ${balance}`);
+        console.log(`🔍 Balance calculation details:`, {
+          currentUserId: currentUser.id,
+          targetUserId: member.userId,
+          groupId: localGroupData.id,
+          calculatedBalance: balance
+        });
       } catch (error) {
-        console.error(`❌ Error calculating balance with ${member.userData.fullName}:`, error);
+        console.error(`❌ Error calculating balance with ${member.userData?.fullName || 'Unknown'}:`, error);
         newBalances.set(member.userId, 0);
-        console.log(`⚠️  Defaulting balance with ${member.userData.fullName} to 0`);
+        console.log(`⚠️  Defaulting balance with ${member.userData?.fullName || 'Unknown'} to 0`);
       }
     }
     
@@ -168,21 +259,29 @@ export default function GroupDetailsModal({
     console.log('✅ Member balances calculated');
     console.log('🔍 Final calculated balances:');
     for (const [userId, balance] of newBalances.entries()) {
-      const member = localGroupData.members.find(m => m.userId === userId);
-      const name = member?.userData.fullName || userId;
+      const member = (localGroupData.members || []).find(m => m.userId === userId);
+      const name = member?.userData?.fullName || userId;
       console.log(`   ${name}: ${balance}`);
     }
     
-    // Force a re-render by updating a dummy state to ensure UI updates
-    setRenderKey(prev => prev + 1);
+    // Remove forced re-render to reduce unnecessary refreshing
   }, [localGroupData, currentUser?.id, calculateGroupBalance]);
 
   // Sync local group data with prop changes
   useEffect(() => {
-    console.log('📊 GroupDetailsModal: group prop changed:', group?.name, group?.id);
+    console.log('📊 GroupDetailsModal: group prop changed:', {
+      groupName: group?.name,
+      groupId: group?.id,
+      hasGroup: !!group,
+      groupKeys: group ? Object.keys(group) : []
+    });
     if (group) {
+      // Ensure the group has an id field
+      if (!group.id) {
+        console.error('❌ Group prop is missing id field:', group);
+      }
       setLocalGroupData(group);
-      console.log('✅ GroupDetailsModal: localGroupData set');
+      console.log('✅ GroupDetailsModal: localGroupData set with id:', group.id);
     }
   }, [group]);
 
@@ -197,20 +296,14 @@ export default function GroupDetailsModal({
       return undefined;
     }
     
+    // Only load data when modal becomes visible or group changes
     loadGroupExpenses();
-    calculateMemberBalances(); // Add balance calculation
+    calculateMemberBalances();
     
-    const refreshInterval = setInterval(() => {
-      if (visible && localGroupData) {
-        loadGroupExpenses();
-        calculateMemberBalances();
-      }
-    }, 5000);
+    // Remove automatic refresh interval to prevent constant refreshing
+    // Users can manually refresh using the refresh button if needed
     
-    return () => {
-      clearInterval(refreshInterval);
-    };
-  }, [visible, localGroupData?.id, loadGroupExpenses, calculateMemberBalances]);
+  }, [visible, localGroupData?.id]); // Removed function dependencies to prevent excessive re-renders
 
   useEffect(() => {
     if (!visible) {
@@ -228,7 +321,7 @@ export default function GroupDetailsModal({
     return () => {
       unsubscribe();
     };
-  }, [visible, localGroupData?.id, loadGroupExpenses]);
+  }, [visible, localGroupData?.id]); // Removed loadGroupExpenses dependency
 
   // Add timeout effect to prevent modal from getting stuck in loading state
   useEffect(() => {
@@ -267,7 +360,13 @@ export default function GroupDetailsModal({
   };
 
   const handleLeaveGroup = () => {
-    Alert.alert(
+    // If user is the only active member left, redirect to delete group
+    if (isOnlyMemberLeft) {
+      handleDeleteGroup();
+      return;
+    }
+
+    CrossPlatformAlert.alert(
       'Leave Group',
       `Are you sure you want to leave "${localGroupData?.name}"? You'll lose access to all group expenses and conversations.`,
       [
@@ -277,14 +376,115 @@ export default function GroupDetailsModal({
           style: 'destructive',
           onPress: async () => {
             try {
-              if (localGroupData && currentUser) {
-                await SplittingService.leaveGroup(localGroupData.id, currentUser.id);
-                Alert.alert('Left Group', `You have left "${localGroupData.name}"`);
+              if (localGroupData && localGroupData.id && currentUser && currentUser.id) {
+                console.log('🚪 Leaving group:', {
+                  groupId: localGroupData.id,
+                  groupName: localGroupData.name,
+                  userId: currentUser.id,
+                  userEmail: currentUser.email
+                });
+                await apiService.leaveGroup(localGroupData.id, currentUser.id);
+                CrossPlatformAlert.alert('Left Group', `You have left "${localGroupData.name}"`);
                 onGroupLeft?.();
                 onClose();
+              } else if (group && group.id && currentUser && currentUser.id) {
+                // Fallback to original group prop if localGroupData.id is missing
+                console.log('🚪 Leaving group (fallback to group prop):', {
+                  groupId: group.id,
+                  groupName: group.name,
+                  userId: currentUser.id,
+                  userEmail: currentUser.email
+                });
+                await apiService.leaveGroup(group.id, currentUser.id);
+                CrossPlatformAlert.alert('Left Group', `You have left "${group.name}"`);
+                onGroupLeft?.();
+                onClose();
+              } else {
+                console.error('❌ Cannot leave group - missing data:', {
+                  hasGroupData: !!localGroupData,
+                  groupId: localGroupData?.id,
+                  groupName: localGroupData?.name,
+                  groupKeys: localGroupData ? Object.keys(localGroupData) : [],
+                  hasOriginalGroup: !!group,
+                  originalGroupId: group?.id,
+                  originalGroupKeys: group ? Object.keys(group) : [],
+                  hasCurrentUser: !!currentUser,
+                  userId: currentUser?.id,
+                  fullGroupData: localGroupData
+                });
+                CrossPlatformAlert.alert('Error', 'Unable to leave group. Missing group or user information.');
               }
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to leave group');
+              console.error('❌ Leave group error:', error);
+              CrossPlatformAlert.alert('Error', error.message || 'Failed to leave group');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteGroup = () => {
+    const groupName = localGroupData?.name || group?.name || 'this group';
+    const alertTitle = isOnlyMemberLeft ? 'Delete Group' : 'Delete Group';
+    const alertMessage = isOnlyMemberLeft 
+      ? `You are the only member left in "${groupName}". The group will be permanently deleted. This action cannot be undone.`
+      : `Are you sure you want to permanently delete "${groupName}"? This action cannot be undone and will remove all expenses and data for all members.`;
+
+    CrossPlatformAlert.alert(
+      alertTitle,
+      alertMessage,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const groupToDelete = localGroupData || group;
+              if (groupToDelete && groupToDelete.id && currentUser && currentUser.id) {
+                console.log('🗑️ Deleting group:', {
+                  groupId: groupToDelete.id,
+                  groupName: groupToDelete.name,
+                  userId: currentUser.id,
+                  userEmail: currentUser.email,
+                  isOnlyMemberLeft,
+                  activeMembers: activeMembers.length
+                });
+                
+                try {
+                  await apiService.deleteGroup(groupToDelete.id);
+                  CrossPlatformAlert.alert('Group Deleted', `"${groupToDelete.name}" has been permanently deleted.`);
+                } catch (deleteError: any) {
+                  console.error('❌ Delete group API error:', deleteError);
+                  
+                  // Handle specific error cases
+                  if (deleteError.message?.includes('404') || deleteError.message?.includes('not found')) {
+                    // Group might already be deleted - treat as success
+                    console.log('ℹ️ Group already deleted or not found, treating as success');
+                    CrossPlatformAlert.alert('Group Removed', `"${groupToDelete.name}" has been removed.`);
+                  } else {
+                    // For other errors, re-throw to be handled by outer catch
+                    throw deleteError;
+                  }
+                }
+                
+                onGroupLeft?.();
+                onClose();
+              } else {
+                console.error('❌ Cannot delete group - missing data:', {
+                  hasGroupData: !!localGroupData,
+                  groupId: localGroupData?.id,
+                  hasOriginalGroup: !!group,
+                  originalGroupId: group?.id,
+                  hasCurrentUser: !!currentUser,
+                  userId: currentUser?.id
+                });
+                CrossPlatformAlert.alert('Error', 'Unable to delete group. Missing group or user information.');
+              }
+            } catch (error: any) {
+              console.error('❌ Delete group error:', error);
+              CrossPlatformAlert.alert('Error', error.message || 'Failed to delete group');
             }
           }
         }
@@ -305,7 +505,7 @@ export default function GroupDetailsModal({
       setShowExportModal(true);
     } catch (error) {
       console.error('Export group error:', error);
-      Alert.alert('Error', 'Failed to access export feature');
+      CrossPlatformAlert.alert('Error', 'Failed to access export feature');
     }
   };
 
@@ -314,12 +514,12 @@ export default function GroupDetailsModal({
       if (!localGroupData) return;
       
       await ExportService.exportGroupData(localGroupData, format);
-      Alert.alert('Export Complete! 📄', `Group data exported as ${format.toUpperCase()} file`);
+      CrossPlatformAlert.alert('Export Complete! 📄', `Group data exported as ${format.toUpperCase()} file`);
       setShowExportModal(false);
       
     } catch (error: any) {
       console.error('Export error:', error);
-      Alert.alert('Export Failed', error.message || 'Failed to export group data');
+      CrossPlatformAlert.alert('Export Failed', error.message || 'Failed to export group data');
     }
   };
 
@@ -327,35 +527,35 @@ export default function GroupDetailsModal({
     if (!localGroupData || !currentUser || !isUserAdmin) return;
     
     try {
-      await SplittingService.updateMemberRole(localGroupData.id, userId, 'admin');
-      Alert.alert('Success', 'Member has been made an admin');
+      await apiService.updateMemberRole(localGroupData.id, userId, 'admin');
+      CrossPlatformAlert.alert('Success', 'Member has been made an admin');
       await loadGroupData();
       onRefresh?.();
       await loadGroupExpenses();
     } catch (error: any) {
       console.error('Make admin error:', error);
-      Alert.alert('Error', error.message || 'Failed to make member admin');
+      CrossPlatformAlert.alert('Error', error.message || 'Failed to make member admin');
     }
   };
 
   const handleRemoveAdmin = async (userId: string) => {
     if (!localGroupData || !currentUser || !isUserAdmin) return;
     
-    const member = localGroupData.members.find(m => m.userId === userId);
+    const member = (localGroupData.members || []).find(m => m.userId === userId);
     if (!member) return;
     
     if (member.balance !== 0) {
-      Alert.alert(
+      CrossPlatformAlert.alert(
         'Cannot Remove Admin',
-        `${member.userData.fullName} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(localGroupData.currency)}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
+        `${member.userData?.fullName || 'This member'} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(localGroupData?.currency || 'USD')}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
         [{ text: 'OK' }]
       );
       return;
     }
     
-    Alert.alert(
+    CrossPlatformAlert.alert(
       'Remove Admin Privileges',
-      `Remove admin privileges from ${member.userData.fullName}?`,
+      `Remove admin privileges from ${member.userData?.fullName || 'this member'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -363,14 +563,14 @@ export default function GroupDetailsModal({
           style: 'destructive',
           onPress: async () => {
             try {
-              await SplittingService.updateMemberRole(localGroupData.id, userId, 'member');
-              Alert.alert('Success', 'Admin privileges removed');
+              await apiService.updateMemberRole(localGroupData.id, userId, 'member');
+              CrossPlatformAlert.alert('Success', 'Admin privileges removed');
               await loadGroupData();
               onRefresh?.();
               await loadGroupExpenses();
             } catch (error: any) {
               console.error('Remove admin error:', error);
-              Alert.alert('Error', error.message || 'Failed to remove admin privileges');
+              CrossPlatformAlert.alert('Error', error.message || 'Failed to remove admin privileges');
             }
           }
         }
@@ -379,38 +579,77 @@ export default function GroupDetailsModal({
   };
 
   const handleRemoveMember = async (userId: string) => {
-    if (!localGroupData || !currentUser || !isUserAdmin) return;
+    console.log('🔄 handleRemoveMember called with userId:', userId);
+    console.log('🔍 Debug info:', {
+      hasGroupData: !!localGroupData,
+      hasCurrentUser: !!currentUser,
+      isUserAdmin,
+      currentUserId: currentUser?.id
+    });
     
-    const member = localGroupData.members.find(m => m.userId === userId);
-    if (!member) return;
+    if (!localGroupData || !currentUser || !isUserAdmin) {
+      console.log('❌ Early return due to missing data or not admin');
+      return;
+    }
     
+    const member = (localGroupData.members || []).find(m => m.userId === userId);
+    console.log('👤 Found member:', member);
+    if (!member) {
+      console.log('❌ Member not found');
+      return;
+    }
+    
+    console.log('💰 Member balance:', member.balance);
     if (member.balance !== 0) {
-      Alert.alert(
+      console.log('❌ Cannot remove member - has pending balance:', member.balance);
+      CrossPlatformAlert.alert(
         'Cannot Remove Member',
-        `${member.userData.fullName} has pending balances. Please settle all expenses before removing them from the group.`,
+        `${member.userData?.fullName || 'This member'} has pending balances. Please settle all expenses before removing them from the group.`,
         [{ text: 'OK' }]
       );
       return;
     }
     
-    Alert.alert(
+    console.log('✅ Member balance is 0 - showing confirmation dialog');
+    CrossPlatformAlert.alert(
       'Remove Member',
-      `Are you sure you want to remove ${member.userData.fullName} from the group?`,
+      `Are you sure you want to remove ${member.userData?.fullName || 'this member'} from the group?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => console.log('🚫 User cancelled member removal')
+        },
         {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
             try {
-              await SplittingService.removeMemberFromGroup(localGroupData.id, userId);
-              Alert.alert('Success', 'Member has been removed from the group');
-              await loadGroupData();
-              onRefresh?.();
-              await loadGroupExpenses();
+              console.log('�️ Starting member removal for userId:', userId, 'from group:', localGroupData.id);
+              console.log('🔄 Clearing local state and forcing refresh...');
+              
+              // Clear state immediately 
+              setLocalGroupData(null);
+              setRenderKey(prev => prev + 1);
+              
+              // Create new API service instance to bypass any caching
+              const freshApiService = new ApiService();
+              await freshApiService.removeMemberFromGroup(localGroupData.id, userId);
+              console.log('� API Response - Member removed successfully');
+              
+              // Force complete refresh with timeout
+              setTimeout(async () => {
+                console.log('🎯 Force refreshing with fresh data...');
+                await loadGroupData();
+                onRefresh?.();
+                setRenderKey(prev => prev + 1);
+                console.log('✅ Group refresh completed with renderKey:', renderKey + 1);
+              }, 500);
+              
+              CrossPlatformAlert.alert('Success', 'Member has been removed from the group');
             } catch (error: any) {
-              console.error('Remove member error:', error);
-              Alert.alert('Error', error.message || 'Failed to remove member');
+              console.error('❌ Remove member error:', error);
+              CrossPlatformAlert.alert('Error', error.message || 'Failed to remove member');
             }
           }
         }
@@ -422,8 +661,8 @@ export default function GroupDetailsModal({
     if (!localGroupData || !currentUser) return;
     
     try {
-      await SplittingService.addGroupMember(localGroupData.id, friendId);
-      Alert.alert('Success', 'Friend has been added to the group');
+      await apiService.addGroupMember(localGroupData.id, friendId, 'member');
+      CrossPlatformAlert.alert('Success', 'Friend has been added to the group');
       setShowAddMember(false);
       await loadGroupData();
       onRefresh?.();
@@ -434,16 +673,16 @@ export default function GroupDetailsModal({
       
     } catch (error: any) {
       console.error('Add friend to group error:', error);
-      Alert.alert('Error', error.message || 'Failed to add friend to group');
+      CrossPlatformAlert.alert('Error', error.message || 'Failed to add friend to group');
     }
   };
 
   const handleAddPendingFriendToGroup = async (friend: Friend) => {
     if (!localGroupData || !currentUser) return;
     
-    Alert.alert(
+    CrossPlatformAlert.alert(
       'Add Pending Friend',
-      `${friend.friendData.fullName} hasn't accepted your friend request yet. They will be added to the group once they accept the friend request.`,
+      `${friend.friendData?.fullName || friend.friendData?.email || 'This friend'} hasn't accepted your friend request yet. They will be added to the group once they accept the friend request.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -451,8 +690,8 @@ export default function GroupDetailsModal({
           onPress: async () => {
             try {
               // Add them to the group even though they're pending
-              await SplittingService.addGroupMember(localGroupData.id, friend.friendId);
-              Alert.alert('Success', `${friend.friendData.fullName} has been added to the group. They'll see it once they accept your friend request.`);
+              await apiService.addGroupMember(localGroupData.id, friend.friendId, 'member');
+              CrossPlatformAlert.alert('Success', `${friend.friendData?.fullName || friend.friendData?.email || 'Friend'} has been added to the group. They'll see it once they accept your friend request.`);
               setShowAddMember(false);
               await loadGroupData();
               onRefresh?.();
@@ -463,7 +702,7 @@ export default function GroupDetailsModal({
               
             } catch (error: any) {
               console.error('Add pending friend to group error:', error);
-              Alert.alert('Error', error.message || 'Failed to add friend to group');
+              CrossPlatformAlert.alert('Error', error.message || 'Failed to add friend to group');
             }
           }
         }
@@ -488,7 +727,9 @@ export default function GroupDetailsModal({
 
   const renderExpenseCard = (expense: Expense, index: number) => {
     const hasUpdated = expense.updatedAt && expense.createdAt;
-    const timeDiff = hasUpdated ? Math.abs(expense.updatedAt.getTime() - expense.createdAt.getTime()) : 0;
+    const updatedTime = safeGetTime(expense.updatedAt);
+    const createdTime = safeGetTime(expense.createdAt);
+    const timeDiff = hasUpdated && updatedTime && createdTime ? Math.abs(updatedTime - createdTime) : 0;
     const isEdited = hasUpdated && timeDiff > 1000;
 
     return (
@@ -500,7 +741,7 @@ export default function GroupDetailsModal({
       >
         <View style={styles.expenseRow}>
           <View style={[styles.expenseIcon, { backgroundColor: theme.colors.background }]}>
-            <Text style={styles.expenseIconText}>{expense.categoryIcon}</Text>
+            <Text style={styles.expenseIconText}>{getCategoryIcon(expense.category)}</Text>
           </View>
           <View style={styles.expenseDetails}>
             <Text style={[styles.expenseTitle, { color: theme.colors.text }]}>
@@ -508,7 +749,17 @@ export default function GroupDetailsModal({
             </Text>
             <View style={styles.expenseMeta}>
               <Text style={[styles.expenseMetaText, { color: theme.colors.textSecondary }]}>
-                {expense.date.toLocaleDateString()} • {expense.paidByData?.fullName || 'Unknown'}
+                {formatTimestamp(expense.date, 'Unknown Date')} • {(() => {
+                  // Try to get user name from expense.paidByData first, then from group members
+                  if (expense.paidByData?.fullName) {
+                    return expense.paidByData.fullName;
+                  }
+                  if (expense.paidBy && localGroupData?.members) {
+                    const member = (localGroupData.members || []).find(m => m.userId === expense.paidBy);
+                    if (member?.userData?.fullName) return member.userData.fullName;
+                  }
+                  return 'Unknown User';
+                })()}
               </Text>
               {isEdited && (
                 <View style={[styles.editedBadge, { backgroundColor: '#FEF3C7' }]}>
@@ -519,7 +770,9 @@ export default function GroupDetailsModal({
             </View>
           </View>
           <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-            {getCurrencySymbol(localGroupData?.currency || 'USD')}{expense.amount.toFixed(2)}
+            {getCurrencySymbol(localGroupData?.currency || 'USD')}{
+              isNaN(expense.amount) ? '0.00' : (expense.amount || 0).toFixed(2)
+            }
           </Text>
         </View>
       </TouchableOpacity>
@@ -527,9 +780,24 @@ export default function GroupDetailsModal({
   };
 
   const renderMemberCard = (member: any, index: number) => {
+    // Safety check for member object
+    if (!member || !member.userId) {
+      console.warn('⚠️ renderMemberCard: Invalid member data:', member);
+      return null;
+    }
+    
     // Get calculated balance from our state instead of member.balance
     const calculatedBalance = memberBalances.get(member.userId) || 0;
-    console.log(`🎨 Rendering member card for ${member.userData.fullName}: balance = ${calculatedBalance}`);
+    console.log(`🎨 Rendering member card for ${member.userData?.fullName || 'Unknown'}: balance = ${calculatedBalance}`);
+    console.log('👤 Member data structure:', {
+      userId: member.userId,
+      userData: member.userData,
+      role: member.role,
+      isActive: member.isActive
+    });
+    
+    // For current user, always show settled
+    const isCurrentUser = member.userId === currentUser?.id;
     
     return (
       <TouchableOpacity
@@ -541,12 +809,16 @@ export default function GroupDetailsModal({
         <View style={styles.memberRow}>
           <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
             <Text style={styles.memberAvatarText}>
-              {member.userData.fullName.charAt(0).toUpperCase()}
+              {(() => {
+                const name = member.userData?.fullName || member.userData?.email || 'U';
+                console.log('🔤 Member avatar name:', name, 'for member:', member.userId);
+                return name.charAt(0).toUpperCase();
+              })()}
             </Text>
           </View>
           <View style={styles.memberInfo}>
             <Text style={[styles.memberName, { color: theme.colors.text }]}>
-              {member.userId === currentUser?.id ? 'You' : member.userData.fullName}
+              {isCurrentUser ? 'You' : (member.userData?.fullName || 'Unknown')}
             </Text>
             <View style={styles.memberRole}>
               <Text style={[styles.memberRoleText, { color: theme.colors.textSecondary }]}>
@@ -555,31 +827,44 @@ export default function GroupDetailsModal({
             </View>
           </View>
           <View style={styles.memberBalance}>
-            {Math.abs(calculatedBalance) < 0.01 ? (
+            {isCurrentUser ? (
+              // Current user always shows settled since we calculate from their perspective
               <>
                 <Text style={[styles.balanceAmount, { color: theme.colors.textSecondary }]}>
-                  $0.00
+                  {getCurrencySymbol(localGroupData?.currency || 'USD')}0.00
+                </Text>
+                <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
+                  Settled
+                </Text>
+              </>
+            ) : Math.abs(calculatedBalance) < 0.01 ? (
+              // Other members with no balance
+              <>
+                <Text style={[styles.balanceAmount, { color: theme.colors.textSecondary }]}>
+                  {getCurrencySymbol(localGroupData?.currency || 'USD')}0.00
                 </Text>
                 <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
                   Settled
                 </Text>
               </>
             ) : calculatedBalance > 0 ? (
+              // Positive balance: this member owes the current user
               <>
                 <Text style={[styles.balanceAmount, styles.balancePositive]}>
                   +{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
                 </Text>
                 <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
-                  Owed to you
+                  Owes you
                 </Text>
               </>
             ) : (
+              // Negative balance: current user owes this member
               <>
                 <Text style={[styles.balanceAmount, styles.balanceNegative]}>
-                  -{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
+                  {getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
                 </Text>
                 <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
-                  Owes
+                  You owe
                 </Text>
               </>
             )}
@@ -658,7 +943,7 @@ export default function GroupDetailsModal({
           
           <View style={styles.groupHeader}>
             <View style={styles.groupAvatar}>
-              <Text style={styles.groupAvatarText}>{localGroupData.avatar}</Text>
+              <Text style={styles.groupAvatarText}>{localGroupData.avatar || '🏢'}</Text>
             </View>
             <Text style={styles.groupName}>{localGroupData.name}</Text>
             {localGroupData.description && (
@@ -668,27 +953,27 @@ export default function GroupDetailsModal({
             <View style={styles.groupBadges}>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
-                  📅 {localGroupData.createdAt.toLocaleDateString()}
+                  📅 {formatTimestamp(localGroupData.createdAt, 'Recently')}
                 </Text>
               </View>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>💰 {localGroupData.currency}</Text>
               </View>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>👥 {localGroupData.members.length} members</Text>
+                <Text style={styles.badgeText}>👥 {(localGroupData.members || []).length} members</Text>
               </View>
             </View>
             
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
-                  {getCurrencySymbol(localGroupData.currency)}{localGroupData.totalExpenses.toFixed(2)}
+                  {getCurrencySymbol(localGroupData?.currency || 'USD')}{isNaN(totalExpenses) ? '0.00' : totalExpenses.toFixed(2)}
                 </Text>
                 <Text style={styles.statLabel}>Total Spent</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
-                  {getCurrencySymbol(localGroupData.currency)}{(localGroupData.totalExpenses / localGroupData.members.length).toFixed(2)}
+                  {getCurrencySymbol(localGroupData?.currency || 'USD')}{isNaN(perPersonAmount) ? '0.00' : perPersonAmount.toFixed(2)}
                 </Text>
                 <Text style={styles.statLabel}>Per Person</Text>
               </View>
@@ -767,7 +1052,7 @@ export default function GroupDetailsModal({
                       Loading expenses...
                     </Text>
                   </View>
-                ) : groupExpenses.length === 0 ? (
+                ) : (Array.isArray(groupExpenses) ? groupExpenses : []).length === 0 ? (
                   <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
                     <Text style={styles.emptyIcon}>📋</Text>
                     <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
@@ -778,7 +1063,7 @@ export default function GroupDetailsModal({
                     </Text>
                   </View>
                 ) : (
-                  groupExpenses.slice(0, 10).map((expense, index) => renderExpenseCard(expense, index))
+                  (Array.isArray(groupExpenses) ? groupExpenses : []).slice(0, 10).map((expense, index) => renderExpenseCard(expense, index))
                 )}
               </View>
             )}
@@ -799,7 +1084,46 @@ export default function GroupDetailsModal({
                   )}
                 </View>
                 
-                {localGroupData.members.map((member, index) => renderMemberCard(member, index))}
+                {(() => {
+                  console.log('🎨 Rendering members tab with data:', {
+                    groupId: localGroupData?.id,
+                    groupName: localGroupData?.name,
+                    memberCount: localGroupData?.members?.length || 0,
+                    members: localGroupData?.members?.map(m => ({
+                      userId: m.userId,
+                      fullName: m.userData?.fullName,
+                      isActive: m.isActive
+                    })) || [],
+                    renderKey: renderKey
+                  });
+                  
+                  // Additional debugging
+                  const membersArray = localGroupData?.members && Array.isArray(localGroupData.members) ? localGroupData.members : [];
+                  console.log('🔍 Members array processing:', {
+                    hasLocalGroupData: !!localGroupData,
+                    hasMembersProperty: !!localGroupData?.members,
+                    isArray: Array.isArray(localGroupData?.members),
+                    arrayLength: membersArray.length,
+                    rawMembersData: localGroupData?.members
+                  });
+                  
+                  return null;
+                })()}
+                
+                {(localGroupData?.members && Array.isArray(localGroupData.members) ? localGroupData.members : []).map((member, index) => {
+                  console.log(`🔄 Processing member ${index}:`, {
+                    member,
+                    hasUserId: !!member?.userId,
+                    userData: member?.userData
+                  });
+                  
+                  // Safety check for member data
+                  if (!member || !member.userId) {
+                    console.warn('⚠️ Invalid member data at index:', index, member);
+                    return null;
+                  }
+                  return renderMemberCard(member, index);
+                })}
               </View>
             )}
             
@@ -820,7 +1144,7 @@ export default function GroupDetailsModal({
                   <View style={styles.buttonGroup}>
                     <TouchableOpacity
                       style={[styles.secondaryBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
-                      onPress={() => Alert.alert('Copied!', 'Invite code copied to clipboard')}
+                      onPress={() => CrossPlatformAlert.alert('Copied!', 'Invite code copied to clipboard')}
                     >
                       <Ionicons name="copy" size={16} color={theme.colors.textSecondary} />
                       <Text style={[styles.secondaryBtnText, { color: theme.colors.textSecondary }]}>
@@ -864,15 +1188,27 @@ export default function GroupDetailsModal({
                 </View>
                 
                 <View style={styles.dangerSection}>
-                  <TouchableOpacity
-                    style={[styles.dangerBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
-                    onPress={handleLeaveGroup}
-                  >
-                    <Ionicons name="exit" size={20} color="#DC2626" />
-                    <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>
-                      Leave Group
-                    </Text>
-                  </TouchableOpacity>
+                  {isOnlyMemberLeft || isGroupCreator ? (
+                    <TouchableOpacity
+                      style={[styles.dangerBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+                      onPress={handleDeleteGroup}
+                    >
+                      <Ionicons name="trash" size={20} color="#DC2626" />
+                      <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>
+                        Delete Group
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.dangerBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+                      onPress={handleLeaveGroup}
+                    >
+                      <Ionicons name="exit" size={20} color="#DC2626" />
+                      <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>
+                        Leave Group
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             )}
@@ -889,7 +1225,7 @@ export default function GroupDetailsModal({
             </Text>
             
             {(() => {
-              const member = localGroupData?.members.find(m => m.userId === selectedMemberForAction);
+              const member = (localGroupData?.members || []).find(m => m.userId === selectedMemberForAction);
               return member ? (
                 <>
                   <TouchableOpacity
@@ -998,15 +1334,19 @@ export default function GroupDetailsModal({
                       <View style={styles.friendRow}>
                         <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
                           <Text style={styles.memberAvatarText}>
-                            {friend.friendData.fullName.charAt(0).toUpperCase()}
+                            {(() => {
+                              const name = friend.friendData?.fullName || friend.friendData?.email || 'U';
+                              console.log('🔤 Friend avatar name:', name, 'for friend:', friend.friendId);
+                              return name.charAt(0).toUpperCase();
+                            })()}
                           </Text>
                         </View>
                         <View style={styles.memberInfo}>
                           <Text style={[styles.memberName, { color: theme.colors.text }]}>
-                            {friend.friendData.fullName}
+                            {friend.friendData?.fullName || friend.friendData?.email || 'Unknown Friend'}
                           </Text>
                           <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                            {friend.friendData.email}
+                            {friend.friendData?.email || 'No email'}
                           </Text>
                         </View>
                         <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
@@ -1045,15 +1385,19 @@ export default function GroupDetailsModal({
                       <View style={styles.friendRow}>
                         <View style={[styles.memberAvatar, { backgroundColor: theme.colors.warning }]}>
                           <Text style={styles.memberAvatarText}>
-                            {friend.friendData.fullName.charAt(0).toUpperCase()}
+                            {(() => {
+                              const name = friend.friendData?.fullName || friend.friendData?.email || 'U';
+                              console.log('🔤 Pending friend avatar name:', name, 'for friend:', friend.friendId);
+                              return name.charAt(0).toUpperCase();
+                            })()}
                           </Text>
                         </View>
                         <View style={styles.memberInfo}>
                           <Text style={[styles.memberName, { color: theme.colors.text }]}>
-                            {friend.friendData.fullName}
+                            {friend.friendData?.fullName || friend.friendData?.email || 'Unknown Friend'}
                           </Text>
                           <Text style={[styles.friendEmail, { color: theme.colors.textSecondary }]}>
-                            {friend.friendData.email}
+                            {friend.friendData?.email || 'No email'}
                           </Text>
                           <View style={styles.statusIndicator}>
                             <Ionicons name="time" size={12} color={theme.colors.warning} />

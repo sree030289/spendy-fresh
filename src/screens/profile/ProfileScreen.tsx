@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -138,22 +139,33 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            await logout();
-            setLoading(false);
-          }
-        },
-      ]
-    );
+    if (Platform.OS === 'web') {
+      // For web, use a simple confirm dialog
+      const confirmed = window.confirm('Are you sure you want to logout?');
+      if (confirmed) {
+        setLoading(true);
+        await logout();
+        setLoading(false);
+      }
+    } else {
+      // For mobile, use the native Alert
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Logout', 
+            style: 'destructive',
+            onPress: async () => {
+              setLoading(true);
+              await logout();
+              setLoading(false);
+            }
+          },
+        ]
+      );
+    }
   };
 
   const handleChangePassword = () => {

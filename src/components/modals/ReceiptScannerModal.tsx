@@ -1382,7 +1382,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.3)',
-    pointerEvents: 'none', // Allow touch events to pass through to camera
   },
   guideline: {
     width: screenWidth * 0.8,
@@ -1390,6 +1389,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: 12,
     borderStyle: 'dashed',
+    pointerEvents: 'none', // Allow touch events to pass through to camera
   },
   guidelineText: {
     marginTop: 16,

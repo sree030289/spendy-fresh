@@ -2,9 +2,11 @@
 import React from 'react';
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView } from 'expo-camera';
-import { Linking, Alert, Share } from 'react-native';
-import { SplittingService } from '../firebase/splitting';
+import { Linking, Share } from 'react-native';
+import { SplittingService } from '@/services/firebase/splitting-disabled';
 import { InviteService } from '../payments/PaymentService';
+import { ApiService } from '@/services/api/ApiService';
+import { CrossPlatformAlert } from '@/utils/alertUtils';
 
 export interface QRData {
   type: 'friend_invite' | 'group_invite' | 'expense_share' | 'payment_request';
@@ -211,7 +213,7 @@ static decodeQRData(qrString: string): QRData {
     } catch (error) {
       console.error('Handle QR error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Invalid QR code';
-      Alert.alert('QR Code Error', errorMessage);
+      CrossPlatformAlert.alert('QR Code Error', errorMessage);
     }
   }
 
@@ -251,7 +253,7 @@ static decodeQRData(qrString: string): QRData {
   } catch (error) {
     console.error('Handle QR error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Invalid QR code';
-    Alert.alert('QR Code Error', errorMessage);
+    CrossPlatformAlert.alert('QR Code Error', errorMessage);
     throw error; // Re-throw so caller can handle
   }
 }
@@ -263,19 +265,20 @@ static decodeQRData(qrString: string): QRData {
     }
     
     if (qrData.userId === currentUserId) {
-      Alert.alert('Oops!', 'You cannot add yourself as a friend');
+      CrossPlatformAlert.alert('Oops!', 'You cannot add yourself as a friend');
       return;
     }
 
     // Import services needed
-    const { SplittingService } = await import('../firebase/splitting');
+    const { SplittingService } = await import('@/services/firebase/splitting-disabled');
+    const apiService = ApiService.getInstance();
     
     // Check if user exists and get current status
     let userExists = false;
     let connectionStatus = null;
     
     try {
-      connectionStatus = await SplittingService.checkFriendshipStatus(currentUserId, qrData.userData.email);
+      connectionStatus = await apiService.checkExistingFriendship(currentUserId, qrData.userData.email);
       userExists = true;
     } catch (error: any) {
       // User might not exist or connection might not be established
@@ -290,16 +293,16 @@ static decodeQRData(qrString: string): QRData {
     if (userExists && connectionStatus) {
       switch (connectionStatus) {
         case 'accepted':
-          Alert.alert('Already Friends', `You are already friends with ${qrData.userData.fullName}.`);
+          CrossPlatformAlert.alert('Already Friends', `You are already friends with ${qrData.userData.fullName}.`);
           return;
         case 'request_sent':
-          Alert.alert('Request Pending', `You have already sent a friend request to ${qrData.userData.fullName}. Please wait for them to respond.`);
+          CrossPlatformAlert.alert('Request Pending', `You have already sent a friend request to ${qrData.userData.fullName}. Please wait for them to respond.`);
           return;
         case 'request_received':
-          Alert.alert('Request Received', `${qrData.userData.fullName} has already sent you a friend request. Check your notifications to accept it.`);
+          CrossPlatformAlert.alert('Request Received', `${qrData.userData.fullName} has already sent you a friend request. Check your notifications to accept it.`);
           return;
         case 'pending':
-          Alert.alert('Request Pending', `A friend request with ${qrData.userData.fullName} is already pending.`);
+          CrossPlatformAlert.alert('Request Pending', `A friend request with ${qrData.userData.fullName} is already pending.`);
           return;
       }
     }
@@ -309,7 +312,7 @@ static decodeQRData(qrString: string): QRData {
       buttonText = 'Send Invite';
     }
     
-    Alert.alert(
+    CrossPlatformAlert.alert(
       dialogTitle,
       dialogMessage,
       [
@@ -321,19 +324,19 @@ static decodeQRData(qrString: string): QRData {
           text: buttonText,
           onPress: async () => {
             try {
-              const result = await SplittingService.sendFriendRequest(
+              const result = await apiService.sendFriendRequest(
                 currentUserId,
                 qrData.userData!.email,
                 'Added via QR code scan'
               );
               
               if (result.isNewUser) {
-                Alert.alert('Invitation Saved!', result.message || `We've saved your invitation for ${qrData.userData!.fullName}. They'll get a friend request automatically when they join Spendy!`);
+                CrossPlatformAlert.alert('Invitation Saved!', result.message || `We've saved your invitation for ${qrData.userData!.fullName}. They'll get a friend request automatically when they join Spendy!`);
               } else {
-                Alert.alert('Success!', result.message || `Friend request sent to ${qrData.userData!.fullName}! They'll receive a notification about your request.`);
+                CrossPlatformAlert.alert('Success!', result.message || `Friend request sent to ${qrData.userData!.fullName}! They'll receive a notification about your request.`);
               }
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to send friend request');
+              CrossPlatformAlert.alert('Error', error.message || 'Failed to send friend request');
             }
           }
         }
@@ -347,8 +350,10 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
     throw new Error('Invalid group invite QR code');
   }
   
+  const apiService = ApiService.getInstance();
+  
   return new Promise((resolve) => {
-    Alert.alert(
+    CrossPlatformAlert.alert(
       'Group Invitation',
       `Join "${qrData.groupData!.name}" group with ${qrData.groupData!.memberCount} members?`,
       [
@@ -361,14 +366,14 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
           text: 'Join Group',
           onPress: async () => {
             try {
-              const groupId = await SplittingService.joinGroupByInviteCode(
+              const groupId = await apiService.joinGroupByInviteCode(
                 qrData.inviteCode!,
                 currentUserId
               );
-              Alert.alert('Success', `You've joined "${qrData.groupData!.name}"!`);
+              CrossPlatformAlert.alert('Success', `You've joined "${qrData.groupData!.name}"!`);
               resolve(groupId);
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to join group');
+              CrossPlatformAlert.alert('Error', error.message || 'Failed to join group');
               resolve(null);
             }
           }
@@ -384,7 +389,7 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
       throw new Error('Invalid expense share QR code');
     }
     
-    Alert.alert(
+    CrossPlatformAlert.alert(
       'Expense Details',
       'View expense details?',
       [
@@ -409,7 +414,7 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
       throw new Error('Invalid payment request QR code');
     }
     
-    Alert.alert(
+    CrossPlatformAlert.alert(
       'Payment Request',
       'Process payment request?',
       [
@@ -469,7 +474,7 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
       await Share.share(shareOptions);
     } catch (error) {
       console.error('Share QR error:', error);
-      Alert.alert('Error', 'Failed to share QR code');
+      CrossPlatformAlert.alert('Error', 'Failed to share QR code');
     }
   }
   
@@ -500,7 +505,7 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
       await InviteService.sendSMSInvite(phoneNumber, message);
     } catch (error) {
       console.error('Share SMS error:', error);
-      Alert.alert('Error', 'Failed to send SMS');
+      CrossPlatformAlert.alert('Error', 'Failed to send SMS');
     }
   }
   
@@ -531,7 +536,7 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
       await InviteService.sendWhatsAppInvite(phoneNumber, message);
     } catch (error) {
       console.error('Share WhatsApp error:', error);
-      Alert.alert('Error', 'Failed to send WhatsApp message');
+      CrossPlatformAlert.alert('Error', 'Failed to send WhatsApp message');
     }
   }
   
