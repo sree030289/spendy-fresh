@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
@@ -106,7 +106,7 @@ export default function ExportModal({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.title, { color: theme.colors.text }]}>
             Export Group Data
@@ -118,7 +118,7 @@ export default function ExportModal({
           {/* Group Info */}
           <View style={[styles.groupInfo, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.groupIcon, { backgroundColor: theme.colors.primary }]}>
-              <Ionicons name="people" size={24} color="white" />
+              <Icon name="people" size={24} color="white"  />
             </View>
             <View style={styles.groupDetails}>
               <Text style={[styles.groupName, { color: theme.colors.text }]}>
@@ -129,7 +129,7 @@ export default function ExportModal({
               </Text>
             </View>
             <View style={[styles.premiumBadge, { backgroundColor: '#FFD700' }]}>
-              <Ionicons name="star" size={16} color="#FFF" />
+              <Icon name="star" size={16} color="#FFF"  />
               <Text style={styles.premiumText}>Premium</Text>
             </View>
           </View>
@@ -155,7 +155,7 @@ export default function ExportModal({
                 disabled={isExporting}
               >
                 <View style={[styles.optionIcon, { backgroundColor: option.color }]}>
-                  <Ionicons name={option.icon as any} size={24} color="white" />
+                  <Icon name={option.icon as any} size={24} color="white" />
                 </View>
                 <View style={styles.optionContent}>
                   <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
@@ -166,7 +166,7 @@ export default function ExportModal({
                   </Text>
                 </View>
                 {selectedFormat === option.format && (
-                  <Ionicons name="checkmark-circle" size={24} color={option.color} />
+                  <Icon name="success" size={24} color={option.color}  />
                 )}
               </TouchableOpacity>
             ))}
@@ -187,7 +187,7 @@ export default function ExportModal({
                 selectedFormat === 'pdf' ? 'Charts and visualizations' : 'Data ready for analysis'
               ].map((item, index) => (
                 <View key={index} style={styles.infoItem}>
-                  <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                  <Icon name="success" size={16} color={theme.colors.success}  />
                   <Text style={[styles.infoText, { color: theme.colors.text }]}>
                     {item}
                   </Text>

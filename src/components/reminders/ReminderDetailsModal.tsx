@@ -12,7 +12,7 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -279,7 +279,7 @@ export default function ReminderDetailsModal({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.headerButton}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
@@ -287,7 +287,7 @@ export default function ReminderDetailsModal({
           </Text>
           
           <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
-            <Ionicons name="share-outline" size={24} color={theme.colors.text} />
+            <Icon name="share" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
         </View>
 
@@ -297,7 +297,7 @@ export default function ReminderDetailsModal({
             <View style={styles.mainCardHeader}>
               <View style={styles.titleSection}>
                 <View style={[styles.categoryIcon, { backgroundColor: categoryColor }]}>
-                  <Ionicons name={categoryIcon as any} size={24} color="white" />
+                  <Icon name={categoryIcon as any} size={24} color="white" />
                 </View>
                 <View style={styles.titleText}>
                   <Text style={[styles.title, { color: theme.colors.text }]}>
@@ -331,7 +331,7 @@ export default function ReminderDetailsModal({
           {/* Due Date Card */}
           <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
             <View style={styles.infoHeader}>
-              <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
+              <Icon name="calendar" size={20} color={theme.colors.primary}  />
               <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
                 Due Date
               </Text>
@@ -361,7 +361,7 @@ export default function ReminderDetailsModal({
           {reminder.isRecurring && (
             <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
               <View style={styles.infoHeader}>
-                <Ionicons name="repeat-outline" size={20} color={theme.colors.primary} />
+                <Icon name="repeat-outline" size={20} color={theme.colors.primary} />
                 <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
                   Recurring
                 </Text>
@@ -383,7 +383,7 @@ export default function ReminderDetailsModal({
           {reminder.autoDetected && reminder.emailSource && (
             <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
               <View style={styles.infoHeader}>
-                <Ionicons name="mail-outline" size={20} color={theme.colors.primary} />
+                <Icon name="mail" size={20} color={theme.colors.primary}  />
                 <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
                   Auto-detected
                 </Text>
@@ -441,11 +441,11 @@ export default function ReminderDetailsModal({
           {/* More Options */}
           <View style={[styles.moreOptionsCard, { backgroundColor: theme.colors.surface }]}>
             <TouchableOpacity style={styles.moreOption} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+              <Icon name="trash" size={20} color={theme.colors.error}  />
               <Text style={[styles.moreOptionText, { color: theme.colors.error }]}>
                 Delete Reminder
               </Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+              <Icon name="forward" size={16} color={theme.colors.textSecondary}  />
             </TouchableOpacity>
           </View>
         </ScrollView>

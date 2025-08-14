@@ -14,7 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -242,7 +242,7 @@ export default function EditReminderModal({
       <SafeAreaView style={[styles.pickerContainer, { backgroundColor: theme.colors.background }]}>
         <View style={styles.pickerHeader}>
           <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>
             Select Category
@@ -261,13 +261,13 @@ export default function EditReminderModal({
               }}
             >
               <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
-                <Ionicons name={category.icon as any} size={20} color="white" />
+                <Icon name={category.icon as any} size={20} color="white" />
               </View>
               <Text style={[styles.pickerOptionText, { color: theme.colors.text }]}>
                 {category.label}
               </Text>
               {formData.category === category.id && (
-                <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
+                <Icon name="checkmark" size={20} color={theme.colors.primary}  />
               )}
             </TouchableOpacity>
           ))}
@@ -286,7 +286,7 @@ export default function EditReminderModal({
       <SafeAreaView style={[styles.pickerContainer, { backgroundColor: theme.colors.background }]}>
         <View style={styles.pickerHeader}>
           <TouchableOpacity onPress={() => setShowRecurringPicker(false)}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>
             Recurring Frequency
@@ -304,7 +304,7 @@ export default function EditReminderModal({
                 setShowRecurringPicker(false);
               }}
             >
-              <Ionicons 
+              <Icon 
                 name="repeat-outline" 
                 size={20} 
                 color={theme.colors.textSecondary} 
@@ -314,7 +314,7 @@ export default function EditReminderModal({
                 {option.label}
               </Text>
               {formData.recurringType === option.id && (
-                <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
+                <Icon name="checkmark" size={20} color={theme.colors.primary}  />
               )}
             </TouchableOpacity>
           ))}
@@ -333,7 +333,7 @@ export default function EditReminderModal({
       <SafeAreaView style={[styles.pickerContainer, { backgroundColor: theme.colors.background }]}>
         <View style={styles.pickerHeader}>
           <TouchableOpacity onPress={() => setShowReminderDaysPicker(false)}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>
             Reminder Schedule
@@ -366,7 +366,7 @@ export default function EditReminderModal({
                 }
               ]}>
                 {formData.reminderDays.includes(option.value) && (
-                  <Ionicons name="checkmark" size={16} color="white" />
+                  <Icon name="checkmark" size={16} color="white"  />
                 )}
               </View>
             </TouchableOpacity>
@@ -416,7 +416,7 @@ export default function EditReminderModal({
           {/* Changes Indicator */}
           {hasChanges && (
             <View style={[styles.changesIndicator, { backgroundColor: theme.colors.primary }]}>
-              <Ionicons name="pencil" size={16} color="white" />
+              <Icon name="pencil" size={16} color="white" />
               <Text style={styles.changesText}>You have unsaved changes</Text>
             </View>
           )}
@@ -532,12 +532,12 @@ export default function EditReminderModal({
                 onPress={() => setShowCategoryPicker(true)}
               >
                 <View style={[styles.categoryIcon, { backgroundColor: selectedCategory.color }]}>
-                  <Ionicons name={selectedCategory.icon as any} size={16} color="white" />
+                  <Icon name={selectedCategory.icon as any} size={16} color="white" />
                 </View>
                 <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                   {selectedCategory.label}
                 </Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
               </TouchableOpacity>
             </View>
 
@@ -556,16 +556,15 @@ export default function EditReminderModal({
                 ]}
                 onPress={() => setShowDatePicker(true)}
               >
-                <Ionicons 
-                  name="calendar-outline" 
+                <Icon name="calendar" 
                   size={20} 
                   color={theme.colors.textSecondary} 
                   style={{ marginRight: 12 }}
-                />
+                 />
                 <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                   {formatDate(formData.dueDate)}
                 </Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
               </TouchableOpacity>
               {errors.dueDate ? (
                 <Text style={[styles.errorText, { color: theme.colors.error }]}>
@@ -605,7 +604,7 @@ export default function EditReminderModal({
                   ]}
                   onPress={() => setShowRecurringPicker(true)}
                 >
-                  <Ionicons 
+                  <Icon 
                     name="repeat-outline" 
                     size={20} 
                     color={theme.colors.textSecondary} 
@@ -614,7 +613,7 @@ export default function EditReminderModal({
                   <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                     {RECURRING_OPTIONS.find(opt => opt.id === formData.recurringType)?.label || 'Monthly'}
                   </Text>
-                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                  <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
                 </TouchableOpacity>
               )}
             </View>
@@ -650,19 +649,18 @@ export default function EditReminderModal({
                   ]}
                   onPress={() => setShowReminderDaysPicker(true)}
                 >
-                  <Ionicons 
-                    name="notifications-outline" 
+                  <Icon name="notifications" 
                     size={20} 
                     color={theme.colors.textSecondary} 
                     style={{ marginRight: 12 }}
-                  />
+                   />
                   <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                     {formData.reminderDays.length > 0 
                       ? `Remind ${formData.reminderDays.length} time${formData.reminderDays.length === 1 ? '' : 's'}`
                       : 'Set reminder schedule'
                     }
                   </Text>
-                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                  <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
                 </TouchableOpacity>
               )}
             </View>
@@ -695,7 +693,7 @@ export default function EditReminderModal({
             {/* Auto-detected Info */}
             {reminder.autoDetected && (
               <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
-                <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+                <Icon name="information" size={20} color={theme.colors.primary}  />
                 <View style={styles.infoTextContainer}>
                   <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
                     Auto-detected Bill
@@ -715,7 +713,7 @@ export default function EditReminderModal({
               </Text>
               <View style={styles.previewContent}>
                 <View style={styles.previewRow}>
-                  <Ionicons name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
+                  <Icon name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
                   <Text style={[styles.previewText, { color: theme.colors.text }]}>
                     {formData.title || 'Reminder Title'}
                   </Text>

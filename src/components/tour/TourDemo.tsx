@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useTour } from '@/components/tour/TourProvider';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 
 export default function TourDemo() {
   const { theme } = useTheme();
@@ -27,7 +27,7 @@ export default function TourDemo() {
         style={[styles.button, { backgroundColor: theme.colors.primary }]}
         onPress={handleStartTour}
       >
-        <Ionicons name="play-circle" size={24} color="white" />
+        <Icon name="play-circle" size={24} color="white" />
         <Text style={styles.buttonText}>Start App Tour</Text>
       </TouchableOpacity>
 

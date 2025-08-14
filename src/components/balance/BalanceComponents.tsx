@@ -2,7 +2,7 @@
 
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { BalanceDetail } from '@/services/BalanceManager';
 import { getCurrencySymbol } from '@/utils/currency';
@@ -169,7 +169,7 @@ export const BalanceItem: React.FC<BalanceItemProps> = ({
           
           {showSource && detail.source === 'group' && detail.groupName && (
             <View style={styles.sourceIndicator}>
-              <Ionicons name="people" size={12} color={theme.colors.primary} />
+              <Icon name="people" size={12} color={theme.colors.primary}  />
               <Text style={[styles.sourceText, { color: theme.colors.primary }]} numberOfLines={1}>
                 {detail.groupName}
               </Text>
@@ -180,14 +180,14 @@ export const BalanceItem: React.FC<BalanceItemProps> = ({
 
       <View style={styles.balanceItemRight}>
         <View style={styles.balanceDisplay}>
-          <Ionicons name={balanceDisplay.icon} size={16} color={balanceDisplay.color} />
+          <Icon name={balanceDisplay.icon} size={16} color={balanceDisplay.color} />
           <Text style={[styles.balanceText, { color: balanceDisplay.color }]} numberOfLines={1}>
             {balanceDisplay.text}
           </Text>
         </View>
         
         {onPress && (
-          <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+          <Icon name="forward" size={16} color={theme.colors.textSecondary}  />
         )}
       </View>
     </TouchableOpacity>
@@ -219,7 +219,7 @@ export const BalanceSummary: React.FC<BalanceSummaryProps> = ({
   if (Math.abs(netBalance) < 0.01) {
     return (
       <View style={[styles.balanceSummary, isHorizontal ? styles.horizontal : styles.vertical]}>
-        <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+        <Icon name="success" size={16} color={theme.colors.success}  />
         <Text style={[styles.summaryText, { color: theme.colors.success }]}>
           Settled up
         </Text>
@@ -231,14 +231,14 @@ export const BalanceSummary: React.FC<BalanceSummaryProps> = ({
     <View style={[styles.balanceSummary, isHorizontal ? styles.horizontal : styles.vertical]}>
       {netBalance > 0 ? (
         <>
-          <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
+          <Icon name="arrow-up-circle" size={16} color={theme.colors.success} />
           <Text style={[styles.summaryText, { color: theme.colors.success }]}>
             +{currencySymbol}{Math.abs(netBalance).toFixed(2)}
           </Text>
         </>
       ) : (
         <>
-          <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
+          <Icon name="arrow-down-circle" size={16} color={theme.colors.error} />
           <Text style={[styles.summaryText, { color: theme.colors.error }]}>
             -{currencySymbol}{Math.abs(netBalance).toFixed(2)}
           </Text>
@@ -268,7 +268,7 @@ export const EmptyBalanceState: React.FC<EmptyBalanceStateProps> = ({
 
   return (
     <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-      <Ionicons name="wallet-outline" size={64} color={theme.colors.textSecondary} />
+      <Icon name="wallet" size={64} color={theme.colors.textSecondary}  />
       <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{title}</Text>
       <Text style={[styles.emptyMessage, { color: theme.colors.textSecondary }]}>{message}</Text>
       
@@ -410,11 +410,10 @@ export const BalanceRefreshButton: React.FC<BalanceRefreshButtonProps> = ({
       onPress={onRefresh}
       disabled={isRefreshing}
     >
-      <Ionicons 
-        name="refresh" 
+      <Icon name="refresh" 
         size={size === 'large' ? 24 : 16} 
         color={isRefreshing ? theme.colors.textSecondary : theme.colors.primary} 
-      />
+       />
       {size === 'large' && (
         <Text style={[styles.refreshButtonText, { color: theme.colors.primary }]}>
           {isRefreshing ? 'Refreshing...' : 'Refresh Balances'}

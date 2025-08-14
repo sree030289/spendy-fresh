@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 
 interface SplittingAnimationProps {
   totalAmount: number;
@@ -100,7 +100,7 @@ export default function SplittingAnimation({ totalAmount, numPeople, color }: Sp
           },
         ]}
       >
-        <Ionicons name="arrow-down" size={24} color={color} />
+        <Icon name="arrowDown" size={24} color={color}  />
       </Animated.View>
 
       {/* Split Amounts */}
@@ -130,7 +130,7 @@ export default function SplittingAnimation({ totalAmount, numPeople, color }: Sp
             ]}
           >
             <View style={[styles.personIcon, { backgroundColor: color }]}>
-              <Ionicons name="person" size={16} color="white" />
+              <Icon name="person" size={16} color="white"  />
             </View>
             <Text style={[styles.splitAmount, { color }]}>
               ${splitAmount.toFixed(2)}

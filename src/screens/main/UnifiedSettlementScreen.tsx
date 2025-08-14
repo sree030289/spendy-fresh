@@ -10,11 +10,12 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { CrossPlatformAlert } from '@/utils/alertUtils';
 import { useAuth } from '@/hooks/useAuth';
-import { useBalances } from '@/hooks/useBalances';
+import { useBalances, UnifiedSettlementService } from '@/hooks/useBalances';
+import { useSharedBalances } from '@/hooks/useSharedBalances';
 import { getCurrencySymbol } from '@/utils/currency';
 import { ApiService } from '@/services/api/ApiService';
 
@@ -58,6 +59,7 @@ export default function UnifiedSettlementScreen({
   const { theme } = useTheme();
   const { user } = useAuth();
   const { calculateSettlementBalances } = useBalances();
+  const sharedBalances = useSharedBalances();
 
   // Debug props
   console.log('🔧 UnifiedSettlementScreen props:', { mode, groupId, groupName });
@@ -257,6 +259,12 @@ export default function UnifiedSettlementScreen({
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    
+    // Clear cache and force refresh balances when manually refreshing
+    console.log('🧹 Manual refresh: Clearing balance cache...');
+    UnifiedSettlementService.clearBalanceCache();
+    await sharedBalances.forceRefresh();
+    
     await loadInitialData();
     setRefreshing(false);
   };
@@ -310,6 +318,14 @@ export default function UnifiedSettlementScreen({
                 
                 console.log('✅ Settlement payment recorded successfully');
                 
+                // CRITICAL: Clear balance cache and force refresh to reflect settlement
+                console.log('🧹 Clearing balance cache after settlement...');
+                UnifiedSettlementService.clearBalanceCache();
+                
+                // Force refresh shared balances to update all UI components
+                console.log('🔄 Force refreshing shared balances...');
+                await sharedBalances.forceRefresh();
+                
                 CrossPlatformAlert.alert(
                   'Payment Recorded',
                   `Successfully recorded ${suggestion.fromUserName}'s payment of ${getCurrencySymbol('USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}.`,
@@ -357,7 +373,7 @@ export default function UnifiedSettlementScreen({
       
       {groups.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
+          <Icon name="people" size={64} color={theme.colors.textSecondary}  />
           <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
             No Groups Found
           </Text>
@@ -389,14 +405,14 @@ export default function UnifiedSettlementScreen({
               </View>
             </View>
             
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
           </TouchableOpacity>
         ))
       )}
       
       {/* Info Card */}
       <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
-        <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+        <Icon name="information" size={20} color={theme.colors.primary}  />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
           Select a group to view optimized settlement suggestions. Each group's settlements are calculated independently.
         </Text>
@@ -421,7 +437,7 @@ export default function UnifiedSettlementScreen({
       {settlementSuggestions.length === 0 ? (
         <View style={[styles.allSettledContainer, { backgroundColor: theme.colors.surface }]}>
           <View style={[styles.settledIcon, { backgroundColor: `${theme.colors.success}15` }]}>
-            <Ionicons name="checkmark-circle" size={48} color={theme.colors.success} />
+            <Icon name="success" size={48} color={theme.colors.success}  />
           </View>
           <Text style={[styles.allSettledTitle, { color: theme.colors.text }]}>
             All Settled! 🎉
@@ -457,7 +473,7 @@ export default function UnifiedSettlementScreen({
                   </Text>
                 </View>
                 
-                <Ionicons name="arrow-forward" size={20} color={theme.colors.textSecondary} />
+                <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
                 
                 <View style={styles.payeeContainer}>
                   <View style={styles.userInfo}>
@@ -488,7 +504,7 @@ export default function UnifiedSettlementScreen({
                 {recordingPayment ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Ionicons name="checkmark-circle" size={16} color="white" />
+                  <Icon name="success" size={16} color="white"  />
                 )}
                 <Text style={styles.markPaidText}>
                   {recordingPayment ? 'Recording...' : 'Mark as Paid'}
@@ -499,7 +515,7 @@ export default function UnifiedSettlementScreen({
           
           {/* Settlement Info */}
           <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
-            <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+            <Icon name="information" size={20} color={theme.colors.primary}  />
             <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
               This is the optimized settlement plan for {selectedGroupName}. 
               Complete these payments to settle all balances in this group.
@@ -532,7 +548,7 @@ export default function UnifiedSettlementScreen({
             onPress={selectedGroupId && mode === 'group-selector' ? handleBackToGroupSelection : onClose} 
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            <Icon name="back" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
         )}
         
@@ -541,7 +557,7 @@ export default function UnifiedSettlementScreen({
         </Text>
         
         <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-          <Ionicons name="refresh" size={24} color={theme.colors.primary} />
+          <Icon name="refresh" size={24} color={theme.colors.primary}  />
         </TouchableOpacity>
       </View>
 

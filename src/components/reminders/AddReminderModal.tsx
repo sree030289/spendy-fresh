@@ -14,7 +14,7 @@ import {
   Modal,
   SafeAreaView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -168,7 +168,7 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
       <SafeAreaView style={[styles.pickerContainer, { backgroundColor: theme.colors.background }]}>
         <View style={styles.pickerHeader}>
           <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>
             Select Category
@@ -187,13 +187,13 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
               }}
             >
               <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
-                <Ionicons name={category.icon as any} size={20} color="white" />
+                <Icon name={category.icon as any} size={20} color="white" />
               </View>
               <Text style={[styles.pickerOptionText, { color: theme.colors.text }]}>
                 {category.label}
               </Text>
               {formData.category === category.id && (
-                <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
+                <Icon name="checkmark" size={20} color={theme.colors.primary}  />
               )}
             </TouchableOpacity>
           ))}
@@ -212,7 +212,7 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
       <SafeAreaView style={[styles.pickerContainer, { backgroundColor: theme.colors.background }]}>
         <View style={styles.pickerHeader}>
           <TouchableOpacity onPress={() => setShowRecurringPicker(false)}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>
             Recurring Frequency
@@ -239,7 +239,7 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
                 </Text>
               </View>
               {formData.recurringType === option.id && (
-                <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
+                <Icon name="checkmark" size={20} color={theme.colors.primary}  />
               )}
             </TouchableOpacity>
           ))}
@@ -382,12 +382,12 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
                   onPress={() => setShowCategoryPicker(true)}
                 >
                   <View style={[styles.categoryIcon, { backgroundColor: selectedCategory.color }]}>
-                    <Ionicons name={selectedCategory.icon as any} size={16} color="white" />
+                    <Icon name={selectedCategory.icon as any} size={16} color="white" />
                   </View>
                   <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                     {selectedCategory.label}
                   </Text>
-                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                  <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
                 </TouchableOpacity>
               </View>
 
@@ -406,16 +406,15 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
                   ]}
                   onPress={() => setShowDatePicker(true)}
                 >
-                  <Ionicons 
-                    name="calendar-outline" 
+                  <Icon name="calendar" 
                     size={20} 
                     color={theme.colors.textSecondary} 
                     style={{ marginRight: 12 }}
-                  />
+                   />
                   <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                     {formatDate(formData.dueDate)}
                   </Text>
-                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                  <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
                 </TouchableOpacity>
                 {errors.dueDate ? (
                   <Text style={[styles.errorText, { color: theme.colors.error }]}>
@@ -455,8 +454,8 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
                     ]}
                     onPress={() => setShowRecurringPicker(true)}
                   >
-                    <Ionicons 
-                      name="repeat-outline" 
+                    <Icon 
+                      name="refresh" 
                       size={20} 
                       color={theme.colors.textSecondary} 
                       style={{ marginRight: 12 }}
@@ -464,7 +463,7 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
                     <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                       {RECURRING_OPTIONS.find(opt => opt.id === formData.recurringType)?.label || 'Monthly'}
                     </Text>
-                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                    <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
                   </TouchableOpacity>
                 )}
               </View>
@@ -476,7 +475,7 @@ export default function AddReminderModal({ visible, onClose, onReminderAdded }: 
                 </Text>
                 <View style={styles.previewContent}>
                   <View style={styles.previewRow}>
-                    <Ionicons name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
+                    <Icon name={selectedCategory.icon as any} size={20} color={selectedCategory.color} />
                     <Text style={[styles.previewText, { color: theme.colors.text }]}>
                       {formData.title || 'Reminder Title'}
                     </Text>

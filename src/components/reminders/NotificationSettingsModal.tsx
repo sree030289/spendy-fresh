@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -162,7 +162,7 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
       disabled && { opacity: 0.5 }
     ]}>
       <View style={styles.settingLeft}>
-        <Ionicons name={icon as any} size={20} color={theme.colors.primary} />
+        <Icon name={icon as any} size={20} color={theme.colors.primary} />
         <View style={styles.settingText}>
           <Text style={[styles.settingTitle, { color: theme.colors.text }]}>
             {title}
@@ -320,7 +320,7 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
                   }
                 ]}>
                   {settings.reminderDays.includes(option.value) && (
-                    <Ionicons name="checkmark" size={16} color="white" />
+                    <Icon name="checkmark" size={16} color="white"  />
                   )}
                 </View>
               </TouchableOpacity>
@@ -345,11 +345,11 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
               }}
               disabled={!settings.enabled}
             >
-              <Ionicons name="time-outline" size={20} color={theme.colors.primary} />
+              <Icon name="time" size={20} color={theme.colors.primary}  />
               <Text style={[styles.timeText, { color: theme.colors.text }]}>
                 {formatTime(settings.timeOfDay)}
               </Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+              <Icon name="forward" size={16} color={theme.colors.textSecondary}  />
             </TouchableOpacity>
           </View>
 
@@ -420,7 +420,7 @@ export default function NotificationSettingsModal({ visible, onClose }: Notifica
 
           {/* Info */}
           <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
-            <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+            <Icon name="information" size={20} color={theme.colors.primary}  />
             <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
               Notifications help you stay on top of your bills and avoid late fees. 
               You can always change these settings later.

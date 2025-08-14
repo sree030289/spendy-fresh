@@ -8,7 +8,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -107,7 +107,7 @@ export default function BudgetPlanSection({ onManageBudget }: BudgetPlanSectionP
             style={[styles.manageButton, { backgroundColor: theme.colors.primary }]}
             onPress={onManageBudget}
           >
-            <Ionicons name="settings" size={16} color="white" />
+            <Icon name="settings" size={16} color="white"  />
           </TouchableOpacity>
         </View>
 
@@ -162,7 +162,7 @@ export default function BudgetPlanSection({ onManageBudget }: BudgetPlanSectionP
                 </View>
                 <View style={styles.categoryStatus}>
                   {category.spent > category.allocated ? (
-                    <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                    <Icon name="alert" size={16} color="#EF4444"  />
                   ) : (
                     <Text style={[styles.categoryPercentage, { color: progressColor }]}>
                       {progress.toFixed(0)}%
@@ -191,7 +191,7 @@ export default function BudgetPlanSection({ onManageBudget }: BudgetPlanSectionP
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
-        <Ionicons name="pie-chart" color="#10B981" size={24} />
+        <Icon name="pie-chart" color="#10B981" size={24} />
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
           Budget Plan for Family
         </Text>
@@ -199,13 +199,13 @@ export default function BudgetPlanSection({ onManageBudget }: BudgetPlanSectionP
           style={[styles.addButton, { backgroundColor: '#10B981' }]}
           onPress={onManageBudget}
         >
-          <Ionicons name="add" color="#FFFFFF" size={20} />
+          <Icon name="add" color="#FFFFFF" size={20}  />
         </TouchableOpacity>
       </View>
 
       {budgetCategories.length === 0 ? (
         <View style={styles.emptyStateContainer}>
-          <Ionicons name="pie-chart-outline" color="#D1D5DB" size={40} />
+          <Icon name="pie-chart-outline" color="#D1D5DB" size={40} />
           <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
             No budget plan set up
           </Text>
@@ -231,7 +231,7 @@ export default function BudgetPlanSection({ onManageBudget }: BudgetPlanSectionP
             <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>
               Manage Budget Plan
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+            <Icon name="forward" size={16} color={theme.colors.primary}  />
           </TouchableOpacity>
         </>
       )}

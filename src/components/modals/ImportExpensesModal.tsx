@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
 
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -140,7 +140,7 @@ export default function ImportExpensesModal({
           onPress={handleSelectFile}
           disabled={loading}
         >
-          <Ionicons name="document-outline" size={32} color={theme.colors.primary} />
+          <Icon name="document" size={32} color={theme.colors.primary}  />
           <Text style={[styles.uploadText, { color: theme.colors.text }]}>
             Tap to select a CSV file
           </Text>
@@ -151,7 +151,7 @@ export default function ImportExpensesModal({
       ) : (
         <View style={[styles.selectedFile, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.fileInfo}>
-            <Ionicons name="document-text-outline" size={24} color={theme.colors.primary} />
+            <Icon name="document-text-outline" size={24} color={theme.colors.primary} />
             <View style={styles.fileDetails}>
               <Text style={[styles.fileName, { color: theme.colors.text }]} numberOfLines={1}>
                 {fileName}
@@ -168,7 +168,7 @@ export default function ImportExpensesModal({
       )}
       
       <View style={styles.infoBox}>
-        <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+        <Icon name="information" size={20} color={theme.colors.primary}  />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
           The CSV file should have names or phone numbers in columns that match group members.
         </Text>
@@ -272,7 +272,7 @@ export default function ImportExpensesModal({
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
             Import Expenses

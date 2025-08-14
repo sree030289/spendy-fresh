@@ -14,7 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -177,9 +177,37 @@ export default function SimpleExpenseListModal({
       if (initialGroupId && initialGroupId !== 'all') {
         apiExpenses = await apiService.getGroupExpenses(initialGroupId);
       } else {
-        // 🚀 For "View All", use the Test Group 123 expenses directly to match overview behavior
-        console.log('🌟 View All Modal: Loading Test Group 123 expenses for user:', user?.id);
-        apiExpenses = await apiService.getGroupExpenses('vqNs1YeIWsZRLl8lIbMI');
+        // 🚀 For "View All", load expenses from all user groups
+        console.log('🌟 View All Modal: Loading all user expenses for user:', user?.id);
+        
+        try {
+          // First try to get all user expenses directly
+          apiExpenses = await apiService.getUserExpenses(user.id, 50);
+          console.log('🌟 View All Modal: Loaded', apiExpenses.length, 'expenses from getUserExpenses');
+        } catch (error) {
+          console.log('🌟 View All Modal: getUserExpenses failed, trying group-based approach:', error);
+          
+          // Fallback: Get all groups and load their expenses
+          const userGroups = await apiService.getUserGroups(user.id);
+          console.log('🌟 View All Modal: Found', userGroups.length, 'user groups');
+          
+          for (const group of userGroups) {
+            try {
+              const groupExpenses = await apiService.getGroupExpenses(group.id);
+              apiExpenses.push(...groupExpenses);
+              console.log('🌟 View All Modal: Added', groupExpenses.length, 'expenses from group', group.name);
+            } catch (groupError) {
+              console.log('🌟 View All Modal: Failed to load expenses from group', group.name, groupError);
+            }
+          }
+          
+          // Remove duplicates based on expense ID
+          const uniqueExpenses = apiExpenses.filter((expense, index, self) => 
+            index === self.findIndex(e => e.id === expense.id)
+          );
+          apiExpenses = uniqueExpenses;
+          console.log('🌟 View All Modal: After deduplication:', apiExpenses.length, 'unique expenses');
+        }
       }
 
       const processedExpenses = apiExpenses.map(expense => ({
@@ -377,11 +405,10 @@ export default function SimpleExpenseListModal({
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons 
-        name="receipt-outline" 
+      <Icon name="receipt" 
         size={64} 
         color={theme.colors.textTertiary} 
-      />
+       />
       <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
         No expenses found
       </Text>
@@ -413,7 +440,7 @@ export default function SimpleExpenseListModal({
         >
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="white" />
+              <Icon name="close" size={24} color="white"  />
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle}>{title}</Text>
@@ -434,7 +461,7 @@ export default function SimpleExpenseListModal({
         <View style={[styles.filterSection, { backgroundColor: theme.colors.surfaceSecondary }]}>
           {/* Search Bar */}
           <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-            <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+            <Icon name="search" size={20} color={theme.colors.textSecondary}  />
             <TextInput
               style={[styles.searchInput, { color: theme.colors.text }]}
               placeholder="Search expenses by name or category..."
@@ -444,7 +471,7 @@ export default function SimpleExpenseListModal({
             />
             {filters.searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => updateFilter('searchQuery', '')}>
-                <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                <Icon name="error" size={20} color={theme.colors.textSecondary}  />
               </TouchableOpacity>
             )}
           </View>
@@ -468,11 +495,10 @@ export default function SimpleExpenseListModal({
                 }
               ]}
             >
-              <Ionicons 
-                name="calendar-outline" 
+              <Icon name="calendar" 
                 size={16} 
                 color={filters.sortBy === 'date' ? 'white' : theme.colors.text} 
-              />
+               />
               <Text style={[
                 styles.sortButtonText, 
                 { color: filters.sortBy === 'date' ? 'white' : theme.colors.text }
@@ -480,7 +506,7 @@ export default function SimpleExpenseListModal({
                 Date
               </Text>
               {filters.sortBy === 'date' && (
-                <Ionicons 
+                <Icon 
                   name={filters.sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'} 
                   size={14} 
                   color="white" 
@@ -505,11 +531,10 @@ export default function SimpleExpenseListModal({
                 }
               ]}
             >
-              <Ionicons 
-                name="cash-outline" 
+              <Icon name="cash" 
                 size={16} 
                 color={filters.sortBy === 'amount' ? 'white' : theme.colors.text} 
-              />
+               />
               <Text style={[
                 styles.sortButtonText, 
                 { color: filters.sortBy === 'amount' ? 'white' : theme.colors.text }
@@ -517,7 +542,7 @@ export default function SimpleExpenseListModal({
                 Price
               </Text>
               {filters.sortBy === 'amount' && (
-                <Ionicons 
+                <Icon 
                   name={filters.sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'} 
                   size={14} 
                   color="white" 
@@ -531,12 +556,11 @@ export default function SimpleExpenseListModal({
               style={[styles.refreshButton, { backgroundColor: theme.colors.surface }]}
               disabled={refreshing}
             >
-              <Ionicons 
-                name="refresh-outline" 
+              <Icon name="refresh" 
                 size={16} 
                 color={theme.colors.primary}
                 style={refreshing ? styles.spinning : undefined}
-              />
+               />
               <Text style={[styles.refreshButtonText, { color: theme.colors.primary }]}>
                 Refresh
               </Text>

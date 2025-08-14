@@ -1,6 +1,6 @@
 // App.tsx - Test with simplified modal
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, ActivityIndicator, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
@@ -24,6 +24,7 @@ import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import MainTabNavigator from './src/navigation/MainTabNavigator';
 import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
+import LandingPage from '@/components/web/LandingPage';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { RealNotificationService } from './src/services/notifications/RealNotificationService';
 import { ApiService } from '@/services/api/ApiService';
@@ -43,6 +44,21 @@ const AppNavigator = () => {
   const [hasShownTour, setHasShownTour] = useState(false);
   const [tourCheckCompleted, setTourCheckCompleted] = useState(false);
   const { startTour } = useTour();
+
+  // Web-specific states
+  const [showLandingPage, setShowLandingPage] = useState(Platform.OS === 'web' && !user);
+  const [hasVisitedLanding, setHasVisitedLanding] = useState(false);
+
+  // Update landing page visibility based on user state
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      if (user) {
+        setShowLandingPage(false);
+      } else if (!hasVisitedLanding) {
+        setShowLandingPage(true);
+      }
+    }
+  }, [user, hasVisitedLanding]);
 
   // Subscription states
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -300,6 +316,12 @@ const AppNavigator = () => {
     }
   };
 
+  // Handle web landing page "Get Started" button
+  const handleGetStarted = () => {
+    setShowLandingPage(false);
+    setHasVisitedLanding(true);
+  };
+
   // Global function to show subscription modal for various reasons
   const showSubscriptionModalForReason = (
     reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature',
@@ -376,6 +398,11 @@ const AppNavigator = () => {
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
+  }
+
+  // Show web landing page if needed
+  if (showLandingPage && Platform.OS === 'web') {
+    return <LandingPage onGetStarted={handleGetStarted} />;
   }
 
   return (

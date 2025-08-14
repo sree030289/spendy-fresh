@@ -9,7 +9,7 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { Expense, ExpenseSplit } from '@/services/firebase/splitting-disabled';
@@ -294,7 +294,7 @@ export default function ExpenseSettlementModal({
           ]}
           onPress={() => toggleUserSettlement(item.userId)}
         >
-          <Ionicons 
+          <Icon 
             name={item.isSettled ? "checkmark" : "time"} 
             size={20} 
             color={item.isSettled ? "white" : theme.colors.textSecondary} 
@@ -414,7 +414,7 @@ export default function ExpenseSettlementModal({
 
           {settlementItems.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="checkmark-circle" size={48} color={theme.colors.success} />
+              <Icon name="success" size={48} color={theme.colors.success}  />
               <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>All Settled!</Text>
               <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
                 This expense has been fully settled.

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@/types';
-import { SplittingService } from './splitting';
+import { SplittingService } from './splitting-disabled';
 import { RealNotificationService } from '../notifications/RealNotificationService';
 
 

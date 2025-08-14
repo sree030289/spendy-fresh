@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,7 +26,7 @@ import { SubscriptionHelper } from '@/utils/SubscriptionHelper';
 
 // FIXED: Import only the unified balance system
 import { useSharedBalances } from '@/hooks/useSharedBalances';
-import { useOverviewBalances } from '@/hooks/useBalances';
+import { useOverviewBalances, UnifiedSettlementService } from '@/hooks/useBalances';
 import { 
   BalanceCard, 
   BalanceList, 
@@ -44,7 +44,7 @@ interface Friend {
   friendId: string;
   friendData: {
     id: string;
-    fullName: string;
+    fullName: string; 
     email: string;
     avatar?: string;
   };
@@ -172,7 +172,7 @@ export default function RealSplittingScreen() {
   
   // PERFORMANCE OPTIMIZED: Single shared balance hook prevents duplicate calculations
   const sharedBalances = useSharedBalances();
-  const { calculateSettlementBalances } = sharedBalances;
+  const { calculateSettlementBalances, totalOwed, totalOwing, netBalance, allBalances, groupMemberBalances } = sharedBalances;
   
   // Helper function to get category icon
   const getCategoryIcon = (categoryId: string) => {
@@ -664,11 +664,13 @@ export default function RealSplittingScreen() {
     loadSettlementBalances();
   }, [sharedBalances, friends, user?.id]); // Added friends dependency back since we're using it
   
-  // FIXED: Unified balance change notification
+  // FIXED: Unified balance change notification with cache clearing
   const notifyBalanceChange = useCallback(() => {
+    console.log('🔄 Notifying balance change and clearing cache...');
+    UnifiedSettlementService.clearBalanceCache(); // FIXED: Clear cache when balance changes
     sharedBalances.notifyChange();
-    sharedBalances.notifyChange();
-  }, [sharedBalances.notifyChange, sharedBalances.notifyChange]);
+    sharedBalances.forceRefresh(); // FIXED: Force refresh instead of just notify
+  }, [sharedBalances.notifyChange, sharedBalances.forceRefresh]);
 
   // Reset to overview tab when the screen gains focus (when bottom tab is pressed)
   useFocusEffect(
@@ -741,19 +743,13 @@ export default function RealSplittingScreen() {
           });
         }, 100); // Small delay to allow UI to render first
         
-        // Set up periodic refresh for friends data
-        const friendsRefreshInterval = setInterval(async () => {
-          try {
-            await loadFriendsAndRequests();
-            notifyBalanceChange();
-          } catch (error) {
-            console.log('Error in friends refresh interval:', error);
-          }
-        }, 120000); // OPTIMIZED: Refresh every 2 minutes instead of 30 seconds
+        // REMOVED: Aggressive friends refresh interval
+        // Friends data is now updated via event-driven notifications when needed
+        // This eliminates unnecessary API calls and balance recalculations
         
-        // Store cleanup function
+        // Store cleanup function (no intervals to clean up anymore)
         unsubscribeFriends = () => {
-          clearInterval(friendsRefreshInterval);
+          // No periodic refresh to clean up - using event-driven updates only
         };
         
       } catch (error) {
@@ -802,9 +798,10 @@ export default function RealSplittingScreen() {
       }
     };
 
-    checkNavigationIntent();
-    const interval = setInterval(checkNavigationIntent, 1000);
-    return () => clearInterval(interval);
+    // REMOVED: Periodic navigation check - use event-driven approach instead
+    // This eliminates unnecessary background processing
+    checkNavigationIntent(); // Run once on mount only
+    // No need for continuous polling - navigation intents are processed immediately when received
   }, [user?.id]);
 
   const loadNotifications = async () => {
@@ -897,11 +894,11 @@ export default function RealSplittingScreen() {
         expensesData = await apiService.getUserExpenses(user.id, 10);
         console.log('📋 loadRecentExpenses: Primary API call successful:', expensesData);
         
-        // If we get very few expenses (less than expected), use fallback for comprehensive results
-        // This helps when the API endpoint is incomplete or missing some user expenses
-        if (expensesData.length < 3 && groupsData.length > 0) {
-          console.log('⚠️  Primary API returned limited expenses, trying fallback for comprehensive results');
-          throw new Error('Incomplete primary results - using fallback');
+        // If we get very few expenses (less than expected), consider fallback but don't force it
+        // for groups with recent activity - the primary API might be working correctly
+        if (expensesData.length === 0 && groupsData.length > 0) {
+          console.log('⚠️  Primary API returned no expenses, trying fallback for comprehensive results');
+          throw new Error('No primary results - using fallback');
         }
       } catch (primaryError) {
         console.log('⚠️  Primary getUserExpenses failed or incomplete, trying fallback method:', primaryError.message || primaryError);
@@ -914,7 +911,8 @@ export default function RealSplittingScreen() {
             const groupExpenses = await apiService.getGroupExpenses(group.id);
             console.log(`📋 Fallback: Group ${group.name} has ${groupExpenses.length} total expenses`);
             
-            // Filter for expenses where user is involved (paidBy or in splits)
+            // Show ALL expenses from groups user is a member of for transparency
+            // Users should see all group activity, not just expenses they're involved in
             const userExpenses = groupExpenses.filter(expense => {
               console.log(`🔍 Processing expense: ${expense.description}`);
               console.log(`  splitType: "${expense.splitType}" (type: ${typeof expense.splitType})`);
@@ -940,16 +938,16 @@ export default function RealSplittingScreen() {
               let isInvolvedInEqualSplit = false;
               if (expense.splitType === 'equal' || !expense.splitType) {
                 // For equal split expenses, assume user is involved unless proven otherwise
-                // This could be enhanced to check expense timestamps vs user join dates
                 isInvolvedInEqualSplit = true;
                 console.log(`🔍 User assumed involved in equal split: ${expense.description}`);
               } else if (expense.splitType === 'custom') {
-                // For custom split expenses, be more conservative - only include if user paid
-                isInvolvedInEqualSplit = isPaidBy;
-                console.log(`🔍 Custom split expense, user involved based on payment: ${expense.description}`);
+                // FIXED: For custom split expenses, show all group expenses for transparency
+                // Users should see all expenses in their groups, even if not personally involved
+                isInvolvedInEqualSplit = true; // Changed from isPaidBy to true
+                console.log(`🔍 Custom split expense, showing for group transparency: ${expense.description}`);
               } else {
                 console.log(`🔍 Unknown split type: ${expense.splitType} for expense: ${expense.description}`);
-                isInvolvedInEqualSplit = false;
+                isInvolvedInEqualSplit = true; // Show by default for unknown types
               }
               
               const isInvolved = isPaidBy || isInSplitData || isInSplitDetails || isInvolvedInEqualSplit;
@@ -958,15 +956,13 @@ export default function RealSplittingScreen() {
               console.log(`  Final isInvolved: ${isInvolved}`);
               
               if (isInvolved) {
-                console.log(`✅ User involved in expense: ${expense.description} (${
+                console.log(`✅ User can see expense: ${expense.description} (${
                   isPaidBy ? 'paid by user' : 
                   isInSplitData || isInSplitDetails ? 'in split data' : 
-                  'equal split assumption'
+                  'group member visibility'
                 })`);
               } else {
-                console.log(`❌ User NOT involved in expense: ${expense.description} (${
-                  expense.splitType === 'custom' ? 'custom split exclusion' : 'other reason'
-                })`);
+                console.log(`❌ User cannot see expense: ${expense.description} (should not happen with new logic)`);
               }
               
               return isInvolved;
@@ -1888,6 +1884,9 @@ export default function RealSplittingScreen() {
       await apiService.updateExpense(expenseData.id, expenseData);
       console.log('✅ Expense updated successfully in database');
       
+      // FIXED: Clear settlement cache when expense is updated
+      UnifiedSettlementService.clearBalanceCache();
+      
       ExpenseRefreshService.getInstance().notifyExpenseAdded();
       
       await Promise.all([
@@ -2132,14 +2131,14 @@ export default function RealSplittingScreen() {
           <View style={styles.balanceGrid}>
             <View style={styles.balanceItem}>
               <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
-                {getCurrencySymbol(user?.currency || 'USD')}{String(sharedBalances.totalOwed.toFixed(2))}
+                {getCurrencySymbol(user?.currency || 'USD')}{(totalOwed || 0).toFixed(2)}
               </Text>
               <Text style={styles.balanceLabel}>You're owed</Text>
             </View>
             
             <View style={styles.balanceItem}>
               <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
-                {getCurrencySymbol(user?.currency || 'USD')}{String(sharedBalances.totalOwing.toFixed(2))}
+                {getCurrencySymbol(user?.currency || 'USD')}{(totalOwing || 0).toFixed(2)}
               </Text>
               <Text style={styles.balanceLabel}>You owe</Text>
             </View>
@@ -2148,12 +2147,12 @@ export default function RealSplittingScreen() {
               <Text 
                 style={[
                   styles.balanceAmount, 
-                  { color: sharedBalances.netBalance >= 0 ? '#FFD700' : '#FFA500' }
+                  { color: (netBalance || 0) >= 0 ? '#FFD700' : '#FFA500' }
                 ]} 
                 numberOfLines={1} 
                 adjustsFontSizeToFit
               >
-                {sharedBalances.netBalance >= 0 ? '+' : ''}{getCurrencySymbol(user?.currency || 'USD')}{Math.abs(sharedBalances.netBalance).toFixed(2)}
+                {(netBalance || 0) >= 0 ? '+' : ''}{getCurrencySymbol(user?.currency || 'USD')}{Math.abs(netBalance || 0).toFixed(2)}
               </Text>
               <Text style={styles.balanceLabel}>Net balance</Text>
             </View>
@@ -2170,7 +2169,7 @@ export default function RealSplittingScreen() {
             style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
             onPress={() => setShowAddExpense(true)}
           >
-            <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
+            <Icon name="add" size={24} color={theme.colors.primary} />
             <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Expense</Text>
             <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
               Split bills with friends
@@ -2181,7 +2180,7 @@ export default function RealSplittingScreen() {
             style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
             onPress={() => setShowCreateGroup(true)}
           >
-            <Ionicons name="people" size={24} color="#4F46E5" />
+            <Icon name="people" size={24} color="#4F46E5"  />
             <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Create Group</Text>
             <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
               Start a new expense group
@@ -2192,7 +2191,7 @@ export default function RealSplittingScreen() {
             style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
             onPress={() => setShowAddFriend(true)}
           >
-            <Ionicons name="person-add" size={24} color="#10B981" />
+            <Icon name="person" size={24} color="#10B981" />
             <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Friend</Text>
             <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
               Invite friends to split expenses
@@ -2203,7 +2202,7 @@ export default function RealSplittingScreen() {
             style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
             onPress={() => openSettlementScreen({ filter: 'all' })}
           >
-            <Ionicons name="cash" size={24} color="#F59E0B" />
+            <Icon name="cash" size={24} color="#F59E0B"  />
             <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Settlements</Text>
             <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
               Manage outstanding balances
@@ -2214,7 +2213,7 @@ export default function RealSplittingScreen() {
             style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
             onPress={handleAnalyticsAccess}
           >
-            <Ionicons name="analytics" size={24} color="#10B981" />
+            <Icon name="analytics" size={24} color="#10B981"  />
             <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Analytics</Text>
             <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
               View spending insights
@@ -2229,7 +2228,7 @@ export default function RealSplittingScreen() {
             <View style={styles.sectionActions}>
               <TouchableOpacity onPress={navigateToExpenses} style={styles.viewAllButton}>
                 <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
-                <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+                <Icon name="forward" size={16} color={theme.colors.primary}  />
               </TouchableOpacity>
             </View>
           </View>
@@ -2243,7 +2242,7 @@ export default function RealSplittingScreen() {
               onPress={() => setShowAddExpense(true)}
               activeOpacity={0.7}
             >
-              <Ionicons name="receipt-outline" size={40} color={theme.colors.textSecondary} />
+              <Icon name="receipt" size={40} color={theme.colors.textSecondary}  />
               <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
                 No expenses yet
               </Text>
@@ -2328,14 +2327,14 @@ export default function RealSplittingScreen() {
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Friends</Text>
             <View style={styles.sectionActions}>
               <TouchableOpacity onPress={() => sharedBalances.refresh()} style={styles.refreshButton}>
-                <Ionicons name="refresh" size={16} color={theme.colors.primary} />
+                <Icon name="refresh" size={16} color={theme.colors.primary}  />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowAddFriend(true)} style={styles.addButton}>
-                <Ionicons name="person-add" size={16} color={theme.colors.primary} />
+                <Icon name="person" size={16} color={theme.colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setActiveTab('friends')} style={styles.viewAllButton}>
                 <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
-                <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+                <Icon name="forward" size={16} color={theme.colors.primary}  />
               </TouchableOpacity>
             </View>
           </View>
@@ -2346,7 +2345,7 @@ export default function RealSplittingScreen() {
               onPress={() => setShowAddFriend(true)}
               activeOpacity={0.7}
             >
-              <Ionicons name="people-outline" size={40} color={theme.colors.textSecondary} />
+              <Icon name="people" size={40} color={theme.colors.textSecondary}  />
               <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
                 No friends yet
               </Text>
@@ -2403,7 +2402,7 @@ export default function RealSplittingScreen() {
                     </Text>
                     {detail.source === 'group' && (
                       <View style={[styles.groupIndicator, { backgroundColor: theme.colors.primary + '20' }]}>
-                        <Ionicons name="people" size={10} color={theme.colors.primary} />
+                        <Icon name="people" size={10} color={theme.colors.primary}  />
                       </View>
                     )}
                   </View>
@@ -2424,7 +2423,7 @@ export default function RealSplittingScreen() {
                   <View style={styles.friendCardRowBalance}>
                     {Math.abs(detail.balance) < 0.01 ? (
                       <>
-                        <Ionicons name="checkmark-circle" size={16} color={theme.colors.textSecondary} />
+                        <Icon name="success" size={16} color={theme.colors.textSecondary}  />
                         <Text style={[styles.friendCardRowBalanceText, { color: theme.colors.textSecondary }]}>
                           Settled
                         </Text>
@@ -2432,16 +2431,16 @@ export default function RealSplittingScreen() {
                     ) : detail.balance > 0 ? (
                       <>
                         <Text style={[styles.friendCardRowBalanceText, { color: theme.colors.success }]}>
-                          +{getCurrencySymbol(user?.currency || 'USD')}{String(detail.balance.toFixed(2))}
+                          +{getCurrencySymbol(user?.currency || 'USD')}{(detail.balance || 0).toFixed(2)}
                         </Text>
-                        <Ionicons name="arrow-up-circle" size={16} color={theme.colors.success} />
+                        <Icon name="arrowUp" size={16} color={theme.colors.success} />
                       </>
                     ) : (
                       <>
                         <Text style={[styles.friendCardRowBalanceText, { color: theme.colors.error }]}>
                           {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(detail.balance).toFixed(2)}
                         </Text>
-                        <Ionicons name="arrow-down-circle" size={16} color={theme.colors.error} />
+                        <Icon name="arrowDown" size={16} color={theme.colors.error} />
                       </>
                     )}
                   </View>
@@ -2502,7 +2501,7 @@ export default function RealSplittingScreen() {
           <View style={styles.headerTitleSection}>
             <Text style={[styles.cleanTabTitle, { color: theme.colors.text }]}>Friends</Text>
             <Text style={[styles.cleanTabSubtitle, { color: theme.colors.textSecondary }]}>
-              {String(settlementBalances.length)} active • {String(invitedFriends.length)} pending
+              {(acceptedFriends?.length || 0)} active • {(invitedFriends?.length || 0)} pending
             </Text>
           </View>
           <View style={styles.cleanHeaderActions}>
@@ -2510,19 +2509,19 @@ export default function RealSplittingScreen() {
               onPress={() => sharedBalances.refresh()} 
               style={[styles.cleanActionButton, { backgroundColor: theme.colors.surface }]}
             >
-              <Ionicons name="refresh" size={18} color={theme.colors.primary} />
+              <Icon name="refresh" size={18} color={theme.colors.primary}  />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.cleanActionButton, { backgroundColor: '#FF6B6B' }]}
               onPress={debugFriendRequests}
             >
-              <Ionicons name="bug" size={18} color="white" />
+              <Icon name="warning" size={18} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.cleanActionButton, { backgroundColor: theme.colors.primary }]}
               onPress={() => setShowAddFriend(true)}
             >
-              <Ionicons name="person-add" size={18} color="white" />
+              <Icon name="person" size={18} color="white" />
             </TouchableOpacity>
           </View>
         </View>
@@ -2550,7 +2549,7 @@ export default function RealSplittingScreen() {
                 styles.modernTabBadgeText,
                 { color: activeFriendsTab === 'accepted' ? 'white' : 'white' }
               ]}>
-                {String(settlementBalances.length)}
+                {(settlementBalances?.length || 0)}
               </Text>
             </View>
           </TouchableOpacity>
@@ -2575,7 +2574,7 @@ export default function RealSplittingScreen() {
                 styles.modernTabBadgeText,
                 { color: 'white' }
               ]}>
-                {String(invitedFriends.length)}
+                {(invitedFriends?.length || 0)}
               </Text>
             </View>
           </TouchableOpacity>
@@ -2586,7 +2585,7 @@ export default function RealSplittingScreen() {
           acceptedFriends.length === 0 ? (
             <View style={[styles.cleanEmptyState, { backgroundColor: theme.colors.surface }]}>
               <View style={[styles.cleanEmptyIcon, { backgroundColor: `${theme.colors.primary}10` }]}>
-                <Ionicons name="people-outline" size={32} color={theme.colors.primary} />
+                <Icon name="people" size={32} color={theme.colors.primary}  />
               </View>
               <Text style={[styles.cleanEmptyTitle, { color: theme.colors.text }]}>No friends yet</Text>
               <Text style={[styles.cleanEmptySubtitle, { color: theme.colors.textSecondary }]}>
@@ -2647,7 +2646,7 @@ export default function RealSplittingScreen() {
                         </Text>
                         {balanceEntry?.groupName ? (
                           <View style={styles.cleanGroupIndicator}>
-                            <Ionicons name="people" size={12} color={theme.colors.primary} />
+                            <Icon name="people" size={12} color={theme.colors.primary}  />
                             <Text style={[styles.cleanGroupText, { color: theme.colors.primary }]} numberOfLines={1}>
                               {balanceEntry.groupName}
                             </Text>
@@ -2664,7 +2663,7 @@ export default function RealSplittingScreen() {
                     <View style={styles.cleanFriendRight}>
                       {isSettled ? (
                         <View style={styles.cleanSettledBadge}>
-                          <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                          <Icon name="success" size={16} color={theme.colors.success}  />
                           <Text style={[styles.cleanSettledText, { color: theme.colors.success }]}>
                             Settled
                           </Text>
@@ -2677,7 +2676,7 @@ export default function RealSplittingScreen() {
                             <Text style={[styles.cleanBalanceAmount, { 
                               color: owesYou ? theme.colors.success : theme.colors.error 
                             }]}>
-                              {getCurrencySymbol(user?.currency || 'USD')}{String(amount.toFixed(2))}
+                              {getCurrencySymbol(user?.currency || 'USD')}{(amount || 0).toFixed(2)}
                             </Text>
                             <Text style={[styles.cleanBalanceLabel, { 
                               color: owesYou ? theme.colors.success : theme.colors.error 
@@ -2693,7 +2692,7 @@ export default function RealSplittingScreen() {
                               showFriendActionsMenu(friend);
                             }}
                           >
-                            <Ionicons name="notifications" size={12} color="white" />
+                            <Icon name="notifications" size={12} color="white"  />
                           </TouchableOpacity>
                         </>
                       )}
@@ -2709,7 +2708,7 @@ export default function RealSplittingScreen() {
           invitedFriends.length === 0 ? (
             <View style={[styles.cleanEmptyState, { backgroundColor: theme.colors.surface }]}>
               <View style={[styles.cleanEmptyIcon, { backgroundColor: `${theme.colors.warning}15` }]}>
-                <Ionicons name="mail-outline" size={32} color={theme.colors.warning} />
+                <Icon name="mail" size={32} color={theme.colors.warning}  />
               </View>
               <Text style={[styles.cleanEmptyTitle, { color: theme.colors.text }]}>No pending invitations</Text>
               <Text style={[styles.cleanEmptySubtitle, { color: theme.colors.textSecondary }]}>
@@ -2777,14 +2776,14 @@ export default function RealSplittingScreen() {
                             setShowFriendRequest(true);
                           }}
                         >
-                          <Ionicons name="chatbubble" size={16} color="white" />
+                          <Icon name="mail" size={16} color="white" />
                         </TouchableOpacity>
                       ) : (
                         <TouchableOpacity
                           style={[styles.cleanActionButton, { backgroundColor: theme.colors.primary }]}
                           onPress={() => handleResendInvitation(friend)}
                         >
-                          <Ionicons name="send" size={16} color="white" />
+                          <Icon name="send" size={16} color="white"  />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -2813,7 +2812,7 @@ export default function RealSplittingScreen() {
             style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
             onPress={() => setShowCreateGroup(true)}
           >
-            <Ionicons name="add" size={18} color="white" />
+            <Icon name="add" size={18} color="white"  />
             <Text style={styles.headerButtonText}>Create</Text>
           </TouchableOpacity>
         </View>
@@ -2821,7 +2820,7 @@ export default function RealSplittingScreen() {
 
       {groups.length === 0 ? (
         <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="people-outline" size={64} color={theme.colors.textSecondary} />
+          <Icon name="people" size={64} color={theme.colors.textSecondary}  />
           <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Groups Yet</Text>
           <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
             Create a group to start splitting expenses with friends
@@ -2835,15 +2834,29 @@ export default function RealSplittingScreen() {
         </View>
       ) : (
         groups.map((group) => {
-          // Use the calculated group balances instead of empty sharedBalances
-          const groupBalance = groupBalances.get(group.id) || 0;
+          // FIXED: Use sharedBalances data instead of separate groupBalances calculation
+          // Calculate total balance for this group from all group members
+          let groupBalance = 0;
+          if (allBalances) {
+            for (const detail of allBalances) {
+              if (detail.groupId === group.id || (detail.breakdown?.fromGroups && detail.breakdown.fromGroups[group.id])) {
+                if (detail.groupId === group.id) {
+                  // This is a group-only member
+                  groupBalance += detail.balance;
+                } else if (detail.breakdown?.fromGroups?.[group.id]) {
+                  // This is part of a mixed balance (friend + group)
+                  groupBalance += detail.breakdown.fromGroups[group.id].balance;
+                }
+              }
+            }
+          }
           
           const userShare = Math.abs(groupBalance || 0);
-          const shareStatus = groupBalance === 0 ? 'settled' : (groupBalance > 0 ? 'owed' : 'owes');
+          const shareStatus = Math.abs(groupBalance) < 0.01 ? 'settled' : (groupBalance > 0 ? 'owed' : 'owes');
           
           // Debug logging for group card display
           console.log(`🏷️  Rendering group card: ${group.name}`);
-          console.log(`💳 Group balance from overview balances: ${groupBalance}`);
+          console.log(`💳 Group balance from sharedBalances: ${groupBalance}`);
           console.log(`📊 Display: ${shareStatus} ${userShare}`);
                   
           return (
@@ -2866,7 +2879,7 @@ export default function RealSplittingScreen() {
                     </Text>
                     <View style={styles.groupMetaRow}>
                       <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
-                        {String(group.members.length)} members
+                        {(group.members?.length || 0)} members
                       </Text>
                       <Text style={[styles.groupDivider, { color: theme.colors.textSecondary }]}>•</Text>
                       <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
@@ -2883,7 +2896,7 @@ export default function RealSplittingScreen() {
                     }}
                     style={styles.groupActionButton}
                   >
-                    <Ionicons name="download" size={20} color={theme.colors.textSecondary} />
+                    <Icon name="download" size={20} color={theme.colors.textSecondary}  />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={async (e) => {
@@ -2897,7 +2910,7 @@ export default function RealSplittingScreen() {
                     }}
                     style={styles.groupActionButton}
                   >
-                    <Ionicons name="qr-code" size={20} color={theme.colors.textSecondary} />
+                    <Icon name="qrCode" size={20} color={theme.colors.textSecondary}  />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2908,7 +2921,7 @@ export default function RealSplittingScreen() {
                     Total spent
                   </Text>
                   <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                    {getCurrencySymbol(group.currency)}{String(((group as any).totalExpenses || 0).toFixed(2))}
+                    {getCurrencySymbol(group.currency)}{(((group as any).totalExpenses || 0)).toFixed(2)}
                   </Text>
                 </View>
                 <View style={styles.groupStat}>
@@ -2938,7 +2951,7 @@ export default function RealSplittingScreen() {
                   }}
                   style={[styles.actionButton, styles.viewDetailsButton, { backgroundColor: theme.colors.primary + '20' }]}
                 >
-                  <Ionicons name="eye" size={16} color={theme.colors.primary} />
+                  <Icon name="eye" size={16} color={theme.colors.primary}  />
                   <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>View Details</Text>
                 </TouchableOpacity>
 
@@ -2949,7 +2962,7 @@ export default function RealSplittingScreen() {
                   }}
                   style={[styles.actionButton, { backgroundColor: theme.colors.primary + '20' }]}
                 >
-                  <Ionicons name="chatbubbles" size={16} color={theme.colors.primary} />
+                  <Icon name="mail" size={16} color={theme.colors.primary} />
                   <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Chat</Text>
                 </TouchableOpacity>
                 
@@ -2963,7 +2976,7 @@ export default function RealSplittingScreen() {
                   }}
                   style={[styles.actionButton, styles.settlementButton, { backgroundColor: theme.colors.success + '20' }]}
                 >
-                  <Ionicons name="card" size={16} color={theme.colors.success} />
+                  <Icon name="card" size={16} color={theme.colors.success}  />
                   <Text style={[styles.actionButtonText, { color: theme.colors.success }]}>Settle</Text>
                 </TouchableOpacity>
               </View>
@@ -3383,19 +3396,19 @@ export default function RealSplittingScreen() {
             style={styles.headerAction}
             onPress={handleQRScannerAccess}
           >
-            <Ionicons name="qr-code" size={24} color="#8B5CF6" />
+            <Icon name="qrCode" size={24} color="#8B5CF6"  />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerAction}
             onPress={handleAnalyticsAccess}
           >
-            <Ionicons name="analytics" size={24} color="#10B981" />
+            <Icon name="analytics" size={24} color="#10B981"  />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerAction}
             onPress={handleNotificationsPress}
           >
-            <Ionicons name="notifications" size={24} color="#F59E0B" />
+            <Icon name="notifications" size={24} color="#F59E0B"  />
             {notifications.filter(n => !n.isRead).length > 0 && (
               <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
                 <Text style={styles.notificationBadgeText}>
@@ -3421,7 +3434,7 @@ export default function RealSplittingScreen() {
               ]}
               onPress={() => handleTabSwitch(tab.id)}
             >
-              <Ionicons
+              <Icon
                 name={tab.icon as any}
                 size={18}
                 color={activeTab === tab.id ? 'white' : theme.colors.textSecondary}

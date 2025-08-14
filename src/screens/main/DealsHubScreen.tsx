@@ -18,7 +18,7 @@ import {
   Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { DealsAPI, useDeals, Deal, OZBARGAIN_CATEGORIES } from '@/services/DealsAPI';
 
@@ -136,7 +136,7 @@ Found this great deal on OzBargain via Spendy app!
         <View style={styles.dealHeader}>
           <View style={styles.leftHeader}>
             <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
-              <Ionicons 
+              <Icon 
                 name={getCategoryIcon(deal.categoryIcon) as any} 
                 size={12} 
                 color="white" 
@@ -148,7 +148,7 @@ Found this great deal on OzBargain via Spendy app!
             </View>
           </View>
           <View style={styles.voteContainer}>
-            <Ionicons name="chevron-up" size={12} color={colors.success} />
+            <Icon name="chevron-up" size={12} color={colors.success} />
             <Text style={[styles.voteText, { color: colors.success }]}>
               {deal.likes}
             </Text>
@@ -197,7 +197,7 @@ Found this great deal on OzBargain via Spendy app!
               style={styles.actionButton}
               onPress={() => handleShareDeal(deal)}
             >
-              <Ionicons name="share-outline" size={16} color={colors.textMuted} />
+              <Icon name="share" size={16} color={colors.textMuted}  />
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -205,7 +205,7 @@ Found this great deal on OzBargain via Spendy app!
               onPress={() => openDeal(deal)}
             >
               <Text style={styles.getDealText}>Get Deal</Text>
-              <Ionicons name="open-outline" size={14} color="white" />
+              <Icon name="open-outline" size={14} color="white" />
             </TouchableOpacity>
           </View>
         </View>
@@ -228,7 +228,7 @@ Found this great deal on OzBargain via Spendy app!
           ) : (
             <>
               <Text style={styles.loadMoreText}>Load More</Text>
-              <Ionicons name="chevron-down" size={16} color="white" />
+              <Icon name="chevron-down" size={16} color="white" />
             </>
           )}
         </TouchableOpacity>
@@ -239,7 +239,7 @@ Found this great deal on OzBargain via Spendy app!
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <View style={[styles.emptyIconContainer, { backgroundColor: colors.surface }]}>
-        <Ionicons name="pricetag-outline" size={48} color={colors.textMuted} />
+        <Icon name="pricetag-outline" size={48} color={colors.textMuted} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
         {error ? 'Connection Error' : 'No deals found'}
@@ -283,7 +283,7 @@ Found this great deal on OzBargain via Spendy app!
               {isManualRefresh ? (
                 <ActivityIndicator size={16} color={colors.primary} />
               ) : (
-                <Ionicons name="refresh" size={18} color={colors.primary} />
+                <Icon name="refresh" size={18} color={colors.primary}  />
               )}
             </TouchableOpacity>
           </View>
@@ -291,7 +291,7 @@ Found this great deal on OzBargain via Spendy app!
           {/* Search Bar */}
           <View style={styles.searchContainer}>
             <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
-              <Ionicons name="search" size={18} color={colors.textMuted} />
+              <Icon name="search" size={18} color={colors.textMuted}  />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Search deals..."
@@ -301,7 +301,7 @@ Found this great deal on OzBargain via Spendy app!
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                  <Icon name="error" size={18} color={colors.textMuted}  />
                 </TouchableOpacity>
               )}
             </View>
@@ -310,7 +310,7 @@ Found this great deal on OzBargain via Spendy app!
           {/* Last Updated */}
           {lastUpdated && (
             <View style={styles.lastUpdatedContainer}>
-              <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.7)" />
+              <Icon name="time" size={12} color="rgba(255,255,255,0.7)"  />
               <Text style={styles.lastUpdatedText}>
                 Updated {new Date(lastUpdated).toLocaleTimeString('en-AU', { 
                   hour: '2-digit', 
@@ -410,7 +410,7 @@ Found this great deal on OzBargain via Spendy app!
               onPress={() => setShowWebView(false)}
               style={styles.webViewCloseButton}
             >
-              <Ionicons name="close" size={24} color="white" />
+              <Icon name="close" size={24} color="white"  />
             </TouchableOpacity>
             <Text style={styles.webViewTitle} numberOfLines={1}>
               {currentDealTitle}
@@ -423,7 +423,7 @@ Found this great deal on OzBargain via Spendy app!
               }}
               style={styles.webViewOpenButton}
             >
-              <Ionicons name="open-outline" size={20} color="white" />
+              <Icon name="open-outline" size={20} color="white" />
             </TouchableOpacity>
           </View>
           
@@ -466,7 +466,7 @@ Found this great deal on OzBargain via Spendy app!
             />
           ) : (
             <View style={styles.webViewError}>
-              <Ionicons name="alert-circle-outline" size={48} color={colors.textMuted} />
+              <Icon name="alert" size={48} color={colors.textMuted}  />
               <Text style={[styles.webViewErrorText, { color: colors.text }]}>
                 No URL available for this deal
               </Text>

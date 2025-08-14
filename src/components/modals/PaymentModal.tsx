@@ -10,7 +10,7 @@ import {
   TextInput,
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -364,7 +364,7 @@ export default function PaymentModal({
               </View>
             </View>
             {selectedMethod === provider.id && (
-              <Ionicons name="checkmark-circle" size={24} color={theme.colors.primary} />
+              <Icon name="success" size={24} color={theme.colors.primary}  />
             )}
           </TouchableOpacity>
         ))}
@@ -372,7 +372,7 @@ export default function PaymentModal({
 
       {availableProviders.length === 0 && (
         <View style={[styles.noMethods, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="card-outline" size={48} color={theme.colors.textSecondary} />
+          <Icon name="card" size={48} color={theme.colors.textSecondary}  />
           <Text style={[styles.noMethodsText, { color: theme.colors.textSecondary }]}>
             No payment methods available for {userCurrency} in {userCountry}
           </Text>
@@ -436,7 +436,7 @@ export default function PaymentModal({
 
           {/* Instructions */}
           <View style={[styles.instructionsCard, { backgroundColor: theme.colors.background }]}>
-            <Ionicons name="information-circle" size={20} color={theme.colors.primary} />
+            <Icon name="information" size={20} color={theme.colors.primary}  />
             <Text style={[styles.instructionsText, { color: theme.colors.textSecondary }]}>
               You'll be redirected to {selectedProvider?.name} to complete the payment securely.
             </Text>

@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/hooks/useTheme';
@@ -92,7 +92,7 @@ export default function ProfileScreen() {
       onPress={onPress}
     >
       <View style={styles.profileItemLeft}>
-        <Ionicons name={icon as any} size={24} color={theme.colors.text} />
+        <Icon name={icon as any} size={24} color={theme.colors.text} />
         <View style={styles.profileItemTextContainer}>
           <Text style={[styles.profileItemTitle, { color: theme.colors.text }]}>
             {title}
@@ -114,7 +114,7 @@ export default function ProfileScreen() {
           </Text>
         )}
         {showChevron && (
-          <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+          <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
         )}
       </View>
     </TouchableOpacity>
@@ -323,10 +323,10 @@ export default function ProfileScreen() {
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
           <View style={styles.headerActions}>
             <TouchableOpacity onPress={startTour} style={styles.tourButton}>
-              <Ionicons name="help-circle-outline" size={24} color={theme.colors.text} />
+              <Icon name="help" size={24} color={theme.colors.text}  />
             </TouchableOpacity>
             <TouchableOpacity onPress={toggleTheme}>
-              <Ionicons 
+              <Icon 
                 name={isDark ? 'sunny' : 'moon'} 
                 size={24} 
                 color={theme.colors.text} 
@@ -348,7 +348,7 @@ export default function ProfileScreen() {
               </View>
             )}
             <View style={styles.cameraIcon}>
-              <Ionicons name="camera" size={16} color="white" />
+              <Icon name="camera" size={16} color="white"  />
             </View>
           </TouchableOpacity>
           

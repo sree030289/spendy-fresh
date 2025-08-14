@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
@@ -457,7 +457,7 @@ export default function RecurringExpenseModal({
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Group *</Text>
             {groups.length === 0 ? (
               <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-                <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} />
+                <Icon name="people" size={48} color={theme.colors.textSecondary}  />
                 <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
                   No groups available
                 </Text>
@@ -527,7 +527,7 @@ export default function RecurringExpenseModal({
               <Text style={[styles.dateText, { color: theme.colors.text }]}>
                 {startDate.toLocaleDateString()}
               </Text>
-              <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+              <Icon name="calendar" size={20} color={theme.colors.textSecondary}  />
             </TouchableOpacity>
             {showStartDatePicker && (
               <DateTimePicker
@@ -565,7 +565,7 @@ export default function RecurringExpenseModal({
               }}
             >
               <View style={styles.endConditionLeft}>
-                <Ionicons
+                <Icon
                   name={hasEndDate ? "checkbox" : "square-outline"}
                   size={20}
                   color={hasEndDate ? theme.colors.primary : theme.colors.textSecondary}
@@ -597,7 +597,7 @@ export default function RecurringExpenseModal({
                 <Text style={[styles.dateText, { color: theme.colors.text }]}>
                   {endDate ? endDate.toLocaleDateString() : 'Select end date'}
                 </Text>
-                <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+                <Icon name="calendar" size={20} color={theme.colors.textSecondary}  />
               </TouchableOpacity>
             )}
 
@@ -632,7 +632,7 @@ export default function RecurringExpenseModal({
               }}
             >
               <View style={styles.endConditionLeft}>
-                <Ionicons
+                <Icon
                   name={hasMaxOccurrences ? "checkbox" : "square-outline"}
                   size={20}
                   color={hasMaxOccurrences ? theme.colors.primary : theme.colors.textSecondary}

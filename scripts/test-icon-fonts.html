@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Font Test</title>
+    <style>
+        @font-face {
+            font-family: 'Ionicons';
+            src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.6148e7019854f3bde85b633cb88f3c25.ttf') format('truetype'),
+                 url('/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.6148e7019854f3bde85b633cb88f3c25.ttf') format('truetype');
+            font-display: swap;
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        .icon-test {
+            font-family: 'Ionicons';
+            font-size: 24px;
+            margin: 20px;
+            display: inline-block;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Vector Icon Font Test</h1>
+    
+    <div class="test-section">
+        <h2>Ionicons Test</h2>
+        <p>If the fonts are loading correctly, you should see icons instead of square boxes:</p>
+        
+        <!-- Common Ionicons unicode characters -->
+        <span class="icon-test">&#xf2c7;</span> <!-- home -->
+        <span class="icon-test">&#xf2d1;</span> <!-- person -->
+        <span class="icon-test">&#xf37e;</span> <!-- settings -->
+        <span class="icon-test">&#xf2b8;</span> <!-- heart -->
+        <span class="icon-test">&#xf2ca;</span> <!-- search -->
+    </div>
+    
+    <div class="test-section">
+        <h2>Font Loading Status</h2>
+        <p id="font-status">Checking font status...</p>
+    </div>
+    
+    <script>
+        // Check if the font is loaded
+        function checkFontLoading() {
+            if (document.fonts) {
+                document.fonts.ready.then(() => {
+                    const ioniconsFont = document.fonts.check('24px Ionicons');
+                    const statusElement = document.getElementById('font-status');
+                    
+                    if (ioniconsFont) {
+                        statusElement.textContent = '✅ Ionicons font loaded successfully!';
+                        statusElement.style.color = 'green';
+                    } else {
+                        statusElement.textContent = '❌ Ionicons font failed to load';
+                        statusElement.style.color = 'red';
+                    }
+                });
+            } else {
+                document.getElementById('font-status').textContent = '⚠️ Font loading API not supported';
+            }
+        }
+        
+        // Run the check after page loads
+        window.addEventListener('load', checkFontLoading);
+    </script>
+</body>
+</html>

@@ -26,8 +26,12 @@ metroRequire @ require.js:98
 loadModuleImplementation @ require.js:285
 guardedLoadModule @ require.js:183
 metroRequire @ require.js:98
-(anonymous) @ index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:296301
-config.ts:45 🔧 Firebase initialized in development mode
+(anonymous) @ index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:289618
+config.ts:16 🔧 Firebase Environment: development Build: dev
+config.ts:20 🔧 Using DEVELOPMENT Firebase project
+config.ts:58 🔧 Firebase initialized in development mode
+ApiService.ts:10 🔧 API Environment: development Build: dev
+ApiService.ts:14 🔧 Using DEVELOPMENT API endpoint
 SplashScreen.tsx:65 "shadow*" style props are deprecated. Use "boxShadow".
 warnOnce @ index.js:24
 preprocess @ preprocess.js:136
@@ -46,53 +50,55 @@ metroRequire @ require.js:98
 loadModuleImplementation @ require.js:285
 guardedLoadModule @ require.js:183
 metroRequire @ require.js:98
-(anonymous) @ index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:296301
+(anonymous) @ index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:289618
 index.ts:8 Running application "main" with appParams:
  {rootTag: '#root', hydrate: undefined} 
 Development-level warnings: ON.
 Performance optimizations: OFF.
-App.tsx:64 AppNavigator - User: Not authenticated
-App.tsx:65 AppNavigator - Loading: true
-App.tsx:199 🔍 Tour trigger check: {user: false, isLoading: true, initializing: true, hasShownTour: false, tourCheckCompleted: false, …}
+App.tsx:80 AppNavigator - User: Not authenticated
+App.tsx:81 AppNavigator - Loading: true
+App.tsx:215 🔍 Tour trigger check: {user: false, isLoading: true, initializing: true, hasShownTour: false, tourCheckCompleted: false, …}
 RealNotificationService.ts:59 🔔 Initializing notification service...
-App.tsx:339 🔧 Setting up global subscription modal function
+App.tsx:377 🔧 Setting up global subscription modal function
 useAuth.tsx:41 Setting up auth state...
-App.tsx:72 🔍 Tour Status Check - Tour completed value: null
+App.tsx:88 🔍 Tour Status Check - Tour completed value: null
 useAuth.tsx:52 Found stored auth data, verifying...
-ApiService.ts:109 🌐 API Request: GET /auth/profile
+ApiService.ts:126 🌐 API Request: GET /auth/profile
 RealNotificationService.ts:118 📱 Simulating push token registration (demo mode)
-RealNotificationService.ts:126 📱 Mock push token generated for demo: ExponentPushToken[demo-kag4hef...
+RealNotificationService.ts:126 📱 Mock push token generated for demo: ExponentPushToken[demo-1jrv7x7...
 RealNotificationService.ts:226 🔔 Skipping notification categories setup on web platform
 RealNotificationService.ts:93 ✅ Notification service initialized successfully
-App.tsx:64 AppNavigator - User: Not authenticated
-App.tsx:65 AppNavigator - Loading: true
-App.tsx:199 🔍 Tour trigger check: {user: false, isLoading: true, initializing: true, hasShownTour: false, tourCheckCompleted: true, …}
-ApiService.ts:131 ✅ API Response: /auth/profile Success
-useAuth.tsx:77 Auth state restored for user: test510@example.com
-App.tsx:64 AppNavigator - User: Authenticated
-App.tsx:65 AppNavigator - Loading: false
-App.tsx:158 🚀 Initializing Smart Money notifications for user: jv8gKAyRdtVlBAQUsgFO
+App.tsx:80 AppNavigator - User: Not authenticated
+App.tsx:81 AppNavigator - Loading: true
+App.tsx:215 🔍 Tour trigger check: {user: false, isLoading: true, initializing: true, hasShownTour: false, tourCheckCompleted: true, …}
+ApiService.ts:148 ✅ API Response: /auth/profile Success
+useAuth.tsx:77 Auth state restored for user: sam1@spendydev.com
+App.tsx:80 AppNavigator - User: Authenticated
+App.tsx:81 AppNavigator - Loading: false
+App.tsx:174 🚀 Initializing Smart Money notifications for user: R8lgO0eVYn7S5BclTvca
 firebaseNotificationService.ts:47 🔔 Initializing Firebase Notification Service...
 firebaseNotificationService.ts:48 📱 Platform: web
 firebaseNotificationService.ts:138 🌐 Registering web notifications...
-App.tsx:199 🔍 Tour trigger check: {user: true, isLoading: false, initializing: true, hasShownTour: false, tourCheckCompleted: true, …}
-ApiService.ts:109 🌐 API Request: POST /recurring-expenses/process
-PushNotificationService.ts:55 Push notifications initialized for user: jv8gKAyRdtVlBAQUsgFO
-NotificationManager.ts:43 NotificationManager initialized for user: jv8gKAyRdtVlBAQUsgFO
+App.tsx:215 🔍 Tour trigger check: {user: true, isLoading: false, initializing: true, hasShownTour: false, tourCheckCompleted: true, …}
+ApiService.ts:126 🌐 API Request: POST /recurring-expenses/process
+PushNotificationService.ts:55 Push notifications initialized for user: R8lgO0eVYn7S5BclTvca
+NotificationManager.ts:43 NotificationManager initialized for user: R8lgO0eVYn7S5BclTvca
 firebaseNotificationService.ts:147 ✅ Web notification permission granted
 firebaseNotificationService.ts:54 ✅ Push token obtained: web-notifications-enabled
+App.tsx:80 AppNavigator - User: Authenticated
+App.tsx:81 AppNavigator - Loading: false
 firebaseNotificationService.ts:241 ❌ Web notification setup failed: InvalidAccessError: Failed to execute 'subscribe' on 'PushManager': The provided applicationServerKey is not valid.
     at getPushSubscription (index.esm2017.js:568:39)
     at async getTokenInternal (index.esm2017.js:484:30)
     at async FirebaseNotificationService.setupWebNotifications (firebaseNotificationService.ts:226:27)
     at async FirebaseNotificationService.initialize (firebaseNotificationService.ts:61:11)
-    at async initializeSmartMoney (App.tsx:160:31)
+    at async initializeSmartMoney (App.tsx:176:31)
 setupWebNotifications @ firebaseNotificationService.ts:241
 await in setupWebNotifications
 initialize @ firebaseNotificationService.ts:61
 await in initialize
-initializeSmartMoney @ App.tsx:160
-(anonymous) @ App.tsx:181
+initializeSmartMoney @ App.tsx:176
+(anonymous) @ App.tsx:197
 react-stack-bottom-frame @ react-dom-client.development.js:22509
 runWithFiberInDEV @ react-dom-client.development.js:543
 commitHookEffectListMount @ react-dom-client.development.js:10758
@@ -121,15 +127,15 @@ commitPassiveMountOnFiber @ react-dom-client.development.js:12657
 flushPassiveEffects @ react-dom-client.development.js:15460
 (anonymous) @ react-dom-client.development.js:15324
 performWorkUntilDeadline @ scheduler.development.js:44
-App.tsx:163 ✅ Smart Money notifications initialized
-App.tsx:175 ❌ Failed to initialize notifications: UnavailabilityError: The method or property Notifications.getAllScheduledNotificationsAsync is not available on web, are you sure you've linked all the native dependencies properly?
+App.tsx:179 ✅ Smart Money notifications initialized
+App.tsx:191 ❌ Failed to initialize notifications: UnavailabilityError: The method or property Notifications.getAllScheduledNotificationsAsync is not available on web, are you sure you've linked all the native dependencies properly?
     at Object.getAllScheduledNotificationsAsync (getAllScheduledNotificationsAsync.js:11:15)
     at FirebaseNotificationService.cancelNotificationsByTag (firebaseNotificationService.ts:450:56)
     at FirebaseNotificationService.scheduleDailyExpenseReminder (firebaseNotificationService.ts:359:16)
-    at initializeSmartMoney (App.tsx:166:39)
-initializeSmartMoney @ App.tsx:175
+    at initializeSmartMoney (App.tsx:182:39)
+initializeSmartMoney @ App.tsx:191
 await in initializeSmartMoney
-(anonymous) @ App.tsx:181
+(anonymous) @ App.tsx:197
 react-stack-bottom-frame @ react-dom-client.development.js:22509
 runWithFiberInDEV @ react-dom-client.development.js:543
 commitHookEffectListMount @ react-dom-client.development.js:10758
@@ -158,8 +164,8 @@ commitPassiveMountOnFiber @ react-dom-client.development.js:12657
 flushPassiveEffects @ react-dom-client.development.js:15460
 (anonymous) @ react-dom-client.development.js:15324
 performWorkUntilDeadline @ scheduler.development.js:44
-App.tsx:64 AppNavigator - User: Authenticated
-App.tsx:65 AppNavigator - Loading: false
+App.tsx:80 AppNavigator - User: Authenticated
+App.tsx:81 AppNavigator - Loading: false
 index.js:24 props.pointerEvents is deprecated. Use style.pointerEvents
 warnOnce @ index.js:24
 createDOMProps @ index.js:805
@@ -177,28 +183,23 @@ performWorkOnRoot @ react-dom-client.development.js:14334
 performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:15931
 performWorkUntilDeadline @ scheduler.development.js:44
 SubscriptionModal.tsx:75 🔍 Fixed SubscriptionModal render: {visible: false, reason: 'firstTime', canClose: true, autoCloseAfter: undefined}
-useBalances.ts:802 📡 useBalances: Registered for balance change notifications
-useBalances.ts:819 🚀 useBalances: Initial load for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:758 🔄 useBalances: Refreshing with UnifiedSettlementService
-useBalances.ts:57 🔄 Calculating UNIFIED balances for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:802 📡 useBalances: Registered for balance change notifications
-useBalances.ts:819 🚀 useBalances: Initial load for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:758 🔄 useBalances: Refreshing with UnifiedSettlementService
-useBalances.ts:57 🔄 Calculating UNIFIED balances for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:207 🚨🚨🚨 CLAUDE FIX ACTIVE - EXPENSES STATE CHANGED: {length: 0, expenses: Array(0)}
-useBalances.ts:802 📡 useBalances: Registered for balance change notifications
-useBalances.ts:819 🚀 useBalances: Initial load for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:758 🔄 useBalances: Refreshing with UnifiedSettlementService
-useBalances.ts:57 🔄 Calculating UNIFIED balances for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:348 🔄 Initializing friends data for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:1118 🔄 Loading friends and friend requests...
-ApiService.ts:555 🔄 ApiService: Getting friend requests from API
-RealSplittingScreen.tsx:417 🔄 Loading settlement balances for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:571 🔄 Calculating SETTLEMENT balances for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:668 🚀 Starting data loading - user ID: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:669 ⏰ Step 1: Loading friends and requests...
-RealSplittingScreen.tsx:1118 🔄 Loading friends and friend requests...
-ApiService.ts:555 🔄 ApiService: Getting friend requests from API
+useSharedBalances.ts:247 🚀 useSharedBalances: Starting initial load for user: R8lgO0eVYn7S5BclTvca
+useSharedBalances.ts:159 🔄 SharedBalanceManager: Starting unified refresh
+useBalances.ts:65 🔄 Calculating UNIFIED balances for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:209 🚨🚨🚨 CLAUDE FIX ACTIVE - EXPENSES STATE CHANGED: {length: 0, expenses: Array(0)}
+useBalances.ts:867 📡 useBalances: Registered for balance change notifications
+useBalances.ts:884 🚀 useBalances: Initial load for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:816 🔄 useBalances: Refreshing with UnifiedSettlementService
+useBalances.ts:65 🔄 Calculating UNIFIED balances for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:394 🔄 Initializing friends data for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:1166 🔄 Loading friends and friend requests...
+ApiService.ts:572 🔄 ApiService: Getting friend requests from API
+RealSplittingScreen.tsx:464 🔄 Loading settlement balances for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:620 🔄 Calculating SETTLEMENT balances for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:717 🚀 Starting data loading - user ID: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:718 ⏰ Step 1: Loading friends and requests...
+RealSplittingScreen.tsx:1166 🔄 Loading friends and friend requests...
+ApiService.ts:572 🔄 ApiService: Getting friend requests from API
 UnifiedActionModal.tsx:76 Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md
 shouldUseNativeDriver @ NativeAnimatedHelper.js:410
 TimingAnimation @ TimingAnimation.js:36
@@ -401,13 +402,20 @@ recursivelyTraversePassiveMountEffects @ react-dom-client.development.js:12627
 commitPassiveMountOnFiber @ react-dom-client.development.js:12646
 recursivelyTraversePassiveMountEffects @ react-dom-client.development.js:12627
 AddExpenseModal.tsx:115 🔍 PAID BY CHANGED: 
-App.tsx:199 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: false, tourCheckCompleted: true, …}
-ApiService.ts:111  POST https://us-central1-spendy-97913.cloudfunctions.net/spendyApi/recurring-expenses/process 404 (Not Found)
-makeRequest @ ApiService.ts:111
-request @ ApiService.ts:160
-processRecurringExpenses @ ApiService.ts:484
-processRecurring @ App.tsx:255
-(anonymous) @ App.tsx:260
+App.tsx:215 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: false, tourCheckCompleted: true, …}
+useBalances.ts:871 📡 useBalances: Unregistered from balance change notifications
+useBalances.ts:867 📡 useBalances: Registered for balance change notifications
+useBalances.ts:884 🚀 useBalances: Initial load for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:807 ⏭️ useBalances: Skipping refresh - request already pending
+ApiService.ts:128 
+            
+            
+           POST https://us-central1-spendy-develop.cloudfunctions.net/spendyApi/recurring-expenses/process 404 (Not Found)
+makeRequest @ ApiService.ts:128
+request @ ApiService.ts:177
+processRecurringExpenses @ ApiService.ts:501
+processRecurring @ App.tsx:271
+(anonymous) @ App.tsx:276
 react-stack-bottom-frame @ react-dom-client.development.js:22509
 runWithFiberInDEV @ react-dom-client.development.js:543
 commitHookEffectListMount @ react-dom-client.development.js:10758
@@ -436,18 +444,18 @@ commitPassiveMountOnFiber @ react-dom-client.development.js:12657
 flushPassiveEffects @ react-dom-client.development.js:15460
 (anonymous) @ react-dom-client.development.js:15324
 performWorkUntilDeadline @ scheduler.development.js:44
-ApiService.ts:125 Could not parse error response as JSON
-ApiService.ts:140 ❌ API Error: /recurring-expenses/process Error: HTTP 404: 
-    at ApiService.makeRequest (ApiService.ts:127:15)
-    at async ApiService.request (ApiService.ts:160:24)
-    at async ApiService.processRecurringExpenses (ApiService.ts:484:7)
-    at async processRecurring (App.tsx:255:9)
-makeRequest @ ApiService.ts:140
+ApiService.ts:142 Could not parse error response as JSON
+ApiService.ts:157 ❌ API Error: /recurring-expenses/process Error: HTTP 404: 
+    at ApiService.makeRequest (ApiService.ts:144:15)
+    at async ApiService.request (ApiService.ts:177:24)
+    at async ApiService.processRecurringExpenses (ApiService.ts:501:7)
+    at async processRecurring (App.tsx:271:9)
+makeRequest @ ApiService.ts:157
 await in makeRequest
-request @ ApiService.ts:160
-processRecurringExpenses @ ApiService.ts:484
-processRecurring @ App.tsx:255
-(anonymous) @ App.tsx:260
+request @ ApiService.ts:177
+processRecurringExpenses @ ApiService.ts:501
+processRecurring @ App.tsx:271
+(anonymous) @ App.tsx:276
 react-stack-bottom-frame @ react-dom-client.development.js:22509
 runWithFiberInDEV @ react-dom-client.development.js:543
 commitHookEffectListMount @ react-dom-client.development.js:10758
@@ -476,1013 +484,571 @@ commitPassiveMountOnFiber @ react-dom-client.development.js:12657
 flushPassiveEffects @ react-dom-client.development.js:15460
 (anonymous) @ react-dom-client.development.js:15324
 performWorkUntilDeadline @ scheduler.development.js:44
-ApiService.ts:164 🔍 Full error details: {message: 'HTTP 404: ', endpoint: '/recurring-expenses/process', method: 'POST'}
-ApiService.ts:488 No recurring expenses to process for new user (404)
-RealSplittingScreen.tsx:365 🔄 Calculating balances for 0 groups
-RealSplittingScreen.tsx:400 📋 Final group balances: []
-App.tsx:64 AppNavigator - User: Authenticated
-App.tsx:65 AppNavigator - Loading: false
+ApiService.ts:181 🔍 Full error details: {message: 'HTTP 404: ', endpoint: '/recurring-expenses/process', method: 'POST'}
+ApiService.ts:505 No recurring expenses to process for new user (404)
+RealSplittingScreen.tsx:411 🔄 Calculating balances for 0 groups
+RealSplittingScreen.tsx:447 📋 Final group balances: []
+useBalances.ts:83 Processing 2 friendships
+useBalances.ts:115 Processing 1 groups (optimized)
+useBalances.ts:147 Processing group: TestGroup with 3 members
+useBalances.ts:344 
+🔍 === OPTIMIZED BALANCE CALCULATION ===
+useBalances.ts:345 👤 User1 (You): R8lgO0eVYn7S5BclTvca
+useBalances.ts:346 👤 User2 (Them): G1LvPEfuDYqWGSfAsuox
+useBalances.ts:347 🏢 Group: 8my2pdWv400E0Eo0QJIB
+useBalances.ts:354 🔄 Using backend settlement calculation (cached for 10min)...
+ApiService.ts:126 🌐 API Request: GET /settlements/group/8my2pdWv400E0Eo0QJIB
+useBalances.ts:344 
+🔍 === OPTIMIZED BALANCE CALCULATION ===
+useBalances.ts:345 👤 User1 (You): R8lgO0eVYn7S5BclTvca
+useBalances.ts:346 👤 User2 (Them): 3bwiGARFab3qeQcj0u8U
+useBalances.ts:347 🏢 Group: 8my2pdWv400E0Eo0QJIB
+useBalances.ts:354 🔄 Using backend settlement calculation (cached for 10min)...
+ApiService.ts:126 🌐 API Request: GET /settlements/group/8my2pdWv400E0Eo0QJIB
+ApiService.ts:574 📄 ApiService: Friend requests response: {incoming: Array(0), outgoing: Array(0), totalIncoming: 0, totalOutgoing: 0}
+App.tsx:80 AppNavigator - User: Authenticated
+App.tsx:81 AppNavigator - Loading: false
 SubscriptionModal.tsx:75 🔍 Fixed SubscriptionModal render: {visible: false, reason: 'firstTime', canClose: true, autoCloseAfter: undefined}
-App.tsx:90 🔍 Checking subscription status for user: jv8gKAyRdtVlBAQUsgFO
-App.tsx:199 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: false, tourCheckCompleted: true, …}
-App.tsx:95 🔍 User premium status: false
-App.tsx:99 🎯 Free user detected, will show subscription modal first
-App.tsx:64 AppNavigator - User: Authenticated
-App.tsx:65 AppNavigator - Loading: false
+App.tsx:106 🔍 Checking subscription status for user: R8lgO0eVYn7S5BclTvca
+App.tsx:215 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: false, tourCheckCompleted: true, …}
+ApiService.ts:574 📄 ApiService: Friend requests response: {incoming: Array(0), outgoing: Array(0), totalIncoming: 0, totalOutgoing: 0}
+ApiService.ts:148 ✅ API Response: /settlements/group/8my2pdWv400E0Eo0QJIB Success
+useBalances.ts:376 ✅ No settlement needed - cached 0 balance
+useBalances.ts:377 ===============================
+
+useBalances.ts:83 Processing 2 friendships
+useBalances.ts:115 Processing 1 groups (optimized)
+useBalances.ts:147 Processing group: TestGroup with 3 members
+useBalances.ts:344 
+🔍 === OPTIMIZED BALANCE CALCULATION ===
+useBalances.ts:345 👤 User1 (You): R8lgO0eVYn7S5BclTvca
+useBalances.ts:346 👤 User2 (Them): G1LvPEfuDYqWGSfAsuox
+useBalances.ts:347 🏢 Group: 8my2pdWv400E0Eo0QJIB
+useBalances.ts:354 🔄 Using backend settlement calculation (cached for 10min)...
+ApiService.ts:126 🌐 API Request: GET /settlements/group/8my2pdWv400E0Eo0QJIB
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_3bwiGARFab3qeQcj0u8U_8my2pdWv400E0Eo0QJIB
+App.tsx:111 🔍 User premium status: true
+App.tsx:123 🔍 Premium user or tour already shown - skipping subscription modal
+App.tsx:80 AppNavigator - User: Authenticated
+App.tsx:81 AppNavigator - Loading: false
 SubscriptionModal.tsx:75 🔍 Fixed SubscriptionModal render: {visible: false, reason: 'firstTime', canClose: true, autoCloseAfter: undefined}
-App.tsx:199 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: false, tourCheckCompleted: true, …}
-ApiService.ts:557 📄 ApiService: Friend requests response: {incoming: Array(0), outgoing: Array(0), totalIncoming: 0, totalOutgoing: 0}
-ApiService.ts:557 📄 ApiService: Friend requests response: {incoming: Array(0), outgoing: Array(0), totalIncoming: 0, totalOutgoing: 0}
-App.tsx:124 🎯 DEBUG: Showing pending subscription modal: firstTime
-App.tsx:64 AppNavigator - User: Authenticated
-App.tsx:65 AppNavigator - Loading: false
-SubscriptionModal.tsx:75 🔍 Fixed SubscriptionModal render: {visible: true, reason: 'firstTime', canClose: false, autoCloseAfter: 5}
-SubscriptionModal.tsx:80 📱 SubscriptionModal becoming visible with reason: firstTime
-App.tsx:199 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: false, tourCheckCompleted: true, …}
-SubscriptionModal.tsx:75 🔍 Fixed SubscriptionModal render: {visible: true, reason: 'firstTime', canClose: false, autoCloseAfter: 5}
-App.tsx:64 AppNavigator - User: Authenticated
-App.tsx:65 AppNavigator - Loading: false
-SubscriptionModal.tsx:75 🔍 Fixed SubscriptionModal render: {visible: true, reason: 'firstTime', canClose: false, autoCloseAfter: 4}
-SubscriptionModal.tsx:75 🔍 Fixed SubscriptionModal render: {visible: true, reason: 'firstTime', canClose: false, autoCloseAfter: 4}
-App.tsx:320 🔄 DEBUG: Closing subscription modal
-App.tsx:64 AppNavigator - User: Authenticated
-App.tsx:65 AppNavigator - Loading: false
-SubscriptionModal.tsx:75 🔍 Fixed SubscriptionModal render: {visible: false, reason: 'firstTime', canClose: true, autoCloseAfter: undefined}
-App.tsx:199 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: false, tourCheckCompleted: true, …}
-useBalances.ts:75 Processing 3 friendships
-useBalances.ts:106 Processing 2 groups (optimized)
-useBalances.ts:137 Processing group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-useBalances.ts:137 Processing group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-App.tsx:329 🎯 Showing onboarding tour after subscription modal close
+App.tsx:215 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: false, tourCheckCompleted: true, …}
+ApiService.ts:148 ✅ API Response: /settlements/group/8my2pdWv400E0Eo0QJIB Success
+useBalances.ts:376 ✅ No settlement needed - cached 0 balance
+useBalances.ts:377 ===============================
+
+useBalances.ts:305 ✅ UNIFIED balance calculation complete: {totalOwed: 0, totalOwing: 0, netBalance: 0, relationships: 0}
+useSharedBalances.ts:172 ✅ SharedBalanceManager: Refresh complete: {totalOwed: 0, totalOwing: 0, netBalance: 0, detailCount: 0, friendsCount: 2}
+RealSplittingScreen.tsx:464 🔄 Loading settlement balances for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:620 🔄 Calculating SETTLEMENT balances for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:717 🚀 Starting data loading - user ID: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:718 ⏰ Step 1: Loading friends and requests...
+RealSplittingScreen.tsx:1166 🔄 Loading friends and friend requests...
+ApiService.ts:572 🔄 ApiService: Getting friend requests from API
+ApiService.ts:574 📄 ApiService: Friend requests response: {incoming: Array(0), outgoing: Array(0), totalIncoming: 0, totalOutgoing: 0}
+ApiService.ts:148 ✅ API Response: /settlements/group/8my2pdWv400E0Eo0QJIB Success
+useBalances.ts:376 ✅ No settlement needed - cached 0 balance
+useBalances.ts:377 ===============================
+
+useBalances.ts:305 ✅ UNIFIED balance calculation complete: {totalOwed: 0, totalOwing: 0, netBalance: 0, relationships: 0}
+useBalances.ts:829 ✅ useBalances: Refresh complete: {totalOwed: 0, totalOwing: 0, netBalance: 0, detailCount: 0, friendsCount: 2}
+useBalances.ts:871 📡 useBalances: Unregistered from balance change notifications
+useBalances.ts:867 📡 useBalances: Registered for balance change notifications
+useBalances.ts:884 🚀 useBalances: Initial load for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:800 ⏭️ useBalances: Skipping refresh due to cache
+useBalances.ts:924 📊 useBalances: Current state: {totalOwed: 0, totalOwing: 0, netBalance: 0, friendCount: 0, groupMemberCount: 0, …}
+useBalances.ts:933 📊 useBalances: Friends breakdown: []
+useBalances.ts:938 📊 useBalances: Group members breakdown: []
+RealSplittingScreen.tsx:411 🔄 Calculating balances for 0 groups
+RealSplittingScreen.tsx:447 📋 Final group balances: []
+RealSplittingScreen.tsx:1174 📋 Raw friends response: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1175 📋 Raw requests data: {incoming: Array(0), outgoing: Array(0)}
+RealSplittingScreen.tsx:1179 📋 Extracted friends data: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1197 🔄 Transformed friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1205 🔍 Outgoing requests details: []
+RealSplittingScreen.tsx:1270 ✅ Processed friends: {accepted: 2, pending: 0, outgoingRequests: 0, totalPending: 0}
+RealSplittingScreen.tsx:396 ✅ Friends data initialization complete
+RealSplittingScreen.tsx:464 🔄 Loading settlement balances for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:620 🔄 Calculating SETTLEMENT balances for user: R8lgO0eVYn7S5BclTvca
+App.tsx:240 🎯 Showing onboarding tour for user (no subscription conflicts)
 TourProvider.tsx:20 🎯 TourProvider: startTour called
-TourProvider.tsx:33 🎯 TourProvider: Starting tour for user: jv8gKAyRdtVlBAQUsgFO
-App.tsx:64 AppNavigator - User: Authenticated
-App.tsx:65 AppNavigator - Loading: false
+TourProvider.tsx:33 🎯 TourProvider: Starting tour for user: R8lgO0eVYn7S5BclTvca
+App.tsx:80 AppNavigator - User: Authenticated
+App.tsx:81 AppNavigator - Loading: false
 SubscriptionModal.tsx:75 🔍 Fixed SubscriptionModal render: {visible: false, reason: 'firstTime', canClose: true, autoCloseAfter: undefined}
-App.tsx:90 🔍 Checking subscription status for user: jv8gKAyRdtVlBAQUsgFO
-App.tsx:199 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: true, tourCheckCompleted: true, …}
-App.tsx:95 🔍 User premium status: false
-App.tsx:107 🔍 Premium user or tour already shown - skipping subscription modal
-App.tsx:64 AppNavigator - User: Authenticated
-App.tsx:65 AppNavigator - Loading: false
-useBalances.ts:75 Processing 3 friendships
-useBalances.ts:106 Processing 2 groups (optimized)
-useBalances.ts:137 Processing group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-useBalances.ts:137 Processing group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:271 ✅ UNIFIED balance calculation complete: {totalOwed: 275, totalOwing: 0, netBalance: 275, relationships: 1}
-useBalances.ts:771 ✅ useBalances: Refresh complete: {totalOwed: 275, totalOwing: 0, netBalance: 275, detailCount: 1, friendsCount: 3}
-useBalances.ts:806 📡 useBalances: Unregistered from balance change notifications
-useBalances.ts:802 📡 useBalances: Registered for balance change notifications
-useBalances.ts:819 🚀 useBalances: Initial load for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:750 ⏭️ useBalances: Skipping refresh due to cache
-useBalances.ts:859 📊 useBalances: Current state: {totalOwed: 275, totalOwing: 0, netBalance: 275, friendCount: 0, groupMemberCount: 1, …}
-useBalances.ts:868 📊 useBalances: Friends breakdown: []
-useBalances.ts:873 📊 useBalances: Group members breakdown: [{…}]
-RealSplittingScreen.tsx:668 🚀 Starting data loading - user ID: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:669 ⏰ Step 1: Loading friends and requests...
-RealSplittingScreen.tsx:1118 🔄 Loading friends and friend requests...
-ApiService.ts:555 🔄 ApiService: Getting friend requests from API
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-ApiService.ts:557 📄 ApiService: Friend requests response: {incoming: Array(0), outgoing: Array(0), totalIncoming: 0, totalOutgoing: 0}
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:271 ✅ UNIFIED balance calculation complete: {totalOwed: 275, totalOwing: 0, netBalance: 275, relationships: 1}
-useBalances.ts:771 ✅ useBalances: Refresh complete: {totalOwed: 275, totalOwing: 0, netBalance: 275, detailCount: 1, friendsCount: 3}
-useBalances.ts:806 📡 useBalances: Unregistered from balance change notifications
-useBalances.ts:802 📡 useBalances: Registered for balance change notifications
-useBalances.ts:819 🚀 useBalances: Initial load for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:750 ⏭️ useBalances: Skipping refresh due to cache
-useBalances.ts:859 📊 useBalances: Current state: {totalOwed: 275, totalOwing: 0, netBalance: 275, friendCount: 0, groupMemberCount: 1, …}
-useBalances.ts:868 📊 useBalances: Friends breakdown: []
-useBalances.ts:873 📊 useBalances: Group members breakdown: [{…}]
-RealSplittingScreen.tsx:417 🔄 Loading settlement balances for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:571 🔄 Calculating SETTLEMENT balances for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:668 🚀 Starting data loading - user ID: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:669 ⏰ Step 1: Loading friends and requests...
-RealSplittingScreen.tsx:1118 🔄 Loading friends and friend requests...
-ApiService.ts:555 🔄 ApiService: Getting friend requests from API
-RealSplittingScreen.tsx:1126 📋 Raw friends response: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1127 📋 Raw requests data: {incoming: Array(0), outgoing: Array(0)}
-RealSplittingScreen.tsx:1131 📋 Extracted friends data: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1149 🔄 Transformed friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1157 🔍 Outgoing requests details: []
-RealSplittingScreen.tsx:1222 ✅ Processed friends: {accepted: 3, pending: 0, outgoingRequests: 0, totalPending: 0}
-RealSplittingScreen.tsx:671 ✅ Step 1 complete: Friends data loaded 3 friends
-RealSplittingScreen.tsx:674 ⏰ Step 2: Loading groups...
-RealSplittingScreen.tsx:417 🔄 Loading settlement balances for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:571 🔄 Calculating SETTLEMENT balances for user: jv8gKAyRdtVlBAQUsgFO
-ApiService.ts:557 📄 ApiService: Friend requests response: {incoming: Array(0), outgoing: Array(0), totalIncoming: 0, totalOutgoing: 0}
-ApiService.ts:109 🌐 API Request: GET /expenses/group/XhEIVEteAjWvDSUmKvNb
-ApiService.ts:109 🌐 API Request: GET /expenses/group/k3jg22lmnLOCmZZSEReq
-RealSplittingScreen.tsx:1126 📋 Raw friends response: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1127 📋 Raw requests data: {incoming: Array(0), outgoing: Array(0)}
-RealSplittingScreen.tsx:1131 📋 Extracted friends data: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1149 🔄 Transformed friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1157 🔍 Outgoing requests details: []
-RealSplittingScreen.tsx:1222 ✅ Processed friends: {accepted: 3, pending: 0, outgoingRequests: 0, totalPending: 0}
-RealSplittingScreen.tsx:350 ✅ Friends data initialization complete
-RealSplittingScreen.tsx:417 🔄 Loading settlement balances for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:571 🔄 Calculating SETTLEMENT balances for user: jv8gKAyRdtVlBAQUsgFO
-ApiService.ts:131 ✅ API Response: /expenses/group/XhEIVEteAjWvDSUmKvNb Success
-ApiService.ts:131 ✅ API Response: /expenses/group/k3jg22lmnLOCmZZSEReq Success
-RealSplittingScreen.tsx:676 ✅ Step 2 complete: Groups data loaded 2 groups
-RealSplittingScreen.tsx:679 ⏰ Step 3: Loading notifications...
-RealSplittingScreen.tsx:365 🔄 Calculating balances for 2 groups
-RealSplittingScreen.tsx:369 
-📊 Calculating balance for group: chitti (XhEIVEteAjWvDSUmKvNb)
-RealSplittingScreen.tsx:370 👥 Group members: 2
-RealSplittingScreen.tsx:376 ⏭️  Skipping self: Test User
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-useBalances.ts:75 Processing 3 friendships
-useBalances.ts:106 Processing 2 groups (optimized)
-useBalances.ts:137 Processing group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-useBalances.ts:137 Processing group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-RealSplittingScreen.tsx:681 ✅ Step 3 complete: Notifications loaded
-RealSplittingScreen.tsx:685 ⏰ Step 4: Loading expenses with enhanced user data...
-RealSplittingScreen.tsx:823 🚀 loadRecentExpenses: FUNCTION CALLED
-RealSplittingScreen.tsx:829 🔄 loadRecentExpenses: Loading expenses for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:835 🔍 loadRecentExpenses: Using data: {friendsCount: 3, groupsCount: 2, fromParameters: true}
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-RealSplittingScreen.tsx:382 💰 Balance with krish: 0
-RealSplittingScreen.tsx:396 ✅ Total balance for chitti: 0
-RealSplittingScreen.tsx:369 
-📊 Calculating balance for group: Slitracker (k3jg22lmnLOCmZZSEReq)
-RealSplittingScreen.tsx:370 👥 Group members: 3
-RealSplittingScreen.tsx:376 ⏭️  Skipping self: Test User
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:587 Processing 3 friendships for settlement
-useBalances.ts:609 Processing 2 groups for settlement
-useBalances.ts:612 Processing settlement balances for group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:271 ✅ UNIFIED balance calculation complete: {totalOwed: 275, totalOwing: 0, netBalance: 275, relationships: 1}
-useBalances.ts:771 ✅ useBalances: Refresh complete: {totalOwed: 275, totalOwing: 0, netBalance: 275, detailCount: 1, friendsCount: 3}
-useBalances.ts:806 📡 useBalances: Unregistered from balance change notifications
-useBalances.ts:802 📡 useBalances: Registered for balance change notifications
-useBalances.ts:819 🚀 useBalances: Initial load for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:750 ⏭️ useBalances: Skipping refresh due to cache
-useBalances.ts:859 📊 useBalances: Current state: {totalOwed: 275, totalOwing: 0, netBalance: 275, friendCount: 0, groupMemberCount: 1, …}
-useBalances.ts:868 📊 useBalances: Friends breakdown: []
-useBalances.ts:873 📊 useBalances: Group members breakdown: [{…}]
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:612 Processing settlement balances for group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-RealSplittingScreen.tsx:382 💰 Balance with krish: 0
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-RealSplittingScreen.tsx:846 📋 loadRecentExpenses: Primary API call successful: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
-RealSplittingScreen.tsx:941 📋 loadRecentExpenses: Raw expenses data received: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
-RealSplittingScreen.tsx:942 📋 loadRecentExpenses: Is array? true Length: 6
-RealSplittingScreen.tsx:943 📋 loadRecentExpenses: Method used: PRIMARY (user API)
-RealSplittingScreen.tsx:946 🔍 loadRecentExpenses: Starting expense enhancement with: {friendsCount: 3, groupsCount: 2, expensesCount: 6}
-RealSplittingScreen.tsx:953 🔍 Processing expense: myer paid by jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:959 ✅ Payer is current user (You)
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: myer
-RealSplittingScreen.tsx:953 🔍 Processing expense: target paid by l1uvhpdPYlYwvY7nuUyW
-RealSplittingScreen.tsx:962 🔍 Looking for payer l1uvhpdPYlYwvY7nuUyW in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: Test User 1
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: target
-RealSplittingScreen.tsx:953 🔍 Processing expense: Kmatt paid by l1uvhpdPYlYwvY7nuUyW
-RealSplittingScreen.tsx:962 🔍 Looking for payer l1uvhpdPYlYwvY7nuUyW in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: Test User 1
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Kmatt
-RealSplittingScreen.tsx:953 🔍 Processing expense: Hoyts paid by 17cvdFlbU3mXH22aaVSk
-RealSplittingScreen.tsx:962 🔍 Looking for payer 17cvdFlbU3mXH22aaVSk in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: krish
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Hoyts
-RealSplittingScreen.tsx:953 🔍 Processing expense: Qantas paid by 17cvdFlbU3mXH22aaVSk
-RealSplittingScreen.tsx:962 🔍 Looking for payer 17cvdFlbU3mXH22aaVSk in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: krish
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Qantas
-RealSplittingScreen.tsx:953 🔍 Processing expense: Uber paid by jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:959 ✅ Payer is current user (You)
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Uber
-RealSplittingScreen.tsx:1081 🌟 Applying dynamic expense filtering for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:1089 ✅ Showing all expenses to maintain consistent user experience
-RealSplittingScreen.tsx:1090 ✅ Total expenses shown: 6
-RealSplittingScreen.tsx:1091 ✅ Expense descriptions: (6) ['myer', 'target', 'Kmatt', 'Hoyts', 'Qantas', 'Uber']
-RealSplittingScreen.tsx:1093 ✅ loadRecentExpenses: Set expenses array with length: 6
-RealSplittingScreen.tsx:1096 🕐 FINAL CHECK: Enhanced debug logging at 2025-08-10T14:29:47.094Z
-RealSplittingScreen.tsx:1099 🔍 FINAL EXPENSE OBJECT AFTER CONVERSION:
-RealSplittingScreen.tsx:1100   📋 Description: myer
-RealSplittingScreen.tsx:1101   � Date field AFTER conversion: Sun Aug 10 2025 23:32:29 GMT+1000 (Australian Eastern Standard Time) Type: object
-RealSplittingScreen.tsx:1102   📅 CreatedAt field AFTER conversion: Sun Aug 10 2025 23:32:31 GMT+1000 (Australian Eastern Standard Time) Type: object
-RealSplittingScreen.tsx:1103   ✅ Date isValid: true
-RealSplittingScreen.tsx:1104   ✅ CreatedAt isValid: true
-RealSplittingScreen.tsx:687 ✅ Step 4 complete: Recent expenses loaded with user names
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+App.tsx:106 🔍 Checking subscription status for user: R8lgO0eVYn7S5BclTvca
+App.tsx:215 🔍 Tour trigger check: {user: true, isLoading: false, initializing: false, hasShownTour: true, tourCheckCompleted: true, …}
+App.tsx:111 🔍 User premium status: true
+App.tsx:123 🔍 Premium user or tour already shown - skipping subscription modal
+App.tsx:80 AppNavigator - User: Authenticated
+App.tsx:81 AppNavigator - Loading: false
+useBalances.ts:636 Processing 2 friendships for settlement
+useBalances.ts:658 Processing 1 groups for settlement
+useBalances.ts:661 Processing settlement balances for group: TestGroup with 3 members
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_G1LvPEfuDYqWGSfAsuox_8my2pdWv400E0Eo0QJIB
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_3bwiGARFab3qeQcj0u8U_8my2pdWv400E0Eo0QJIB
+useBalances.ts:706 ✅ SETTLEMENT balance calculation complete: {totalEntries: 0, friendEntries: 0, groupEntries: 0}
+RealSplittingScreen.tsx:466 📊 Raw settlement balances from sharedBalances: []
+RealSplittingScreen.tsx:473 🔍 DEBUG: Accepted friends data: []
+RealSplittingScreen.tsx:495 🔍 DEBUG: Raw balance calculation results: []
+RealSplittingScreen.tsx:532 🔍 DEBUG: Enhanced non-zero balances: []
+RealSplittingScreen.tsx:573 🔍 DEBUG: Settled friends: []
+RealSplittingScreen.tsx:626 👥 Settlement balances after processing: 0 entries
+RealSplittingScreen.tsx:627 👥 Non-zero balances: 0
+RealSplittingScreen.tsx:628 👥 Settled friends added: 0
+RealSplittingScreen.tsx:629 👥 Final settlement balances with names: []
+RealSplittingScreen.tsx:1174 📋 Raw friends response: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1175 📋 Raw requests data: {incoming: Array(0), outgoing: Array(0)}
+RealSplittingScreen.tsx:1179 📋 Extracted friends data: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1197 🔄 Transformed friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1205 🔍 Outgoing requests details: []
+RealSplittingScreen.tsx:1270 ✅ Processed friends: {accepted: 2, pending: 0, outgoingRequests: 0, totalPending: 0}
+RealSplittingScreen.tsx:720 ✅ Step 1 complete: Friends data loaded 2 friends
+RealSplittingScreen.tsx:723 ⏰ Step 2: Loading groups...
+RealSplittingScreen.tsx:464 🔄 Loading settlement balances for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:620 🔄 Calculating SETTLEMENT balances for user: R8lgO0eVYn7S5BclTvca
+ApiService.ts:126 🌐 API Request: GET /expenses/group/8my2pdWv400E0Eo0QJIB
+useBalances.ts:636 Processing 2 friendships for settlement
+useBalances.ts:658 Processing 1 groups for settlement
+useBalances.ts:661 Processing settlement balances for group: TestGroup with 3 members
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_G1LvPEfuDYqWGSfAsuox_8my2pdWv400E0Eo0QJIB
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_3bwiGARFab3qeQcj0u8U_8my2pdWv400E0Eo0QJIB
+useBalances.ts:706 ✅ SETTLEMENT balance calculation complete: {totalEntries: 0, friendEntries: 0, groupEntries: 0}
+RealSplittingScreen.tsx:466 📊 Raw settlement balances from sharedBalances: []
+RealSplittingScreen.tsx:473 🔍 DEBUG: Accepted friends data: []
+RealSplittingScreen.tsx:495 🔍 DEBUG: Raw balance calculation results: []
+RealSplittingScreen.tsx:532 🔍 DEBUG: Enhanced non-zero balances: []
+RealSplittingScreen.tsx:573 🔍 DEBUG: Settled friends: []
+RealSplittingScreen.tsx:626 👥 Settlement balances after processing: 0 entries
+RealSplittingScreen.tsx:627 👥 Non-zero balances: 0
+RealSplittingScreen.tsx:628 👥 Settled friends added: 0
+RealSplittingScreen.tsx:629 👥 Final settlement balances with names: []
+ApiService.ts:148 ✅ API Response: /expenses/group/8my2pdWv400E0Eo0QJIB Success
+RealSplittingScreen.tsx:725 ✅ Step 2 complete: Groups data loaded 1 groups
+RealSplittingScreen.tsx:728 ⏰ Step 3: Loading notifications...
+RealSplittingScreen.tsx:1174 📋 Raw friends response: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1175 📋 Raw requests data: {incoming: Array(0), outgoing: Array(0)}
+RealSplittingScreen.tsx:1179 📋 Extracted friends data: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1197 🔄 Transformed friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1205 🔍 Outgoing requests details: []
+RealSplittingScreen.tsx:1270 ✅ Processed friends: {accepted: 2, pending: 0, outgoingRequests: 0, totalPending: 0}
+RealSplittingScreen.tsx:720 ✅ Step 1 complete: Friends data loaded 2 friends
+RealSplittingScreen.tsx:723 ⏰ Step 2: Loading groups...
+RealSplittingScreen.tsx:464 🔄 Loading settlement balances for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:620 🔄 Calculating SETTLEMENT balances for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:411 🔄 Calculating balances for 1 groups
+RealSplittingScreen.tsx:415 
+📊 Calculating balance for group: TestGroup (8my2pdWv400E0Eo0QJIB)
+RealSplittingScreen.tsx:416 👥 Group members: 3
+RealSplittingScreen.tsx:422 ⏭️  Skipping self: sam
+RealSplittingScreen.tsx:429 💰 Balance with sam2: 0
+RealSplittingScreen.tsx:429 💰 Balance with sam3: 0
+RealSplittingScreen.tsx:443 ✅ Total balance for TestGroup: 0
+RealSplittingScreen.tsx:447 📋 Final group balances: [Array(2)]
+RealSplittingScreen.tsx:730 ✅ Step 3 complete: Notifications loaded
+RealSplittingScreen.tsx:733 ⏰ Essential data loaded, showing UI immediately
+RealSplittingScreen.tsx:737 ⏰ Background: Starting lazy load of expenses...
+ApiService.ts:126 🌐 API Request: GET /expenses/group/8my2pdWv400E0Eo0QJIB
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 0
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
 AddExpenseModal.tsx:115 🔍 PAID BY CHANGED: 
-useBalances.ts:802 📡 useBalances: Registered for balance change notifications
-useBalances.ts:819 🚀 useBalances: Initial load for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:758 🔄 useBalances: Refreshing with UnifiedSettlementService
-useBalances.ts:57 🔄 Calculating UNIFIED balances for user: jv8gKAyRdtVlBAQUsgFO
+useBalances.ts:867 📡 useBalances: Registered for balance change notifications
+useBalances.ts:884 🚀 useBalances: Initial load for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:816 🔄 useBalances: Refreshing with UnifiedSettlementService
+useBalances.ts:65 🔄 Calculating UNIFIED balances for user: R8lgO0eVYn7S5BclTvca
 GroupDetailsModal.tsx:272 📊 GroupDetailsModal: group prop changed: {groupName: undefined, groupId: undefined, hasGroup: false, groupKeys: Array(0)}
-RealSplittingScreen.tsx:207 🚨🚨🚨 CLAUDE FIX ACTIVE - EXPENSES STATE CHANGED: {length: 6, expenses: Array(6)}
-RealSplittingScreen.tsx:1126 📋 Raw friends response: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1127 📋 Raw requests data: {incoming: Array(0), outgoing: Array(0)}
-RealSplittingScreen.tsx:1131 📋 Extracted friends data: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1149 🔄 Transformed friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1157 🔍 Outgoing requests details: []
-RealSplittingScreen.tsx:1222 ✅ Processed friends: {accepted: 3, pending: 0, outgoingRequests: 0, totalPending: 0}
-RealSplittingScreen.tsx:671 ✅ Step 1 complete: Friends data loaded 3 friends
-RealSplittingScreen.tsx:674 ⏰ Step 2: Loading groups...
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-RealSplittingScreen.tsx:417 🔄 Loading settlement balances for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:571 🔄 Calculating SETTLEMENT balances for user: jv8gKAyRdtVlBAQUsgFO
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:109 🌐 API Request: GET /expenses/group/XhEIVEteAjWvDSUmKvNb
-ApiService.ts:109 🌐 API Request: GET /expenses/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-RealSplittingScreen.tsx:382 💰 Balance with Test User 1: 275
-RealSplittingScreen.tsx:396 ✅ Total balance for Slitracker: 275
-RealSplittingScreen.tsx:400 📋 Final group balances: (2) [Array(2), Array(2)]
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+useBalances.ts:871 📡 useBalances: Unregistered from balance change notifications
+useBalances.ts:867 📡 useBalances: Registered for balance change notifications
+useBalances.ts:884 🚀 useBalances: Initial load for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:807 ⏭️ useBalances: Skipping refresh - request already pending
+useBalances.ts:636 Processing 2 friendships for settlement
+useBalances.ts:658 Processing 1 groups for settlement
+useBalances.ts:661 Processing settlement balances for group: TestGroup with 3 members
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_G1LvPEfuDYqWGSfAsuox_8my2pdWv400E0Eo0QJIB
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_3bwiGARFab3qeQcj0u8U_8my2pdWv400E0Eo0QJIB
+useBalances.ts:706 ✅ SETTLEMENT balance calculation complete: {totalEntries: 0, friendEntries: 0, groupEntries: 0}
+RealSplittingScreen.tsx:466 📊 Raw settlement balances from sharedBalances: []
+RealSplittingScreen.tsx:473 🔍 DEBUG: Accepted friends data: (2) [{…}, {…}]
+RealSplittingScreen.tsx:495 🔍 DEBUG: Raw balance calculation results: []
+RealSplittingScreen.tsx:532 🔍 DEBUG: Enhanced non-zero balances: []
+RealSplittingScreen.tsx:556 🔍 DEBUG: Adding settled friend G1LvPEfuDYqWGSfAsuox: {name: 'sam2', email: 'sam2@spendydev.com', fullData: {…}}
+RealSplittingScreen.tsx:556 🔍 DEBUG: Adding settled friend 3bwiGARFab3qeQcj0u8U: {name: 'sam3', email: 'sam3@spendydev.com', fullData: {…}}
+RealSplittingScreen.tsx:573 🔍 DEBUG: Settled friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:626 👥 Settlement balances after processing: 2 entries
+RealSplittingScreen.tsx:627 👥 Non-zero balances: 0
+RealSplittingScreen.tsx:628 👥 Settled friends added: 2
+RealSplittingScreen.tsx:629 👥 Final settlement balances with names: (2) [{…}, {…}]
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 0
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-useBalances.ts:587 Processing 3 friendships for settlement
-useBalances.ts:609 Processing 2 groups for settlement
-useBalances.ts:612 Processing settlement balances for group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-ApiService.ts:131 ✅ API Response: /expenses/group/XhEIVEteAjWvDSUmKvNb Success
-ApiService.ts:131 ✅ API Response: /expenses/group/k3jg22lmnLOCmZZSEReq Success
-RealSplittingScreen.tsx:676 ✅ Step 2 complete: Groups data loaded 2 groups
-RealSplittingScreen.tsx:679 ⏰ Step 3: Loading notifications...
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+RealSplittingScreen.tsx:872 🚀 loadRecentExpenses: FUNCTION CALLED
+RealSplittingScreen.tsx:878 🔄 loadRecentExpenses: Loading expenses for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:884 🔍 loadRecentExpenses: Using data: {friendsCount: 2, groupsCount: 1, fromParameters: true}
+ApiService.ts:148 ✅ API Response: /expenses/group/8my2pdWv400E0Eo0QJIB Success
+RealSplittingScreen.tsx:725 ✅ Step 2 complete: Groups data loaded 1 groups
+RealSplittingScreen.tsx:728 ⏰ Step 3: Loading notifications...
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 0
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:650 💰 Settlement: Test User 1 in Slitracker: 275
-useBalances.ts:657 ✅ SETTLEMENT balance calculation complete: {totalEntries: 1, friendEntries: 0, groupEntries: 1}
-RealSplittingScreen.tsx:419 📊 Raw settlement balances from friendsBalances: [{…}]
-RealSplittingScreen.tsx:426 🔍 DEBUG: Accepted friends data: []
-RealSplittingScreen.tsx:448 🔍 DEBUG: Raw balance calculation results: [{…}]
-RealSplittingScreen.tsx:465 🔍 DEBUG: Balance entry for l1uvhpdPYlYwvY7nuUyW: {originalName: 'Test User 1', betterName: 'Test User 1', friendMatch: false, friendName: undefined, friendEmail: undefined, …}
-RealSplittingScreen.tsx:485 🔍 DEBUG: Enhanced non-zero balances: [{…}]
-RealSplittingScreen.tsx:526 🔍 DEBUG: Settled friends: []
-RealSplittingScreen.tsx:579 👥 Settlement balances after processing: 1 entries
-RealSplittingScreen.tsx:580 👥 Non-zero balances: 1
-RealSplittingScreen.tsx:581 👥 Settled friends added: 0
-RealSplittingScreen.tsx:582 👥 Final settlement balances with names: [{…}]
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+useBalances.ts:636 Processing 2 friendships for settlement
+useBalances.ts:658 Processing 1 groups for settlement
+useBalances.ts:661 Processing settlement balances for group: TestGroup with 3 members
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_G1LvPEfuDYqWGSfAsuox_8my2pdWv400E0Eo0QJIB
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_3bwiGARFab3qeQcj0u8U_8my2pdWv400E0Eo0QJIB
+useBalances.ts:706 ✅ SETTLEMENT balance calculation complete: {totalEntries: 0, friendEntries: 0, groupEntries: 0}
+RealSplittingScreen.tsx:466 📊 Raw settlement balances from sharedBalances: []
+RealSplittingScreen.tsx:473 🔍 DEBUG: Accepted friends data: (2) [{…}, {…}]
+RealSplittingScreen.tsx:495 🔍 DEBUG: Raw balance calculation results: []
+RealSplittingScreen.tsx:532 🔍 DEBUG: Enhanced non-zero balances: []
+RealSplittingScreen.tsx:556 🔍 DEBUG: Adding settled friend G1LvPEfuDYqWGSfAsuox: {name: 'sam2', email: 'sam2@spendydev.com', fullData: {…}}
+RealSplittingScreen.tsx:556 🔍 DEBUG: Adding settled friend 3bwiGARFab3qeQcj0u8U: {name: 'sam3', email: 'sam3@spendydev.com', fullData: {…}}
+RealSplittingScreen.tsx:573 🔍 DEBUG: Settled friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:626 👥 Settlement balances after processing: 2 entries
+RealSplittingScreen.tsx:627 👥 Non-zero balances: 0
+RealSplittingScreen.tsx:628 👥 Settled friends added: 2
+RealSplittingScreen.tsx:629 👥 Final settlement balances with names: (2) [{…}, {…}]
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 0
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:612 Processing settlement balances for group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-RealSplittingScreen.tsx:681 ✅ Step 3 complete: Notifications loaded
-RealSplittingScreen.tsx:685 ⏰ Step 4: Loading expenses with enhanced user data...
-RealSplittingScreen.tsx:823 🚀 loadRecentExpenses: FUNCTION CALLED
-RealSplittingScreen.tsx:829 🔄 loadRecentExpenses: Loading expenses for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:835 🔍 loadRecentExpenses: Using data: {friendsCount: 3, groupsCount: 2, fromParameters: true}
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+RealSplittingScreen.tsx:730 ✅ Step 3 complete: Notifications loaded
+RealSplittingScreen.tsx:733 ⏰ Essential data loaded, showing UI immediately
+RealSplittingScreen.tsx:737 ⏰ Background: Starting lazy load of expenses...
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 0
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-RealSplittingScreen.tsx:1126 📋 Raw friends response: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1127 📋 Raw requests data: {incoming: Array(0), outgoing: Array(0)}
-RealSplittingScreen.tsx:1131 📋 Extracted friends data: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1149 🔄 Transformed friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:1157 🔍 Outgoing requests details: []
-RealSplittingScreen.tsx:1222 ✅ Processed friends: {accepted: 3, pending: 0, outgoingRequests: 0, totalPending: 0}
-RealSplittingScreen.tsx:671 ✅ Step 1 complete: Friends data loaded 3 friends
-RealSplittingScreen.tsx:674 ⏰ Step 2: Loading groups...
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+RealSplittingScreen.tsx:872 🚀 loadRecentExpenses: FUNCTION CALLED
+RealSplittingScreen.tsx:878 🔄 loadRecentExpenses: Loading expenses for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:884 🔍 loadRecentExpenses: Using data: {friendsCount: 2, groupsCount: 1, fromParameters: true}
+RealSplittingScreen.tsx:895 📋 loadRecentExpenses: Primary API call successful: (3) [{…}, {…}, {…}]
+RealSplittingScreen.tsx:989 📋 loadRecentExpenses: Raw expenses data received: (3) [{…}, {…}, {…}]
+RealSplittingScreen.tsx:990 📋 loadRecentExpenses: Is array? true Length: 3
+RealSplittingScreen.tsx:991 📋 loadRecentExpenses: Method used: PRIMARY (user API)
+RealSplittingScreen.tsx:994 🔍 loadRecentExpenses: Starting expense enhancement with: {friendsCount: 2, groupsCount: 1, expensesCount: 3}
+RealSplittingScreen.tsx:1001 🔍 Processing expense: hoyts paid by 3bwiGARFab3qeQcj0u8U
+RealSplittingScreen.tsx:1010 🔍 Looking for payer 3bwiGARFab3qeQcj0u8U in friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1020 ✅ Found payer in friends: sam3
+RealSplittingScreen.tsx:1054 📅 Processing date conversion for expense: hoyts
+RealSplittingScreen.tsx:1001 🔍 Processing expense: H&M paid by G1LvPEfuDYqWGSfAsuox
+RealSplittingScreen.tsx:1010 🔍 Looking for payer G1LvPEfuDYqWGSfAsuox in friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1020 ✅ Found payer in friends: sam2
+RealSplittingScreen.tsx:1054 📅 Processing date conversion for expense: H&M
+RealSplittingScreen.tsx:1001 🔍 Processing expense: ubereats paid by R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:1007 ✅ Payer is current user (You)
+RealSplittingScreen.tsx:1054 📅 Processing date conversion for expense: ubereats
+RealSplittingScreen.tsx:1129 🌟 Applying dynamic expense filtering for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:1137 ✅ Showing all expenses to maintain consistent user experience
+RealSplittingScreen.tsx:1138 ✅ Total expenses shown: 3
+RealSplittingScreen.tsx:1139 ✅ Expense descriptions: (3) ['hoyts', 'H&M', 'ubereats']
+RealSplittingScreen.tsx:1141 ✅ loadRecentExpenses: Set expenses array with length: 3
+RealSplittingScreen.tsx:1144 🕐 FINAL CHECK: Enhanced debug logging at 2025-08-12T14:48:20.468Z
+RealSplittingScreen.tsx:1147 🔍 FINAL EXPENSE OBJECT AFTER CONVERSION:
+RealSplittingScreen.tsx:1148   📋 Description: hoyts
+RealSplittingScreen.tsx:1149   � Date field AFTER conversion: Tue Aug 12 2025 23:53:02 GMT+1000 (Australian Eastern Standard Time) Type: object
+RealSplittingScreen.tsx:1150   📅 CreatedAt field AFTER conversion: Tue Aug 12 2025 23:53:03 GMT+1000 (Australian Eastern Standard Time) Type: object
+RealSplittingScreen.tsx:1151   ✅ Date isValid: true
+RealSplittingScreen.tsx:1152   ✅ CreatedAt isValid: true
+RealSplittingScreen.tsx:740 ✅ Background: Recent expenses loaded
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 3
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-RealSplittingScreen.tsx:417 🔄 Loading settlement balances for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:571 🔄 Calculating SETTLEMENT balances for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:365 🔄 Calculating balances for 2 groups
-RealSplittingScreen.tsx:369 
-📊 Calculating balance for group: chitti (XhEIVEteAjWvDSUmKvNb)
-RealSplittingScreen.tsx:370 👥 Group members: 2
-RealSplittingScreen.tsx:376 ⏭️  Skipping self: Test User
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:109 🌐 API Request: GET /expenses/group/XhEIVEteAjWvDSUmKvNb
-ApiService.ts:109 🌐 API Request: GET /expenses/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-RealSplittingScreen.tsx:382 💰 Balance with krish: 0
-RealSplittingScreen.tsx:396 ✅ Total balance for chitti: 0
-RealSplittingScreen.tsx:369 
-📊 Calculating balance for group: Slitracker (k3jg22lmnLOCmZZSEReq)
-RealSplittingScreen.tsx:370 👥 Group members: 3
-RealSplittingScreen.tsx:376 ⏭️  Skipping self: Test User
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-useBalances.ts:587 Processing 3 friendships for settlement
-useBalances.ts:609 Processing 2 groups for settlement
-useBalances.ts:612 Processing settlement balances for group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-ApiService.ts:131 ✅ API Response: /expenses/group/k3jg22lmnLOCmZZSEReq Success
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:650 💰 Settlement: Test User 1 in Slitracker: 275
-useBalances.ts:657 ✅ SETTLEMENT balance calculation complete: {totalEntries: 1, friendEntries: 0, groupEntries: 1}
-RealSplittingScreen.tsx:419 📊 Raw settlement balances from friendsBalances: [{…}]
-RealSplittingScreen.tsx:426 🔍 DEBUG: Accepted friends data: []
-RealSplittingScreen.tsx:448 🔍 DEBUG: Raw balance calculation results: [{…}]
-RealSplittingScreen.tsx:465 🔍 DEBUG: Balance entry for l1uvhpdPYlYwvY7nuUyW: {originalName: 'Test User 1', betterName: 'Test User 1', friendMatch: false, friendName: undefined, friendEmail: undefined, …}
-RealSplittingScreen.tsx:485 🔍 DEBUG: Enhanced non-zero balances: [{…}]
-RealSplittingScreen.tsx:526 🔍 DEBUG: Settled friends: []
-RealSplittingScreen.tsx:579 👥 Settlement balances after processing: 1 entries
-RealSplittingScreen.tsx:580 👥 Non-zero balances: 1
-RealSplittingScreen.tsx:581 👥 Settled friends added: 0
-RealSplittingScreen.tsx:582 👥 Final settlement balances with names: [{…}]
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+RealSplittingScreen.tsx:209 🚨🚨🚨 CLAUDE FIX ACTIVE - EXPENSES STATE CHANGED: {length: 3, expenses: Array(3)}
+useBalances.ts:636 Processing 2 friendships for settlement
+useBalances.ts:658 Processing 1 groups for settlement
+useBalances.ts:661 Processing settlement balances for group: TestGroup with 3 members
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_G1LvPEfuDYqWGSfAsuox_8my2pdWv400E0Eo0QJIB
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_3bwiGARFab3qeQcj0u8U_8my2pdWv400E0Eo0QJIB
+useBalances.ts:706 ✅ SETTLEMENT balance calculation complete: {totalEntries: 0, friendEntries: 0, groupEntries: 0}
+RealSplittingScreen.tsx:466 📊 Raw settlement balances from sharedBalances: []
+RealSplittingScreen.tsx:473 🔍 DEBUG: Accepted friends data: (2) [{…}, {…}]
+RealSplittingScreen.tsx:495 🔍 DEBUG: Raw balance calculation results: []
+RealSplittingScreen.tsx:532 🔍 DEBUG: Enhanced non-zero balances: []
+RealSplittingScreen.tsx:556 🔍 DEBUG: Adding settled friend G1LvPEfuDYqWGSfAsuox: {name: 'sam2', email: 'sam2@spendydev.com', fullData: {…}}
+RealSplittingScreen.tsx:556 🔍 DEBUG: Adding settled friend 3bwiGARFab3qeQcj0u8U: {name: 'sam3', email: 'sam3@spendydev.com', fullData: {…}}
+RealSplittingScreen.tsx:573 🔍 DEBUG: Settled friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:626 👥 Settlement balances after processing: 2 entries
+RealSplittingScreen.tsx:627 👥 Non-zero balances: 0
+RealSplittingScreen.tsx:628 👥 Settled friends added: 2
+RealSplittingScreen.tsx:629 👥 Final settlement balances with names: (2) [{…}, {…}]
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 3
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-ApiService.ts:131 ✅ API Response: /expenses/group/XhEIVEteAjWvDSUmKvNb Success
-RealSplittingScreen.tsx:676 ✅ Step 2 complete: Groups data loaded 2 groups
-RealSplittingScreen.tsx:679 ⏰ Step 3: Loading notifications...
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+RealSplittingScreen.tsx:411 🔄 Calculating balances for 1 groups
+RealSplittingScreen.tsx:415 
+📊 Calculating balance for group: TestGroup (8my2pdWv400E0Eo0QJIB)
+RealSplittingScreen.tsx:416 👥 Group members: 3
+RealSplittingScreen.tsx:422 ⏭️  Skipping self: sam
+RealSplittingScreen.tsx:429 💰 Balance with sam2: 0
+RealSplittingScreen.tsx:429 💰 Balance with sam3: 0
+RealSplittingScreen.tsx:443 ✅ Total balance for TestGroup: 0
+RealSplittingScreen.tsx:447 📋 Final group balances: [Array(2)]
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 3
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-RealSplittingScreen.tsx:681 ✅ Step 3 complete: Notifications loaded
-RealSplittingScreen.tsx:685 ⏰ Step 4: Loading expenses with enhanced user data...
-RealSplittingScreen.tsx:823 🚀 loadRecentExpenses: FUNCTION CALLED
-RealSplittingScreen.tsx:829 🔄 loadRecentExpenses: Loading expenses for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:835 🔍 loadRecentExpenses: Using data: {friendsCount: 3, groupsCount: 2, fromParameters: true}
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+RealSplittingScreen.tsx:895 📋 loadRecentExpenses: Primary API call successful: (3) [{…}, {…}, {…}]
+RealSplittingScreen.tsx:989 📋 loadRecentExpenses: Raw expenses data received: (3) [{…}, {…}, {…}]
+RealSplittingScreen.tsx:990 📋 loadRecentExpenses: Is array? true Length: 3
+RealSplittingScreen.tsx:991 📋 loadRecentExpenses: Method used: PRIMARY (user API)
+RealSplittingScreen.tsx:994 🔍 loadRecentExpenses: Starting expense enhancement with: {friendsCount: 2, groupsCount: 1, expensesCount: 3}
+RealSplittingScreen.tsx:1001 🔍 Processing expense: hoyts paid by 3bwiGARFab3qeQcj0u8U
+RealSplittingScreen.tsx:1010 🔍 Looking for payer 3bwiGARFab3qeQcj0u8U in friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1020 ✅ Found payer in friends: sam3
+RealSplittingScreen.tsx:1054 📅 Processing date conversion for expense: hoyts
+RealSplittingScreen.tsx:1001 🔍 Processing expense: H&M paid by G1LvPEfuDYqWGSfAsuox
+RealSplittingScreen.tsx:1010 🔍 Looking for payer G1LvPEfuDYqWGSfAsuox in friends: (2) [{…}, {…}]
+RealSplittingScreen.tsx:1020 ✅ Found payer in friends: sam2
+RealSplittingScreen.tsx:1054 📅 Processing date conversion for expense: H&M
+RealSplittingScreen.tsx:1001 🔍 Processing expense: ubereats paid by R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:1007 ✅ Payer is current user (You)
+RealSplittingScreen.tsx:1054 📅 Processing date conversion for expense: ubereats
+RealSplittingScreen.tsx:1129 🌟 Applying dynamic expense filtering for user: R8lgO0eVYn7S5BclTvca
+RealSplittingScreen.tsx:1137 ✅ Showing all expenses to maintain consistent user experience
+RealSplittingScreen.tsx:1138 ✅ Total expenses shown: 3
+RealSplittingScreen.tsx:1139 ✅ Expense descriptions: (3) ['hoyts', 'H&M', 'ubereats']
+RealSplittingScreen.tsx:1141 ✅ loadRecentExpenses: Set expenses array with length: 3
+RealSplittingScreen.tsx:1144 🕐 FINAL CHECK: Enhanced debug logging at 2025-08-12T14:48:20.892Z
+RealSplittingScreen.tsx:1147 🔍 FINAL EXPENSE OBJECT AFTER CONVERSION:
+RealSplittingScreen.tsx:1148   📋 Description: hoyts
+RealSplittingScreen.tsx:1149   � Date field AFTER conversion: Tue Aug 12 2025 23:53:02 GMT+1000 (Australian Eastern Standard Time) Type: object
+RealSplittingScreen.tsx:1150   📅 CreatedAt field AFTER conversion: Tue Aug 12 2025 23:53:03 GMT+1000 (Australian Eastern Standard Time) Type: object
+RealSplittingScreen.tsx:1151   ✅ Date isValid: true
+RealSplittingScreen.tsx:1152   ✅ CreatedAt isValid: true
+RealSplittingScreen.tsx:740 ✅ Background: Recent expenses loaded
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 3
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:612 Processing settlement balances for group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-RealSplittingScreen.tsx:382 💰 Balance with krish: 0
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-RealSplittingScreen.tsx:365 🔄 Calculating balances for 2 groups
-RealSplittingScreen.tsx:369 
-📊 Calculating balance for group: chitti (XhEIVEteAjWvDSUmKvNb)
-RealSplittingScreen.tsx:370 👥 Group members: 2
-RealSplittingScreen.tsx:376 ⏭️  Skipping self: Test User
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-useBalances.ts:587 Processing 3 friendships for settlement
-useBalances.ts:609 Processing 2 groups for settlement
-useBalances.ts:612 Processing settlement balances for group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-RealSplittingScreen.tsx:846 📋 loadRecentExpenses: Primary API call successful: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
-RealSplittingScreen.tsx:941 📋 loadRecentExpenses: Raw expenses data received: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
-RealSplittingScreen.tsx:942 📋 loadRecentExpenses: Is array? true Length: 6
-RealSplittingScreen.tsx:943 📋 loadRecentExpenses: Method used: PRIMARY (user API)
-RealSplittingScreen.tsx:946 🔍 loadRecentExpenses: Starting expense enhancement with: {friendsCount: 3, groupsCount: 2, expensesCount: 6}
-RealSplittingScreen.tsx:953 🔍 Processing expense: myer paid by jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:959 ✅ Payer is current user (You)
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: myer
-RealSplittingScreen.tsx:953 🔍 Processing expense: target paid by l1uvhpdPYlYwvY7nuUyW
-RealSplittingScreen.tsx:962 🔍 Looking for payer l1uvhpdPYlYwvY7nuUyW in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: Test User 1
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: target
-RealSplittingScreen.tsx:953 🔍 Processing expense: Kmatt paid by l1uvhpdPYlYwvY7nuUyW
-RealSplittingScreen.tsx:962 🔍 Looking for payer l1uvhpdPYlYwvY7nuUyW in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: Test User 1
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Kmatt
-RealSplittingScreen.tsx:953 🔍 Processing expense: Hoyts paid by 17cvdFlbU3mXH22aaVSk
-RealSplittingScreen.tsx:962 🔍 Looking for payer 17cvdFlbU3mXH22aaVSk in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: krish
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Hoyts
-RealSplittingScreen.tsx:953 🔍 Processing expense: Qantas paid by 17cvdFlbU3mXH22aaVSk
-RealSplittingScreen.tsx:962 🔍 Looking for payer 17cvdFlbU3mXH22aaVSk in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: krish
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Qantas
-RealSplittingScreen.tsx:953 🔍 Processing expense: Uber paid by jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:959 ✅ Payer is current user (You)
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Uber
-RealSplittingScreen.tsx:1081 🌟 Applying dynamic expense filtering for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:1089 ✅ Showing all expenses to maintain consistent user experience
-RealSplittingScreen.tsx:1090 ✅ Total expenses shown: 6
-RealSplittingScreen.tsx:1091 ✅ Expense descriptions: (6) ['myer', 'target', 'Kmatt', 'Hoyts', 'Qantas', 'Uber']
-RealSplittingScreen.tsx:1093 ✅ loadRecentExpenses: Set expenses array with length: 6
-RealSplittingScreen.tsx:1096 🕐 FINAL CHECK: Enhanced debug logging at 2025-08-10T14:29:56.989Z
-RealSplittingScreen.tsx:1099 🔍 FINAL EXPENSE OBJECT AFTER CONVERSION:
-RealSplittingScreen.tsx:1100   📋 Description: myer
-RealSplittingScreen.tsx:1101   � Date field AFTER conversion: Sun Aug 10 2025 23:32:29 GMT+1000 (Australian Eastern Standard Time) Type: object
-RealSplittingScreen.tsx:1102   📅 CreatedAt field AFTER conversion: Sun Aug 10 2025 23:32:31 GMT+1000 (Australian Eastern Standard Time) Type: object
-RealSplittingScreen.tsx:1103   ✅ Date isValid: true
-RealSplittingScreen.tsx:1104   ✅ CreatedAt isValid: true
-RealSplittingScreen.tsx:687 ✅ Step 4 complete: Recent expenses loaded with user names
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+RealSplittingScreen.tsx:209 🚨🚨🚨 CLAUDE FIX ACTIVE - EXPENSES STATE CHANGED: {length: 3, expenses: Array(3)}
+useBalances.ts:83 Processing 2 friendships
+useBalances.ts:115 Processing 1 groups (optimized)
+useBalances.ts:147 Processing group: TestGroup with 3 members
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_G1LvPEfuDYqWGSfAsuox_8my2pdWv400E0Eo0QJIB
+useBalances.ts:340 📦 Using cached balance calculation for: balance_R8lgO0eVYn7S5BclTvca_3bwiGARFab3qeQcj0u8U_8my2pdWv400E0Eo0QJIB
+useBalances.ts:305 ✅ UNIFIED balance calculation complete: {totalOwed: 0, totalOwing: 0, netBalance: 0, relationships: 0}
+useBalances.ts:829 ✅ useBalances: Refresh complete: {totalOwed: 0, totalOwing: 0, netBalance: 0, detailCount: 0, friendsCount: 2}
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-RealSplittingScreen.tsx:207 🚨🚨🚨 CLAUDE FIX ACTIVE - EXPENSES STATE CHANGED: {length: 6, expenses: Array(6)}
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-RealSplittingScreen.tsx:382 💰 Balance with krish: 0
-RealSplittingScreen.tsx:396 ✅ Total balance for chitti: 0
-RealSplittingScreen.tsx:369 
-📊 Calculating balance for group: Slitracker (k3jg22lmnLOCmZZSEReq)
-RealSplittingScreen.tsx:370 👥 Group members: 3
-RealSplittingScreen.tsx:376 ⏭️  Skipping self: Test User
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-useBalances.ts:75 Processing 3 friendships
-useBalances.ts:106 Processing 2 groups (optimized)
-useBalances.ts:137 Processing group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-useBalances.ts:137 Processing group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-RealSplittingScreen.tsx:382 💰 Balance with Test User 1: 275
-RealSplittingScreen.tsx:396 ✅ Total balance for Slitracker: 275
-RealSplittingScreen.tsx:400 📋 Final group balances: (2) [Array(2), Array(2)]
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+useBalances.ts:871 📡 useBalances: Unregistered from balance change notifications
+useBalances.ts:867 📡 useBalances: Registered for balance change notifications
+useBalances.ts:884 🚀 useBalances: Initial load for user: R8lgO0eVYn7S5BclTvca
+useBalances.ts:800 ⏭️ useBalances: Skipping refresh due to cache
+useBalances.ts:924 📊 useBalances: Current state: {totalOwed: 0, totalOwing: 0, netBalance: 0, friendCount: 0, groupMemberCount: 0, …}
+useBalances.ts:933 📊 useBalances: Friends breakdown: []
+useBalances.ts:938 📊 useBalances: Group members breakdown: []
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 3
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:612 Processing settlement balances for group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:650 💰 Settlement: Test User 1 in Slitracker: 275
-useBalances.ts:657 ✅ SETTLEMENT balance calculation complete: {totalEntries: 1, friendEntries: 0, groupEntries: 1}
-RealSplittingScreen.tsx:419 📊 Raw settlement balances from friendsBalances: [{…}]
-RealSplittingScreen.tsx:426 🔍 DEBUG: Accepted friends data: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:448 🔍 DEBUG: Raw balance calculation results: [{…}]
-RealSplittingScreen.tsx:465 🔍 DEBUG: Balance entry for l1uvhpdPYlYwvY7nuUyW: {originalName: 'Test User 1', betterName: 'Test User 1', friendMatch: true, friendName: 'Test User 1', friendEmail: 'test874@example.com', …}
-RealSplittingScreen.tsx:485 🔍 DEBUG: Enhanced non-zero balances: [{…}]
-RealSplittingScreen.tsx:509 🔍 DEBUG: Adding settled friend CiOEoTAB6ej6yQu99Pxh: {name: 'Test User', email: 'test842@example.com', fullData: {…}}
-RealSplittingScreen.tsx:509 🔍 DEBUG: Adding settled friend 17cvdFlbU3mXH22aaVSk: {name: 'krish', email: 'krish@spendy.com', fullData: {…}}
-RealSplittingScreen.tsx:526 🔍 DEBUG: Settled friends: (2) [{…}, {…}]
-RealSplittingScreen.tsx:579 👥 Settlement balances after processing: 3 entries
-RealSplittingScreen.tsx:580 👥 Non-zero balances: 1
-RealSplittingScreen.tsx:581 👥 Settled friends added: 2
-RealSplittingScreen.tsx:582 👥 Final settlement balances with names: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+EditExpenseModal.tsx:88 Initializing edit form with expense: {id: 'Wrta16KboJTOrnjzZX6v', title: 'hoyts', description: 'hoyts', amount: 900, paidBy: '3bwiGARFab3qeQcj0u8U', …}
+EditExpenseModal.tsx:93 Found group for expense: TestGroup
+EditExpenseModal.tsx:114 Active members found: 3
+EditExpenseModal.tsx:152 Enhanced split data set: 3 entries
+index.js:57 Unexpected text node: . A text node cannot be a child of a <View>.
+(anonymous) @ index.js:57
+View @ index.js:55
+react-stack-bottom-frame @ react-dom-client.development.js:22428
+renderWithHooks @ react-dom-client.development.js:5757
+updateForwardRef @ react-dom-client.development.js:7762
+beginWork @ react-dom-client.development.js:10014
+runWithFiberInDEV @ react-dom-client.development.js:543
+performUnitOfWork @ react-dom-client.development.js:15052
+workLoopSync @ react-dom-client.development.js:14870
+renderRootSync @ react-dom-client.development.js:14850
+performWorkOnRoot @ react-dom-client.development.js:14334
+performSyncWorkOnRoot @ react-dom-client.development.js:15946
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:15807
+processRootScheduleInMicrotask @ react-dom-client.development.js:15841
+(anonymous) @ react-dom-client.development.js:15962
+EditExpenseModal.tsx:317 Submitting updated expense: {id: 'Wrta16KboJTOrnjzZX6v', description: 'hoyts', amount: 1000, currency: 'AUD', category: 'entertainment', …}
+RealSplittingScreen.tsx:1882 🔄 Updating expense with data: {id: 'Wrta16KboJTOrnjzZX6v', description: 'hoyts', amount: 1000, currency: 'AUD', category: 'entertainment', …}
+ApiService.ts:126 🌐 API Request: PUT /expenses/Wrta16KboJTOrnjzZX6v
+index.js:57 Unexpected text node: . A text node cannot be a child of a <View>.
+(anonymous) @ index.js:57
+View @ index.js:55
+react-stack-bottom-frame @ react-dom-client.development.js:22428
+renderWithHooks @ react-dom-client.development.js:5757
+updateForwardRef @ react-dom-client.development.js:7762
+beginWork @ react-dom-client.development.js:10014
+runWithFiberInDEV @ react-dom-client.development.js:543
+performUnitOfWork @ react-dom-client.development.js:15052
+workLoopSync @ react-dom-client.development.js:14870
+renderRootSync @ react-dom-client.development.js:14850
+performWorkOnRoot @ react-dom-client.development.js:14334
+performSyncWorkOnRoot @ react-dom-client.development.js:15946
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:15807
+processRootScheduleInMicrotask @ react-dom-client.development.js:15841
+(anonymous) @ react-dom-client.development.js:15962
+ApiService.ts:128 
+            
+            
+           PUT https://us-central1-spendy-develop.cloudfunctions.net/spendyApi/expenses/Wrta16KboJTOrnjzZX6v 404 (Not Found)
+makeRequest @ ApiService.ts:128
+request @ ApiService.ts:177
+updateExpense @ ApiService.ts:489
+handleExpenseUpdate @ RealSplittingScreen.tsx:1884
+handleSubmit @ EditExpenseModal.tsx:318
+onClick @ PressResponder.js:314
+processDispatchQueue @ react-dom-client.development.js:16122
+(anonymous) @ react-dom-client.development.js:16725
+batchedUpdates$1 @ react-dom-client.development.js:3129
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:16281
+dispatchEvent @ react-dom-client.development.js:20353
+dispatchDiscreteEvent @ react-dom-client.development.js:20321
+ApiService.ts:142 Could not parse error response as JSON
+ApiService.ts:157 ❌ API Error: /expenses/Wrta16KboJTOrnjzZX6v Error: HTTP 404: 
+    at ApiService.makeRequest (ApiService.ts:144:15)
+    at async ApiService.request (ApiService.ts:177:24)
+    at async ApiService.updateExpense (ApiService.ts:489:5)
+    at async handleExpenseUpdate (RealSplittingScreen.tsx:1884:7)
+    at async handleSubmit (EditExpenseModal.tsx:318:7)
+makeRequest @ ApiService.ts:157
+await in makeRequest
+request @ ApiService.ts:177
+updateExpense @ ApiService.ts:489
+handleExpenseUpdate @ RealSplittingScreen.tsx:1884
+handleSubmit @ EditExpenseModal.tsx:318
+onClick @ PressResponder.js:314
+processDispatchQueue @ react-dom-client.development.js:16122
+(anonymous) @ react-dom-client.development.js:16725
+batchedUpdates$1 @ react-dom-client.development.js:3129
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:16281
+dispatchEvent @ react-dom-client.development.js:20353
+dispatchDiscreteEvent @ react-dom-client.development.js:20321
+ApiService.ts:181 🔍 Full error details: {message: 'HTTP 404: ', endpoint: '/expenses/Wrta16KboJTOrnjzZX6v', method: 'PUT'}
+RealSplittingScreen.tsx:1900 ❌ Update expense error: Error: Resource not found (404). Please check if the group still exists.
+    at ApiService.request (ApiService.ts:206:17)
+    at async ApiService.updateExpense (ApiService.ts:489:5)
+    at async handleExpenseUpdate (RealSplittingScreen.tsx:1884:7)
+    at async handleSubmit (EditExpenseModal.tsx:318:7)
+handleExpenseUpdate @ RealSplittingScreen.tsx:1900
+await in handleExpenseUpdate
+handleSubmit @ EditExpenseModal.tsx:318
+onClick @ PressResponder.js:314
+processDispatchQueue @ react-dom-client.development.js:16122
+(anonymous) @ react-dom-client.development.js:16725
+batchedUpdates$1 @ react-dom-client.development.js:3129
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:16281
+dispatchEvent @ react-dom-client.development.js:20353
+dispatchDiscreteEvent @ react-dom-client.development.js:20321
+EditExpenseModal.tsx:330 Update expense error: Error: Resource not found (404). Please check if the group still exists.
+    at ApiService.request (ApiService.ts:206:17)
+    at async ApiService.updateExpense (ApiService.ts:489:5)
+    at async handleExpenseUpdate (RealSplittingScreen.tsx:1884:7)
+    at async handleSubmit (EditExpenseModal.tsx:318:7)
+handleSubmit @ EditExpenseModal.tsx:330
+await in handleSubmit
+onClick @ PressResponder.js:314
+processDispatchQueue @ react-dom-client.development.js:16122
+(anonymous) @ react-dom-client.development.js:16725
+batchedUpdates$1 @ react-dom-client.development.js:3129
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:16281
+dispatchEvent @ react-dom-client.development.js:20353
+dispatchDiscreteEvent @ react-dom-client.development.js:20321
+index.js:57 Unexpected text node: . A text node cannot be a child of a <View>.
+(anonymous) @ index.js:57
+View @ index.js:55
+react-stack-bottom-frame @ react-dom-client.development.js:22428
+renderWithHooks @ react-dom-client.development.js:5757
+updateForwardRef @ react-dom-client.development.js:7762
+beginWork @ react-dom-client.development.js:10014
+runWithFiberInDEV @ react-dom-client.development.js:543
+performUnitOfWork @ react-dom-client.development.js:15052
+workLoopSync @ react-dom-client.development.js:14870
+renderRootSync @ react-dom-client.development.js:14850
+performWorkOnRoot @ react-dom-client.development.js:14334
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:15931
+performWorkUntilDeadline @ scheduler.development.js:44
+index.js:57 Unexpected text node: . A text node cannot be a child of a <View>.
+(anonymous) @ index.js:57
+View @ index.js:55
+react-stack-bottom-frame @ react-dom-client.development.js:22428
+renderWithHooks @ react-dom-client.development.js:5757
+updateForwardRef @ react-dom-client.development.js:7762
+beginWork @ react-dom-client.development.js:10014
+runWithFiberInDEV @ react-dom-client.development.js:543
+performUnitOfWork @ react-dom-client.development.js:15052
+workLoopSync @ react-dom-client.development.js:14870
+renderRootSync @ react-dom-client.development.js:14850
+performWorkOnRoot @ react-dom-client.development.js:14334
+performSyncWorkOnRoot @ react-dom-client.development.js:15946
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:15807
+processRootScheduleInMicrotask @ react-dom-client.development.js:15841
+(anonymous) @ react-dom-client.development.js:15962
+ApiService.ts:126 🌐 API Request: GET /groups/8my2pdWv400E0Eo0QJIB
+ApiService.ts:148 ✅ API Response: /groups/8my2pdWv400E0Eo0QJIB Success
+index.js:57 Unexpected text node: . A text node cannot be a child of a <View>.
+(anonymous) @ index.js:57
+View @ index.js:55
+react-stack-bottom-frame @ react-dom-client.development.js:22428
+renderWithHooks @ react-dom-client.development.js:5757
+updateForwardRef @ react-dom-client.development.js:7762
+beginWork @ react-dom-client.development.js:10014
+runWithFiberInDEV @ react-dom-client.development.js:543
+performUnitOfWork @ react-dom-client.development.js:15052
+workLoopSync @ react-dom-client.development.js:14870
+renderRootSync @ react-dom-client.development.js:14850
+performWorkOnRoot @ react-dom-client.development.js:14334
+performSyncWorkOnRoot @ react-dom-client.development.js:15946
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:15807
+processRootScheduleInMicrotask @ react-dom-client.development.js:15841
+(anonymous) @ react-dom-client.development.js:15962
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 3
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-RealSplittingScreen.tsx:846 📋 loadRecentExpenses: Primary API call successful: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
-RealSplittingScreen.tsx:941 📋 loadRecentExpenses: Raw expenses data received: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
-RealSplittingScreen.tsx:942 📋 loadRecentExpenses: Is array? true Length: 6
-RealSplittingScreen.tsx:943 📋 loadRecentExpenses: Method used: PRIMARY (user API)
-RealSplittingScreen.tsx:946 🔍 loadRecentExpenses: Starting expense enhancement with: {friendsCount: 3, groupsCount: 2, expensesCount: 6}
-RealSplittingScreen.tsx:953 🔍 Processing expense: myer paid by jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:959 ✅ Payer is current user (You)
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: myer
-RealSplittingScreen.tsx:953 🔍 Processing expense: target paid by l1uvhpdPYlYwvY7nuUyW
-RealSplittingScreen.tsx:962 🔍 Looking for payer l1uvhpdPYlYwvY7nuUyW in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: Test User 1
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: target
-RealSplittingScreen.tsx:953 🔍 Processing expense: Kmatt paid by l1uvhpdPYlYwvY7nuUyW
-RealSplittingScreen.tsx:962 🔍 Looking for payer l1uvhpdPYlYwvY7nuUyW in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: Test User 1
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Kmatt
-RealSplittingScreen.tsx:953 🔍 Processing expense: Hoyts paid by 17cvdFlbU3mXH22aaVSk
-RealSplittingScreen.tsx:962 🔍 Looking for payer 17cvdFlbU3mXH22aaVSk in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: krish
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Hoyts
-RealSplittingScreen.tsx:953 🔍 Processing expense: Qantas paid by 17cvdFlbU3mXH22aaVSk
-RealSplittingScreen.tsx:962 🔍 Looking for payer 17cvdFlbU3mXH22aaVSk in friends: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:972 ✅ Found payer in friends: krish
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Qantas
-RealSplittingScreen.tsx:953 🔍 Processing expense: Uber paid by jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:959 ✅ Payer is current user (You)
-RealSplittingScreen.tsx:1006 📅 Processing date conversion for expense: Uber
-RealSplittingScreen.tsx:1081 🌟 Applying dynamic expense filtering for user: jv8gKAyRdtVlBAQUsgFO
-RealSplittingScreen.tsx:1089 ✅ Showing all expenses to maintain consistent user experience
-RealSplittingScreen.tsx:1090 ✅ Total expenses shown: 6
-RealSplittingScreen.tsx:1091 ✅ Expense descriptions: (6) ['myer', 'target', 'Kmatt', 'Hoyts', 'Qantas', 'Uber']
-RealSplittingScreen.tsx:1093 ✅ loadRecentExpenses: Set expenses array with length: 6
-RealSplittingScreen.tsx:1096 🕐 FINAL CHECK: Enhanced debug logging at 2025-08-10T14:30:01.052Z
-RealSplittingScreen.tsx:1099 🔍 FINAL EXPENSE OBJECT AFTER CONVERSION:
-RealSplittingScreen.tsx:1100   📋 Description: myer
-RealSplittingScreen.tsx:1101   � Date field AFTER conversion: Sun Aug 10 2025 23:32:29 GMT+1000 (Australian Eastern Standard Time) Type: object
-RealSplittingScreen.tsx:1102   📅 CreatedAt field AFTER conversion: Sun Aug 10 2025 23:32:31 GMT+1000 (Australian Eastern Standard Time) Type: object
-RealSplittingScreen.tsx:1103   ✅ Date isValid: true
-RealSplittingScreen.tsx:1104   ✅ CreatedAt isValid: true
-RealSplittingScreen.tsx:687 ✅ Step 4 complete: Recent expenses loaded with user names
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
+RealSplittingScreen.tsx:2104 🎯 Overview tab rendering with unified balances: {totalOwed: 0, totalOwing: 0, netBalance: 0, isLoading: false, allBalances: Array(0), …}
+RealSplittingScreen.tsx:2234 🔍 Overview expenses rendering: length = 3
+RealSplittingScreen.tsx:2376 🔍 Friends overview: Total accepted friends: 2
+RealSplittingScreen.tsx:2377 🔍 Friends overview: Balance entries: 0
+RealSplittingScreen.tsx:2378 🔍 Friends overview: Combined friends with balances: 2
 GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-RealSplittingScreen.tsx:207 🚨🚨🚨 CLAUDE FIX ACTIVE - EXPENSES STATE CHANGED: {length: 6, expenses: Array(6)}
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-RealSplittingScreen.tsx:382 💰 Balance with krish: 0
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-useBalances.ts:587 Processing 3 friendships for settlement
-useBalances.ts:609 Processing 2 groups for settlement
-useBalances.ts:612 Processing settlement balances for group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:612 Processing settlement balances for group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-useBalances.ts:587 Processing 3 friendships for settlement
-useBalances.ts:609 Processing 2 groups for settlement
-useBalances.ts:612 Processing settlement balances for group: chitti with 2 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: XhEIVEteAjWvDSUmKvNb
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/XhEIVEteAjWvDSUmKvNb
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:271 ✅ UNIFIED balance calculation complete: {totalOwed: 275, totalOwing: 0, netBalance: 275, relationships: 1}
-useBalances.ts:771 ✅ useBalances: Refresh complete: {totalOwed: 275, totalOwing: 0, netBalance: 275, detailCount: 1, friendsCount: 3}
-GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-useBalances.ts:806 📡 useBalances: Unregistered from balance change notifications
-useBalances.ts:802 📡 useBalances: Registered for balance change notifications
-useBalances.ts:819 🚀 useBalances: Initial load for user: jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:750 ⏭️ useBalances: Skipping refresh due to cache
-useBalances.ts:859 📊 useBalances: Current state: {totalOwed: 275, totalOwing: 0, netBalance: 275, friendCount: 0, groupMemberCount: 1, …}
-useBalances.ts:868 📊 useBalances: Friends breakdown: []
-useBalances.ts:873 📊 useBalances: Group members breakdown: [{…}]
-ApiService.ts:131 ✅ API Response: /settlements/group/XhEIVEteAjWvDSUmKvNb Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:612 Processing settlement balances for group: Slitracker with 3 members
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): 17cvdFlbU3mXH22aaVSk
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-RealSplittingScreen.tsx:382 💰 Balance with Test User 1: 275
-RealSplittingScreen.tsx:396 ✅ Total balance for Slitracker: 275
-RealSplittingScreen.tsx:400 📋 Final group balances: (2) [Array(2), Array(2)]
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
-GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:330 ✅ No settlement needed between these users
-useBalances.ts:331 ===============================
-
-useBalances.ts:301 
-🔍 === DETAILED BALANCE CALCULATION ===
-useBalances.ts:302 👤 User1 (You): jv8gKAyRdtVlBAQUsgFO
-useBalances.ts:303 👤 User2 (Them): l1uvhpdPYlYwvY7nuUyW
-useBalances.ts:304 🏢 Group: k3jg22lmnLOCmZZSEReq
-useBalances.ts:312 🔄 Using backend settlement calculation (includes settlement records)...
-ApiService.ts:109 🌐 API Request: GET /settlements/group/k3jg22lmnLOCmZZSEReq
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:650 💰 Settlement: Test User 1 in Slitracker: 275
-useBalances.ts:657 ✅ SETTLEMENT balance calculation complete: {totalEntries: 1, friendEntries: 0, groupEntries: 1}
-RealSplittingScreen.tsx:419 📊 Raw settlement balances from friendsBalances: [{…}]
-RealSplittingScreen.tsx:426 🔍 DEBUG: Accepted friends data: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:448 🔍 DEBUG: Raw balance calculation results: [{…}]
-RealSplittingScreen.tsx:465 🔍 DEBUG: Balance entry for l1uvhpdPYlYwvY7nuUyW: {originalName: 'Test User 1', betterName: 'Test User 1', friendMatch: true, friendName: 'Test User 1', friendEmail: 'test874@example.com', …}
-RealSplittingScreen.tsx:485 🔍 DEBUG: Enhanced non-zero balances: [{…}]
-RealSplittingScreen.tsx:509 🔍 DEBUG: Adding settled friend CiOEoTAB6ej6yQu99Pxh: {name: 'Test User', email: 'test842@example.com', fullData: {…}}
-RealSplittingScreen.tsx:509 🔍 DEBUG: Adding settled friend 17cvdFlbU3mXH22aaVSk: {name: 'krish', email: 'krish@spendy.com', fullData: {…}}
-RealSplittingScreen.tsx:526 🔍 DEBUG: Settled friends: (2) [{…}, {…}]
-RealSplittingScreen.tsx:579 👥 Settlement balances after processing: 3 entries
-RealSplittingScreen.tsx:580 👥 Non-zero balances: 1
-RealSplittingScreen.tsx:581 👥 Settled friends added: 2
-RealSplittingScreen.tsx:582 👥 Final settlement balances with names: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
-GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:650 💰 Settlement: Test User 1 in Slitracker: 275
-useBalances.ts:657 ✅ SETTLEMENT balance calculation complete: {totalEntries: 1, friendEntries: 0, groupEntries: 1}
-RealSplittingScreen.tsx:419 📊 Raw settlement balances from friendsBalances: [{…}]
-RealSplittingScreen.tsx:426 🔍 DEBUG: Accepted friends data: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:448 🔍 DEBUG: Raw balance calculation results: [{…}]
-RealSplittingScreen.tsx:465 🔍 DEBUG: Balance entry for l1uvhpdPYlYwvY7nuUyW: {originalName: 'Test User 1', betterName: 'Test User 1', friendMatch: true, friendName: 'Test User 1', friendEmail: 'test874@example.com', …}
-RealSplittingScreen.tsx:485 🔍 DEBUG: Enhanced non-zero balances: [{…}]
-RealSplittingScreen.tsx:509 🔍 DEBUG: Adding settled friend CiOEoTAB6ej6yQu99Pxh: {name: 'Test User', email: 'test842@example.com', fullData: {…}}
-RealSplittingScreen.tsx:509 🔍 DEBUG: Adding settled friend 17cvdFlbU3mXH22aaVSk: {name: 'krish', email: 'krish@spendy.com', fullData: {…}}
-RealSplittingScreen.tsx:526 🔍 DEBUG: Settled friends: (2) [{…}, {…}]
-RealSplittingScreen.tsx:579 👥 Settlement balances after processing: 3 entries
-RealSplittingScreen.tsx:580 👥 Non-zero balances: 1
-RealSplittingScreen.tsx:581 👥 Settled friends added: 2
-RealSplittingScreen.tsx:582 👥 Final settlement balances with names: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
-GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
-ApiService.ts:131 ✅ API Response: /settlements/group/k3jg22lmnLOCmZZSEReq Success
-useBalances.ts:325 💰 Backend settlement balance: 275
-useBalances.ts:326 💭 Interpretation: User2 owes User1
-useBalances.ts:327 ===============================
-
-useBalances.ts:650 💰 Settlement: Test User 1 in Slitracker: 275
-useBalances.ts:657 ✅ SETTLEMENT balance calculation complete: {totalEntries: 1, friendEntries: 0, groupEntries: 1}
-RealSplittingScreen.tsx:419 📊 Raw settlement balances from friendsBalances: [{…}]
-RealSplittingScreen.tsx:426 🔍 DEBUG: Accepted friends data: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:448 🔍 DEBUG: Raw balance calculation results: [{…}]
-RealSplittingScreen.tsx:465 🔍 DEBUG: Balance entry for l1uvhpdPYlYwvY7nuUyW: {originalName: 'Test User 1', betterName: 'Test User 1', friendMatch: true, friendName: 'Test User 1', friendEmail: 'test874@example.com', …}
-RealSplittingScreen.tsx:485 🔍 DEBUG: Enhanced non-zero balances: [{…}]
-RealSplittingScreen.tsx:509 🔍 DEBUG: Adding settled friend CiOEoTAB6ej6yQu99Pxh: {name: 'Test User', email: 'test842@example.com', fullData: {…}}
-RealSplittingScreen.tsx:509 🔍 DEBUG: Adding settled friend 17cvdFlbU3mXH22aaVSk: {name: 'krish', email: 'krish@spendy.com', fullData: {…}}
-RealSplittingScreen.tsx:526 🔍 DEBUG: Settled friends: (2) [{…}, {…}]
-RealSplittingScreen.tsx:579 👥 Settlement balances after processing: 3 entries
-RealSplittingScreen.tsx:580 👥 Non-zero balances: 1
-RealSplittingScreen.tsx:581 👥 Settled friends added: 2
-RealSplittingScreen.tsx:582 👥 Final settlement balances with names: (3) [{…}, {…}, {…}]
-RealSplittingScreen.tsx:2057 🎯 Overview tab rendering with unified balances: {totalOwed: 275, totalOwing: 0, netBalance: 275, isLoading: false, allBalances: Array(1), …}
-RealSplittingScreen.tsx:2194 🔍 Overview expenses rendering: length = 6
-RealSplittingScreen.tsx:2336 🔍 Friends overview: Total accepted friends: 3
-RealSplittingScreen.tsx:2337 🔍 Friends overview: Balance entries: 1
-RealSplittingScreen.tsx:2338 🔍 Friends overview: Combined friends with balances: 3
-GroupDetailsModal.tsx:921 ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: false
+index.js:57 Unexpected text node: . A text node cannot be a child of a <View>.
+(anonymous) @ index.js:57
+View @ index.js:55
+react-stack-bottom-frame @ react-dom-client.development.js:22428
+renderWithHooks @ react-dom-client.development.js:5757
+updateForwardRef @ react-dom-client.development.js:7762
+beginWork @ react-dom-client.development.js:10014
+runWithFiberInDEV @ react-dom-client.development.js:543
+performUnitOfWork @ react-dom-client.development.js:15052
+workLoopSync @ react-dom-client.development.js:14870
+renderRootSync @ react-dom-client.development.js:14850
+performWorkOnRoot @ react-dom-client.development.js:14334
+performSyncWorkOnRoot @ react-dom-client.development.js:15946
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:15807
+processRootScheduleInMicrotask @ react-dom-client.development.js:15841
+(anonymous) @ react-dom-client.development.js:15962
+EditExpenseModal.tsx:88 Initializing edit form with expense: {id: 'Wrta16KboJTOrnjzZX6v', title: 'hoyts', description: 'hoyts', amount: 900, paidBy: '3bwiGARFab3qeQcj0u8U', …}
+EditExpenseModal.tsx:93 Found group for expense: TestGroup
+EditExpenseModal.tsx:114 Active members found: 3
+EditExpenseModal.tsx:152 Enhanced split data set: 3 entries

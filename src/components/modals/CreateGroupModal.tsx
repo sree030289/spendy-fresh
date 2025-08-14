@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -161,7 +161,7 @@ const renderFriendSelector = () => (
     
     {friends.length === 0 ? (
       <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-        <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} />
+        <Icon name="people" size={48} color={theme.colors.textSecondary}  />
         <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
           No friends added yet
         </Text>
@@ -210,7 +210,7 @@ const renderFriendSelector = () => (
                 selectedFriends.includes(friend.id) && [styles.checkedBox, { backgroundColor: theme.colors.primary }]
               ]}>
                 {selectedFriends.includes(friend.id) && (
-                  <Ionicons name="checkmark" size={16} color="white" />
+                  <Icon name="checkmark" size={16} color="white"  />
                 )}
               </View>
             </View>
@@ -226,7 +226,7 @@ const renderInviteMethod = () => (
     <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>After Creation</Text>
     
     <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
-      <Ionicons name="information-circle" size={20} color={theme.colors.primary} />
+      <Icon name="information" size={20} color={theme.colors.primary}  />
       <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
         After creating the group, you'll get an invite code that you can share with friends via SMS, WhatsApp, or QR code.
       </Text>
@@ -243,7 +243,7 @@ const renderInviteMethod = () => (
           disabled={loading}
           style={styles.cancelButton}
         >
-          <Ionicons name="close" size={24} color={theme.colors.text} />
+          <Icon name="close" size={24} color={theme.colors.text}  />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Create Group</Text>
         <View style={{ width: 24 }} />

@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, TouchableOpacity, StyleSheet, Animated, Dimensions, Text } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../components/common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,7 +17,7 @@ import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
 import AddExpenseModal from '@/components/modals/AddExpenseModal';
 import AddReminderModal from '@/components/reminders/AddReminderModal';
 import GmailSyncModal from '@/components/modals/GmailSyncModal';
-import SmartMoneyScreen from '@/screens/main/SmartMoneyApp';
+import MoneyManagementScreen from '@/screens/main/MoneyManagementScreen';
 import Reminders from '@/screens/main/RemindersScreen';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
@@ -41,7 +41,7 @@ function PlusTabButton({ children, onPress }: any) {
         colors={[theme.colors.gradientStart, theme.colors.gradientEnd]}
         style={styles.plusGradient}
       >
-        <Ionicons name="add" size={36} color="white" />
+        <Icon name="add" size={36} color="white"  />
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -50,7 +50,7 @@ function PlusTabButton({ children, onPress }: any) {
 // Tab routes configuration (excluding the center action button)
 const TAB_ROUTES = [
   { name: 'Split', component: RealSplittingScreen, index: 0 },
-  { name: 'SmartMoney', component: SmartMoneyScreen, index: 1 },
+  { name: 'MoneyManagement', component: MoneyManagementScreen, index: 1 },
   { name: 'Reminders', component: Reminders, index: 3 }, // Skip index 2 (AddAction)
   { name: 'Profile', component: ProfileScreen, index: 4 }
 ];
@@ -151,10 +151,10 @@ function SwipeableTabNavigator() {
         setShowAddExpense(true);
         break;
       case 'smart-expense':
-        // Navigate to Smart Money tab
+        // Navigate to Money Management tab
         navigation.dispatch(
           CommonActions.navigate({
-            name: 'SmartMoney'
+            name: 'MoneyManagement'
           })
         );
         break;
@@ -253,26 +253,26 @@ function SwipeableTabNavigator() {
           <Tab.Navigator
             screenOptions={({ route }) => ({
               tabBarIcon: ({ focused, color, size }) => {
-                let iconName: keyof typeof Ionicons.glyphMap;
+                let iconName: string;
 
                 switch (route.name) {
                   case 'Split':
-                    iconName = focused ? 'people' : 'people-outline';
+                    iconName = 'people';
                     break;
-                  case 'SmartMoney':
-                    iconName = focused ? 'sparkles' : 'sparkles-outline';
+                  case 'MoneyManagement':
+                    iconName = 'wallet';
                     break;
                   case 'AddAction':
                     iconName = 'add';
                     break;
                   case 'Reminders':
-                    iconName = focused ? 'calendar' : 'calendar-outline';
+                    iconName = 'calendar';
                     break;
                   case 'Profile':
-                    iconName = focused ? 'person' : 'person-outline';
+                    iconName = 'person';
                     break;
                   default:
-                    iconName = 'ellipse';
+                    iconName = 'help';
                 }
 
                 // Special styling for Add Action (Plus) tab
@@ -280,7 +280,7 @@ function SwipeableTabNavigator() {
                   return null; // Don't return icon, handle it in PlusTabButton
                 }
 
-                return <Ionicons name={iconName} size={size} color={color} />;
+                return <Icon name={iconName as any} size={size} color={color} />;
               },
               tabBarActiveTintColor: theme.colors.tabActive,
               tabBarInactiveTintColor: theme.colors.tabInactive,
@@ -313,10 +313,10 @@ function SwipeableTabNavigator() {
             />
             
             <Tab.Screen
-              name="SmartMoney"
-              component={SmartMoneyScreen}
+              name="MoneyManagement"
+              component={MoneyManagementScreen}
               options={{
-                tabBarLabel: 'Smart Money',
+                tabBarLabel: 'Money',
               }}
             />
             

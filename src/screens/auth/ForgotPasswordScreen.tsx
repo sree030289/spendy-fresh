@@ -12,7 +12,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -149,11 +149,11 @@ export default function ForgotPasswordScreen() {
                 onPress={() => navigation.goBack()}
                 style={styles.backButton}
               >
-                <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+                <Icon name="back" size={24} color={theme.colors.text}  />
               </TouchableOpacity>
               
               <View style={styles.iconContainer}>
-                <Ionicons 
+                <Icon 
                   name={sent ? "checkmark-circle" : "mail-outline"} 
                   size={64} 
                   color={sent ? theme.colors.success : theme.colors.primary} 
@@ -196,12 +196,11 @@ export default function ForgotPasswordScreen() {
                     returnKeyType="send"
                     onSubmitEditing={handleResetPassword}
                   />
-                  <Ionicons 
-                    name="mail-outline" 
+                  <Icon name="mail" 
                     size={20} 
                     color={emailError ? theme.colors.error : theme.colors.textSecondary} 
                     style={styles.inputIcon}
-                  />
+                   />
                   {emailError ? (
                     <Text style={[styles.errorText, { color: theme.colors.error }]}>
                       {emailError}

@@ -656,11 +656,12 @@ export class SmartMoneyService {
       
       const transaction = transactionDoc.data() as SmartTransaction;
       
-      // Use existing splitting service
-      const { SplittingService } = await import('../firebase/splitting-disabled');
+      // Use ApiService instead of disabled SplittingService
+      const { ApiService } = await import('../api/ApiService');
+      const apiService = ApiService.getInstance();
       
       // Find user's groups to determine where to split
-      const userGroups = await SplittingService.getUserGroups(transaction.userId);
+      const userGroups = await apiService.getUserGroups(transaction.userId);
       let targetGroup = userGroups.find(group => 
         group.members.some(member => participants.includes(member.userId))
       );
@@ -673,8 +674,8 @@ export class SmartMoneyService {
         throw new Error('No suitable group found for splitting');
       }
       
-      // Create expense in splitting system
-      const expenseId = await SplittingService.addExpense({
+      // Create expense using ApiService
+      const expenseData = {
         description: transaction.description,
         amount: transaction.amount,
         currency: 'AUD', // TODO: Get from user preferences
@@ -697,7 +698,10 @@ export class SmartMoneyService {
         notes: `Split from Smart Money transaction: ${transaction.description}`,
         date: transaction.date,
         isSettled: false
-      });
+      };
+      
+      const response = await apiService.addExpense(expenseData);
+      const expenseId = response.id;
       
       // Update original transaction with split reference
       await updateDoc(doc(db, 'smartTransactions', transactionId), {

@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -138,7 +138,7 @@ export const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
 
         {/* Selected Value Display */}
         <View style={[styles.selectedContainer, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons 
+          <Icon 
             name={mode === 'time' ? 'time-outline' : 'calendar-outline'} 
             size={24} 
             color={theme.colors.primary} 

@@ -12,7 +12,7 @@ import {
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -209,7 +209,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
           colors={['#EA4335', '#FBBC04']}
           style={styles.gmailLogo}
         >
-          <Ionicons name="mail" size={48} color="white" />
+          <Icon name="mail" size={48} color="white"  />
         </LinearGradient>
       </View>
 
@@ -225,7 +225,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
       <View style={styles.featuresContainer}>
         <View style={styles.featureItem}>
           <View style={[styles.featureIcon, { backgroundColor: '#00C851' + '20' }]}>
-            <Ionicons name="sparkles" size={20} color="#00C851" />
+            <Icon name="star" size={20} color="#00C851" />
           </View>
           <View style={styles.featureText}>
             <Text style={[styles.featureTitle, { color: theme.colors.text }]}>
@@ -239,7 +239,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
 
         <View style={styles.featureItem}>
           <View style={[styles.featureIcon, { backgroundColor: '#3B82F6' + '20' }]}>
-            <Ionicons name="shield-checkmark" size={20} color="#3B82F6" />
+            <Icon name="shield" size={20} color="#3B82F6" />
           </View>
           <View style={styles.featureText}>
             <Text style={[styles.featureTitle, { color: theme.colors.text }]}>
@@ -253,7 +253,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
 
         <View style={styles.featureItem}>
           <View style={[styles.featureIcon, { backgroundColor: '#F59E0B' + '20' }]}>
-            <Ionicons name="notifications" size={20} color="#F59E0B" />
+            <Icon name="notifications" size={20} color="#F59E0B"  />
           </View>
           <View style={styles.featureText}>
             <Text style={[styles.featureTitle, { color: theme.colors.text }]}>
@@ -273,15 +273,15 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
         </Text>
         
         {[
-          { key: 'includeBills', label: 'Utility Bills', icon: 'flash' },
-          { key: 'includeSubscriptions', label: 'Subscriptions', icon: 'repeat' },
+          { key: 'includeBills', label: 'Utility Bills', icon: 'cash' },
+          { key: 'includeSubscriptions', label: 'Subscriptions', icon: 'refresh' },
           { key: 'includeCreditCards', label: 'Credit Card Bills', icon: 'card' },
           { key: 'includeReceipts', label: 'Purchase Receipts', icon: 'receipt' },
-          { key: 'includeInvestments', label: 'Investment Statements', icon: 'trending-up' },
+          { key: 'includeInvestments', label: 'Investment Statements', icon: 'trending' },
         ].map((setting) => (
           <View key={setting.key} style={styles.settingItem}>
             <View style={styles.settingLeft}>
-              <Ionicons 
+              <Icon 
                 name={setting.icon as any} 
                 size={20} 
                 color={theme.colors.primary} 
@@ -309,7 +309,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
           colors={['#EA4335', '#DB4437']}
           style={styles.connectButton}
         >
-          <Ionicons name="logo-google" size={24} color="white" />
+          <Icon name="mail" size={24} color="white" />
           <Text style={styles.connectButtonText}>Connect Gmail Account</Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -364,7 +364,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
                 item.completed && { backgroundColor: '#00C851' }
               ]}>
                 {item.completed && (
-                  <Ionicons name="checkmark" size={12} color="white" />
+                  <Icon name="checkmark" size={12} color="white"  />
                 )}
               </View>
               <Text style={[
@@ -385,7 +385,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
       {/* Header */}
       <View style={styles.resultsHeader}>
         <View style={[styles.successIcon, { backgroundColor: '#00C851' + '20' }]}>
-          <Ionicons name="checkmark-circle" size={32} color="#00C851" />
+          <Icon name="success" size={32} color="#00C851"  />
         </View>
         <Text style={[styles.resultsTitle, { color: theme.colors.text }]}>
           Found {detectedBills.length} Bills & Payments
@@ -416,7 +416,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
                 bill.selected && { backgroundColor: '#00C851', borderColor: '#00C851' }
               ]}>
                 {bill.selected && (
-                  <Ionicons name="checkmark" size={16} color="white" />
+                  <Icon name="checkmark" size={16} color="white"  />
                 )}
               </View>
               
@@ -493,7 +493,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
             colors={['#00C851', '#00A844']}
             style={styles.createButton}
           >
-            <Ionicons name="notifications" size={20} color="white" />
+            <Icon name="notifications" size={20} color="white"  />
             <Text style={styles.createButtonText}>
               Create {detectedBills.filter(b => b.selected).length} Reminders
             </Text>
@@ -509,7 +509,7 @@ export default function GmailSyncModal({ visible, onClose, onSync }: GmailSyncMo
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
             Gmail Smart Sync

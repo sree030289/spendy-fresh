@@ -13,7 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -1404,7 +1404,7 @@ export default function ImportSplitwiseModal({
           onPress={handleSelectFile}
           disabled={loading}
         >
-          <Ionicons name="document-outline" size={32} color={theme.colors.primary} />
+          <Icon name="document" size={32} color={theme.colors.primary}  />
           <Text style={[styles.uploadText, { color: theme.colors.text }]}>
             Tap to select your Splitwise CSV export
           </Text>
@@ -1415,7 +1415,7 @@ export default function ImportSplitwiseModal({
       ) : (
         <View style={[styles.selectedFile, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.fileInfo}>
-            <Ionicons name="document-text-outline" size={24} color={theme.colors.primary} />
+            <Icon name="document-text-outline" size={24} color={theme.colors.primary} />
             <View style={styles.fileDetails}>
               <Text style={[styles.fileName, { color: theme.colors.text }]} numberOfLines={1}>
                 {fileName}
@@ -1438,7 +1438,7 @@ export default function ImportSplitwiseModal({
       )}
 
       <View style={styles.infoBox}>
-        <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+        <Icon name="information" size={20} color={theme.colors.primary}  />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
           To get your Splitwise export, log in to Splitwise website, go to Your Account &gt; Export your data, and select CSV format.
         </Text>
@@ -1848,7 +1848,7 @@ export default function ImportSplitwiseModal({
                           onPress={() => toggleParticipantSelection(name)}
                         >
                           {isSelected && (
-                            <Ionicons name="checkmark" size={16} color="white" />
+                            <Icon name="checkmark" size={16} color="white"  />
                           )}
                         </TouchableOpacity>
                       )}
@@ -2047,7 +2047,7 @@ export default function ImportSplitwiseModal({
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
             Import from Splitwise

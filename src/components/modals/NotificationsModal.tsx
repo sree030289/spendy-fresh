@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
 
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { Notification } from '@/services/firebase/splitting-disabled';
@@ -114,7 +114,7 @@ export default function NotificationsModal({
       onPress={() => handleNotificationPress(notification)}
     >
       <View style={styles.notificationIcon}>
-        <Ionicons
+        <Icon
           name={getNotificationIcon(notification.type) as any}
           size={20}
           color={notification.isRead ? theme.colors.textSecondary : theme.colors.primary}
@@ -181,7 +181,7 @@ export default function NotificationsModal({
             </View>
           ) : notifications.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="notifications-outline" size={64} color={theme.colors.textSecondary} />
+              <Icon name="notifications" size={64} color={theme.colors.textSecondary}  />
               <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
                 No Notifications
               </Text>

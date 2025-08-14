@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -918,10 +918,10 @@ Items: [Enter items]`,
               <ActivityIndicator size="small" color={theme.colors.primary} />
             )}
             {step.status === 'completed' && (
-              <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+              <Icon name="success" size={20} color={theme.colors.success}  />
             )}
             {step.status === 'error' && (
-              <Ionicons name="close-circle" size={20} color={theme.colors.error} />
+              <Icon name="error" size={20} color={theme.colors.error}  />
             )}
           </View>
           <View style={styles.stepContent}>
@@ -1036,7 +1036,7 @@ Items: [Enter items]`,
           style={[styles.cameraButton, { backgroundColor: 'rgba(0,0,0,0.6)' }]}
           onPress={() => setShowCamera(false)}
         >
-          <Ionicons name="close" size={24} color="white" />
+          <Icon name="close" size={24} color="white"  />
         </TouchableOpacity>
         
         <TouchableOpacity
@@ -1050,7 +1050,7 @@ Items: [Enter items]`,
           onPress={handleTakePicture}
           disabled={isProcessing || !cameraReady}
         >
-          <Ionicons name="camera" size={32} color="white" />
+          <Icon name="camera" size={32} color="white"  />
         </TouchableOpacity>
         
         <TouchableOpacity
@@ -1060,7 +1060,7 @@ Items: [Enter items]`,
           )}
           disabled={!cameraReady}
         >
-          <Ionicons name="camera-reverse" size={24} color="white" />
+          <Icon name="camera-reverse" size={24} color="white" />
         </TouchableOpacity>
       </View>
         </View>
@@ -1128,7 +1128,7 @@ Items: [Enter items]`,
   const renderMainView = () => (
     <ScrollView contentContainerStyle={styles.mainContainer}>
       <View style={styles.headerSection}>
-        <Ionicons name="camera" size={64} color={theme.colors.primary} />
+        <Icon name="camera" size={64} color={theme.colors.primary}  />
         <Text style={[styles.title, { color: theme.colors.text }]}>
           Smart Receipt Scanner
         </Text>
@@ -1147,7 +1147,7 @@ Items: [Enter items]`,
           }}
           disabled={!permission?.granted}
         >
-          <Ionicons name="camera" size={24} color="white" />
+          <Icon name="camera" size={24} color="white"  />
           <Text style={styles.optionButtonText}>Take Photo</Text>
         </TouchableOpacity>
 
@@ -1155,7 +1155,7 @@ Items: [Enter items]`,
           style={[styles.optionButton, { backgroundColor: theme.colors.secondary }]}
           onPress={handlePickImage}
         >
-          <Ionicons name="image" size={24} color="white" />
+          <Icon name="image" size={24} color="white"  />
           <Text style={styles.optionButtonText}>Choose from Gallery</Text>
         </TouchableOpacity>
       </View>
@@ -1166,25 +1166,25 @@ Items: [Enter items]`,
         </Text>
         <View style={styles.featuresList}>
           <View style={styles.featureItem}>
-            <Ionicons name="eye" size={20} color={theme.colors.primary} />
+            <Icon name="eye" size={20} color={theme.colors.primary}  />
             <Text style={[styles.featureText, { color: theme.colors.textSecondary }]}>
               Multi-engine OCR for better accuracy
             </Text>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="bulb" size={20} color={theme.colors.primary} />
+            <Icon name="bulb" size={20} color={theme.colors.primary} />
             <Text style={[styles.featureText, { color: theme.colors.textSecondary }]}>
               AI-powered data extraction
             </Text>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="shield-checkmark" size={20} color={theme.colors.primary} />
+            <Icon name="shield-checkmark" size={20} color={theme.colors.primary} />
             <Text style={[styles.featureText, { color: theme.colors.textSecondary }]}>
               Smart validation and error correction
             </Text>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="flash" size={20} color={theme.colors.primary} />
+            <Icon name="flash" size={20} color={theme.colors.primary} />
             <Text style={[styles.featureText, { color: theme.colors.textSecondary }]}>
               Real-time processing
             </Text>
@@ -1223,7 +1223,7 @@ Items: [Enter items]`,
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <View style={styles.permissionContainer}>
-            <Ionicons name="camera" size={64} color={theme.colors.textSecondary} />
+            <Icon name="camera" size={64} color={theme.colors.textSecondary}  />
             <Text style={[styles.permissionTitle, { color: theme.colors.text }]}>
               Camera Access Required
             </Text>
@@ -1259,7 +1259,7 @@ Items: [Enter items]`,
         {!showCamera && !capturedImage && (
           <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Icon name="close" size={24} color={theme.colors.text}  />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
               Receipt Scanner

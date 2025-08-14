@@ -12,7 +12,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -211,7 +211,7 @@ export default function ChangePasswordScreen() {
   const renderEmailStep = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <Ionicons name="mail-outline" size={48} color={theme.colors.primary} />
+        <Icon name="mail" size={48} color={theme.colors.primary}  />
         <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
           Verify Your Email
         </Text>
@@ -243,12 +243,11 @@ export default function ChangePasswordScreen() {
           returnKeyType="send"
           onSubmitEditing={handleSendOTP}
         />
-        <Ionicons
-          name="mail-outline"
+        <Icon name="mail"
           size={20}
           color={errors.email ? theme.colors.error : theme.colors.textSecondary}
           style={styles.inputIcon}
-        />
+         />
         {errors.email ? (
           <Text style={[styles.errorText, { color: theme.colors.error }]}>
             {errors.email}
@@ -268,7 +267,7 @@ export default function ChangePasswordScreen() {
   const renderOTPStep = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <Ionicons name="shield-checkmark-outline" size={48} color={theme.colors.primary} />
+        <Icon name="shield-checkmark-outline" size={48} color={theme.colors.primary} />
         <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
           Enter OTP
         </Text>
@@ -302,7 +301,7 @@ export default function ChangePasswordScreen() {
           onSubmitEditing={handleVerifyOTP}
           maxLength={6}
         />
-        <Ionicons
+        <Icon
           name="keypad-outline"
           size={20}
           color={errors.otp ? theme.colors.error : theme.colors.textSecondary}
@@ -333,7 +332,7 @@ export default function ChangePasswordScreen() {
   const renderPasswordStep = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <Ionicons name="lock-closed-outline" size={48} color={theme.colors.primary} />
+        <Icon name="lock" size={48} color={theme.colors.primary}  />
         <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
           Set New Password
         </Text>
@@ -364,17 +363,16 @@ export default function ChangePasswordScreen() {
             secureTextEntry={!showNewPassword}
             returnKeyType="next"
           />
-          <Ionicons
-            name="lock-closed-outline"
+          <Icon name="lock"
             size={20}
             color={errors.newPassword ? theme.colors.error : theme.colors.textSecondary}
             style={styles.inputIcon}
-          />
+           />
           <TouchableOpacity
             onPress={() => setShowNewPassword(!showNewPassword)}
             style={styles.passwordToggle}
           >
-            <Ionicons
+            <Icon
               name={showNewPassword ? "eye-off-outline" : "eye-outline"}
               size={20}
               color={theme.colors.textSecondary}
@@ -409,17 +407,16 @@ export default function ChangePasswordScreen() {
             returnKeyType="done"
             onSubmitEditing={handleChangePassword}
           />
-          <Ionicons
-            name="lock-closed-outline"
+          <Icon name="lock"
             size={20}
             color={errors.confirmPassword ? theme.colors.error : theme.colors.textSecondary}
             style={styles.inputIcon}
-          />
+           />
           <TouchableOpacity
             onPress={() => setShowConfirmPassword(!showConfirmPassword)}
             style={styles.passwordToggle}
           >
-            <Ionicons
+            <Icon
               name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
               size={20}
               color={theme.colors.textSecondary}
@@ -459,7 +456,7 @@ export default function ChangePasswordScreen() {
                 onPress={() => navigation.goBack()}
                 style={styles.backButton}
               >
-                <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+                <Icon name="back" size={24} color={theme.colors.text}  />
               </TouchableOpacity>
               <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
                 Change Password

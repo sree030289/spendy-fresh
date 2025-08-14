@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "spendy-97913"
+    "default": "spendy-97913",
+    "dev": "spendy-develop",
+    "prod": "spendy-97913"
   }
 }

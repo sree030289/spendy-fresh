@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
@@ -197,19 +197,19 @@ export default function FriendRequestModal({
               </Text>
               <View style={styles.benefitsList}>
                 <View style={styles.benefitItem}>
-                  <Ionicons name="receipt-outline" size={16} color={theme.colors.primary} />
+                  <Icon name="receipt" size={16} color={theme.colors.primary}  />
                   <Text style={[styles.benefitText, { color: theme.colors.textSecondary }]}>
                     Split expenses together
                   </Text>
                 </View>
                 <View style={styles.benefitItem}>
-                  <Ionicons name="people-outline" size={16} color={theme.colors.primary} />
+                  <Icon name="people" size={16} color={theme.colors.primary}  />
                   <Text style={[styles.benefitText, { color: theme.colors.textSecondary }]}>
                     Create groups and manage balances
                   </Text>
                 </View>
                 <View style={styles.benefitItem}>
-                  <Ionicons name="card-outline" size={16} color={theme.colors.primary} />
+                  <Icon name="card" size={16} color={theme.colors.primary}  />
                   <Text style={[styles.benefitText, { color: theme.colors.textSecondary }]}>
                     Send and receive payments
                   </Text>
@@ -231,7 +231,7 @@ export default function FriendRequestModal({
                 <ActivityIndicator size="small" color={theme.colors.textSecondary} />
               ) : (
                 <>
-                  <Ionicons name="close-circle-outline" size={20} color={theme.colors.textSecondary} />
+                  <Icon name="error" size={20} color={theme.colors.textSecondary}  />
                   <Text style={[styles.declineButtonText, { color: theme.colors.textSecondary }]}>
                     Decline
                   </Text>
@@ -251,7 +251,7 @@ export default function FriendRequestModal({
                 <ActivityIndicator size="small" color="white" />
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle" size={20} color="white" />
+                  <Icon name="success" size={20} color="white"  />
                   <Text style={styles.acceptButtonText}>Accept</Text>
                 </>
               )}

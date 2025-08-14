@@ -11,7 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { ApiService } from '@/services/api/ApiService';
 import { getCurrencySymbol } from '@/utils/currency';
@@ -196,7 +196,7 @@ export default function GroupBalanceOverviewModal({
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           
           <View style={styles.headerContent}>
@@ -213,11 +213,10 @@ export default function GroupBalanceOverviewModal({
             style={styles.refreshButton}
             disabled={refreshing}
           >
-            <Ionicons 
-              name="refresh" 
+            <Icon name="refresh" 
               size={20} 
               color={refreshing ? theme.colors.textSecondary : theme.colors.primary} 
-            />
+             />
           </TouchableOpacity>
         </View>
 
@@ -257,7 +256,7 @@ export default function GroupBalanceOverviewModal({
                           </Text>
                         </View>
                         
-                        <Ionicons name="arrow-forward" size={20} color={theme.colors.textSecondary} />
+                        <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
                         
                         <View style={styles.payeeContainer}>
                           <Text style={[styles.payeeName, { color: theme.colors.text }]}>
@@ -270,7 +269,7 @@ export default function GroupBalanceOverviewModal({
                         style={[styles.simpleMarkPaidButton, { backgroundColor: theme.colors.primary }]}
                         onPress={() => handleMarkAsPaid(suggestion)}
                       >
-                        <Ionicons name="checkmark-circle" size={16} color="white" />
+                        <Icon name="success" size={16} color="white"  />
                         <Text style={styles.simpleMarkPaidText}>Mark as Paid</Text>
                       </TouchableOpacity>
                     </View>
@@ -279,7 +278,7 @@ export default function GroupBalanceOverviewModal({
               ) : (
                 <View style={[styles.allSettledContainer, { backgroundColor: theme.colors.surface }]}>
                   <View style={[styles.settledIcon, { backgroundColor: `${theme.colors.success}15` }]}>
-                    <Ionicons name="checkmark-circle" size={48} color={theme.colors.success} />
+                    <Icon name="success" size={48} color={theme.colors.success}  />
                   </View>
                   <Text style={[styles.allSettledTitle, { color: theme.colors.text }]}>
                     All Settled! 🎉

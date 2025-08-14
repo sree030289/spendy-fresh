@@ -10,7 +10,7 @@ import {
   TextInput,
   Linking,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
@@ -144,7 +144,7 @@ export default function RemindModal({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.title, { color: theme.colors.text }]}>
             Send Reminder
@@ -206,7 +206,7 @@ export default function RemindModal({
             onPress={() => handleSendReminder('sms')}
             disabled={isSending}
           >
-            <Ionicons name="chatbubble" size={24} color="#10B981" />
+            <Icon name="chatbubble" size={24} color="#10B981" />
             <View style={styles.optionContent}>
               <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
                 Send SMS
@@ -215,7 +215,7 @@ export default function RemindModal({
                 Send a text message reminder
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -223,7 +223,7 @@ export default function RemindModal({
             onPress={() => handleSendReminder('whatsapp')}
             disabled={isSending}
           >
-            <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+            <Icon name="logo-whatsapp" size={24} color="#25D366" />
             <View style={styles.optionContent}>
               <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
                 Send WhatsApp
@@ -232,7 +232,7 @@ export default function RemindModal({
                 Send a WhatsApp message
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -240,7 +240,7 @@ export default function RemindModal({
             onPress={() => handleSendReminder('app')}
             disabled={isSending}
           >
-            <Ionicons name="notifications" size={24} color="#8B5CF6" />
+            <Icon name="notifications" size={24} color="#8B5CF6"  />
             <View style={styles.optionContent}>
               <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
                 App Notification
@@ -249,7 +249,7 @@ export default function RemindModal({
                 Send an in-app notification
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
           </TouchableOpacity>
         </View>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 
 interface MoneyFlowAnimationProps {
   color: string;
@@ -107,7 +107,7 @@ export default function MoneyFlowAnimation({ color, direction }: MoneyFlowAnimat
         },
       ]}
     >
-      <Ionicons name="logo-usd" size={20} color={color} />
+      <Icon name="logo-usd" size={20} color={color} />
     </Animated.View>
   );
 

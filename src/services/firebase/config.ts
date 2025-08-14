@@ -5,16 +5,29 @@ import { getMessaging } from 'firebase/messaging';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { firebaseDevConfig } from '../../config/firebase.dev';
+import { firebaseProdConfig } from '../../config/firebase.prod';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyA3PwHVfgqpxizujlimha-xTjsh_-5Tsc0",
-  authDomain: "spendy-97913.firebaseapp.com",
-  projectId: "spendy-97913",
-  storageBucket: "spendy-97913.firebasestorage.app",
-  messagingSenderId: "576826934856",
-  appId: "1:576826934856:web:7a74ac9644f9bfc7da7a7d",
-  measurementId: "G-ZHGC7PM0HZ"
+// OPTIMIZATION: Environment-based configuration for cost management
+const getFirebaseConfig = () => {
+  const environment = process.env.NODE_ENV || 'development';
+  const buildType = process.env.EXPO_PUBLIC_BUILD_TYPE || 'dev';
+  
+  console.log('🔧 Firebase Environment:', environment, 'Build:', buildType);
+  
+  // Use dev config for development builds (but respect prod override)
+  if (buildType === 'dev' || (environment === 'development' && buildType !== 'prod')) {
+    console.log('🔧 Using DEVELOPMENT Firebase project');
+    return firebaseDevConfig;
+  }
+  
+  // Use production config for production builds
+  console.log('🔧 Using PRODUCTION Firebase project');
+  return firebaseProdConfig;
 };
+
+// Get environment-specific config
+const firebaseConfig = getFirebaseConfig();
 
 export const app = initializeApp(firebaseConfig);
 

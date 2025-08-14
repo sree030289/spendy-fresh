@@ -66,6 +66,15 @@ class ExpenseRefreshService {
   // Notify all listeners that balance has changed
   notifyBalanceChange() {
     console.log('Notifying balance change to', this.listeners.size, 'listeners');
+    
+    // CRITICAL: Clear balance calculation cache when notifying balance changes
+    try {
+      const { UnifiedSettlementService } = require('@/hooks/useBalances');
+      UnifiedSettlementService.clearBalanceCache();
+    } catch (error) {
+      console.warn('Could not clear balance cache:', error);
+    }
+    
     this.listeners.forEach(listener => {
       try {
         listener();

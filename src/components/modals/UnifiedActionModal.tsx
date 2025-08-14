@@ -12,7 +12,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -243,7 +243,7 @@ interface ActionItem {
                 style={[styles.closeButton, { backgroundColor: theme.colors.surface }]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                <Icon name="close" size={18} color={theme.colors.textSecondary}  />
               </TouchableOpacity>
             </View>
 
@@ -274,7 +274,7 @@ interface ActionItem {
                   >
                     <View style={styles.actionContent}>
                       <View style={styles.iconContainer}>
-                        <Ionicons 
+                        <Icon 
                           name={item.icon as any} 
                           size={24} 
                           color="white" 
@@ -291,11 +291,10 @@ interface ActionItem {
                       </View>
                       
                       <View style={styles.arrowContainer}>
-                        <Ionicons 
-                          name="chevron-forward" 
+                        <Icon name="forward" 
                           size={20} 
                           color="rgba(255,255,255,0.8)" 
-                        />
+                         />
                       </View>
                     </View>
                   </LinearGradient>

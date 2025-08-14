@@ -14,7 +14,7 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '@/hooks/useTheme';
@@ -215,7 +215,7 @@ export default function ExpensesScreen() {
               <Text style={styles.statsSubtitle}>AI-powered expense detection</Text>
             </View>
             <TouchableOpacity style={styles.insightsButton} onPress={() => setShowAnalytics(true)}>
-              <Ionicons name="analytics" size={20} color="white" />
+              <Icon name="analytics" size={20} color="white"  />
             </TouchableOpacity>
           </View>
           
@@ -252,7 +252,7 @@ export default function ExpensesScreen() {
             colors={['#22C55E', '#16A34A']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="camera" size={24} color="white" />
+            <Icon name="camera" size={24} color="white"  />
           </LinearGradient>
           <Text style={styles.quickActionLabel}>Scan Receipt</Text>
         </TouchableOpacity>
@@ -265,7 +265,7 @@ export default function ExpensesScreen() {
             colors={['#3B82F6', '#2563EB']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="location" size={24} color="white" />
+            <Icon name="location" size={24} color="white"  />
           </LinearGradient>
           <Text style={styles.quickActionLabel}>Location Detect</Text>
         </TouchableOpacity>
@@ -278,7 +278,7 @@ export default function ExpensesScreen() {
             colors={['#8B5CF6', '#7C3AED']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="add" size={24} color="white" />
+            <Icon name="add" size={24} color="white"  />
           </LinearGradient>
           <Text style={styles.quickActionLabel}>Add Manual</Text>
         </TouchableOpacity>
@@ -291,7 +291,7 @@ export default function ExpensesScreen() {
             colors={['#F59E0B', '#D97706']}
             style={styles.quickActionGradient}
           >
-            <Ionicons name="pie-chart" size={24} color="white" />
+            <Icon name="pie-chart" size={24} color="white" />
           </LinearGradient>
           <Text style={styles.quickActionLabel}>Analytics</Text>
         </TouchableOpacity>
@@ -340,7 +340,7 @@ export default function ExpensesScreen() {
                     colors={categoryConfig.gradient as [string, string, ...string[]]}
                     style={styles.categoryIconContainer}
                   >
-                    <Ionicons 
+                    <Icon 
                       name={categoryConfig.icon as any} 
                       size={24} 
                       color="white" 
@@ -359,7 +359,7 @@ export default function ExpensesScreen() {
                       )}
                       {isSettlement && (
                         <View style={styles.settlementBadge}>
-                          <Ionicons name="checkmark" size={14} color="white" />
+                          <Icon name="checkmark" size={14} color="white"  />
                           <Text style={styles.settlementBadgeText}>Settled</Text>
                         </View>
                       )}
@@ -373,7 +373,7 @@ export default function ExpensesScreen() {
                 
                 <View style={styles.expenseRight}>
                   <View style={[styles.detectionBadge, { backgroundColor: `${detectionConfig.color}20` }]}>
-                    <Ionicons 
+                    <Icon 
                       name={detectionConfig.icon as any} 
                       size={14} 
                       color={detectionConfig.color} 
@@ -386,11 +386,11 @@ export default function ExpensesScreen() {
               {/* Location & Details */}
               <View style={styles.expenseDetails}>
                 <View style={styles.locationRow}>
-                  <Ionicons name="location-outline" size={14} color="#64748B" />
+                  <Icon name="location" size={14} color="#64748B"  />
                   <Text style={styles.locationText}>{item.location}</Text>
                 </View>
                 <View style={styles.detectionRow}>
-                  <Ionicons name="checkmark-circle" size={14} color={detectionConfig.color} />
+                  <Icon name="success" size={14} color={detectionConfig.color}  />
                   <Text style={[styles.detectionText, { color: detectionConfig.color }]}>
                     {detectionConfig.label} Detection
                   </Text>
@@ -405,14 +405,14 @@ export default function ExpensesScreen() {
                       colors={['#667eea', '#764ba2']}
                       style={styles.splitGradient}
                     >
-                      <Ionicons name="people" size={16} color="white" />
+                      <Icon name="people" size={16} color="white"  />
                       <Text style={styles.splitText}>Split</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 )}
                 
                 <TouchableOpacity style={styles.moreButton}>
-                  <Ionicons name="ellipsis-horizontal" size={20} color="#64748B" />
+                  <Icon name="ellipsis-horizontal" size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -438,7 +438,7 @@ export default function ExpensesScreen() {
             >
               <View style={styles.locationModalHeader}>
                 <View style={styles.locationIconContainer}>
-                  <Ionicons name="location" size={32} color="white" />
+                  <Icon name="location" size={32} color="white"  />
                 </View>
                 <Text style={styles.locationModalTitle}>Location Detected!</Text>
                 <Text style={styles.locationModalSubtitle}>You're at Coles Collins Street</Text>
@@ -515,7 +515,7 @@ export default function ExpensesScreen() {
               style={styles.scannerModalGradient}
             >
               <View style={styles.scannerIconContainer}>
-                <Ionicons name="camera" size={48} color="white" />
+                <Icon name="camera" size={48} color="white"  />
               </View>
               <Text style={styles.scannerTitle}>Scanning Receipt...</Text>
               <Text style={styles.scannerSubtitle}>AI is extracting expense details</Text>
@@ -551,7 +551,7 @@ export default function ExpensesScreen() {
                   onPress={() => setShowAnalytics(false)}
                   style={styles.closeButton}
                 >
-                  <Ionicons name="close" size={24} color="white" />
+                  <Icon name="close" size={24} color="white"  />
                 </TouchableOpacity>
                 <Text style={styles.analyticsTitle}>Expense Analytics</Text>
                 <View style={styles.placeholder} />
@@ -576,7 +576,7 @@ export default function ExpensesScreen() {
                             colors={config.gradient as [string, string, ...string[]]}
                             style={styles.categoryItemIcon}
                           >
-                            <Ionicons name={config.icon as any} size={16} color="white" />
+                            <Icon name={config.icon as any} size={16} color="white" />
                           </LinearGradient>
                           <Text style={styles.categoryItemName}>{category}</Text>
                         </View>
@@ -607,7 +607,7 @@ export default function ExpensesScreen() {
           <Animated.View style={[styles.animatedHeaderContent, { transform: [{ translateY: headerTranslateY }] }]}>
             <Text style={styles.animatedHeaderTitle}>Smart Expenses</Text>
             <TouchableOpacity style={styles.animatedHeaderButton} onPress={handleScanReceipt}>
-              <Ionicons name="camera" size={20} color="white" />
+              <Icon name="camera" size={20} color="white"  />
             </TouchableOpacity>
           </Animated.View>
         </LinearGradient>
@@ -652,10 +652,10 @@ export default function ExpensesScreen() {
                   </View>
                   <View style={styles.heroActions}>
                     <TouchableOpacity style={styles.heroButton} onPress={handleScanReceipt}>
-                      <Ionicons name="camera" size={20} color="white" />
+                      <Icon name="camera" size={20} color="white"  />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.heroButton} onPress={() => setShowAnalytics(true)}>
-                      <Ionicons name="analytics" size={20} color="white" />
+                      <Icon name="analytics" size={20} color="white"  />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -667,14 +667,14 @@ export default function ExpensesScreen() {
                   >
                     <View style={styles.smartBannerLeft}>
                       <View style={styles.smartBannerIcon}>
-                        <Ionicons name="location" size={20} color="white" />
+                        <Icon name="location" size={20} color="white"  />
                       </View>
                       <View>
                         <Text style={styles.smartBannerTitle}>Smart Detection Active</Text>
                         <Text style={styles.smartBannerSubtitle}>Tap for location suggestions</Text>
                       </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+                    <Icon name="forward" size={20} color="rgba(255,255,255,0.7)"  />
                   </TouchableOpacity>
                 </View>
               </BlurView>
@@ -703,7 +703,7 @@ export default function ExpensesScreen() {
           ) : expenses.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconContainer}>
-                <Ionicons name="receipt-outline" size={48} color="#CBD5E1" />
+                <Icon name="receipt" size={48} color="#CBD5E1"  />
               </View>
               <Text style={styles.emptyTitle}>No Smart Expenses Yet</Text>
               <Text style={styles.emptySubtitle}>
@@ -735,7 +735,7 @@ export default function ExpensesScreen() {
           colors={['#667eea', '#764ba2']}
           style={styles.fabGradient}
         >
-          <Ionicons name="add" size={28} color="white" />
+          <Icon name="add" size={28} color="white"  />
         </LinearGradient>
       </TouchableOpacity>
 

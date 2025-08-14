@@ -14,7 +14,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -242,7 +242,7 @@ export default function RegisterScreen() {
       <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
             Select Country
@@ -273,7 +273,7 @@ export default function RegisterScreen() {
                 </Text>
               </View>
               {formData.country === country.code && (
-                <Ionicons name="checkmark" size={24} color={theme.colors.primary} />
+                <Icon name="checkmark" size={24} color={theme.colors.primary}  />
               )}
             </TouchableOpacity>
           ))}
@@ -291,7 +291,7 @@ export default function RegisterScreen() {
       <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
             Select Currency
@@ -320,7 +320,7 @@ export default function RegisterScreen() {
                   </Text>
                 </View>
                 {formData.currency === currency && (
-                  <Ionicons name="checkmark" size={24} color={theme.colors.primary} />
+                  <Icon name="checkmark" size={24} color={theme.colors.primary}  />
                 )}
               </TouchableOpacity>
             );
@@ -339,7 +339,7 @@ export default function RegisterScreen() {
       <View style={styles.biometricModalOverlay}>
         <View style={[styles.biometricContent, { backgroundColor: theme.colors.background }]}>
           <View style={styles.biometricIcon}>
-            <Ionicons name="finger-print" size={64} color={theme.colors.primary} />
+            <Icon name="fingerprint" size={64} color={theme.colors.primary}  />
           </View>
           <Text style={[styles.biometricTitle, { color: theme.colors.text }]}>
             Enable Biometric Login?
@@ -398,7 +398,7 @@ export default function RegisterScreen() {
                 onPress={() => navigation.goBack()}
                 style={styles.backButton}
               >
-                <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+                <Icon name="back" size={24} color={theme.colors.text}  />
               </TouchableOpacity>
               <Text style={[styles.title, { color: theme.colors.text }]}>Create Account</Text>
               <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
@@ -432,12 +432,11 @@ export default function RegisterScreen() {
                     inputMode: 'text' as any,
                   })}
                 />
-                <Ionicons 
-                  name="person-outline" 
+                <Icon name="person" 
                   size={20} 
                   color={errors.fullName ? theme.colors.error : theme.colors.textSecondary} 
                   style={styles.inputIcon}
-                />
+                 />
                 {errors.fullName ? (
                   <Text style={[styles.errorText, { color: theme.colors.error }]}>
                     {errors.fullName}
@@ -473,12 +472,11 @@ export default function RegisterScreen() {
                     inputMode: 'email' as any,
                   })}
                 />
-                <Ionicons 
-                  name="mail-outline" 
+                <Icon name="mail" 
                   size={20} 
                   color={errors.email ? theme.colors.error : theme.colors.textSecondary} 
                   style={styles.inputIcon}
-                />
+                 />
                 {errors.email ? (
                   <Text style={[styles.errorText, { color: theme.colors.error }]}>
                     {errors.email}
@@ -493,12 +491,12 @@ export default function RegisterScreen() {
                 }]}
                 onPress={() => setShowCountryPicker(true)}
               >
-                <Ionicons name="flag-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
+                <Icon name="flag-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
                 <Text style={styles.selectorFlag}>{selectedCountry.flag}</Text>
                 <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                   {selectedCountry.name}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
+                <Icon name="chevron-down" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
 
               <View style={styles.phoneContainer}>
@@ -539,12 +537,11 @@ export default function RegisterScreen() {
                       inputMode: 'numeric' as any,
                     })}
                   />
-                  <Ionicons 
-                    name="call-outline" 
+                  <Icon name="call" 
                     size={20} 
                     color={errors.mobile ? theme.colors.error : theme.colors.textSecondary} 
                     style={styles.inputIcon}
-                  />
+                   />
                 </View>
               </View>
               {errors.mobile ? (
@@ -560,12 +557,12 @@ export default function RegisterScreen() {
                 }]}
                 onPress={() => setShowCurrencyPicker(true)}
               >
-                <Ionicons name="card-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
+                <Icon name="card" size={20} color={theme.colors.textSecondary} style={styles.inputIcon}  />
                 <Text style={styles.selectorFlag}>💰</Text>
                 <Text style={[styles.selectorText, { color: theme.colors.text }]}>
                   {formData.currency}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
+                <Icon name="chevron-down" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
 
               <View style={styles.inputContainer}>
@@ -596,17 +593,16 @@ export default function RegisterScreen() {
                     inputMode: 'text' as any,
                   })}
                 />
-                <Ionicons 
-                  name="lock-closed-outline" 
+                <Icon name="lock" 
                   size={20} 
                   color={errors.password ? theme.colors.error : theme.colors.textSecondary} 
                   style={styles.inputIcon}
-                />
+                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.passwordToggle}
                 >
-                  <Ionicons 
+                  <Icon 
                     name={showPassword ? "eye-off-outline" : "eye-outline"} 
                     size={20} 
                     color={theme.colors.textSecondary} 

@@ -13,7 +13,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import useBalances from '@/hooks/useBalances';
 import { Button } from '@/components/common/Button';
@@ -763,7 +763,7 @@ export default function GroupDetailsModal({
               </Text>
               {isEdited && (
                 <View style={[styles.editedBadge, { backgroundColor: '#FEF3C7' }]}>
-                  <Ionicons name="create" size={10} color="#D97706" />
+                  <Icon name="edit" size={10} color="#D97706"  />
                   <Text style={[styles.editedText, { color: '#D97706' }]}>Edited</Text>
                 </View>
               )}
@@ -884,12 +884,12 @@ export default function GroupDetailsModal({
             style={[styles.backBtn, { position: 'absolute', top: 60, left: 20, backgroundColor: theme.colors.surface }]}
             onPress={onClose}
           >
-            <Ionicons name="arrow-back" size={20} color={theme.colors.text} />
+            <Icon name="back" size={20} color={theme.colors.text}  />
           </TouchableOpacity>
           
           {loadingTimeout ? (
             <>
-              <Ionicons name="warning" size={48} color={theme.colors.error} />
+              <Icon name="warning" size={48} color={theme.colors.error}  />
               <Text style={[styles.loadingText, { color: theme.colors.text, marginTop: 16, textAlign: 'center' }]}>
                 Failed to load group details
               </Text>
@@ -938,7 +938,7 @@ export default function GroupDetailsModal({
             style={styles.backBtn}
             onPress={onClose}
           >
-            <Ionicons name="arrow-back" size={20} color="white" />
+            <Icon name="back" size={20} color="white"  />
           </TouchableOpacity>
           
           <View style={styles.groupHeader}>
@@ -1022,7 +1022,7 @@ export default function GroupDetailsModal({
                   </Text>
                   <View style={styles.headerActions}>
                     <TouchableOpacity onPress={handleRefresh} style={styles.refreshBtn}>
-                      <Ionicons name="refresh" size={16} color={theme.colors.primary} />
+                      <Icon name="refresh" size={16} color={theme.colors.primary}  />
                     </TouchableOpacity>
                     {groupExpenses.length > 0 && (
                       <TouchableOpacity
@@ -1146,7 +1146,7 @@ export default function GroupDetailsModal({
                       style={[styles.secondaryBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
                       onPress={() => CrossPlatformAlert.alert('Copied!', 'Invite code copied to clipboard')}
                     >
-                      <Ionicons name="copy" size={16} color={theme.colors.textSecondary} />
+                      <Icon name="copy" size={16} color={theme.colors.textSecondary}  />
                       <Text style={[styles.secondaryBtnText, { color: theme.colors.textSecondary }]}>
                         Copy Code
                       </Text>
@@ -1155,7 +1155,7 @@ export default function GroupDetailsModal({
                       style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]}
                       onPress={() => setShowQRModal(true)}
                     >
-                      <Ionicons name="qr-code" size={16} color="white" />
+                      <Icon name="qrCode" size={16} color="white"  />
                       <Text style={styles.primaryBtnText}>QR Code</Text>
                     </TouchableOpacity>
                   </View>
@@ -1169,21 +1169,21 @@ export default function GroupDetailsModal({
                     style={[styles.actionRow, { borderBottomColor: theme.colors.border }]}
                     onPress={handleShareInviteCode}
                   >
-                    <Ionicons name="share" size={20} color={theme.colors.textSecondary} />
+                    <Icon name="share" size={20} color={theme.colors.textSecondary}  />
                     <Text style={[styles.actionRowText, { color: theme.colors.text }]}>
                       Share Invite Link
                     </Text>
-                    <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="forward" size={16} color={theme.colors.textSecondary}  />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionRow}
                     onPress={handleExportGroup}
                   >
-                    <Ionicons name="download" size={20} color={theme.colors.textSecondary} />
+                    <Icon name="download" size={20} color={theme.colors.textSecondary}  />
                     <Text style={[styles.actionRowText, { color: theme.colors.text }]}>
                       Export Group Data
                     </Text>
-                    <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="forward" size={16} color={theme.colors.textSecondary}  />
                   </TouchableOpacity>
                 </View>
                 
@@ -1193,7 +1193,7 @@ export default function GroupDetailsModal({
                       style={[styles.dangerBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
                       onPress={handleDeleteGroup}
                     >
-                      <Ionicons name="trash" size={20} color="#DC2626" />
+                      <Icon name="trash" size={20} color="#DC2626"  />
                       <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>
                         Delete Group
                       </Text>
@@ -1203,7 +1203,7 @@ export default function GroupDetailsModal({
                       style={[styles.dangerBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
                       onPress={handleLeaveGroup}
                     >
-                      <Ionicons name="exit" size={20} color="#DC2626" />
+                      <Icon name="exit" size={20} color="#DC2626" />
                       <Text style={[styles.dangerBtnText, { color: '#DC2626' }]}>
                         Leave Group
                       </Text>
@@ -1239,7 +1239,7 @@ export default function GroupDetailsModal({
                       }
                     }}
                   >
-                    <Ionicons 
+                    <Icon 
                       name={member.role === 'admin' ? 'person-remove' : 'ribbon'} 
                       size={20} 
                       color={theme.colors.primary} 
@@ -1256,7 +1256,7 @@ export default function GroupDetailsModal({
                       handleRemoveMember(selectedMemberForAction);
                     }}
                   >
-                    <Ionicons name="person-remove" size={20} color="#DC2626" />
+                    <Icon name="person-remove" size={20} color="#DC2626" />
                     <Text style={[styles.actionModalOptionText, { color: '#DC2626' }]}>
                       Remove from Group
                     </Text>
@@ -1282,7 +1282,7 @@ export default function GroupDetailsModal({
         <SafeAreaView style={[styles.addMemberModal, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity onPress={() => setShowAddMember(false)}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Icon name="close" size={24} color={theme.colors.text}  />
             </TouchableOpacity>
             <Text style={[styles.modalHeaderTitle, { color: theme.colors.text }]}>
               Add Member
@@ -1303,7 +1303,7 @@ export default function GroupDetailsModal({
                 style={[styles.inviteContactsBtn, { backgroundColor: theme.colors.primary }]}
                 onPress={handleShareInviteCode}
               >
-                <Ionicons name="person-add" size={20} color="white" />
+                <Icon name="person-add" size={20} color="white" />
                 <Text style={styles.inviteContactsBtnText}>
                   Share Group Invite
                 </Text>
@@ -1349,7 +1349,7 @@ export default function GroupDetailsModal({
                             {friend.friendData?.email || 'No email'}
                           </Text>
                         </View>
-                        <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
+                        <Icon name="add-circle" size={24} color={theme.colors.primary} />
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -1400,13 +1400,13 @@ export default function GroupDetailsModal({
                             {friend.friendData?.email || 'No email'}
                           </Text>
                           <View style={styles.statusIndicator}>
-                            <Ionicons name="time" size={12} color={theme.colors.warning} />
+                            <Icon name="time" size={12} color={theme.colors.warning}  />
                             <Text style={[styles.statusText, { color: theme.colors.warning }]}>
                               Friend request pending
                             </Text>
                           </View>
                         </View>
-                        <Ionicons name="add-circle" size={24} color={theme.colors.warning} />
+                        <Icon name="add-circle" size={24} color={theme.colors.warning} />
                       </View>
                     </TouchableOpacity>
                   ))}

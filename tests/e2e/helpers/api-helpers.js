@@ -72,7 +72,15 @@ class SpendyApiHelper {
   constructor(request) {
     this.request = request;
     // Use the Firebase emulator URL directly
-    this.baseURL = 'http://127.0.0.1:5001/spendy-97913/us-central1/spendyApi';
+    // OPTIMIZATION: Environment-based API URL for testing
+    const buildType = process.env.EXPO_PUBLIC_BUILD_TYPE || 'dev';
+    if (buildType === 'dev') {
+      this.baseURL = 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi';
+      console.log('🔧 API Helper using DEVELOPMENT endpoint');
+    } else {
+      this.baseURL = 'https://us-central1-spendy-97913.cloudfunctions.net/spendyApi';
+      console.log('🔧 API Helper using PRODUCTION endpoint');
+    }
   }
 
   async post(endpoint, data, token = null) {

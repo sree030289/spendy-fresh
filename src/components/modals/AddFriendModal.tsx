@@ -12,7 +12,7 @@ import {
   PermissionsAndroid,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -502,7 +502,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
       />
 
       <View style={styles.infoCard}>
-        <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+        <Icon name="information" size={20} color={theme.colors.primary}  />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
           Your friend will receive an email invitation to join Spendy and connect with you.
         </Text>
@@ -542,7 +542,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
                   onPress={() => removeContactFromSelection(index)}
                   style={styles.removeContactButton}
                 >
-                  <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
+                  <Icon name="error" size={18} color={theme.colors.textSecondary}  />
                 </TouchableOpacity>
               </View>
             ))}
@@ -562,13 +562,13 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         onPress={handlePickContact}
         disabled={loading || selectedContacts.length >= MAX_CONTACTS}
       >
-        <Ionicons name="people" size={24} color={theme.colors.primary} />
+        <Icon name="people" size={24} color={theme.colors.primary}  />
         <Text style={[styles.contactPickerText, { color: theme.colors.text }]}>
           {loading ? 'Loading...' : 
            selectedContacts.length >= MAX_CONTACTS ? `Maximum ${MAX_CONTACTS} contacts selected` :
            `Pick from Contacts (${selectedContacts.length}/${MAX_CONTACTS})`}
         </Text>
-        <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+        <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
       </TouchableOpacity>
 
       <View style={styles.divider}>
@@ -583,7 +583,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           style={[styles.manualEntryButton, { backgroundColor: theme.colors.surface }]}
           onPress={() => setShowManualInput(true)}
         >
-          <Ionicons name="add-circle-outline" size={24} color={theme.colors.primary} />
+          <Icon name="add" size={24} color={theme.colors.primary} />
           <Text style={[styles.manualEntryText, { color: theme.colors.text }]}>
             Add Contact Manually
           </Text>
@@ -687,7 +687,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
       )}
 
       <View style={styles.infoCard}>
-        <Ionicons name="chatbubble-outline" size={20} color={theme.colors.primary} />
+        <Icon name="mail" size={20} color={theme.colors.primary} />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
           {selectedContacts.length > 0 
             ? `Send invitations to ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''} via SMS or WhatsApp with a link to download Spendy.`
@@ -705,7 +705,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           style={[styles.qrCard, { backgroundColor: theme.colors.surface }]}
           onPress={handleShowQR}
         >
-          <Ionicons name="qr-code" size={48} color={theme.colors.primary} />
+          <Icon name="qrCode" size={48} color={theme.colors.primary}  />
           <Text style={[styles.qrTitle, { color: theme.colors.text }]}>Share Your QR Code</Text>
           <Text style={[styles.qrDescription, { color: theme.colors.textSecondary }]}>
             Generate a QR code for others to scan
@@ -716,7 +716,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           style={[styles.qrCard, { backgroundColor: theme.colors.surface }]}
           onPress={handleScanQR}
         >
-          <Ionicons name="camera" size={48} color={theme.colors.secondary} />
+          <Icon name="camera" size={48} color={theme.colors.secondary}  />
           <Text style={[styles.qrTitle, { color: theme.colors.text }]}>Scan QR Code</Text>
           <Text style={[styles.qrDescription, { color: theme.colors.textSecondary }]}>
             Scan a friend's QR code to add them
@@ -725,7 +725,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
       </View>
 
       <View style={styles.infoCard}>
-        <Ionicons name="flash-outline" size={20} color={theme.colors.primary} />
+        <Icon name="camera" size={20} color={theme.colors.primary} />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
           QR codes are the fastest way to add friends when you're together in person.
         </Text>
@@ -743,7 +743,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           onPress={onOpenQRScanner}
           style={{ padding: 4 }}
         >
-          <Ionicons name="qr-code" size={24} color={theme.colors.text} />
+          <Icon name="qrCode" size={24} color={theme.colors.text}  />
         </TouchableOpacity>
       }
     >
@@ -757,11 +757,10 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
               ]}
               onPress={() => setActiveMethod('email')}
             >
-              <Ionicons
-                name="mail"
+              <Icon name="mail"
                 size={20}
                 color={activeMethod === 'email' ? theme.colors.primary : theme.colors.textSecondary}
-              />
+               />
               <Text style={[
                 styles.methodTabText,
                 { color: activeMethod === 'email' ? theme.colors.primary : theme.colors.textSecondary }
@@ -777,8 +776,8 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
               ]}
               onPress={() => setActiveMethod('phone')}
             >
-              <Ionicons
-                name="phone-portrait"
+              <Icon
+                name="call"
                 size={20}
                 color={activeMethod === 'phone' ? theme.colors.primary : theme.colors.textSecondary}
               />
@@ -797,11 +796,10 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
               ]}
               onPress={() => setActiveMethod('qr')}
             >
-              <Ionicons
-                name="qr-code"
+              <Icon name="qrCode"
                 size={20}
                 color={activeMethod === 'qr' ? theme.colors.primary : theme.colors.textSecondary}
-              />
+               />
               <Text style={[
                 styles.methodTabText,
                 { color: activeMethod === 'qr' ? theme.colors.primary : theme.colors.textSecondary }

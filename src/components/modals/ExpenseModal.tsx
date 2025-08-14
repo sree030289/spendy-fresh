@@ -10,7 +10,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { SplittingService, Expense } from '@/services/firebase/splitting-disabled';
@@ -167,11 +167,10 @@ export default function ExpenseModal({
           activeView === 'expenses' && { backgroundColor: theme.colors.background, shadowColor: theme.colors.border }
         ]}
       >
-        <Ionicons 
-          name="receipt" 
+        <Icon name="receipt" 
           size={16} 
           color={activeView === 'expenses' ? theme.colors.primary : theme.colors.textSecondary} 
-        />
+         />
         <Text style={[
           styles.viewToggleText,
           { color: activeView === 'expenses' ? theme.colors.primary : theme.colors.textSecondary }
@@ -186,11 +185,10 @@ export default function ExpenseModal({
           activeView === 'analytics' && { backgroundColor: theme.colors.background, shadowColor: theme.colors.border }
         ]}
       >
-        <Ionicons 
-          name="analytics" 
+        <Icon name="analytics" 
           size={16} 
           color={activeView === 'analytics' ? theme.colors.primary : theme.colors.textSecondary} 
-        />
+         />
         <Text style={[
           styles.viewToggleText,
           { color: activeView === 'analytics' ? theme.colors.primary : theme.colors.textSecondary }
@@ -261,7 +259,7 @@ export default function ExpenseModal({
                 {isSettlement ? `💸 ${expense.description}` : expense.description}
               </Text>
               <View style={styles.expenseMetaRow}>
-                <Ionicons name="location-outline" size={12} color={theme.colors.textSecondary} />
+                <Icon name="location" size={12} color={theme.colors.textSecondary}  />
                 <Text style={[styles.expenseLocation, { color: theme.colors.textSecondary }]}>
                   {expense.paidByData.fullName}
                 </Text>
@@ -304,7 +302,7 @@ export default function ExpenseModal({
                 )}
                 {isSettlement && (
                   <View style={[styles.settlementBadge, { backgroundColor: '#10b981' }]}>
-                    <Ionicons name="checkmark" size={14} color="white" />
+                    <Icon name="checkmark" size={14} color="white"  />
                     <Text style={styles.settlementBadgeText}>Settled</Text>
                   </View>
                 )}
@@ -334,7 +332,7 @@ export default function ExpenseModal({
     <View style={[styles.smartBanner, { backgroundColor: theme.colors.primary }]}>
       <View style={styles.smartBannerContent}>
         <View style={[styles.smartBannerIcon, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-          <Ionicons name="location" size={20} color="white" />
+          <Icon name="location" size={20} color="white"  />
         </View>
         <View style={styles.smartBannerText}>
           <Text style={styles.smartBannerTitle}>Smart Expense Tracking</Text>
@@ -355,17 +353,17 @@ export default function ExpenseModal({
         <View style={[styles.header, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.border }]}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Icon name="close" size={24} color={theme.colors.text}  />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
               {title}
             </Text>
             <View style={styles.headerActions}>
               <TouchableOpacity style={[styles.headerActionButton, { backgroundColor: '#10b981' }]}>
-                <Ionicons name="camera" size={18} color="white" />
+                <Icon name="camera" size={18} color="white"  />
               </TouchableOpacity>
               <TouchableOpacity style={[styles.headerActionButton, { backgroundColor: theme.colors.primary }]}>
-                <Ionicons name="analytics" size={18} color="white" />
+                <Icon name="analytics" size={18} color="white"  />
               </TouchableOpacity>
             </View>
           </View>
@@ -411,11 +409,10 @@ export default function ExpenseModal({
             {expenses.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <View style={[styles.emptyIcon, { backgroundColor: theme.colors.surface }]}>
-                  <Ionicons 
-                    name="receipt-outline" 
+                  <Icon name="receipt" 
                     size={48} 
                     color={theme.colors.textSecondary} 
-                  />
+                   />
                 </View>
                 <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
                   No Expenses Found
@@ -431,7 +428,7 @@ export default function ExpenseModal({
               <View style={styles.expensesList}>
                 <View style={styles.expensesHeader}>
                   <View style={styles.expensesCounter}>
-                    <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="time" size={16} color={theme.colors.textSecondary}  />
                     <Text style={[styles.expensesCounterText, { color: theme.colors.textSecondary }]}>
                       Auto-tracked
                     </Text>

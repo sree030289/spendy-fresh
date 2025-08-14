@@ -459,10 +459,10 @@ export class SubscriptionService {
   // HELPER METHODS
   private async getUserGroupCount(userId: string): Promise<number> {
     try {
-      // This would typically query the groups collection
-      // For now, return 0 - you'll need to implement this based on your data structure
-      const { SplittingService } = await import('./firebase/splitting-disabled');
-      const groups = await SplittingService.getUserGroups(userId);
+      // Use ApiService instead of disabled SplittingService
+      const { ApiService } = await import('./api/ApiService');
+      const apiService = ApiService.getInstance();
+      const groups = await apiService.getUserGroups(userId);
       return groups.length;
     } catch (error) {
       console.error('Get user group count error:', error);

@@ -10,11 +10,12 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { RemindersService } from '@/services/reminders/RemindersService1';
+import { GmailService } from '@/services/gmail/gmailService';
 import { Reminder, ReminderCategory, ReminderStatus } from '@/types/reminder';
 import { formatCurrency } from '@/utils/currency';
 import AddReminderModal from '@/components/reminders/AddReminderModal';
@@ -74,7 +75,8 @@ export default function RemindersScreen() {
 
   const checkEmailConnection = async () => {
     try {
-      const connected = await RealGmailService.isGmailConnected(user?.id || '');
+      const gmailService = GmailService.getInstance();
+      const connected = await gmailService.isGmailConnected(user?.id || '');
       setEmailConnected(connected);
     } catch (error) {
       console.error('Error checking email connection:', error);
@@ -119,7 +121,8 @@ export default function RemindersScreen() {
             text: 'Connect Gmail',
             onPress: async () => {
               try {
-                const success = await RealGmailService.connectGmail(user?.id || '');
+                const gmailService = GmailService.getInstance();
+                const success = await gmailService.connectGmail(user?.id || '');
                 if (success) {
                   setEmailConnected(true);
                   Alert.alert('Success', 'Gmail connected successfully!');
@@ -142,7 +145,8 @@ export default function RemindersScreen() {
   const handleSyncEmail = async () => {
     try {
       setIsSyncing(true);
-      const bills = await RealGmailService.syncBillsFromGmail(user?.id || '');
+      const gmailService = GmailService.getInstance();
+      const bills = await gmailService.syncBillsFromGmail(user?.id || '');
       if (bills.length > 0) {
         Alert.alert('Sync Complete', `Found ${bills.length} new bills!`);
         await loadReminders();
@@ -332,7 +336,7 @@ export default function RemindersScreen() {
           onPress={emailConnected ? handleSyncEmail : handleConnectEmail}
           disabled={isSyncing}
         >
-          <Ionicons name="mail-outline" size={16} color={isSyncing ? theme.colors.text : 'white'} />
+          <Icon name="mail" size={16} color={isSyncing ? theme.colors.text : 'white'}  />
           <Text style={[styles.syncButtonText, { color: isSyncing ? theme.colors.text : 'white' }]}>
             {isSyncing ? 'Syncing...' : emailConnected ? 'Sync' : 'Connect'}
           </Text>
@@ -387,8 +391,8 @@ export default function RemindersScreen() {
           ]}
           onPress={() => setViewMode('list')}
         >
-          <Ionicons 
-            name="list-outline" 
+          <Icon 
+            name="menu" 
             size={16} 
             color={viewMode === 'list' ? 'white' : theme.colors.textSecondary} 
           />
@@ -407,11 +411,10 @@ export default function RemindersScreen() {
           ]}
           onPress={() => setViewMode('calendar')}
         >
-          <Ionicons 
-            name="calendar-outline" 
+          <Icon name="calendar" 
             size={16} 
             color={viewMode === 'calendar' ? 'white' : theme.colors.textSecondary} 
-          />
+           />
           <Text style={[
             styles.viewButtonText,
             { color: viewMode === 'calendar' ? 'white' : theme.colors.textSecondary }
@@ -430,8 +433,8 @@ export default function RemindersScreen() {
         backgroundColor: emailConnected ? theme.colors.success : theme.colors.primary
       }
     ]}>
-      <Ionicons 
-        name={emailConnected ? "checkmark-circle" : "mail-outline"} 
+      <Icon 
+        name={emailConnected ? "checkmark" : "mail"} 
         size={24} 
         color="white" 
       />
@@ -505,7 +508,7 @@ export default function RemindersScreen() {
         <View style={styles.reminderHeader}>
           <View style={styles.reminderTitleSection}>
             <View style={[styles.categoryIcon, { backgroundColor: categoryColor }]}>
-              <Ionicons name={categoryIcon as any} size={16} color="white" />
+              <Icon name={categoryIcon as any} size={16} color="white" />
             </View>
             <View style={styles.reminderTitleText}>
               <Text style={[styles.reminderTitle, { color: theme.colors.text }]}>
@@ -559,14 +562,14 @@ export default function RemindersScreen() {
               style={[styles.actionButton, styles.secondaryButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
               onPress={() => handleEditReminder(reminder)}
             >
-              <Ionicons name="create-outline" size={16} color={theme.colors.textSecondary} />
+              <Icon name="edit" size={16} color={theme.colors.textSecondary}  />
             </TouchableOpacity>
             
             <TouchableOpacity
               style={[styles.actionButton, styles.secondaryButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
               onPress={() => handleDeleteReminder(reminder)}
             >
-              <Ionicons name="trash-outline" size={16} color={theme.colors.textSecondary} />
+              <Icon name="trash" size={16} color={theme.colors.textSecondary}  />
             </TouchableOpacity>
           </View>
         </View>
@@ -590,7 +593,7 @@ export default function RemindersScreen() {
               setCurrentMonth(newMonth);
             }}
           >
-            <Ionicons name="chevron-back" size={24} color={theme.colors.primary} />
+            <Icon name="back" size={24} color={theme.colors.primary}  />
           </TouchableOpacity>
           
           <Text style={[styles.calendarMonth, { color: theme.colors.text }]}>
@@ -605,7 +608,7 @@ export default function RemindersScreen() {
               setCurrentMonth(newMonth);
             }}
           >
-            <Ionicons name="chevron-forward" size={24} color={theme.colors.primary} />
+            <Icon name="forward" size={24} color={theme.colors.primary}  />
           </TouchableOpacity>
         </View>
 
@@ -677,7 +680,7 @@ export default function RemindersScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="alarm-outline" size={64} color={theme.colors.textSecondary} />
+      <Icon name="time" size={64} color={theme.colors.textSecondary} />
       <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
         {activeTab === 'all' ? 'No reminders yet' : `No ${activeTab} reminders`}
       </Text>
@@ -732,12 +735,11 @@ export default function RemindersScreen() {
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
-            <Ionicons 
-              name="search-outline" 
+            <Icon name="search" 
               size={20} 
               color={theme.colors.textSecondary} 
               style={styles.searchIcon}
-            />
+             />
           </View>
         )}
 
@@ -766,7 +768,7 @@ export default function RemindersScreen() {
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         onPress={() => setShowAddModal(true)}
       >
-        <Ionicons name="add" size={28} color="white" />
+        <Icon name="add" size={28} color="white"  />
       </TouchableOpacity>
 
       {/* Modals */}

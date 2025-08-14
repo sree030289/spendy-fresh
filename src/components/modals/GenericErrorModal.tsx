@@ -9,7 +9,7 @@ import {
   Dimensions,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -202,7 +202,7 @@ export default function GenericErrorModal({
                   { backgroundColor: getIconColor() + '20' },
                 ]}
               >
-                <Ionicons
+                <Icon
                   name={getIconName() as any}
                   size={48}
                   color={getIconColor()}

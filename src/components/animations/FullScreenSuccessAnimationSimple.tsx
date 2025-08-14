@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, StatusBar, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 
 const { width, height } = Dimensions.get('window');
 
@@ -107,7 +107,7 @@ const FullScreenSuccessAnimationSimple: React.FC<FullScreenSuccessAnimationProps
       <View style={styles.contentContainer}>
         {/* Success Icon */}
         <View style={styles.successCircle}>
-          <Ionicons name="checkmark" size={60} color="#4CAF50" />
+          <Icon name="checkmark" size={60} color="#4CAF50"  />
         </View>
 
         {/* Text Content */}

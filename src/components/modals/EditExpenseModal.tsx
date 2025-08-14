@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -114,7 +114,7 @@ export default function EditExpenseModal({
         console.log('Active members found:', activeMembers.length);
         
         // Create enhanced split data with proper member info
-        const enhancedSplitData = expense.splitData.map(split => {
+        const enhancedSplitData = (expense.splitData || []).map(split => {
           const member = activeMembers.find(m => m.userId === split.userId);
           console.log(`Processing split for ${split.userId}:`, member?.userData.fullName || 'Unknown');
           
@@ -187,6 +187,52 @@ export default function EditExpenseModal({
     setShowSuccessMessage(false);
     isInitialized.current = false;
     currentExpenseId.current = null;
+  };
+
+  // Check if expense can be edited
+  const canEditExpense = (expense: any): { canEdit: boolean; reason?: string } => {
+    if (!expense || !user) {
+      return { canEdit: false, reason: 'Expense not found' };
+    }
+
+    // Only the person who paid or group admin can edit
+    if (expense.paidBy !== user.id && !isUserAdmin) {
+      return { 
+        canEdit: false, 
+        reason: 'Only the person who paid for this expense or group admins can edit it' 
+      };
+    }
+
+    // Check if expense has been partially settled/paid
+    const splitData = expense.splitData || expense.splitDetails || expense.splits || [];
+    const hasPartialPayments = splitData.some((split: any) => split.isPaid || split.isSettled);
+    if (hasPartialPayments) {
+      return { 
+        canEdit: false, 
+        reason: 'Cannot edit expense with recorded payments. Please contact group members to resolve.' 
+      };
+    }
+
+    // Check if expense is settled
+    if (expense.isSettled) {
+      return { 
+        canEdit: false, 
+        reason: 'Cannot edit a settled expense.' 
+      };
+    }
+
+    // Check if expense is older than 30 days (for non-admins)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const expenseDate = new Date(expense.createdAt || expense.date);
+    if (expenseDate < thirtyDaysAgo && !isUserAdmin) {
+      return { 
+        canEdit: false, 
+        reason: 'Cannot edit expenses older than 30 days. Contact a group admin.' 
+      };
+    }
+
+    return { canEdit: true };
   };
 
   const initializeSplitData = () => {
@@ -519,7 +565,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
     <View style={[styles.successContainer, { backgroundColor: theme.colors.background }]}>
       <View style={[styles.successCard, { backgroundColor: theme.colors.surface }]}>
         <View style={[styles.successIcon, { backgroundColor: theme.colors.success + '20' }]}>
-          <Ionicons name="checkmark-circle" size={60} color={theme.colors.success} />
+          <Icon name="success" size={60} color={theme.colors.success}  />
         </View>
         <Text style={[styles.successTitle, { color: theme.colors.text }]}>
           Expense Updated!
@@ -648,7 +694,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
             {expenseDate.toLocaleDateString()}
           </Text>
           <TouchableOpacity onPress={() => setShowDatePicker(!showDatePicker)}>
-            <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+            <Icon name="calendar" size={20} color={theme.colors.textSecondary}  />
           </TouchableOpacity>
         </TouchableOpacity>
         {showDatePicker && (
@@ -766,11 +812,10 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
               recalculateEqual();
             }}
           >
-            <Ionicons
-              name="people"
+            <Icon name="people"
               size={24}
               color={splitType === 'equal' ? theme.colors.primary : theme.colors.textSecondary}
-            />
+             />
             <Text style={[
               styles.splitTypeText,
               { color: splitType === 'equal' ? theme.colors.primary : theme.colors.textSecondary }
@@ -786,11 +831,10 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
             ]}
             onPress={() => setSplitType('custom')}
           >
-            <Ionicons
-              name="calculator"
+            <Icon name="calculator"
               size={24}
               color={splitType === 'custom' ? theme.colors.primary : theme.colors.textSecondary}
-            />
+             />
             <Text style={[
               styles.splitTypeText,
               { color: splitType === 'custom' ? theme.colors.primary : theme.colors.textSecondary }
@@ -806,7 +850,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
             ]}
             onPress={() => setSplitType('percentage')}
           >
-            <Ionicons
+            <Icon
               name="pie-chart"
               size={24}
               color={splitType === 'percentage' ? theme.colors.primary : theme.colors.textSecondary}
@@ -848,7 +892,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
                   split.isIncluded && [styles.checkedBox, { backgroundColor: theme.colors.primary }]
                 ]}>
                   {split.isIncluded && (
-                    <Ionicons name="checkmark" size={16} color="white" />
+                    <Icon name="checkmark" size={16} color="white"  />
                   )}
                 </View>
               
@@ -1039,6 +1083,33 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
 
   if (!expense) return null;
 
+  // Check if expense can be edited
+  const editCheck = canEditExpense(expense);
+  if (!editCheck.canEdit) {
+    return (
+      <FullscreenModal
+        visible={visible}
+        onClose={onClose}
+        title="Cannot Edit Expense"
+      >
+        <View style={[styles.content, { justifyContent: 'center', alignItems: 'center', padding: 40 }]}>
+          <Icon name="lock" size={64} color={theme.colors.textSecondary}  />
+          <Text style={[styles.successTitle, { color: theme.colors.text, marginTop: 20, textAlign: 'center' }]}>
+            Cannot Edit This Expense
+          </Text>
+          <Text style={[styles.successMessage, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 10 }]}>
+            {editCheck.reason}
+          </Text>
+          <Button
+            title="Close"
+            onPress={onClose}
+            style={{ marginTop: 30, minWidth: 120 }}
+          />
+        </View>
+      </FullscreenModal>
+    );
+  }
+
   return (
     <FullscreenModal
       visible={visible}
@@ -1049,7 +1120,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
           onPress={() => setShowDeleteModal(true)}
           style={styles.deleteButton}
         >
-          <Ionicons name="trash" size={20} color={theme.colors.error} />
+          <Icon name="trash" size={20} color={theme.colors.error}  />
         </TouchableOpacity>
       }
     >

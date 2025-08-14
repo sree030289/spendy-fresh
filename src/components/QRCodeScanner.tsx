@@ -8,7 +8,7 @@ import {
   Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './common/Icon';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useTheme } from '@/hooks/useTheme';
 import QRScannerManager from '@/services/qr/QRScannerManager';
@@ -133,7 +133,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Icon name="close" size={24} color={theme.colors.text}  />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
               Camera Access
@@ -142,7 +142,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
           </View>
           
           <View style={styles.centerContent}>
-            <Ionicons name="camera-outline" size={64} color={theme.colors.textSecondary} />
+            <Icon name="camera" size={64} color={theme.colors.textSecondary}  />
             <Text style={[styles.message, { color: theme.colors.text }]}>
               Camera permission is required to scan QR codes
             </Text>
@@ -189,7 +189,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
               }}
               disabled={processing}
             >
-              <Ionicons name="close" size={24} color="white" />
+              <Icon name="close" size={24} color="white"  />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>
               {processing ? 'Processing...' : 'Scan QR Code'}
@@ -225,20 +225,20 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
                 }}
                 disabled={processing}
               >
-                <Ionicons name="refresh" size={20} color="white" />
+                <Icon name="refresh" size={20} color="white"  />
                 <Text style={styles.actionButtonText}>Scan Again</Text>
               </TouchableOpacity>
             )}
             
             {processing && (
               <View style={styles.actionButton}>
-                <Ionicons name="hourglass" size={20} color="white" />
+                <Icon name="hourglass" size={20} color="white" />
                 <Text style={styles.actionButtonText}>Processing...</Text>
               </View>
             )}
             
             <View style={styles.infoCard}>
-              <Ionicons name="information-circle" size={16} color="rgba(255,255,255,0.8)" />
+              <Icon name="information" size={16} color="rgba(255,255,255,0.8)"  />
               <Text style={styles.infoText}>
                 Only scan QR codes from trusted Spendy users
               </Text>

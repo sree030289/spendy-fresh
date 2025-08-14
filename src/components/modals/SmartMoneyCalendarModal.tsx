@@ -12,7 +12,7 @@ import {
   FlatList,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { Expense, Income, Reminder } from '@/types';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -389,7 +389,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
                       }]}
                       onPress={() => setSelectedDate(day)}
                     >
-                      <Ionicons name="add-circle-outline" size={16} color={theme.colors.textSecondary} />
+                      <Icon name="add-circle-outline" size={16} color={theme.colors.textSecondary} />
                       <Text style={[styles.weekItemCategory, { color: theme.colors.textSecondary, marginTop: 4 }]}>
                         Add item
                       </Text>
@@ -467,21 +467,21 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
                   
                   <View style={styles.yearBottomStats}>
                     <View style={styles.yearStatItem}>
-                      <Ionicons name="remove-circle" size={10} color={theme.colors.error} />
+                      <Icon name="remove-circle" size={10} color={theme.colors.error} />
                       <Text style={[styles.yearStatCount, { color: theme.colors.textSecondary }]}>
                         {expenseCount}
                       </Text>
                     </View>
                     
                     <View style={styles.yearStatItem}>
-                      <Ionicons name="add-circle" size={10} color={theme.colors.success} />
+                      <Icon name="add-circle" size={10} color={theme.colors.success} />
                       <Text style={[styles.yearStatCount, { color: theme.colors.textSecondary }]}>
                         {incomeCount}
                       </Text>
                     </View>
                     
                     <View style={styles.yearStatItem}>
-                      <Ionicons name="notifications" size={10} color={theme.colors.warning} />
+                      <Icon name="notifications" size={10} color={theme.colors.warning}  />
                       <Text style={[styles.yearStatCount, { color: theme.colors.textSecondary }]}>
                         {reminderCount}
                       </Text>
@@ -547,14 +547,14 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
                 onPress={() => setSelectedDate(null)}
                 style={styles.closeButton}
               >
-                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+                <Icon name="close" size={24} color={theme.colors.textSecondary}  />
               </TouchableOpacity>
             </View>
             
             <ScrollView style={styles.selectedDateContent} showsVerticalScrollIndicator={false}>
               {selectedDateItems.length === 0 ? (
                 <View style={styles.emptyDateContainer}>
-                  <Ionicons name="calendar-outline" size={48} color={theme.colors.textSecondary} />
+                  <Icon name="calendar" size={48} color={theme.colors.textSecondary}  />
                   <Text style={[styles.emptyDateText, { color: theme.colors.text }]}>
                     No items for this date
                   </Text>
@@ -676,7 +676,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
         }]}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={onClose} style={styles.closeHeaderButton}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Icon name="close" size={24} color={theme.colors.text}  />
             </TouchableOpacity>
             
             <View style={styles.headerCenter}>
@@ -692,7 +692,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
               onPress={() => setShowFilters(!showFilters)}
               style={styles.filterButton}
             >
-              <Ionicons name="filter" size={24} color={theme.colors.text} />
+              <Icon name="filter" size={24} color={theme.colors.text}  />
             </TouchableOpacity>
           </View>
           
@@ -707,7 +707,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
                   ]}
                   onPress={() => setFilters(prev => ({ ...prev, showExpenses: !prev.showExpenses }))}
                 >
-                  <Ionicons 
+                  <Icon 
                     name="remove-circle" 
                     size={16} 
                     color={filters.showExpenses ? 'white' : theme.colors.error} 
@@ -727,7 +727,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
                   ]}
                   onPress={() => setFilters(prev => ({ ...prev, showIncome: !prev.showIncome }))}
                 >
-                  <Ionicons 
+                  <Icon 
                     name="add-circle" 
                     size={16} 
                     color={filters.showIncome ? 'white' : theme.colors.success} 
@@ -747,11 +747,10 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
                   ]}
                   onPress={() => setFilters(prev => ({ ...prev, showReminders: !prev.showReminders }))}
                 >
-                  <Ionicons 
-                    name="notifications" 
+                  <Icon name="notifications" 
                     size={16} 
                     color={filters.showReminders ? 'white' : theme.colors.warning} 
-                  />
+                   />
                   <Text style={[
                     styles.filterChipText,
                     { color: filters.showReminders ? 'white' : theme.colors.warning }
@@ -771,7 +770,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
               onPress={() => navigate(-1)}
               style={[styles.navButton, { backgroundColor: theme.colors.background }]}
             >
-              <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
+              <Icon name="back" size={20} color={theme.colors.text}  />
             </TouchableOpacity>
             
             <Text style={[styles.navigationTitle, { color: theme.colors.text }]}>
@@ -782,7 +781,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
               onPress={() => navigate(1)}
               style={[styles.navButton, { backgroundColor: theme.colors.background }]}
             >
-              <Ionicons name="chevron-forward" size={20} color={theme.colors.text} />
+              <Icon name="forward" size={20} color={theme.colors.text}  />
             </TouchableOpacity>
           </View>
           
@@ -821,7 +820,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
         <View style={[styles.summaryStats, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.summaryRow}>
             <View style={styles.statItem}>
-              <Ionicons name="remove-circle" size={16} color={theme.colors.error} />
+              <Icon name="remove-circle" size={16} color={theme.colors.error} />
               <Text style={[styles.statValue, { color: theme.colors.text }]}>
                 ${expenses.reduce((sum, exp) => sum + exp.amount, 0).toFixed(2)}
               </Text>
@@ -831,7 +830,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
             </View>
             
             <View style={styles.statItem}>
-              <Ionicons name="add-circle" size={16} color={theme.colors.success} />
+              <Icon name="add-circle" size={16} color={theme.colors.success} />
               <Text style={[styles.statValue, { color: theme.colors.text }]}>
                 ${income.reduce((sum, inc) => sum + inc.amount, 0).toFixed(2)}
               </Text>
@@ -841,7 +840,7 @@ const SmartMoneyCalendarModal: React.FC<SmartMoneyCalendarModalProps> = ({
             </View>
             
             <View style={styles.statItem}>
-              <Ionicons name="notifications" size={16} color={theme.colors.warning} />
+              <Icon name="notifications" size={16} color={theme.colors.warning}  />
               <Text style={[styles.statValue, { color: theme.colors.text }]}>
                 {reminders.filter(r => r.status === 'pending').length}
               </Text>

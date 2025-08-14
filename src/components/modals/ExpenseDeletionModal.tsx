@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { Expense } from '@/services/firebase/splitting-disabled';
@@ -66,7 +66,8 @@ export default function ExpenseDeletionModal({
       const impacts: BalanceImpact[] = [];
 
       // Calculate impact for each person involved in the expense
-      for (const split of expense.splitData) {
+      const expenseSplitData = expense.splitData || expense.splitDetails || expense.splits || [];
+      for (const split of expenseSplitData) {
         const member = group.members.find((m: any) => m.userId === split.userId);
         if (member) {
           let impactAmount = 0;
@@ -109,7 +110,8 @@ export default function ExpenseDeletionModal({
     }
 
     // Check if expense has been partially settled
-    const hasPartialPayments = expense.splitData.some(split => split.isPaid);
+    const splitData = expense.splitData || expense.splitDetails || expense.splits || [];
+    const hasPartialPayments = splitData.some(split => split.isPaid || split.isSettled);
     if (hasPartialPayments) {
       return { 
         canDelete: false, 
@@ -226,7 +228,7 @@ export default function ExpenseDeletionModal({
         <ScrollView style={styles.content}>
           {/* Warning Card */}
           <View style={[styles.warningCard, { backgroundColor: theme.colors.error + '10' }]}>
-            <Ionicons name="warning" size={24} color={theme.colors.error} />
+            <Icon name="warning" size={24} color={theme.colors.error}  />
             <View style={styles.warningContent}>
               <Text style={[styles.warningTitle, { color: theme.colors.error }]}>
                 Delete Expense
@@ -262,25 +264,25 @@ export default function ExpenseDeletionModal({
             </Text>
             <View style={styles.rulesList}>
               <View style={styles.ruleItem}>
-                <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                <Icon name="success" size={16} color={theme.colors.success}  />
                 <Text style={[styles.ruleText, { color: theme.colors.textSecondary }]}>
                   All group member balances will be reversed
                 </Text>
               </View>
               <View style={styles.ruleItem}>
-                <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                <Icon name="success" size={16} color={theme.colors.success}  />
                 <Text style={[styles.ruleText, { color: theme.colors.textSecondary }]}>
                   Friend balances will be adjusted accordingly
                 </Text>
               </View>
               <View style={styles.ruleItem}>
-                <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                <Icon name="success" size={16} color={theme.colors.success}  />
                 <Text style={[styles.ruleText, { color: theme.colors.textSecondary }]}>
                   Group total expenses will be reduced
                 </Text>
               </View>
               <View style={styles.ruleItem}>
-                <Ionicons name="alert-circle" size={16} color={theme.colors.error} />
+                <Icon name="alert" size={16} color={theme.colors.error}  />
                 <Text style={[styles.ruleText, { color: theme.colors.textSecondary }]}>
                   This action cannot be undone
                 </Text>
@@ -306,7 +308,7 @@ export default function ExpenseDeletionModal({
 
         {/* Final Warning */}
         <View style={[styles.finalWarning, { backgroundColor: theme.colors.error + '10' }]}>
-          <Ionicons name="warning" size={20} color={theme.colors.error} />
+          <Icon name="warning" size={20} color={theme.colors.error}  />
           <Text style={[styles.finalWarningText, { color: theme.colors.error }]}>
             This will permanently delete the expense and reverse all associated balances.
           </Text>
@@ -325,7 +327,7 @@ export default function ExpenseDeletionModal({
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
             Delete Expense
@@ -353,7 +355,7 @@ export default function ExpenseDeletionModal({
         {!deleteCheck.canDelete ? (
           <View style={styles.content}>
             <View style={[styles.blockedCard, { backgroundColor: theme.colors.error + '10' }]}>
-              <Ionicons name="lock-closed" size={48} color={theme.colors.error} />
+              <Icon name="lock" size={48} color={theme.colors.error}  />
               <Text style={[styles.blockedTitle, { color: theme.colors.error }]}>
                 Cannot Delete Expense
               </Text>

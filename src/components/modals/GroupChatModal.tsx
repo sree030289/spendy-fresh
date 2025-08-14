@@ -12,7 +12,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { Group, SplittingService } from '@/services/firebase/splitting-disabled';
@@ -197,7 +197,7 @@ const renderMessage = (message: ChatMessage, index: number) => {
         }
       ]}>
         <View style={styles.expenseMessageHeader}>
-          <Ionicons 
+          <Icon 
             name={isEditedExpense ? "create-outline" : "receipt"} 
             size={16} 
             color={isEditedExpense ? theme.colors.warning : theme.colors.success} 
@@ -299,7 +299,7 @@ const renderMessage = (message: ChatMessage, index: number) => {
           style={styles.headerAction}
           onPress={() => Alert.alert('Group Info', 'Group details coming soon')}
         >
-          <Ionicons name="information-circle" size={24} color={theme.colors.text} />
+          <Icon name="information" size={24} color={theme.colors.text}  />
         </TouchableOpacity>
       }
     >
@@ -372,7 +372,7 @@ const renderMessage = (message: ChatMessage, index: number) => {
                 onPress={sendMessage}
                 disabled={!newMessage.trim() || loading}
               >
-                <Ionicons name="send" size={18} color="white" />
+                <Icon name="send" size={18} color="white"  />
               </TouchableOpacity>
             </View>
 
@@ -382,7 +382,7 @@ const renderMessage = (message: ChatMessage, index: number) => {
                 style={[styles.quickAction, { backgroundColor: theme.colors.surface }]}
                 onPress={handleAddExpense}
               >
-                <Ionicons name="add-circle" size={16} color={theme.colors.primary} />
+                <Icon name="add-circle" size={16} color={theme.colors.primary} />
                 <Text style={[styles.quickActionText, { color: theme.colors.primary }]}>
                   Add Expense
                 </Text>
@@ -392,7 +392,7 @@ const renderMessage = (message: ChatMessage, index: number) => {
                 style={[styles.quickAction, { backgroundColor: theme.colors.surface }]}
                 onPress={handleTakePhoto}
               >
-                <Ionicons name="camera" size={16} color={theme.colors.textSecondary} />
+                <Icon name="camera" size={16} color={theme.colors.textSecondary}  />
                 <Text style={[styles.quickActionText, { color: theme.colors.textSecondary }]}>
                   Photo
                 </Text>

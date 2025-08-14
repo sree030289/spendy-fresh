@@ -9,7 +9,7 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './Icon';
 import { useTheme } from '@/hooks/useTheme';
 
 interface FullscreenModalProps {
@@ -49,7 +49,7 @@ export default function FullscreenModal({
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+              <Icon name="back" size={24} color={theme.colors.text}  />
             </TouchableOpacity>
           )}
           

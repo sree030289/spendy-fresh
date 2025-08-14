@@ -71,6 +71,12 @@
       "vapidPublicKey": "BCKn6-hFFrk_G2HzxtJ5u8_BfvwFjhSyBh2DQEG1Y0tPd8yJM1ZZCf7Cz9Hy5KVBEo1vVQb",
       "serviceWorkerPath": "./public/firebase-messaging-sw.js"
     },
+    "web": {
+      "bundler": "metro",
+      "output": "single", 
+      "favicon": "./assets/favicon.png",
+      "template": "./web/index.html"
+    },
     "plugins": [
       [
         "expo-notifications",

@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 
 // Import your services
 import BudgetPlanSection from '@/components/budget/BudgetPlanSection';
@@ -51,7 +51,7 @@ const SimpleExpenseListModal: React.FC<{
       <SafeAreaView style={[styles.fullScreenModal, { backgroundColor: theme.colors.background }]}>
         <View style={[styles.fullScreenHeader, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.fullScreenTitle, { color: theme.colors.text }]}>{title}</Text>
           <View style={{ width: 24 }} />
@@ -87,7 +87,7 @@ const TabButton: React.FC<TabButtonProps> = ({ title, icon, isActive, onPress })
         isActive && [styles.activeSegment, { backgroundColor: theme.colors.primary }],
       ]}
     >
-      <Ionicons
+      <Icon
         name={icon as any}
         size={18}
         color={isActive ? 'white' : theme.colors.textSecondary}
@@ -115,13 +115,13 @@ const RecentTransactionsView: React.FC<{
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Transactions</Text>
         <TouchableOpacity onPress={onViewAll} style={styles.viewAllButton}>
           <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
-          <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+          <Icon name="forward" size={16} color={theme.colors.primary}  />
         </TouchableOpacity>
       </View>
       
       {expenses.length === 0 ? (
         <View style={styles.emptyStateContainer}>
-          <Ionicons name="card-outline" size={40} color={theme.colors.textSecondary} />
+          <Icon name="card" size={40} color={theme.colors.textSecondary}  />
           <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
             No transactions yet
           </Text>
@@ -196,13 +196,13 @@ const UpcomingRemindersView: React.FC<{
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Upcoming Reminders</Text>
         <TouchableOpacity onPress={onViewAll} style={styles.viewAllButton}>
           <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
-          <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+          <Icon name="forward" size={16} color={theme.colors.primary}  />
         </TouchableOpacity>
       </View>
       
       {upcomingReminders.length === 0 ? (
         <View style={styles.emptyStateContainer}>
-          <Ionicons name="calendar-outline" size={40} color={theme.colors.textSecondary} />
+          <Icon name="calendar" size={40} color={theme.colors.textSecondary}  />
           <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
             No upcoming reminders
           </Text>
@@ -282,7 +282,7 @@ const UpcomingRemindersView: React.FC<{
                     }}
                     style={styles.quickMarkPaidButton}
                   >
-                    <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+                    <Icon name="success" size={20} color={theme.colors.success}  />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -383,14 +383,14 @@ const FullScreenReminderModal: React.FC<{
                 onPress={() => onMarkPaid(reminder.id)}
                 style={[styles.fullScreenActionButton, { backgroundColor: theme.colors.success }]}
               >
-                <Ionicons name="checkmark" size={16} color="white" />
+                <Icon name="checkmark" size={16} color="white"  />
               </TouchableOpacity>
             )}
             <TouchableOpacity
               onPress={() => onDelete(reminder.id)}
               style={[styles.fullScreenActionButton, { backgroundColor: theme.colors.error }]}
             >
-              <Ionicons name="trash" size={16} color="white" />
+              <Icon name="trash" size={16} color="white"  />
             </TouchableOpacity>
           </View>
         </View>
@@ -404,7 +404,7 @@ const FullScreenReminderModal: React.FC<{
         {/* Header */}
         <View style={[styles.fullScreenHeader, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.fullScreenTitle, { color: theme.colors.text }]}>All Reminders</Text>
           <View style={{ width: 24 }} />
@@ -448,7 +448,7 @@ const FullScreenReminderModal: React.FC<{
             <View style={styles.fullScreenRemindersList}>
               {reminders.length === 0 ? (
                 <View style={styles.fullScreenEmptyState}>
-                  <Ionicons name="calendar-outline" size={64} color={theme.colors.textSecondary} />
+                  <Icon name="calendar" size={64} color={theme.colors.textSecondary}  />
                   <Text style={[styles.fullScreenEmptyTitle, { color: theme.colors.text }]}>
                     No reminders yet
                   </Text>
@@ -501,7 +501,7 @@ const FullScreenCalendarModal: React.FC<{
         {/* Header */}
         <View style={[styles.fullScreenHeader, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.fullScreenTitle, { color: theme.colors.text }]}>Calendar View</Text>
           <View style={{ width: 24 }} />
@@ -861,7 +861,7 @@ const SmartMoneyScreen: React.FC = () => {
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Analytics</Text>
           <View style={styles.emptyAnalytics}>
-            <Ionicons name="analytics-outline" size={48} color={theme.colors.textSecondary} />
+            <Icon name="analytics" size={48} color={theme.colors.textSecondary}  />
             <Text style={[styles.emptyAnalyticsText, { color: theme.colors.text }]}>
               No data for analytics
             </Text>
@@ -982,7 +982,7 @@ const SmartMoneyScreen: React.FC = () => {
                 setShowAddForm(true);
               }}
             >
-              <Ionicons name="remove-circle-outline" size={24} color={theme.colors.error} />
+              <Icon name="remove-circle-outline" size={24} color={theme.colors.error} />
               <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Expense</Text>
               <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
                 Track family spending
@@ -996,7 +996,7 @@ const SmartMoneyScreen: React.FC = () => {
                 setShowAddForm(true);
               }}
             >
-              <Ionicons name="add-circle-outline" size={24} color={theme.colors.success} />
+              <Icon name="add-circle-outline" size={24} color={theme.colors.success} />
               <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Income</Text>
               <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
                 Record family income
@@ -1010,7 +1010,7 @@ const SmartMoneyScreen: React.FC = () => {
                 setShowAddForm(true);
               }}
             >
-              <Ionicons name="notifications-outline" size={24} color={theme.colors.warning} />
+              <Icon name="notifications" size={24} color={theme.colors.warning}  />
               <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Bill Reminder</Text>
               <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
                 Set payment alerts
@@ -1021,7 +1021,7 @@ const SmartMoneyScreen: React.FC = () => {
               style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
               onPress={() => setActiveTab('budget')}
             >
-              <Ionicons name="wallet-outline" size={24} color={theme.colors.primary} />
+              <Icon name="wallet" size={24} color={theme.colors.primary}  />
               <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Budget Plan</Text>
               <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
                 Manage family budget
@@ -1116,7 +1116,7 @@ const SmartMoneyScreen: React.FC = () => {
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Spending by Category</Text>
           {Object.entries(categoryExpenses).length === 0 ? (
             <View style={styles.emptyStateContainer}>
-              <Ionicons name="pie-chart-outline" size={40} color={theme.colors.textSecondary} />
+              <Icon name="pie-chart-outline" size={40} color={theme.colors.textSecondary} />
               <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
                 No spending data yet
               </Text>
@@ -1156,7 +1156,7 @@ const SmartMoneyScreen: React.FC = () => {
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Monthly Spending Trends</Text>
           {Object.entries(monthlyExpenses).length === 0 ? (
             <View style={styles.emptyStateContainer}>
-              <Ionicons name="trending-up-outline" size={40} color={theme.colors.textSecondary} />
+              <Icon name="trending" size={40} color={theme.colors.textSecondary}  />
               <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
                 No trend data yet
               </Text>
@@ -1181,7 +1181,7 @@ const SmartMoneyScreen: React.FC = () => {
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Budget Insights</Text>
           <View style={styles.insightCard}>
-            <Ionicons name="bulb-outline" size={24} color={theme.colors.warning} />
+            <Icon name="bulb-outline" size={24} color={theme.colors.warning} />
             <View style={styles.insightContent}>
               <Text style={[styles.insightTitle, { color: theme.colors.text }]}>
                 Smart Savings Tip
@@ -1260,7 +1260,7 @@ const SmartMoneyScreen: React.FC = () => {
                 );
               }}
             >
-              <Ionicons name="settings" color="white" size={20} />
+              <Icon name="settings" color="white" size={20}  />
             </TouchableOpacity>
           </View>
           
@@ -1318,7 +1318,7 @@ const SmartMoneyScreen: React.FC = () => {
         <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Budget Tips</Text>
           <View style={styles.tipCard}>
-            <Ionicons name="lightbulb-outline" size={24} color={theme.colors.primary} />
+            <Icon name="lightbulb-outline" size={24} color={theme.colors.primary} />
             <View style={styles.tipContent}>
               <Text style={[styles.tipTitle, { color: theme.colors.text }]}>
                 50/30/20 Rule
@@ -1340,7 +1340,7 @@ const SmartMoneyScreen: React.FC = () => {
     if (totalExpenses > totalIncome * 0.8) {
       return (
         <View style={[styles.alertCard, { backgroundColor: theme.colors.warning + '20', borderColor: theme.colors.warning }]}>
-          <Ionicons name="warning-outline" size={24} color={theme.colors.warning} />
+          <Icon name="warning" size={24} color={theme.colors.warning}  />
           <View style={styles.alertContent}>
             <Text style={[styles.alertTitle, { color: theme.colors.text }]}>
               Budget Alert
@@ -1363,7 +1363,7 @@ const SmartMoneyScreen: React.FC = () => {
       {/* Expenses */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Ionicons name="trending-down" color="#EF4444" size={24} />
+          <Icon name="trending-down" color="#EF4444" size={24} />
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Expenses</Text>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: '#EF4444' }]}
@@ -1372,13 +1372,13 @@ const SmartMoneyScreen: React.FC = () => {
               setShowAddForm(true);
             }}
           >
-            <Ionicons name="add" color="#FFFFFF" size={20} />
+            <Icon name="add" color="#FFFFFF" size={20}  />
           </TouchableOpacity>
         </View>
         
         {expenses.length === 0 ? (
           <View style={styles.emptyStateContainer}>
-            <Ionicons name="trending-down" color="#D1D5DB" size={40} />
+            <Icon name="trending-down" color="#D1D5DB" size={40} />
             <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No expenses yet</Text>
             <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
               Track your spending by adding expenses
@@ -1401,7 +1401,7 @@ const SmartMoneyScreen: React.FC = () => {
                   style={styles.deleteButton}
                   onPress={() => deleteItem(expense.id, 'expense')}
                 >
-                  <Ionicons name="trash-outline" color="#EF4444" size={16} />
+                  <Icon name="trash" color="#EF4444" size={16}  />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1412,7 +1412,7 @@ const SmartMoneyScreen: React.FC = () => {
       {/* Income */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Ionicons name="trending-up" color="#10B981" size={24} />
+          <Icon name="trending" color="#10B981" size={24}  />
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Income</Text>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: '#10B981' }]}
@@ -1421,13 +1421,13 @@ const SmartMoneyScreen: React.FC = () => {
               setShowAddForm(true);
             }}
           >
-            <Ionicons name="add" color="#FFFFFF" size={20} />
+            <Icon name="add" color="#FFFFFF" size={20}  />
           </TouchableOpacity>
         </View>
         
         {income.length === 0 ? (
           <View style={styles.emptyStateContainer}>
-            <Ionicons name="trending-up" color="#D1D5DB" size={40} />
+            <Icon name="trending" color="#D1D5DB" size={40}  />
             <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No income yet</Text>
             <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
               Add income sources to track your earnings
@@ -1450,7 +1450,7 @@ const SmartMoneyScreen: React.FC = () => {
                   style={styles.deleteButton}
                   onPress={() => deleteItem(incomeItem.id, 'income')}
                 >
-                  <Ionicons name="trash-outline" color="#EF4444" size={16} />
+                  <Icon name="trash" color="#EF4444" size={16}  />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1472,7 +1472,7 @@ const SmartMoneyScreen: React.FC = () => {
           style={styles.gmailCard}
         >
           <View style={styles.gmailContent}>
-            <Ionicons name="mail" color="#FFFFFF" size={24} />
+            <Icon name="mail" color="#FFFFFF" size={24}  />
             <View style={styles.gmailText}>
               <Text style={styles.gmailTitle}>Connect Gmail for Smart Reminders</Text>
               <Text style={styles.gmailSubtitle}>AI will scan your emails for bills</Text>
@@ -1523,7 +1523,7 @@ const SmartMoneyScreen: React.FC = () => {
                     setShowAddForm(false);
                   }}
                 >
-                  <Ionicons name="close" color={theme.colors.textSecondary} size={24} />
+                  <Icon name="close" color={theme.colors.textSecondary} size={24}  />
                 </TouchableOpacity>
               </View>
 
@@ -1607,7 +1607,7 @@ const SmartMoneyScreen: React.FC = () => {
                       <Text style={[styles.dateText, { color: theme.colors.text }]}>
                         {new Date(formData.dueDate).toLocaleDateString()}
                       </Text>
-                      <Ionicons name="calendar-outline" color={theme.colors.textSecondary} size={20} />
+                      <Icon name="calendar" color={theme.colors.textSecondary} size={20}  />
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -1623,7 +1623,7 @@ const SmartMoneyScreen: React.FC = () => {
                       <Text style={[styles.dateText, { color: theme.colors.text }]}>
                         {new Date(formData.date).toLocaleDateString()}
                       </Text>
-                      <Ionicons name="calendar-outline" color={theme.colors.textSecondary} size={20} />
+                      <Icon name="calendar" color={theme.colors.textSecondary} size={20}  />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1694,12 +1694,12 @@ const SmartMoneyScreen: React.FC = () => {
               style={styles.headerAction}
               onPress={connectGmail}
             >
-              <Ionicons name="cloud-download" size={24} color="#EF4444" />
+              <Icon name="cloud-download" size={24} color="#EF4444" />
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.headerAction}
             >
-              <Ionicons name="notifications" size={24} color="#F59E0B" />
+              <Icon name="notifications" size={24} color="#F59E0B"  />
               {reminders.filter(r => r.status === 'pending').length > 0 && (
                 <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
                   <Text style={styles.notificationBadgeText}>
@@ -1743,7 +1743,7 @@ const SmartMoneyScreen: React.FC = () => {
           setShowAddForm(true);
         }}
       >
-        <Ionicons name="add" size={28} color="white" />
+        <Icon name="add" size={28} color="white"  />
       </TouchableOpacity>
       
       {/* Modals */}

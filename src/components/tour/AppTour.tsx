@@ -12,7 +12,7 @@ import {
   Image,
   FlatList,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,7 +24,7 @@ interface TourStep {
   title: string;
   description: string;
   quote: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string;
   color: string;
   gradient: [string, string];
   animation?: 'fadeIn' | 'slideUp' | 'bounce' | 'scale' | 'typewriter' | 'pulse';
@@ -440,7 +440,7 @@ export default function AppTour({ visible, onComplete, onSkip }: AppTourProps) {
             },
           ]}
         >
-          <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+          <Icon name="success" size={16} color="#10B981"  />
           <Text style={styles.featureText}>{feature}</Text>
         </Animated.View>
       ))}
@@ -557,7 +557,7 @@ export default function AppTour({ visible, onComplete, onSkip }: AppTourProps) {
                 colors={currentStepData.gradient}
                 style={styles.iconGradient}
               >
-                <Ionicons
+                <Icon
                   name={currentStepData.icon}
                   size={60}
                   color="white"
@@ -596,7 +596,7 @@ export default function AppTour({ visible, onComplete, onSkip }: AppTourProps) {
               ]}
               disabled={currentStep === 0}
             >
-              <Ionicons name="chevron-back" size={20} color="rgba(255, 255, 255, 0.7)" />
+              <Icon name="back" size={20} color="rgba(255, 255, 255, 0.7)"  />
               <Text style={styles.prevButtonText}>Previous</Text>
             </TouchableOpacity>
 
@@ -611,7 +611,7 @@ export default function AppTour({ visible, onComplete, onSkip }: AppTourProps) {
                 <Text style={styles.nextButtonText}>
                   {currentStep === tourSteps.length - 1 ? 'Get Started' : 'Next'}
                 </Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
+                <Icon name="forward" size={20} color="white"  />
               </LinearGradient>
             </TouchableOpacity>
           </View>

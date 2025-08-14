@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -119,7 +119,7 @@ const FilterSelectionModal = ({
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{title}</Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Icon name="close" size={24} color={theme.colors.text}  />
             </TouchableOpacity>
           </View>
           
@@ -151,7 +151,7 @@ const FilterSelectionModal = ({
                   {item.name}
                 </Text>
                 {selectedValue === item.id && (
-                  <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
+                  <Icon name="checkmark" size={20} color={theme.colors.primary}  />
                 )}
               </TouchableOpacity>
             )}
@@ -526,11 +526,10 @@ export default function TransactionListModal({
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons 
-        name="wallet-outline" 
+      <Icon name="wallet" 
         size={64} 
         color={theme.colors.textSecondary} 
-      />
+       />
       <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
         No transactions found
       </Text>
@@ -562,7 +561,7 @@ export default function TransactionListModal({
         >
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="white" />
+              <Icon name="close" size={24} color="white"  />
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle}>{title}</Text>
@@ -602,7 +601,7 @@ export default function TransactionListModal({
         <View style={[styles.filterSection, { backgroundColor: theme.colors.surface }]}>
           {/* Search Bar */}
           <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-            <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+            <Icon name="search" size={20} color={theme.colors.textSecondary}  />
             <TextInput
               style={[styles.searchInput, { color: theme.colors.text }]}
               placeholder="Search transactions..."
@@ -612,7 +611,7 @@ export default function TransactionListModal({
             />
             {filters.searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => updateFilter('searchQuery', '')}>
-                <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+                <Icon name="error" size={20} color={theme.colors.textSecondary}  />
               </TouchableOpacity>
             )}
           </View>
@@ -624,11 +623,11 @@ export default function TransactionListModal({
               style={[styles.filterButton, { backgroundColor: theme.colors.surface }]}
               onPress={() => setShowTypeModal(true)}
             >
-              <Ionicons name="swap-horizontal-outline" size={16} color={theme.colors.text} />
+              <Icon name="swap-horizontal-outline" size={16} color={theme.colors.text} />
               <Text style={[styles.filterButtonText, { color: theme.colors.text }]} numberOfLines={1}>
                 {getSelectedTypeName()}
               </Text>
-              <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
+              <Icon name="chevron-down" size={16} color={theme.colors.textSecondary} />
             </TouchableOpacity>
 
             {/* Categories */}
@@ -636,11 +635,11 @@ export default function TransactionListModal({
               style={[styles.filterButton, { backgroundColor: theme.colors.surface }]}
               onPress={() => setShowCategoryModal(true)}
             >
-              <Ionicons name="pricetag-outline" size={16} color={theme.colors.text} />
+              <Icon name="pricetag-outline" size={16} color={theme.colors.text} />
               <Text style={[styles.filterButtonText, { color: theme.colors.text }]} numberOfLines={1}>
                 {getSelectedCategoryName()}
               </Text>
-              <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
+              <Icon name="chevron-down" size={16} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -650,11 +649,11 @@ export default function TransactionListModal({
               style={[styles.dateButton, { backgroundColor: theme.colors.surface }]}
               onPress={() => setShowDateModal(true)}
             >
-              <Ionicons name="calendar-outline" size={16} color={theme.colors.text} />
+              <Icon name="calendar" size={16} color={theme.colors.text}  />
               <Text style={[styles.dateButtonText, { color: theme.colors.text }]}>
                 {getSelectedDateRange()}
               </Text>
-              <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
+              <Icon name="chevron-down" size={16} color={theme.colors.textSecondary} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -664,7 +663,7 @@ export default function TransactionListModal({
               }}
               style={[styles.sortButton, { backgroundColor: theme.colors.surface }]}
             >
-              <Ionicons 
+              <Icon 
                 name={filters.sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'} 
                 size={16} 
                 color={theme.colors.primary} 

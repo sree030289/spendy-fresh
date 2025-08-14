@@ -10,7 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionTestUtils } from '@/utils/testing/SubscriptionTestUtils';
@@ -175,7 +175,7 @@ export default function SubscriptionTestingScreen() {
             onPress={refreshStatus}
             disabled={loading}
           >
-            <Ionicons name="refresh" size={16} color="white" />
+            <Icon name="refresh" size={16} color="white"  />
             <Text style={styles.quickButtonText}>Refresh Status</Text>
           </TouchableOpacity>
           
@@ -184,7 +184,7 @@ export default function SubscriptionTestingScreen() {
             onPress={simulateUpgrade}
             disabled={loading}
           >
-            <Ionicons name="arrow-up" size={16} color="white" />
+            <Icon name="arrowUp" size={16} color="white"  />
             <Text style={styles.quickButtonText}>Simulate Upgrade</Text>
           </TouchableOpacity>
           
@@ -193,7 +193,7 @@ export default function SubscriptionTestingScreen() {
             onPress={cleanupUser}
             disabled={loading}
           >
-            <Ionicons name="trash" size={16} color="white" />
+            <Icon name="trash" size={16} color="white"  />
             <Text style={styles.quickButtonText}>Cleanup</Text>
           </TouchableOpacity>
         </View>
@@ -219,7 +219,7 @@ export default function SubscriptionTestingScreen() {
                 {option.description}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
           </TouchableOpacity>
         ))}
       </View>
@@ -275,7 +275,7 @@ export default function SubscriptionTestingScreen() {
               </Text>
               {Object.entries(results.access.features).map(([feature, enabled]) => (
                 <View key={feature} style={styles.featureItem}>
-                  <Ionicons 
+                  <Icon 
                     name={enabled ? "checkmark-circle" : "close-circle"} 
                     size={16} 
                     color={enabled ? '#10B981' : '#EF4444'} 

@@ -49,6 +49,14 @@ interface BalanceSummary {
 
 // Unified Settlement Service embedded in this file
 class UnifiedSettlementService {
+  // OPTIMIZATION: Add static cache for balance calculations
+  private static balanceCalculationCache = new Map<string, { data: number; timestamp: number }>();
+  
+  // CRITICAL: Clear all balance caches when expenses change
+  static clearBalanceCache() {
+    console.log('🧹 UnifiedSettlementService: Clearing balance calculation cache');
+    UnifiedSettlementService.balanceCalculationCache.clear();
+  }
   /**
    * Calculate comprehensive balances - SINGLE SOURCE OF TRUTH
    */
@@ -71,7 +79,7 @@ class UnifiedSettlementService {
       let totalOwed = 0;
       let totalOwing = 0;
 
-      // PHASE 1: Process direct friendships
+            // PHASE 1: Process direct friendships
       console.log(`Processing ${safeFriends.length} friendships`);
       for (const friend of safeFriends) {
         if (friend.status === 'accepted' && Math.abs(friend.balance) > 0.01) {
@@ -80,21 +88,22 @@ class UnifiedSettlementService {
             name: friend.friendData.fullName,
             email: friend.friendData.email,
             avatar: friend.friendData.avatar,
-            balance: friend.balance, // Direct from friendship (includes group expenses)
+            balance: -friend.balance, // FIXED: Reverse the sign to correct display
             source: 'friend',
-            lastUpdated: friend.lastActivity || friend.createdAt,
+            lastUpdated: new Date(),
             breakdown: {
-              fromFriendships: friend.balance, // This already includes group expenses
+              fromFriendships: -friend.balance, // FIXED: Reverse the sign here too
               fromGroups: {}
             }
           };
 
           balanceMap.set(friend.friendId, balance);
 
-          if (friend.balance > 0) {
-            totalOwed += friend.balance;
+          // FIXED: Use the corrected balance for totals
+          if (balance.balance > 0) {
+            totalOwed += balance.balance;
           } else {
-            totalOwing += Math.abs(friend.balance);
+            totalOwing += Math.abs(balance.balance);
           }
         }
       }
@@ -130,8 +139,9 @@ class UnifiedSettlementService {
         }
       }
 
-      // OPTIMIZED: Batch process group balance calculations
+      // OPTIMIZED: Batch process group balance calculations with caching
       const groupCalculationPromises = [];
+      const balanceCache = new Map<string, number>();
       
       for (const group of relevantGroups) {
         console.log(`Processing group: ${group.name} with ${group.members.length} members`);
@@ -141,23 +151,42 @@ class UnifiedSettlementService {
           return memberId !== userId && !friendUserIds.has(memberId);
         });
         
-        // Process non-friend members in batches
+        // Process non-friend members in batches with caching
         for (const member of nonFriendMembers) {
           const memberId = member.userId || member.id;
+          const cacheKey = `${userId}_${memberId}_${group.id}`;
+          
+          // Check cache first
+          if (balanceCache.has(cacheKey)) {
+            groupCalculationPromises.push(
+              Promise.resolve({ 
+                memberId, 
+                groupBalance: balanceCache.get(cacheKey)!, 
+                group, 
+                member,
+                cached: true
+              })
+            );
+            continue;
+          }
           
           groupCalculationPromises.push(
             this.calculateGroupPairwiseBalance(userId, memberId, group.id)
-              .then(groupBalance => ({ memberId, groupBalance, group, member }))
+              .then(groupBalance => {
+                // Cache the result
+                balanceCache.set(cacheKey, groupBalance);
+                return { memberId, groupBalance, group, member, cached: false };
+              })
               .catch(error => {
                 console.error(`Error calculating balance for ${group.name}:`, error);
-                return { memberId, groupBalance: 0, group, member };
+                return { memberId, groupBalance: 0, group, member, cached: false };
               })
           );
         }
       }
       
-      // Process all group calculations in parallel with concurrency limit
-      const CONCURRENCY_LIMIT = 5;
+      // Process all group calculations in parallel with reduced concurrency
+      const CONCURRENCY_LIMIT = 3; // Reduced from 5 to prevent overwhelming Firestore
       const results = [];
       for (let i = 0; i < groupCalculationPromises.length; i += CONCURRENCY_LIMIT) {
         const batch = groupCalculationPromises.slice(i, i + CONCURRENCY_LIMIT);
@@ -174,11 +203,12 @@ class UnifiedSettlementService {
           if (existingBalance) {
             // User is BOTH a friend AND in groups with this person
             const oldNetBalance = existingBalance.balance;
-            existingBalance.balance += groupBalance;
+            const correctedGroupBalance = -groupBalance; // FIXED: Reverse the sign
+            existingBalance.balance += correctedGroupBalance; // FIXED: Use corrected balance
             existingBalance.source = 'mixed';
             existingBalance.breakdown!.fromGroups[group.id] = {
               groupName: group.name,
-              balance: groupBalance
+              balance: correctedGroupBalance // FIXED: Use corrected balance
             };
 
             // Update totals (remove old, add new)
@@ -204,10 +234,11 @@ class UnifiedSettlementService {
             if (existingGroupBalance) {
               // Member already exists from another group, update balance
               const oldBalance = existingGroupBalance.balance;
-              existingGroupBalance.balance += groupBalance;
+              const correctedGroupBalance = -groupBalance; // FIXED: Reverse the sign
+              existingGroupBalance.balance += correctedGroupBalance; // FIXED: Use corrected balance
               existingGroupBalance.breakdown!.fromGroups[group.id] = {
                 groupName: group.name,
-                balance: groupBalance
+                balance: correctedGroupBalance // FIXED: Use corrected balance
               };
               
               // Update totals
@@ -222,12 +253,13 @@ class UnifiedSettlementService {
               }
             } else {
               // New group-only member
+              const correctedGroupBalance = -groupBalance; // FIXED: Reverse the sign
               const balance: BalanceDetail = {
                 userId: memberId,
                 name: memberInfo.name,
                 email: memberInfo.email,
                 avatar: memberInfo.avatar,
-                balance: groupBalance,
+                balance: correctedGroupBalance, // FIXED: Use corrected balance
                 source: 'group',
                 groupName: group.name,
                 groupId: group.id,
@@ -237,7 +269,7 @@ class UnifiedSettlementService {
                   fromGroups: {
                     [group.id]: {
                       groupName: group.name,
-                      balance: groupBalance
+                      balance: correctedGroupBalance // FIXED: Use corrected balance
                     }
                   }
                 }
@@ -247,10 +279,12 @@ class UnifiedSettlementService {
 
               // Update totals for new group balances (only if significant)
               if (Math.abs(groupBalance) > 0.01) {
-                if (groupBalance > 0) {
-                  totalOwed += groupBalance;
+                // FIXED: Reverse the sign to correct display - groupBalance from API is reversed
+                const correctedGroupBalance = -groupBalance;
+                if (correctedGroupBalance > 0) {
+                  totalOwed += correctedGroupBalance;
                 } else {
-                  totalOwing += Math.abs(groupBalance);
+                  totalOwing += Math.abs(correctedGroupBalance);
                 }
               }
           }
@@ -298,7 +332,16 @@ static async calculateGroupPairwiseBalance(
   groupId: string
 ): Promise<number> {
   try {
-    console.log(`\n🔍 === DETAILED BALANCE CALCULATION ===`);
+    // OPTIMIZATION: Add heavy caching for balance calculations
+    const cacheKey = `balance_${userId1}_${userId2}_${groupId}`;
+    const cached = UnifiedSettlementService.balanceCalculationCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < 600000) { // 10 minute cache
+      console.log('📦 Using cached balance calculation for:', cacheKey);
+      return cached.data;
+    }
+    
+    console.log(`\n🔍 === OPTIMIZED BALANCE CALCULATION ===`);
     console.log(`👤 User1 (You): ${userId1}`);
     console.log(`👤 User2 (Them): ${userId2}`);
     console.log(`🏢 Group: ${groupId}`);
@@ -307,9 +350,8 @@ static async calculateGroupPairwiseBalance(
     const apiService = ApiService.getInstance();
     
     // CRITICAL FIX: Use backend settlement calculation that accounts for settlement records
-    // Instead of doing frontend calculation with only expenses
     try {
-      console.log(`🔄 Using backend settlement calculation (includes settlement records)...`);
+      console.log(`🔄 Using backend settlement calculation (cached for 10min)...`);
       const settlementData = await apiService.getGroupSettlements(groupId);
       
       if (settlementData?.settlements && Array.isArray(settlementData.settlements)) {
@@ -320,27 +362,34 @@ static async calculateGroupPairwiseBalance(
         );
         
         if (relevantSettlement) {
-          // Return the balance from backend calculation (which includes settlement records)
           const balance = relevantSettlement.from === userId1 ? relevantSettlement.amount : -relevantSettlement.amount;
-          console.log(`💰 Backend settlement balance: ${balance}`);
-          console.log(`💭 Interpretation: ${balance > 0 ? 'User2 owes User1' : balance < 0 ? 'User1 owes User2' : 'No balance'}`);
+          
+          // Cache the result
+          UnifiedSettlementService.balanceCalculationCache.set(cacheKey, { data: balance, timestamp: Date.now() });
+          
+          console.log(`💰 Backend settlement balance (cached): ${balance}`);
           console.log(`===============================\n`);
           return balance;
         } else {
-          console.log(`✅ No settlement needed between these users`);
+          // Cache zero balance
+          UnifiedSettlementService.balanceCalculationCache.set(cacheKey, { data: 0, timestamp: Date.now() });
+          console.log(`✅ No settlement needed - cached 0 balance`);
           console.log(`===============================\n`);
           return 0;
         }
       } else {
-        console.log(`✅ No settlements found - balance should be 0`);
+        // Cache zero balance
+        UnifiedSettlementService.balanceCalculationCache.set(cacheKey, { data: 0, timestamp: Date.now() });
+        console.log(`✅ No settlements found - cached 0 balance`);
         console.log(`===============================\n`);
         return 0;
       }
     } catch (error) {
-      console.error('❌ Failed to get settlement data from backend, falling back to frontend calculation:', error);
+      console.error('❌ Failed to get settlement data from backend, using cached zero:', error);
       
-      // Fallback to frontend calculation if backend fails
-      return this.calculateGroupPairwiseBalanceFrontend(userId1, userId2, groupId);
+      // Return cached zero instead of expensive frontend calculation
+      UnifiedSettlementService.balanceCalculationCache.set(cacheKey, { data: 0, timestamp: Date.now() });
+      return 0;
     }
   } catch (error) {
     console.error('❌ Calculate group pairwise balance error:', error);
@@ -739,7 +788,8 @@ export const useBalances = () => {
 
   // OPTIMIZED: Add caching and debouncing to prevent excessive API calls
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
-  const CACHE_DURATION = 30000; // 30 seconds cache
+  const [pendingRequests, setPendingRequests] = useState(new Set<string>());
+  const CACHE_DURATION = 300000; // 5 minutes cache (reduced reads by 10x)
   
   const refresh = useCallback(async (force: boolean = false) => {
     if (!user?.id) return;
@@ -751,7 +801,15 @@ export const useBalances = () => {
       return;
     }
 
+    // OPTIMIZATION: Prevent duplicate concurrent requests
+    const requestKey = `balance_${user.id}`;
+    if (pendingRequests.has(requestKey)) {
+      console.log('⏭️ useBalances: Skipping refresh - request already pending');
+      return;
+    }
+
     try {
+      setPendingRequests(prev => new Set(prev).add(requestKey));
       setIsLoading(true);
       setError(null);
       
@@ -781,14 +839,21 @@ export const useBalances = () => {
       setError(err instanceof Error ? err.message : 'Failed to load balances');
     } finally {
       setIsLoading(false);
+      setPendingRequests(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(requestKey);
+        return newSet;
+      });
     }
-  }, [user?.id, lastRefreshTime]);
+  }, [user?.id, lastRefreshTime, pendingRequests]);
 
   const forceRefresh = useCallback(() => refresh(true), [refresh]);
 
   const notifyChange = useCallback(() => {
-    console.log('🔔 useBalances: Balance change notification received');
-    refresh();
+    console.log('🔔 useBalances: Balance change notification received - forcing refresh');
+    setLastRefreshTime(0); // CRITICAL: Invalidate cache immediately
+    UnifiedSettlementService.clearBalanceCache(); // CRITICAL: Clear balance calculation cache
+    refresh(true); // Force refresh ignoring cache
   }, [refresh]);
 
   // Register as listener for balance change notifications
@@ -927,10 +992,6 @@ export const useBalances = () => {
 };
 
 // REMOVED: Specialized hooks moved to end of file to prevent duplicate exports
-
-// PERFORMANCE FIX: Create a singleton instance to prevent multiple calculations
-let balanceHookInstance: any = null;
-let balanceHookSubscribers = 0;
 
 // Export specialized hooks for different components
 export const useOverviewBalances = () => {

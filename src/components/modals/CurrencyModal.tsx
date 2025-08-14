@@ -10,7 +10,7 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { COUNTRIES } from '@/constants/countries';
@@ -148,11 +148,10 @@ const CurrencyModal: React.FC<CurrencyModalProps> = ({
         
         <View style={styles.currencyRight}>
           {isSelected && (
-            <Ionicons 
-              name="checkmark-circle" 
+            <Icon name="success" 
               size={24} 
               color={theme.colors.primary} 
-            />
+             />
           )}
         </View>
       </TouchableOpacity>
@@ -172,7 +171,7 @@ const CurrencyModal: React.FC<CurrencyModalProps> = ({
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose} disabled={isUpdating}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           <Text style={[styles.title, { color: theme.colors.text }]}>
             Change Currency
@@ -183,7 +182,7 @@ const CurrencyModal: React.FC<CurrencyModalProps> = ({
         {/* Current Currency Info */}
         <View style={[styles.currentCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.currentHeader}>
-            <Ionicons name="card-outline" size={20} color={theme.colors.primary} />
+            <Icon name="card" size={20} color={theme.colors.primary}  />
             <Text style={[styles.currentTitle, { color: theme.colors.text }]}>
               Current: {currentCurrency}
             </Text>
@@ -207,12 +206,11 @@ const CurrencyModal: React.FC<CurrencyModalProps> = ({
             onChangeText={setSearchQuery}
             editable={!isUpdating}
           />
-          <Ionicons
-            name="search-outline"
+          <Icon name="search"
             size={20}
             color={theme.colors.textSecondary}
             style={styles.searchIcon}
-          />
+           />
         </View>
 
         {/* Currency List */}
@@ -227,7 +225,7 @@ const CurrencyModal: React.FC<CurrencyModalProps> = ({
           
           {filteredCurrencies.length === 0 && (
             <View style={styles.emptyState}>
-              <Ionicons name="search-outline" size={48} color={theme.colors.textSecondary} />
+              <Icon name="search" size={48} color={theme.colors.textSecondary}  />
               <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
                 No currencies found
               </Text>
@@ -239,7 +237,7 @@ const CurrencyModal: React.FC<CurrencyModalProps> = ({
         <View style={styles.footer}>
           {selectedCurrency !== currentCurrency && (
             <View style={[styles.changeInfo, { backgroundColor: `${theme.colors.primary}10` }]}>
-              <Ionicons name="information-circle-outline" size={16} color={theme.colors.primary} />
+              <Icon name="information" size={16} color={theme.colors.primary}  />
               <Text style={[styles.changeText, { color: theme.colors.primary }]}>
                 Changing from {currentCurrency} to {selectedCurrency}
               </Text>

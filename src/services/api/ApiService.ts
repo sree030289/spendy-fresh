@@ -2,8 +2,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { convertApiTimestamps } from '../../utils/timestamp';
 
-// Always use production Firebase Functions
-const API_BASE_URL = 'https://us-central1-spendy-97913.cloudfunctions.net/spendyApi';
+// OPTIMIZATION: Environment-based API URL for cost management
+const getApiBaseUrl = () => {
+  const environment = process.env.NODE_ENV || 'development';
+  const buildType = process.env.EXPO_PUBLIC_BUILD_TYPE || 'dev';
+  
+  console.log('🔧 API Environment:', environment, 'Build:', buildType);
+  
+  // Use dev API for development builds (but respect prod override)
+  if (buildType === 'dev' || (environment === 'development' && buildType !== 'prod')) {
+    console.log('🔧 Using DEVELOPMENT API endpoint');
+    return 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi';
+  }
+  
+  // Use production API for production builds
+  console.log('🔧 Using PRODUCTION API endpoint');
+  return 'https://us-central1-spendy-97913.cloudfunctions.net/spendyApi';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Storage keys
 const STORAGE_KEYS = {

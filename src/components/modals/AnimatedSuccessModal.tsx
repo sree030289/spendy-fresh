@@ -8,7 +8,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -172,7 +172,7 @@ export default function AnimatedSuccessModal({
                   ],
                 }}
               >
-                <Ionicons 
+                <Icon 
                   name={iconConfig.icon as any} 
                   size={48} 
                   color={iconConfig.iconColor} 

@@ -11,7 +11,7 @@ import {
   Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { RemindersService } from '@/services/reminders/RemindersService1';
@@ -133,7 +133,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
       <View style={styles.overviewRow}>
         <View style={[styles.overviewCard, { backgroundColor: theme.colors.surface }]}>
           <View style={[styles.overviewIcon, { backgroundColor: theme.colors.primary }]}>
-            <Ionicons name="alarm-outline" size={20} color="white" />
+            <Icon name="alarm-outline" size={20} color="white" />
           </View>
           <Text style={[styles.overviewValue, { color: theme.colors.text }]}>
             {stats.total}
@@ -145,7 +145,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
 
         <View style={[styles.overviewCard, { backgroundColor: theme.colors.surface }]}>
           <View style={[styles.overviewIcon, { backgroundColor: theme.colors.success }]}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="white" />
+            <Icon name="success" size={20} color="white"  />
           </View>
           <Text style={[styles.overviewValue, { color: theme.colors.text }]}>
             {stats.paid}
@@ -159,7 +159,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
       <View style={styles.overviewRow}>
         <View style={[styles.overviewCard, { backgroundColor: theme.colors.surface }]}>
           <View style={[styles.overviewIcon, { backgroundColor: '#3B82F6' }]}>
-            <Ionicons name="time-outline" size={20} color="white" />
+            <Icon name="time" size={20} color="white"  />
           </View>
           <Text style={[styles.overviewValue, { color: theme.colors.text }]}>
             {stats.upcoming}
@@ -171,7 +171,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
 
         <View style={[styles.overviewCard, { backgroundColor: theme.colors.surface }]}>
           <View style={[styles.overviewIcon, { backgroundColor: theme.colors.error }]}>
-            <Ionicons name="alert-circle-outline" size={20} color="white" />
+            <Icon name="alert" size={20} color="white"  />
           </View>
           <Text style={[styles.overviewValue, { color: theme.colors.text }]}>
             {stats.overdue}
@@ -314,7 +314,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
               <View style={styles.categoryHeader}>
                 <View style={styles.categoryLeft}>
                   <View style={[styles.categoryIcon, { backgroundColor: color }]}>
-                    <Ionicons name={icon as any} size={16} color="white" />
+                    <Icon name={icon as any} size={16} color="white" />
                   </View>
                   <View style={styles.categoryInfo}>
                     <Text style={[styles.categoryName, { color: theme.colors.text }]}>
@@ -355,7 +355,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
         
         {topCategories.length === 0 && (
           <View style={styles.emptyState}>
-            <Ionicons name="pie-chart-outline" size={48} color={theme.colors.textSecondary} />
+            <Icon name="pie-chart-outline" size={48} color={theme.colors.textSecondary} />
             <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
               No category data available
             </Text>
@@ -424,7 +424,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
         {insights.map((insight, index) => (
           <View key={index} style={styles.insightItem}>
             <View style={[styles.insightIcon, { backgroundColor: insight.color }]}>
-              <Ionicons name={insight.icon as any} size={20} color="white" />
+              <Icon name={insight.icon as any} size={20} color="white" />
             </View>
             <View style={styles.insightContent}>
               <Text style={[styles.insightTitle, { color: theme.colors.text }]}>
@@ -439,7 +439,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
         
         {insights.length === 0 && (
           <View style={styles.emptyState}>
-            <Ionicons name="bulb-outline" size={48} color={theme.colors.textSecondary} />
+            <Icon name="bulb-outline" size={48} color={theme.colors.textSecondary} />
             <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
               Add more reminders to see insights
             </Text>
@@ -460,7 +460,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
           style={[styles.exportButton, { borderColor: theme.colors.border }]}
           onPress={() => handleExport('csv')}
         >
-          <Ionicons name="document-text-outline" size={24} color={theme.colors.primary} />
+          <Icon name="document-text-outline" size={24} color={theme.colors.primary} />
           <Text style={[styles.exportText, { color: theme.colors.text }]}>
             Export as CSV
           </Text>
@@ -470,7 +470,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
           style={[styles.exportButton, { borderColor: theme.colors.border }]}
           onPress={() => handleExport('json')}
         >
-          <Ionicons name="document-outline" size={24} color={theme.colors.primary} />
+          <Icon name="document" size={24} color={theme.colors.primary}  />
           <Text style={[styles.exportText, { color: theme.colors.text }]}>
             Export as JSON
           </Text>
@@ -490,7 +490,7 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity onPress={onClose} style={styles.headerButton}>
-            <Ionicons name="close" size={24} color={theme.colors.text} />
+            <Icon name="close" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
           
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
@@ -501,13 +501,13 @@ export default function ReminderStatsModal({ visible, onClose }: ReminderStatsMo
             style={styles.headerButton}
             onPress={loadStats}
           >
-            <Ionicons name="refresh" size={24} color={theme.colors.text} />
+            <Icon name="refresh" size={24} color={theme.colors.text}  />
           </TouchableOpacity>
         </View>
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Ionicons name="analytics-outline" size={64} color={theme.colors.textSecondary} />
+            <Icon name="analytics" size={64} color={theme.colors.textSecondary}  />
             <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
               Loading statistics...
             </Text>

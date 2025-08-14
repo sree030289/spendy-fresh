@@ -13,7 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../../components/common/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -324,12 +324,11 @@ export default function LoginScreen() {
                     inputMode: 'email' as any,
                   })}
                 />
-                <Ionicons 
-                  name="mail-outline" 
+                <Icon name="mail" 
                   size={20} 
                   color={emailError ? theme.colors.error : theme.colors.textSecondary} 
                   style={styles.inputIcon}
-                />
+                 />
                 {emailError ? (
                   <Text style={[styles.errorText, { color: theme.colors.error }]}>
                     {emailError}
@@ -365,18 +364,17 @@ export default function LoginScreen() {
                     inputMode: 'text' as any,
                   })}
                 />
-                <Ionicons 
-                  name="lock-closed-outline" 
+                <Icon name="lock" 
                   size={20} 
                   color={passwordError ? theme.colors.error : theme.colors.textSecondary} 
                   style={styles.inputIcon}
-                />
+                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.passwordToggle}
                 >
-                  <Ionicons 
-                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                  <Icon 
+                    name={showPassword ? "eyeOff" : "eye"} 
                     size={20} 
                     color={theme.colors.textSecondary} 
                   />

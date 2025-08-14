@@ -11,7 +11,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -187,13 +187,13 @@ export default function EnhancedAddModal({
                 >
                   <View style={styles.actionContent}>
                     <View style={styles.actionIcon}>
-                      <Ionicons name={item.icon as any} size={24} color="white" />
+                      <Icon name={item.icon as any} size={24} color="white" />
                     </View>
                     <View style={styles.actionText}>
                       <Text style={styles.actionTitle}>{item.title}</Text>
                       <Text style={styles.actionSubtitle}>{item.subtitle}</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+                    <Icon name="forward" size={20} color="rgba(255,255,255,0.7)"  />
                   </View>
                 </LinearGradient>
               </TouchableOpacity>

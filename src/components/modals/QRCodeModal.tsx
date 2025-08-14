@@ -8,7 +8,7 @@ import {
   Alert,
   Share,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import QRCode from 'react-native-qrcode-svg';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
@@ -356,7 +356,7 @@ const handleScannerClose = useCallback(() => {
         ]}
         onPress={() => setMode('friend')}
       >
-        <Ionicons
+        <Icon
           name="person-add"
           size={20}
           color={mode === 'friend' ? theme.colors.primary : theme.colors.textSecondary}
@@ -377,11 +377,10 @@ const handleScannerClose = useCallback(() => {
           ]}
           onPress={() => setMode('group')}
         >
-          <Ionicons
-            name="people"
+          <Icon name="people"
             size={20}
             color={mode === 'group' ? theme.colors.primary : theme.colors.textSecondary}
-          />
+           />
           <Text style={[
             styles.modeTabText,
             { color: mode === 'group' ? theme.colors.primary : theme.colors.textSecondary }
@@ -401,17 +400,16 @@ const handleScannerClose = useCallback(() => {
         disabled={scannerState.isProcessing || loading}
       >
         {scannerState.isProcessing ? (
-          <Ionicons
+          <Icon
             name="hourglass"
             size={20}
             color={theme.colors.textSecondary}
           />
         ) : (
-          <Ionicons
-            name="camera"
+          <Icon name="camera"
             size={20}
             color={theme.colors.primary}
-          />
+           />
         )}
         <Text style={[
           styles.modeTabText,
@@ -468,7 +466,7 @@ const handleScannerClose = useCallback(() => {
             <Text style={[styles.inviteCode, { color: theme.colors.primary }]}>
               {selectedGroup.inviteCode}
             </Text>
-            <Ionicons name="copy" size={16} color={theme.colors.primary} />
+            <Icon name="copy" size={16} color={theme.colors.primary}  />
           </TouchableOpacity>
         </View>
       )}
@@ -482,7 +480,7 @@ const handleScannerClose = useCallback(() => {
         onPress={handleSendSMS}
         disabled={loading}
       >
-        <Ionicons name="chatbox" size={24} color="#2563EB" />
+        <Icon name="chatbox" size={24} color="#2563EB" />
         <Text style={[styles.shareOptionText, { color: theme.colors.text }]}>SMS</Text>
       </TouchableOpacity>
 
@@ -491,7 +489,7 @@ const handleScannerClose = useCallback(() => {
         onPress={handleSendWhatsApp}
         disabled={loading}
       >
-        <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+        <Icon name="logo-whatsapp" size={24} color="#25D366" />
         <Text style={[styles.shareOptionText, { color: theme.colors.text }]}>WhatsApp</Text>
       </TouchableOpacity>
 
@@ -504,7 +502,7 @@ const handleScannerClose = useCallback(() => {
         }}
         disabled={loading}
       >
-        <Ionicons name="copy" size={24} color={theme.colors.secondary} />
+        <Icon name="copy" size={24} color={theme.colors.secondary}  />
         <Text style={[styles.shareOptionText, { color: theme.colors.text }]}>Copy Link</Text>
       </TouchableOpacity>
     </View>
@@ -521,7 +519,7 @@ const handleScannerClose = useCallback(() => {
           onPress={() => setMode(mode === 'scanner' ? 'friend' : 'scanner')}
           style={{ padding: 4 }}
         >
-          <Ionicons 
+          <Icon 
             name={mode === 'scanner' ? 'qr-code' : 'camera'} 
             size={24} 
             color={theme.colors.text} 
@@ -544,7 +542,7 @@ const handleScannerClose = useCallback(() => {
 
         {/* Footer Info */}
         <View style={[styles.footer, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons name="information-circle" size={20} color={theme.colors.primary} />
+          <Icon name="information" size={20} color={theme.colors.primary}  />
           <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
             QR codes expire after {mode === 'friend' ? '7 days' : '30 days'} for security
           </Text>

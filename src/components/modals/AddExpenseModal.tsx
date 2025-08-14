@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -532,7 +532,7 @@ const initializeSplitData = () => {
         }]}
         onPress={() => setShowReceiptScanner(true)}
       >
-        <Ionicons name="camera" size={24} color={theme.colors.primary} />
+        <Icon name="camera" size={24} color={theme.colors.primary}  />
         <View style={styles.receiptScannerTextContainer}>
           <Text style={[styles.receiptScannerTitle, { color: theme.colors.primary }]}>
             Scan Receipt
@@ -541,7 +541,7 @@ const initializeSplitData = () => {
             Auto-fill expense details from receipt
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={theme.colors.primary} />
+        <Icon name="forward" size={20} color={theme.colors.primary}  />
       </TouchableOpacity>
 
       {/* Description */}
@@ -659,7 +659,7 @@ const initializeSplitData = () => {
             {expenseDate.toLocaleDateString()}
           </Text>
           <TouchableOpacity onPress={() => setShowDatePicker(!showDatePicker)}>
-            <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+            <Icon name="calendar" size={20} color={theme.colors.textSecondary}  />
           </TouchableOpacity>
         </TouchableOpacity>
         {showDatePicker && (
@@ -683,7 +683,7 @@ const initializeSplitData = () => {
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Group *</Text>
         {safeGroups.length === 0 ? (
           <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-            <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} />
+            <Icon name="people" size={48} color={theme.colors.textSecondary}  />
             <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
               No groups available
             </Text>
@@ -816,11 +816,10 @@ const initializeSplitData = () => {
               recalculateEqual();
             }}
           >
-            <Ionicons
-              name="people"
+            <Icon name="people"
               size={24}
               color={splitType === 'equal' ? theme.colors.primary : theme.colors.textSecondary}
-            />
+             />
             <Text style={[
               styles.splitTypeText,
               { color: splitType === 'equal' ? theme.colors.primary : theme.colors.textSecondary }
@@ -836,11 +835,10 @@ const initializeSplitData = () => {
             ]}
             onPress={() => setSplitType('custom')}
           >
-            <Ionicons
-              name="calculator"
+            <Icon name="calculator"
               size={24}
               color={splitType === 'custom' ? theme.colors.primary : theme.colors.textSecondary}
-            />
+             />
             <Text style={[
               styles.splitTypeText,
               { color: splitType === 'custom' ? theme.colors.primary : theme.colors.textSecondary }
@@ -856,7 +854,7 @@ const initializeSplitData = () => {
             ]}
             onPress={() => setSplitType('percentage')}
           >
-            <Ionicons
+            <Icon
               name="pie-chart"
               size={24}
               color={splitType === 'percentage' ? theme.colors.primary : theme.colors.textSecondary}
@@ -914,7 +912,7 @@ const initializeSplitData = () => {
                   split.isIncluded && [styles.checkedBox, { backgroundColor: theme.colors.primary }]
                 ]}>
                   {split.isIncluded && (
-                    <Ionicons name="checkmark" size={16} color="white" />
+                    <Icon name="checkmark" size={16} color="white"  />
                   )}
                 </View>
               </TouchableOpacity>
@@ -1128,7 +1126,7 @@ const initializeSplitData = () => {
             );
           }}
         >
-          <Ionicons name="camera" size={24} color={theme.colors.primary} />
+          <Icon name="camera" size={24} color={theme.colors.primary}  />
           <Text style={[styles.receiptButtonText, { color: theme.colors.primary }]}>
             Attach Receipt (Optional)
           </Text>
@@ -1147,7 +1145,7 @@ const initializeSplitData = () => {
           onPress={() => setShowReceiptScanner(true)}
           style={{ padding: 4 }}
         >
-          <Ionicons name="camera" size={24} color={theme.colors.text} />
+          <Icon name="camera" size={24} color={theme.colors.text}  />
         </TouchableOpacity>
       }
     >

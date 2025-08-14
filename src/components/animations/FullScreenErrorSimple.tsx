@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, StatusBar, Animated, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../common/Icon';
 
 const { width, height } = Dimensions.get('window');
 
@@ -97,7 +97,7 @@ const FullScreenErrorSimple: React.FC<FullScreenErrorSimpleProps> = ({
       <View style={styles.contentContainer}>
         {/* Error Icon */}
         <View style={styles.iconContainer}>
-          <Ionicons name="sad-outline" size={50} color="rgba(255,255,255,0.8)" />
+          <Icon name="sad-outline" size={50} color="rgba(255,255,255,0.8)" />
         </View>
 
         {/* Error Text */}
@@ -118,7 +118,7 @@ const FullScreenErrorSimple: React.FC<FullScreenErrorSimpleProps> = ({
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
-              <Ionicons name="refresh" size={16} color="#4a5568" style={styles.buttonIcon} />
+              <Icon name="refresh" size={16} color="#4a5568" style={styles.buttonIcon}  />
               <Text style={styles.buttonText}>{buttonText}</Text>
             </LinearGradient>
           </TouchableOpacity>

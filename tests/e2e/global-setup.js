@@ -12,8 +12,22 @@ async function globalSetup() {
   const page = await browser.newPage();
   
   try {
+    // OPTIMIZATION: Environment-based API endpoint for testing
+    const buildType = process.env.EXPO_PUBLIC_BUILD_TYPE || 'dev';
+    let apiEndpoint;
+    
+    if (buildType === 'dev') {
+      apiEndpoint = 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi/health';
+      console.log('🔧 Testing against DEVELOPMENT environment');
+    } else {
+      apiEndpoint = 'https://us-central1-spendy-97913.cloudfunctions.net/spendyApi/health';
+      console.log('🔧 Testing against PRODUCTION environment');
+    }
+    
+    console.log(`📡 API Endpoint: ${apiEndpoint}`);
+    
     // Health check on API
-    const response = await page.request.get('http://127.0.0.1:5001/spendy-97913/us-central1/spendyApi/health');
+    const response = await page.request.get(apiEndpoint);
     
     console.log(`✅ API Health Check: ${response.status() === 200 ? 'HEALTHY' : 'UNEXPECTED'}`);
     

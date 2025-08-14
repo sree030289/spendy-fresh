@@ -687,8 +687,16 @@ spendyApp.use((req, res, next) => {
     'exp://192.168.1.100:19000'
   ];
 
+  // Always set CORS headers for development and allowed origins
   if (!origin || allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin || '*');
+  } else {
+    // For development, be more permissive with localhost origins
+    if (origin && origin.includes('localhost')) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else {
+      res.header('Access-Control-Allow-Origin', '*');
+    }
   }
 
   res.header('Access-Control-Allow-Credentials', 'true');
