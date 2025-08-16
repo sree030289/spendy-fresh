@@ -20,6 +20,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
+import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
 import { COUNTRIES } from '@/constants/countries';
 
 export default function RegisterScreen() {
@@ -212,6 +213,13 @@ export default function RegisterScreen() {
       };
       
       await register(userData);
+      
+      // If registration successful and user has biometric enabled, save the preference
+      if (biometricEnabled && user?.id) {
+        await BiometricAuthService.setBiometricEnabledForUser(user.id, true);
+        console.log('✅ Biometric preference saved for new user');
+      }
+      
       // Navigation happens in useEffect when user state changes
     } catch (error: any) {
       console.log('Complete registration error:', error);

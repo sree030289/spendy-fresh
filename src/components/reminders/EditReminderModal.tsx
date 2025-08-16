@@ -170,7 +170,7 @@ export default function EditReminderModal({
     try {
       const updates: Partial<Reminder> = {
         title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
+        description: formData.description.trim() || '',
         amount: parseFloat(formData.amount),
         category: formData.category,
         dueDate: formData.dueDate,
@@ -178,7 +178,7 @@ export default function EditReminderModal({
         recurringType: formData.isRecurring ? formData.recurringType : undefined,
         reminderDays: formData.reminderDays,
         notificationEnabled: formData.notificationEnabled,
-        notes: formData.notes.trim() || undefined,
+        notes: formData.notes.trim() || '',
       };
 
       await RemindersService.updateReminder(reminder.id, updates);
@@ -305,7 +305,7 @@ export default function EditReminderModal({
               }}
             >
               <Icon 
-                name="repeat-outline" 
+                name="refresh" 
                 size={20} 
                 color={theme.colors.textSecondary} 
                 style={{ marginRight: 12 }}
@@ -416,7 +416,7 @@ export default function EditReminderModal({
           {/* Changes Indicator */}
           {hasChanges && (
             <View style={[styles.changesIndicator, { backgroundColor: theme.colors.primary }]}>
-              <Icon name="pencil" size={16} color="white" />
+              <Icon name="edit" size={16} color="white" />
               <Text style={styles.changesText}>You have unsaved changes</Text>
             </View>
           )}
@@ -605,7 +605,7 @@ export default function EditReminderModal({
                   onPress={() => setShowRecurringPicker(true)}
                 >
                   <Icon 
-                    name="repeat-outline" 
+                    name="refresh" 
                     size={20} 
                     color={theme.colors.textSecondary} 
                     style={{ marginRight: 12 }}

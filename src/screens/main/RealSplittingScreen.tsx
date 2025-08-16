@@ -11,10 +11,12 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
+  Animated,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../../components/common/Icon';
+import DynamicBanner from '../../components/common/DynamicBanner';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -140,7 +142,7 @@ import ReceiptScannerModal from '@/components/modals/ReceiptScannerModal';
 import GroupDetailsModal from '@/components/modals/GroupDetailsModal';
 import ExpenseRefreshService from '@/services/expenseRefreshService';
 import NotificationsModal from '@/components/modals/NotificationsModal';
-import AnalyticsModal from '@/components/modals/AnalyticsModal';
+import SplittingAnalyticsModal from '@/components/modals/SplittingAnalyticsModal';
 import ExpenseDeletionModal from '@/components/modals/ExpenseDeletionModal';
 import ExpenseSettlementModal from '@/components/modals/ExpenseSettlementModal';
 import FriendRequestModal from '@/components/modals/FriendRequestModal';
@@ -184,6 +186,7 @@ export default function RealSplittingScreen() {
   const [activeFriendsTab, setActiveFriendsTab] = useState('accepted'); // New state for friends subtabs
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
   
   interface ContactData {
     name: string;
@@ -300,6 +303,8 @@ export default function RealSplittingScreen() {
   const [showExpenseSettlement, setShowExpenseSettlement] = useState(false);
   const [showExpenseDeletion, setShowExpenseDeletion] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   
   // NEW: Unified settlement state
   const [showUnifiedSettlement, setShowUnifiedSettlement] = useState(false);
@@ -807,7 +812,8 @@ export default function RealSplittingScreen() {
   const loadNotifications = async () => {
     try {
       if (!user?.id) return;
-      const notificationsData = await apiService.getNotifications(user.id);
+      const notificationsResponse = await apiService.getUserNotifications({ limit: 20 });
+      const notificationsData = notificationsResponse.notifications;
       
       // Ensure notificationsData is an array before processing
       const dataArray = Array.isArray(notificationsData) ? notificationsData : [];
@@ -1813,8 +1819,180 @@ export default function RealSplittingScreen() {
     
     const hasAccess = await subscriptionHelper.checkAnalyticsAccess(user.id);
     if (hasAccess) {
+      setAnalyticsLoading(true);
+      try {
+        // Generate splitting analytics from current data
+        const splittingAnalytics = generateSplittingAnalytics();
+        setAnalyticsData(splittingAnalytics);
+      } catch (error) {
+        console.log('Error generating splitting analytics, showing empty state');
+        // Create empty splitting analytics for errors
+        const emptySplittingAnalytics = {
+          userId: user.id,
+          period: 'month' as const,
+          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          endDate: new Date(),
+          totalSpent: 0,
+          totalOwed: 0,
+          totalOwing: 0,
+          netBalance: 0,
+          groupAnalytics: [],
+          categoryBreakdown: [],
+          monthlyTrends: [],
+          friendAnalytics: [],
+          insights: [],
+          lastUpdated: new Date()
+        };
+        setAnalyticsData(emptySplittingAnalytics);
+      } finally {
+        setAnalyticsLoading(false);
+      }
       setShowAnalytics(true);
     }
+  };
+
+  // Helper function to generate splitting analytics from current app data
+  const generateSplittingAnalytics = () => {
+    const now = new Date();
+    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Calculate totals from shared balances
+    const totalOwed = sharedBalances.totalOwed || 0;
+    const totalOwing = sharedBalances.totalOwing || 0;
+    const netBalance = sharedBalances.netBalance || 0;
+
+    // Calculate total spent from recent expenses
+    const totalSpent = expenses.reduce((sum, expense) => {
+      // Only count expenses where current user paid
+      return expense.paidBy === user?.id ? sum + expense.amount : sum;
+    }, 0);
+
+    // Generate group analytics
+    const groupAnalytics = groups.map(group => {
+      const groupExpenseTotal = expenses
+        .filter(expense => expense.groupId === group.id)
+        .reduce((sum, expense) => sum + expense.amount, 0);
+
+      // Get user's balance for this group from shared balances
+      let userBalance = 0;
+      if (allBalances) {
+        for (const detail of allBalances) {
+          if (detail.groupId === group.id || (detail.breakdown?.fromGroups && detail.breakdown.fromGroups[group.id])) {
+            if (detail.groupId === group.id) {
+              userBalance += detail.balance;
+            } else if (detail.breakdown?.fromGroups?.[group.id]) {
+              userBalance += detail.breakdown.fromGroups[group.id].balance;
+            }
+          }
+        }
+      }
+
+      return {
+        groupName: group.name,
+        totalSpent: groupExpenseTotal,
+        memberCount: group.members?.length || 0,
+        userBalance: userBalance
+      };
+    });
+
+    // Generate category breakdown from expenses
+    const categoryMap: { [key: string]: { amount: number; count: number; icon: string } } = {};
+    expenses.forEach(expense => {
+      if (expense.paidBy === user?.id) {
+        if (!categoryMap[expense.category]) {
+          categoryMap[expense.category] = {
+            amount: 0,
+            count: 0,
+            icon: expense.categoryIcon || '💰'
+          };
+        }
+        categoryMap[expense.category].amount += expense.amount;
+        categoryMap[expense.category].count += 1;
+      }
+    });
+
+    const totalCategorySpent = Object.values(categoryMap).reduce((sum, cat) => sum + cat.amount, 0);
+    const categoryBreakdown = Object.entries(categoryMap).map(([category, data]) => ({
+      category,
+      amount: data.amount,
+      percentage: totalCategorySpent > 0 ? (data.amount / totalCategorySpent) * 100 : 0,
+      count: data.count,
+      icon: data.icon,
+      color: `hsl(${Math.random() * 360}, 70%, 50%)`
+    })).sort((a, b) => b.amount - a.amount);
+
+    // Generate friend analytics
+    const friendAnalytics = friends.filter(f => f.status === 'accepted').map(friend => {
+      const sharedExpenses = expenses.filter(expense => 
+        expense.splitData?.some(split => split.userId === friend.friendId) ||
+        expense.paidBy === friend.friendId
+      );
+
+      const totalShared = sharedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+      return {
+        friendName: friend.friendData.fullName,
+        totalShared,
+        currentBalance: friend.balance || 0,
+        expenseCount: sharedExpenses.length
+      };
+    }).filter(f => f.expenseCount > 0);
+
+    // Generate monthly trends (simplified)
+    const monthlyTrends = [
+      {
+        month: 'This Month',
+        spent: totalSpent,
+        settled: Math.abs(totalOwed - totalOwing)
+      }
+    ];
+
+    // Generate insights
+    const insights = [];
+    if (totalOwed > totalOwing) {
+      insights.push({
+        type: 'settlement' as const,
+        title: 'You\'re in the green! 💚',
+        description: `You're owed $${(totalOwed - totalOwing).toFixed(2)} more than you owe. Consider collecting from friends.`,
+        icon: '💰'
+      });
+    } else if (totalOwing > totalOwed) {
+      insights.push({
+        type: 'settlement' as const,
+        title: 'Time to settle up! 💳',
+        description: `You owe $${(totalOwing - totalOwed).toFixed(2)} more than you're owed. Consider making payments.`,
+        icon: '💸'
+      });
+    }
+
+    if (groupAnalytics.length > 0) {
+      const mostActiveGroup = groupAnalytics.reduce((max, group) => 
+        group.totalSpent > max.totalSpent ? group : max
+      );
+      insights.push({
+        type: 'spending' as const,
+        title: 'Most Active Group 👥',
+        description: `"${mostActiveGroup.groupName}" has $${mostActiveGroup.totalSpent.toLocaleString()} in total expenses.`,
+        icon: '📊'
+      });
+    }
+
+    return {
+      userId: user?.id || '',
+      period: 'month' as const,
+      startDate,
+      endDate: now,
+      totalSpent,
+      totalOwed,
+      totalOwing,
+      netBalance,
+      groupAnalytics,
+      categoryBreakdown,
+      monthlyTrends,
+      friendAnalytics,
+      insights,
+      lastUpdated: now
+    };
   };
 
   // SUBSCRIPTION-AWARE: QR Scanner access
@@ -2121,6 +2299,11 @@ export default function RealSplittingScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
       >
         {/* FIXED: Use unified balance data */}
         <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
@@ -2495,6 +2678,11 @@ export default function RealSplittingScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
       >
         {/* Simplified header with clean action buttons */}
         <View style={styles.cleanTabHeader}>
@@ -3383,43 +3571,16 @@ export default function RealSplittingScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Splitting</Text>
-          <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-            Track and split expenses
-          </Text>
-        </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerAction}
-            onPress={handleQRScannerAccess}
-          >
-            <Icon name="qrCode" size={24} color="#8B5CF6"  />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerAction}
-            onPress={handleAnalyticsAccess}
-          >
-            <Icon name="analytics" size={24} color="#10B981"  />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.headerAction}
-            onPress={handleNotificationsPress}
-          >
-            <Icon name="notifications" size={24} color="#F59E0B"  />
-            {notifications.filter(n => !n.isRead).length > 0 && (
-              <View style={[styles.notificationBadge, { backgroundColor: theme.colors.error }]}>
-                <Text style={styles.notificationBadgeText}>
-                  {notifications.filter(n => !n.isRead).length > 99 ? '99+' : notifications.filter(n => !n.isRead).length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-
+      {/* Dynamic Banner */}
+      <DynamicBanner 
+        scrollY={scrollY}
+        screenType="home"
+        showStats={false}
+        onQRScanPress={() => setShowQRCode(true)}
+        onAnalyticsPress={undefined}
+        onNotificationsPress={() => setShowNotifications(true)}
+      />
+      
       {/* Tab Navigation */}
       <View style={[styles.tabNavigation, { backgroundColor: theme.colors.background }]}>
         <View style={[styles.segmentedControl, { backgroundColor: theme.colors.surface }]}>
@@ -3618,10 +3779,10 @@ export default function RealSplittingScreen() {
           ?.members.find(m => m.userId === user?.id)?.role === 'admin'}
       />
 
-      <AnalyticsModal
+      <SplittingAnalyticsModal
         visible={showAnalytics}
         onClose={() => setShowAnalytics(false)}
-        currentUser={user}
+        analytics={analyticsData}
       />
 
       <Modal
@@ -3893,6 +4054,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
+  quickActionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    minHeight: 50,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E5E7EB',
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -3904,11 +4075,12 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
   headerAction: {
     position: 'relative',
-    marginLeft: 16,
+    padding: 8,
+    borderRadius: 8,
   },
   notificationBadge: {
     position: 'absolute',

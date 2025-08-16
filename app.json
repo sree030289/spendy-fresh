@@ -17,6 +17,7 @@
       "bundleIdentifier": "com.svaag.spendy",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera for QR code scanning to quickly add expenses and split bills.",
+        "NSFaceIDUsageDescription": "This app uses Face ID for secure and convenient authentication to access your financial data.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true,
           "NSAllowsLocalNetworking": true

@@ -19,6 +19,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
+import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
 import { ApiService } from '@/services/api/ApiService';
 
 export default function LoginScreen() {
@@ -191,6 +192,50 @@ export default function LoginScreen() {
       console.log('LoginScreen: Attempting login...');
       await login(email.trim().toLowerCase(), password);
       console.log('LoginScreen: Login successful, user should be set');
+      
+      // Clear any previous biometric fail counts on successful login
+      await BiometricAuthService.clearFailCount();
+      
+      // Check if user doesn't have biometric enabled and device supports it
+      const hasHardware = await BiometricAuthService.isHardwareAvailable();
+      const userHasBiometric = await apiService.getLastBiometricSetting();
+      
+      console.log('🔍 Checking biometric setup:', { hasHardware, userHasBiometric, userId: user?.id });
+      
+      if (hasHardware && !userHasBiometric && user?.id) {
+        console.log('🔍 Offering biometric setup for user');
+        setTimeout(() => {
+          Alert.alert(
+            'Enable Biometric Authentication?',
+            'Would you like to enable Face ID/Touch ID for faster login next time?',
+            [
+              { text: 'Not Now', style: 'cancel' },
+              { 
+                text: 'Enable', 
+                onPress: async () => {
+                  try {
+                    // Save biometric preference for this user
+                    await BiometricAuthService.setBiometricEnabledForUser(user.id, true);
+                    
+                    // Update the stored session with biometric enabled
+                    if (user) {
+                      const updatedUser = { ...user, biometricEnabled: true };
+                      await apiService.storeUserSession(updatedUser);
+                    }
+                    
+                    console.log('✅ Biometric authentication enabled for user');
+                    Alert.alert('Success', 'Biometric authentication has been enabled for your account.');
+                  } catch (error) {
+                    console.error('Error enabling biometric:', error);
+                    Alert.alert('Error', 'Failed to enable biometric authentication.');
+                  }
+                }
+              }
+            ]
+          );
+        }, 1000);
+      }
+      
       // Navigation will happen automatically in App.tsx when user state changes
     } catch (error: any) {
       console.log('LoginScreen: Login error:', error);

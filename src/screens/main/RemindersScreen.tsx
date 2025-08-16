@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,17 @@ import {
   Alert,
   RefreshControl,
   TextInput,
+  Animated,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import { Icon } from '../../components/common/Icon';
+import DynamicBanner from '../../components/common/DynamicBanner';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { RemindersService } from '@/services/reminders/RemindersService1';
-import { GmailService } from '@/services/gmail/gmailService';
+import { ApiService } from '@/services/api/ApiService';
 import { Reminder, ReminderCategory, ReminderStatus } from '@/types/reminder';
 import { formatCurrency } from '@/utils/currency';
 import AddReminderModal from '@/components/reminders/AddReminderModal';
@@ -48,8 +51,12 @@ export default function RemindersScreen() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
   const [emailConnected, setEmailConnected] = useState(false);
+  const [connectedEmail, setConnectedEmail] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showGmailWebView, setShowGmailWebView] = useState(false);
+  const [gmailAuthUrl, setGmailAuthUrl] = useState('');
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadReminders();
@@ -63,8 +70,9 @@ export default function RemindersScreen() {
   const loadReminders = async () => {
     try {
       setLoading(true);
-      const data = await RemindersService.getReminders(user?.id || '');
-      setReminders(data);
+      const apiService = ApiService.getInstance();
+      const response = await apiService.getReminders({});
+      setReminders(response.data || []);
     } catch (error) {
       console.error('Error loading reminders:', error);
       Alert.alert('Error', 'Failed to load reminders');
@@ -75,11 +83,130 @@ export default function RemindersScreen() {
 
   const checkEmailConnection = async () => {
     try {
-      const gmailService = GmailService.getInstance();
-      const connected = await gmailService.isGmailConnected(user?.id || '');
-      setEmailConnected(connected);
+      const apiService = ApiService.getInstance();
+      const status = await apiService.getGmailStatus();
+      setEmailConnected(status.isConnected);
+      if (status.isConnected && status.email) {
+        setConnectedEmail(status.email);
+      }
     } catch (error) {
       console.error('Error checking email connection:', error);
+    }
+  };
+
+  const handleGmailWebViewNavigation = (navState: any) => {
+    const { url } = navState;
+    console.log('WebView navigation:', url);
+
+    // Check if this is the callback URL with auth code
+    if (url.includes('/gmail/callback') && url.includes('code=')) {
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      const code = urlParams.get('code');
+      
+      if (code) {
+        console.log('Got OAuth code:', code);
+        setShowGmailWebView(false);
+        
+        // Connect Gmail with the auth code
+        connectGmailWithCode(code);
+      }
+    }
+    
+    // Check for OAuth errors
+    if (url.includes('error=')) {
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      const error = urlParams.get('error');
+      const errorDescription = urlParams.get('error_description');
+      
+      console.log('OAuth error:', error, errorDescription);
+      setShowGmailWebView(false);
+      
+      Alert.alert(
+        'Authentication Error',
+        errorDescription || error || 'Failed to authenticate with Gmail'
+      );
+    }
+  };
+
+  const connectGmailWithCode = async (authCode: string) => {
+    try {
+      setIsSyncing(true);
+      const apiService = ApiService.getInstance();
+      const result = await apiService.connectGmail(authCode);
+      
+      setEmailConnected(result.isConnected);
+      if (result.isConnected && result.email) {
+        setConnectedEmail(result.email);
+      }
+      
+      Alert.alert(
+        'Gmail Connected!',
+        `Successfully connected to ${result.email}. You can now sync bills from Gmail.`,
+        [
+          {
+            text: 'Sync Now',
+            onPress: async () => {
+              try {
+                const syncResult = await apiService.syncGmailBills();
+                Alert.alert(
+                  'Sync Complete',
+                  `Found ${syncResult.billsFound} bills, created ${syncResult.remindersCreated} new reminders, skipped ${syncResult.duplicatesSkipped} duplicates.`,
+                  [{ text: 'OK', onPress: () => loadReminders() }]
+                );
+              } catch (syncError) {
+                console.error('Sync error:', syncError);
+                Alert.alert('Sync Error', 'Failed to sync Gmail bills. Please try again.');
+              }
+            }
+          },
+          { text: 'Later' }
+        ]
+      );
+    } catch (error) {
+      console.error('Gmail connection error:', error);
+      Alert.alert('Connection Error', error instanceof Error ? error.message : 'Failed to connect Gmail');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleConnectDisconnectGmail = async () => {
+    if (emailConnected) {
+      // Disconnect Gmail
+      Alert.alert(
+        'Disconnect Gmail',
+        'Are you sure you want to disconnect Gmail? This will stop automatic bill detection.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Disconnect',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const apiService = ApiService.getInstance();
+                await apiService.disconnectGmail();
+                setEmailConnected(false);
+                setConnectedEmail('');
+                Alert.alert('Disconnected', 'Gmail has been disconnected successfully.');
+              } catch (error) {
+                console.error('Disconnect error:', error);
+                Alert.alert('Error', 'Failed to disconnect Gmail. Please try again.');
+              }
+            }
+          }
+        ]
+      );
+    } else {
+      // Connect Gmail - start the same flow as sync button
+      try {
+        const apiService = ApiService.getInstance();
+        const { authUrl } = await apiService.getGmailAuthUrl();
+        setGmailAuthUrl(authUrl);
+        setShowGmailWebView(true);
+      } catch (error) {
+        console.error('Connect Gmail error:', error);
+        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to start Gmail connection');
+      }
     }
   };
 
@@ -121,14 +248,47 @@ export default function RemindersScreen() {
             text: 'Connect Gmail',
             onPress: async () => {
               try {
-                const gmailService = GmailService.getInstance();
-                const success = await gmailService.connectGmail(user?.id || '');
-                if (success) {
-                  setEmailConnected(true);
-                  Alert.alert('Success', 'Gmail connected successfully!');
+                const apiService = ApiService.getInstance();
+                
+                // Check if Gmail is already connected
+                const status = await apiService.getGmailStatus();
+                
+                if (status.isConnected) {
+                  // If connected, perform sync
+                  setIsSyncing(true);
+                  const syncResult = await apiService.syncGmailBills();
+                  
+                  Alert.alert(
+                    'Sync Complete',
+                    `Found ${syncResult.billsFound} bills, created ${syncResult.remindersCreated} new reminders, skipped ${syncResult.duplicatesSkipped} duplicates.`,
+                    [{ text: 'OK', onPress: () => loadReminders() }]
+                  );
+                } else {
+                  // If not connected, start OAuth flow
+                  const { authUrl } = await apiService.getGmailAuthUrl();
+                  
+                  Alert.alert(
+                    'Connect Gmail',
+                    'To sync bills from Gmail, you need to authorize access. This will open Google OAuth in your browser.',
+                    [
+                      {
+                        text: 'Cancel',
+                        style: 'cancel'
+                      },
+                      {
+                        text: 'Connect',
+                        onPress: () => {
+                          // Open WebView modal for OAuth
+                          setGmailAuthUrl(authUrl);
+                          setShowGmailWebView(true);
+                        }
+                      }
+                    ]
+                  );
                 }
               } catch (error) {
-                Alert.alert('Error', error instanceof Error ? error.message : 'An error occurred');
+                console.error('Gmail sync error:', error);
+                Alert.alert('Error', error instanceof Error ? error.message : 'Failed to sync Gmail');
               } finally {
                 setIsSyncing(false);
               }
@@ -145,16 +305,20 @@ export default function RemindersScreen() {
   const handleSyncEmail = async () => {
     try {
       setIsSyncing(true);
-      const gmailService = GmailService.getInstance();
-      const bills = await gmailService.syncBillsFromGmail(user?.id || '');
-      if (bills.length > 0) {
-        Alert.alert('Sync Complete', `Found ${bills.length} new bills!`);
+      const apiService = ApiService.getInstance();
+      const result = await apiService.syncGmailBills();
+      
+      if (result.remindersCreated > 0) {
+        Alert.alert(
+          'Sync Complete', 
+          `Found ${result.billsFound} bills and created ${result.remindersCreated} new reminders!${result.duplicatesSkipped > 0 ? `\n\nSkipped ${result.duplicatesSkipped} duplicates.` : ''}`
+        );
         await loadReminders();
       } else {
         Alert.alert('Sync Complete', 'No new bills found');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to sync email');
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to sync email');
     } finally {
       setIsSyncing(false);
     }
@@ -162,7 +326,8 @@ export default function RemindersScreen() {
 
   const handleMarkAsPaid = async (reminder: Reminder) => {
     try {
-      await RemindersService.markAsPaid(reminder.id);
+      const apiService = ApiService.getInstance();
+      await apiService.markReminderAsPaid(reminder.id);
       await loadReminders();
       Alert.alert('Success', 'Reminder marked as paid!');
     } catch (error) {
@@ -186,7 +351,8 @@ export default function RemindersScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await RemindersService.deleteReminder(reminder.id);
+              const apiService = ApiService.getInstance();
+              await apiService.deleteReminder(reminder.id);
               await loadReminders();
             } catch (error) {
               Alert.alert('Error', 'Failed to delete reminder');
@@ -326,11 +492,21 @@ export default function RemindersScreen() {
   const tabs = getTabs();
 
   const renderHeader = () => (
-    <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
-      <View style={styles.headerTop}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-          Reminders
-        </Text>
+    <>
+      <DynamicBanner 
+        scrollY={scrollY}
+        screenType="reminder"
+        showStats={stats.upcomingCount > 0 || stats.overdueCount > 0}
+        statsData={{
+          leftValue: stats.upcomingCount.toString(),
+          leftLabel: 'Upcoming',
+          rightValue: stats.overdueCount.toString(),
+          rightLabel: 'Overdue'
+        }}
+      />
+      
+      {/* Action buttons header */}
+      <View style={[styles.actionHeader, { backgroundColor: theme.colors.background }]}>
         <TouchableOpacity
           style={[styles.syncButton, { backgroundColor: isSyncing ? theme.colors.textSecondary : theme.colors.primary }]}
           onPress={emailConnected ? handleSyncEmail : handleConnectEmail}
@@ -343,44 +519,6 @@ export default function RemindersScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Stats Cards */}
-      <View style={styles.statsContainer}>
-        <TouchableOpacity
-          style={[styles.statCard, { backgroundColor: theme.colors.background }]}
-          onPress={() => setShowStatsModal(true)}
-        >
-          <Text style={[styles.statValue, { color: theme.colors.primary }]}>
-            {stats.upcomingCount}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-            Upcoming
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.statCard, { backgroundColor: theme.colors.background }]}
-          onPress={() => setShowStatsModal(true)}
-        >
-          <Text style={[styles.statValue, { color: theme.colors.error }]}>
-            {stats.overdueCount}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-            Overdue
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.statCard, { backgroundColor: theme.colors.background }]}
-          onPress={() => setShowStatsModal(true)}
-        >
-          <Text style={[styles.statValue, { color: theme.colors.success }]} numberOfLines={1}>
-            {stats.totalDue}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-            Total Due
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       {/* View Toggle */}
       <View style={[styles.viewToggle, { backgroundColor: theme.colors.background }]}>
@@ -423,7 +561,33 @@ export default function RemindersScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+      
+      {/* Simplified stats */}
+      <View style={styles.statsContainer}>
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => setShowStatsModal(true)}
+        >
+          <Text style={[styles.statValue, { color: theme.colors.success }]}>
+            {reminders.filter(r => r.status === 'paid').length}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+            Paid
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => setShowStatsModal(true)}
+        >
+          <Text style={[styles.statValue, { color: theme.colors.text }]} numberOfLines={1}>
+            {formatCurrency(reminders.reduce((sum, r) => sum + r.amount, 0), user?.currency || 'USD')}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+            Total
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </>
   );
 
   const renderEmailBanner = () => (
@@ -444,14 +608,14 @@ export default function RemindersScreen() {
         </Text>
         <Text style={styles.emailBannerSubtitle}>
           {emailConnected 
-            ? 'Auto-sync enabled • john@gmail.com'
+            ? `Auto-sync enabled • ${connectedEmail || 'Connected'}`
             : 'Auto-detect recurring bills & payments'
           }
         </Text>
       </View>
       <TouchableOpacity
         style={styles.connectBtn}
-        onPress={() => setEmailConnected(!emailConnected)}
+        onPress={handleConnectDisconnectGmail}
       >
         <Text style={styles.connectBtnText}>
           {emailConnected ? 'Disconnect' : 'Connect'}
@@ -714,6 +878,11 @@ export default function RemindersScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
       >
         {/* Email Connection Banner */}
         {renderEmailBanner()}
@@ -806,6 +975,52 @@ export default function RemindersScreen() {
         visible={showStatsModal}
         onClose={() => setShowStatsModal(false)}
       />
+
+      {/* Gmail OAuth WebView Modal */}
+      <Modal
+        visible={showGmailWebView}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.webViewContainer}>
+          <View style={styles.webViewHeader}>
+            <TouchableOpacity
+              onPress={() => setShowGmailWebView(false)}
+              style={styles.webViewCloseButton}
+            >
+              <Icon name="close" size={24} color="white" />
+            </TouchableOpacity>
+            <Text style={styles.webViewTitle}>Connect Gmail</Text>
+            <View style={styles.webViewHeaderSpacer} />
+          </View>
+          
+          {gmailAuthUrl && (
+            <WebView
+              source={{ uri: gmailAuthUrl }}
+              style={styles.webView}
+              startInLoadingState={true}
+              onNavigationStateChange={handleGmailWebViewNavigation}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.warn('WebView error: ', nativeEvent);
+                Alert.alert(
+                  'Connection Error',
+                  'Unable to load Gmail authorization page. Please check your internet connection.',
+                  [
+                    { text: 'Retry', onPress: () => setShowGmailWebView(false) },
+                    { text: 'Cancel', style: 'cancel', onPress: () => setShowGmailWebView(false) }
+                  ]
+                );
+              }}
+              onHttpError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.warn('WebView HTTP error: ', nativeEvent);
+              }}
+              userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -820,6 +1035,13 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     borderBottomWidth: 1,
+  },
+  actionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   headerTop: {
     flexDirection: 'row',
@@ -1191,5 +1413,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 25,
     elevation: 8,
+  },
+  // WebView Modal Styles
+  webViewContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  webViewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#007AFF',
+  },
+  webViewCloseButton: {
+    padding: 8,
+  },
+  webViewTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+  },
+  webViewHeaderSpacer: {
+    width: 40,
+  },
+  webView: {
+    flex: 1,
   },
 });

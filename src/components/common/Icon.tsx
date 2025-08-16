@@ -254,6 +254,8 @@ export const IconMap = {
   call: Platform.OS === 'web' ? IoCall : 'call',
   share: Platform.OS === 'web' ? IoShare : 'share',
   send: Platform.OS === 'web' ? IoSend : 'send',
+  chatbubbles: Platform.OS === 'web' ? IoChatbubbles : 'chatbubbles',
+  chatbubble: Platform.OS === 'web' ? IoChatbubble : 'chatbubble',
   
   // Actions
   refresh: Platform.OS === 'web' ? IoRefresh : 'refresh',
@@ -359,6 +361,8 @@ export const Icon: React.FC<IconProps> = ({ name, size = 24, color = '#000', sty
       case 'stats': return <IoStatsChart size={size} color={color} style={style} {...props} />;
       case 'filter': return <IoFilter size={size} color={color} style={style} {...props} />;
       case 'send': return <IoSend size={size} color={color} style={style} {...props} />;
+      case 'chatbubbles': return <IoChatbubbles size={size} color={color} style={style} {...props} />;
+      case 'chatbubble': return <IoChatbubble size={size} color={color} style={style} {...props} />;
       case 'arrowUp': return <IoArrowUp size={size} color={color} style={style} {...props} />;
       case 'arrowDown': return <IoArrowDown size={size} color={color} style={style} {...props} />;
       case 'play': return <IoPlay size={size} color={color} style={style} {...props} />;

@@ -386,6 +386,11 @@ static async calculateGroupPairwiseBalance(
       }
     } catch (error) {
       console.error('❌ Failed to get settlement data from backend, using cached zero:', error);
+      console.log('🔍 Full error details:', {
+        endpoint: `/settlements/group/${groupId}`,
+        message: (error as any)?.message || 'Unknown error',
+        method: 'GET'
+      });
       
       // Return cached zero instead of expensive frontend calculation
       UnifiedSettlementService.balanceCalculationCache.set(cacheKey, { data: 0, timestamp: Date.now() });

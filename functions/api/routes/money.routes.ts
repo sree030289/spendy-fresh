@@ -43,7 +43,6 @@ router.post('/reminders', moneyController.createSmartReminder);
 router.get('/reminders', moneyController.getSmartReminders);
 router.put('/reminders/:id', moneyController.updateSmartReminder);
 router.delete('/reminders/:id', moneyController.deleteSmartReminder);
-router.post('/reminders/:id/mark-paid', moneyController.markReminderAsPaid);
 router.get('/reminders/upcoming', moneyController.getUpcomingReminders);
 
 // Calendar Data
@@ -57,9 +56,7 @@ router.get('/export/:exportId/download', moneyController.downloadExport);
 
 // Usage Tracking
 router.get('/usage', moneyController.getUsageStats);
-router.get('/usage/daily', moneyController.getDailyUsage);
 router.post('/usage/track', moneyController.trackUsage);
-router.post('/usage/analytics', moneyController.trackAnalyticsUsage);
 
 // Categories
 router.get('/categories', moneyController.getCategories);
@@ -73,20 +70,5 @@ router.get('/filters', moneyController.getFilterOptions);
 router.post('/statements/parse', moneyController.parseStatement);
 router.get('/statements/:importId', moneyController.getStatementImportStatus);
 router.post('/statements/:importId/confirm', moneyController.confirmStatementImport);
-
-// Gmail Integration
-router.get('/gmail/auth-url', moneyController.getGmailAuthUrl);
-router.post('/gmail/connect', moneyController.connectGmail);
-router.get('/gmail/status', moneyController.getGmailStatus);
-router.post('/gmail/sync', moneyController.syncGmailBills);
-router.delete('/gmail/disconnect', moneyController.disconnectGmail);
-
-// Notifications
-router.get('/notifications', moneyController.getUserNotifications);
-router.put('/notifications/:id/read', moneyController.markNotificationAsRead);
-router.put('/notifications/read-all', moneyController.markAllNotificationsAsRead);
-router.delete('/notifications/:id', moneyController.deleteNotification);
-router.post('/notifications/register-token', moneyController.registerFCMToken);
-router.delete('/notifications/remove-token', moneyController.removeFCMToken);
 
 export default router;

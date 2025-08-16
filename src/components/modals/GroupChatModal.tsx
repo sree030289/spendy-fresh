@@ -15,9 +15,44 @@ import {
 import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
-import { Group, SplittingService } from '@/services/firebase/splitting-disabled';
+import { GroupChatService, ChatMessage as GroupChatMessage } from '@/services/firebase/GroupChatService';
 import { User } from '@/types';
 import { getCurrencySymbol } from '@/utils/currency';
+
+// Group interface for this component
+interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  avatar: string;
+  createdBy: string;
+  members: GroupMember[];
+  totalExpenses: number;
+  currency: string;
+  isActive: boolean;
+  inviteCode: string;
+  settings: {
+    allowMemberInvites: boolean;
+    requireApproval: boolean;
+    currency: string;
+    approvalThreshold?: number;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface GroupMember {
+  userId: string;
+  userData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  role: 'admin' | 'member';
+  balance: number;
+  joinedAt: Date;
+  isActive: boolean;
+}
 import FullscreenModal from '@/components/common/FullscreenModal';
 
 interface ChatMessage {
@@ -65,11 +100,11 @@ export default function GroupChatModal({ visible, onClose, group, currentUser, o
         setInitialLoading(true);
         
         // Get initial messages
-        const initialMessages = await SplittingService.getGroupMessages(group.id, 50);
+        const initialMessages = await GroupChatService.getGroupMessages(group.id, 50);
         setMessages(initialMessages);
         
         // Set up real-time listener
-        unsubscribe = SplittingService.onGroupMessages(group.id, (newMessages) => {
+        unsubscribe = GroupChatService.onGroupMessages(group.id, (newMessages: GroupChatMessage[]) => {
           setMessages(newMessages);
           // Auto-scroll to bottom when new messages arrive
           setTimeout(() => {
@@ -110,7 +145,7 @@ export default function GroupChatModal({ visible, onClose, group, currentUser, o
     setNewMessage(''); // Clear input immediately for better UX
 
     try {
-      await SplittingService.sendGroupMessage({
+      await GroupChatService.sendGroupMessage({
         groupId: group.id,
         userId: currentUser.id,
         userName: currentUser.fullName,
@@ -198,7 +233,7 @@ const renderMessage = (message: ChatMessage, index: number) => {
       ]}>
         <View style={styles.expenseMessageHeader}>
           <Icon 
-            name={isEditedExpense ? "create-outline" : "receipt"} 
+            name={isEditedExpense ? "edit" : "receipt"} 
             size={16} 
             color={isEditedExpense ? theme.colors.warning : theme.colors.success} 
           />
@@ -382,7 +417,7 @@ const renderMessage = (message: ChatMessage, index: number) => {
                 style={[styles.quickAction, { backgroundColor: theme.colors.surface }]}
                 onPress={handleAddExpense}
               >
-                <Icon name="add-circle" size={16} color={theme.colors.primary} />
+                <Icon name="add" size={16} color={theme.colors.primary} />
                 <Text style={[styles.quickActionText, { color: theme.colors.primary }]}>
                   Add Expense
                 </Text>

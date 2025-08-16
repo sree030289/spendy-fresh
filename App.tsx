@@ -21,6 +21,7 @@ import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import SplashScreen from './src/screens/auth/SplashScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
+import BiometricAuthScreen from './src/screens/auth/BiometricAuthScreen';
 import MainTabNavigator from './src/navigation/MainTabNavigator';
 import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
@@ -30,6 +31,7 @@ import { RealNotificationService } from './src/services/notifications/RealNotifi
 import { ApiService } from '@/services/api/ApiService';
 import { notificationManager } from '@/services/NotificationManager';
 import SmartMoneyApp from '@/screens/main/SmartMoneyApp';
+import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
 
  import { SubscriptionService } from '@/services/SubscriptionService';
 import SubscriptionModal from '@/components/modals/SubscriptionModal';
@@ -39,10 +41,12 @@ import SubscriptionModal from '@/components/modals/SubscriptionModal';
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, restoreSessionFromBiometric } = useAuth();
   const [initializing, setInitializing] = useState(true);
   const [hasShownTour, setHasShownTour] = useState(false);
   const [tourCheckCompleted, setTourCheckCompleted] = useState(false);
+  const [authFlowState, setAuthFlowState] = useState<'checking' | 'biometric' | 'login' | 'authenticated'>('checking');
+  const [lastUserSession, setLastUserSession] = useState<any>(null);
   const { startTour } = useTour();
 
   // Web-specific states
@@ -79,6 +83,7 @@ const AppNavigator = () => {
 
   console.log('AppNavigator - User:', user ? 'Authenticated' : 'Not authenticated');
   console.log('AppNavigator - Loading:', isLoading);
+  console.log('AppNavigator - Auth Flow State:', authFlowState);
 
   useEffect(() => {
     // Check if tour has been completed before
@@ -96,6 +101,73 @@ const AppNavigator = () => {
 
     checkTourStatus();
   }, []);
+
+  // Authentication flow logic - determines what screen to show
+  useEffect(() => {
+    const checkAuthenticationFlow = async () => {
+      if (isLoading) return; // Wait for auth to complete
+      
+      try {
+        console.log('🔍 Checking authentication flow...');
+        const apiService = ApiService.getInstance();
+        
+        // If user is already authenticated, go to main app
+        if (user) {
+          console.log('✅ User already authenticated, extending session');
+          await apiService.extendUserSession();
+          await BiometricAuthService.extendSession();
+          setAuthFlowState('authenticated');
+          return;
+        }
+
+        // Only check for biometric/login flow if no user and not loading
+        if (!user && !isLoading) {
+          const lastSession = await apiService.getLastUserSession();
+          console.log('🔍 No user authenticated, checking for biometric flow');
+          
+          // If session expired or no session, check for biometric
+          if (lastSession) {
+            console.log('🔍 Checking biometric for user:', lastSession.id, 'biometric enabled:', lastSession.biometricEnabled);
+            
+            // Check if biometric is available on device
+            const isHardwareAvailable = await BiometricAuthService.isHardwareAvailable();
+            console.log('🔍 Biometric hardware available:', isHardwareAvailable);
+            
+            // Check if user has biometric enabled (from session or stored preference)
+            const userBiometricEnabled = lastSession.biometricEnabled || await BiometricAuthService.isBiometricEnabledForUser(lastSession.id);
+            console.log('🔍 User biometric enabled:', userBiometricEnabled);
+            
+            // Check if we haven't exceeded attempts
+            const hasExceededAttempts = await BiometricAuthService.hasExceededMaxAttempts();
+            console.log('🔍 Exceeded biometric attempts:', hasExceededAttempts);
+            
+            if (isHardwareAvailable && userBiometricEnabled && !hasExceededAttempts) {
+              console.log('✅ All biometric conditions met, showing biometric screen');
+              setLastUserSession(lastSession);
+              setAuthFlowState('biometric');
+              return;
+            } else {
+              console.log('❌ Biometric conditions not met:', {
+                hardware: isHardwareAvailable,
+                enabled: userBiometricEnabled, 
+                notExceeded: !hasExceededAttempts
+              });
+            }
+          }
+
+          // Default to login screen
+          console.log('🔍 No valid session or biometric, showing login');
+          setAuthFlowState('login');
+        }
+        
+      } catch (error) {
+        console.error('Error checking authentication flow:', error);
+        setAuthFlowState('login');
+      }
+    };
+
+    checkAuthenticationFlow();
+  }, [user, isLoading]);
 
   // Subscription check with proper premium user verification
   useEffect(() => {
@@ -322,6 +394,34 @@ const AppNavigator = () => {
     setHasVisitedLanding(true);
   };
 
+  // Handle biometric authentication success
+  const handleBiometricSuccess = async () => {
+    console.log('✅ Biometric authentication successful');
+    try {
+      if (lastUserSession) {
+        const apiService = ApiService.getInstance();
+        // Extend session and mark as authenticated
+        await apiService.extendUserSession();
+        await BiometricAuthService.extendSession();
+        
+        // Restore the user session from stored data
+        await restoreSessionFromBiometric();
+        setAuthFlowState('authenticated');
+        
+        console.log('🔄 Session restored after biometric success');
+      }
+    } catch (error) {
+      console.error('Error handling biometric success:', error);
+      setAuthFlowState('login');
+    }
+  };
+
+  // Handle biometric authentication fallback to login
+  const handleBiometricFallback = () => {
+    console.log('⬇️ Falling back to login screen');
+    setAuthFlowState('login');
+  };
+
   // Global function to show subscription modal for various reasons
   const showSubscriptionModalForReason = (
     reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature',
@@ -391,7 +491,7 @@ const AppNavigator = () => {
     };
   }, []);
 
-  if (isLoading || initializing) {
+  if (isLoading || initializing || authFlowState === 'checking') {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#10B981" />
@@ -409,13 +509,25 @@ const AppNavigator = () => {
     <NavigationContainer>
       <StatusBar style="auto" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
+        {(user || authFlowState === 'authenticated') ? (
           // User is authenticated - show main app
           <>
             <Stack.Screen name="Main" component={MainTabNavigator} />
             <Stack.Screen name="RealSplittingScreen" component={RealSplittingScreen} />
             <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
           </>
+        ) : authFlowState === 'biometric' && lastUserSession ? (
+          // Show biometric authentication screen
+          <Stack.Screen 
+            name="BiometricAuth"
+            children={() => (
+              <BiometricAuthScreen
+                onBiometricSuccess={handleBiometricSuccess}
+                onFallbackToLogin={handleBiometricFallback}
+                userEmail={lastUserSession.email}
+              />
+            )}
+          />
         ) : (
           // User is not authenticated - show auth screens
           <>

@@ -16,7 +16,15 @@ import FullscreenModal from '@/components/common/FullscreenModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { InviteService } from '@/services/payments/PaymentService';
 import { User } from '@/types';
-import { Group } from '@/services/firebase/splitting-disabled';
+
+// Temporary Group interface for QR code functionality
+interface Group {
+  id: string;
+  name: string;
+  avatar?: string;
+  inviteCode: string;
+  members: any[];
+}
 import QRCodeScanner from '@/components/QRCodeScanner';
 import QRScannerManager, { QRScannerState } from '@/services/qr/QRScannerManager';
 
@@ -91,7 +99,7 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
           selectedGroup.inviteCode,
           {
             name: selectedGroup.name,
-            avatar: selectedGroup.avatar,
+            avatar: selectedGroup.avatar || '',
             memberCount: selectedGroup.members.length
           },
           user.id
@@ -357,7 +365,7 @@ const handleScannerClose = useCallback(() => {
         onPress={() => setMode('friend')}
       >
         <Icon
-          name="person-add"
+          name="people"
           size={20}
           color={mode === 'friend' ? theme.colors.primary : theme.colors.textSecondary}
         />
@@ -401,7 +409,7 @@ const handleScannerClose = useCallback(() => {
       >
         {scannerState.isProcessing ? (
           <Icon
-            name="hourglass"
+            name="time"
             size={20}
             color={theme.colors.textSecondary}
           />
@@ -480,7 +488,7 @@ const handleScannerClose = useCallback(() => {
         onPress={handleSendSMS}
         disabled={loading}
       >
-        <Icon name="chatbox" size={24} color="#2563EB" />
+        <Icon name="chatbubbles" size={24} color="#2563EB" />
         <Text style={[styles.shareOptionText, { color: theme.colors.text }]}>SMS</Text>
       </TouchableOpacity>
 
@@ -489,7 +497,7 @@ const handleScannerClose = useCallback(() => {
         onPress={handleSendWhatsApp}
         disabled={loading}
       >
-        <Icon name="logo-whatsapp" size={24} color="#25D366" />
+        <Icon name="send" size={24} color="#25D366" />
         <Text style={[styles.shareOptionText, { color: theme.colors.text }]}>WhatsApp</Text>
       </TouchableOpacity>
 
@@ -514,18 +522,6 @@ const handleScannerClose = useCallback(() => {
       onClose={onClose}
       title={scannerState.isProcessing ? 'Processing QR Code...' : 'QR Code'}
       showBackButton={!loading && !scannerState.isProcessing}
-      rightActions={
-        <TouchableOpacity
-          onPress={() => setMode(mode === 'scanner' ? 'friend' : 'scanner')}
-          style={{ padding: 4 }}
-        >
-          <Icon 
-            name={mode === 'scanner' ? 'qr-code' : 'camera'} 
-            size={24} 
-            color={theme.colors.text} 
-          />
-        </TouchableOpacity>
-      }
     >
         {/* Mode Selector */}
         {renderModeSelector()}

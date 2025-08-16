@@ -901,43 +901,33 @@ const authenticateJWT = async (req, res, next) => {
 
     const token = authHeader.substring(7);
     console.log('🔑 Token received, verifying...');
+    const decoded = CryptoUtils.verifyJWTToken(token, JWT_SECRET);
+    console.log('✅ Token verified for userId:', decoded.userId);
     
-    try {
-      const decoded = CryptoUtils.verifyJWTToken(token, JWT_SECRET);
-      console.log('✅ Token verified for userId:', decoded.userId);
-      
-      // Get user from database
-      const userDoc = await db.collection('users').doc(decoded.userId).get();
-      if (!userDoc.exists) {
-        console.log('❌ User not found in database:', decoded.userId);
-        return res.status(401).json({
-          success: false,
-          message: 'User not found',
-          error: 'USER_NOT_FOUND'
-        });
-      }
-
-      req.user = {
-        id: userDoc.id,
-        ...userDoc.data()
-      };
-      console.log('👤 User authenticated successfully:', req.user.id);
-
-      next();
-    } catch (error) {
-      console.error('❌ Authentication error:', error);
+    // Get user from database
+    const userDoc = await db.collection('users').doc(decoded.userId).get();
+    if (!userDoc.exists) {
+      console.log('❌ User not found in database:', decoded.userId);
       return res.status(401).json({
         success: false,
-        message: 'Invalid or expired token',
-        error: 'INVALID_TOKEN'
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
       });
     }
-  } catch (outerError) {
-    console.error('❌ Authentication middleware error:', outerError);
-    return res.status(500).json({
+
+    req.user = {
+      id: userDoc.id,
+      ...userDoc.data()
+    };
+    console.log('👤 User authenticated successfully:', req.user.id);
+
+    next();
+  } catch (error) {
+    console.error('❌ Authentication error:', error);
+    return res.status(401).json({
       success: false,
-      message: 'Internal server error',
-      error: 'INTERNAL_ERROR'
+      message: 'Invalid or expired token',
+      error: 'INVALID_TOKEN'
     });
   }
 };
@@ -1858,7 +1848,7 @@ spendyApp.get('/groups/:groupId', authenticateJWT, async (req, res) => {
     // Sort expenses by createdAt in descending order (newest first)
     expenses.sort((a, b) => {
       const aTime = a.createdAt&& a.createdAt.getTime ? a.createdAt.getTime() : 0;
-      const bTime = b.createdAt && b.createdAt.getTime ? b.createdAt.getTime() : 0;
+      const bTime = b.createdAt&& a.createdAt.getTime ? b.createdAt.getTime() : 0;
       return bTime - aTime;
     });
 
@@ -1913,7 +1903,7 @@ spendyApp.post('/groups/:groupId/members', authenticateJWT, async (req, res) => 
     const groupData = groupDoc.data();
     
     // Check if requester is an admin of this group
-    const requesterMember = groupData.members && groupData.members.find(member => 
+    const requesterMember = groupData.members&&find(member => 
       member.userId === requesterId && member.isActive
     );
     if (!requesterMember || requesterMember.role !== 'admin') {
@@ -1953,7 +1943,7 @@ spendyApp.post('/groups/:groupId/members', authenticateJWT, async (req, res) => 
     }
 
     // Check if user is already a member
-    const isAlreadyMember = groupData.members && groupData.members.some(member => 
+    const isAlreadyMember = groupData.members&&some(member => 
       member.userId === finalNewMemberUserId && member.isActive
     );
     if (isAlreadyMember) {
@@ -2017,93 +2007,6 @@ spendyApp.post('/groups/:groupId/members', authenticateJWT, async (req, res) => 
       updatedAt: new Date()
     });
 
-    // Send notification to the new member who was added
-    try {
-      const requesterData = requesterMember.userData;
-      
-      // Create app notification for new member
-      await db.collection('appNotifications').add({
-        userId: finalNewMemberUserId,
-        type: 'group_member_added',
-        title: '🎉 Added to Group',
-        message: `${requesterData.fullName || 'Someone'} added you to "${groupData.name}"`,
-        data: {
-          groupId: groupId,
-          groupName: groupData.name,
-          addedBy: requesterId,
-          addedByName: requesterData.fullName || 'Someone',
-          role: role,
-          navigationType: 'groupDetails',
-          targetGroupId: groupId
-        },
-        isRead: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-
-      // Send push notification to new member
-      await sendPushNotificationToUser(finalNewMemberUserId, {
-        title: '🎉 Added to Group',
-        body: `${requesterData.fullName || 'Someone'} added you to "${groupData.name}"`,
-        data: {
-          type: 'group_member_added',
-          groupId: groupId,
-          addedBy: requesterId
-        }
-      });
-
-      // Notify other group members about the new addition
-      const otherMembers = groupData.members.filter(member => 
-        member.userId !== requesterId && 
-        member.userId !== finalNewMemberUserId && 
-        member.isActive
-      );
-
-      const otherMemberNotifications = otherMembers.map(async (member) => {
-        try {
-          // Create app notification for other members
-          await db.collection('appNotifications').add({
-            userId: member.userId,
-            type: 'group_member_joined',
-            title: '👥 New Group Member',
-            message: `${newMemberData.fullName || 'Someone'} joined "${groupData.name}"`,
-            data: {
-              groupId: groupId,
-              groupName: groupData.name,
-              newMemberId: finalNewMemberUserId,
-              newMemberName: newMemberData.fullName || 'Someone',
-              addedBy: requesterId,
-              addedByName: requesterData.fullName || 'Someone',
-              navigationType: 'groupDetails',
-              targetGroupId: groupId
-            },
-            isRead: false,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-
-          // Send push notification to other members
-          await sendPushNotificationToUser(member.userId, {
-            title: '👥 New Group Member',
-            body: `${newMemberData.fullName || 'Someone'} joined "${groupData.name}"`,
-            data: {
-              type: 'group_member_joined',
-              groupId: groupId,
-              newMemberId: finalNewMemberUserId
-            }
-          });
-        } catch (memberNotificationError) {
-          console.error('❌ Failed to send notification to member:', member.userId, memberNotificationError);
-        }
-      });
-
-      await Promise.all(otherMemberNotifications);
-      console.log(`✅ Group member addition notifications sent to ${otherMemberNotifications.length + 1} users`);
-    } catch (notificationError) {
-      console.error('❌ Failed to send group member notifications:', notificationError);
-      // Don't fail the member addition if notifications fail
-    }
-
     res.status(201).json({
       success: true,
       message: 'Member added to group successfully'
@@ -2145,13 +2048,13 @@ spendyApp.get('/groups', authenticateJWT, async (req, res) => {
       const memberDetails = group.members ? group.members.map(member => ({
         userId: member.userId,
         userData: {
-          fullName: member.userData && member.userData.fullName || "Unknown User",
-          email: member.userData && member.userData.email || "unknown@email.com",
-          avatar: member.userData && member.userData.avatar || "",
+          fullName: member.userData&&fullName || 'Unknown User',
+          email: member.userData&&email || 'unknown@email.com',
+          avatar: member.userData&&avatar || ''
         },
-        role: member.role || "member",
+        role: member.role || 'member',
         balance: member.balance || 0,
-        isActive: member.isActive !== false,
+        isActive: member.isActive !== false
       })) : [];
 
       groups.push({
@@ -2231,83 +2134,6 @@ spendyApp.post('/groups/:groupId/leave', authenticateJWT, async (req, res) => {
       });
     }
 
-    // Check for pending settlements involving this user
-    try {
-      const settlementsSnapshot = await db.collection(COLLECTIONS.SETTLEMENTS)
-          .where("groupId", "==", groupId)
-          .where("status", "in", ["pending", "requested"])
-          .get();
-
-      const userHasPendingSettlements = settlementsSnapshot.docs.some((doc) => {
-        const settlement = doc.data();
-        return settlement.fromUserId === userId ||
-               settlement.toUserId === userId;
-      });
-
-      if (userHasPendingSettlements) {
-        return res.status(400).json({
-          success: false,
-          message: "Cannot leave group with pending settlements. " +
-                   "Please settle all outstanding balances first.",
-          error: "PENDING_SETTLEMENTS",
-          details: {
-            requiresSettlement: true,
-            message: "You have pending settlements in this group. " +
-                     "Please settle your balances before leaving.",
-          },
-        });
-      }
-
-      // Also check if user has any outstanding balance in the group
-      const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
-          .where("groupId", "==", groupId)
-          .where("isSettled", "==", false)
-          .get();
-
-      let userBalance = 0;
-      let hasUnsolvedExpenses = false;
-
-      expensesSnapshot.forEach((doc) => {
-        const expense = doc.data();
-        if (expense.splits) {
-          const userSplit = expense.splits
-              .find((split) => split.userId === userId);
-          if (userSplit) {
-            hasUnsolvedExpenses = true;
-            if (expense.paidBy === userId) {
-              userBalance += (expense.amount - userSplit.amount);
-            } else {
-              userBalance -= userSplit.amount;
-            }
-          }
-        }
-      });
-
-      if (hasUnsolvedExpenses && Math.abs(userBalance) > 0.01) {
-        const balanceMessage = userBalance > 0 ?
-          `You are owed $${Math.abs(userBalance).toFixed(2)}` :
-          `You owe $${Math.abs(userBalance).toFixed(2)}`;
-
-        return res.status(400).json({
-          success: false,
-          message: `Cannot leave group with outstanding balance. ` +
-                   `${balanceMessage}. Please settle all balances first.`,
-          error: "OUTSTANDING_BALANCE",
-          details: {
-            requiresSettlement: true,
-            balance: userBalance,
-            balanceFormatted: balanceMessage,
-            message: "You have an outstanding balance in this group. " +
-                     "Please settle before leaving.",
-          },
-        });
-      }
-    } catch (settlementCheckError) {
-      console.warn("Error checking settlements before leaving group:",
-          settlementCheckError);
-      // Continue with leaving if settlement check fails (non-blocking)
-    }
-
     // Remove user from group members
     const updatedMembers = [...groupData.members];
     updatedMembers[memberIndex].isActive = false;
@@ -2352,21 +2178,20 @@ spendyApp.delete('/groups/:groupId', authenticateJWT, async (req, res) => {
     const groupData = groupDoc.data();
     
     // Check if user is a member of this group
-    const member = groupData.members.find((member) =>
-      member.userId === userId && member.isActive,
+    const member = groupData.members&&find(member => 
+      member.userId === userId && member.isActive
     );
-
+    
     if (!member) {
       return res.status(403).json({
         success: false,
-        message: "Access denied - not a group member",
-        error: "ACCESS_DENIED",
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
       });
     }
 
     // Only group creator or admin can delete the group, OR if user is the only member left
-    const activeMembersCount = groupData.members
-        .filter((member) => member.isActive).length || 0;
+    const activeMembersCount = groupData.members&&filter(member => member.isActive).length || 0;
     const isCreator = groupData.createdBy === userId;
     const isAdmin = member.role === 'admin';
     const isOnlyMemberLeft = activeMembersCount === 1 && member.userId === userId;
@@ -2634,69 +2459,6 @@ spendyApp.post('/expenses', authenticateJWT, async (req, res) => {
     const createdDoc = await expenseRef.get();
     const createdExpense = createdDoc.data();
 
-    // Send notifications to group members if expense is in a group
-    if (groupId) {
-      try {
-        console.log('💰 Sending expense notifications for:', expenseRef.id);
-        
-        // Get group data for notification
-        const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
-        if (groupDoc.exists) {
-          const groupData = groupDoc.data();
-          
-          // Send notifications to all group members except the creator
-          const notificationPromises = groupData.members
-            .filter(member => member.userId !== userId && member.isActive)
-            .map(async (member) => {
-              try {
-                const payerName = expenseData.paidByData && expenseData.paidByData.fullName ? 
-                  expenseData.paidByData.fullName : 'Someone';
-                
-                // Create app notification
-                await db.collection('appNotifications').add({
-                  userId: member.userId,
-                  type: 'expense_added',
-                  title: '💰 New Expense Added',
-                  message: `${payerName} added "${expenseData.description}" (${expenseData.currency}${expenseData.amount}) to "${groupData.name}"`,
-                  data: {
-                    groupId: groupId,
-                    groupName: groupData.name,
-                    expenseId: expenseRef.id,
-                    expenseDescription: expenseData.description,
-                    amount: expenseData.amount,
-                    currency: expenseData.currency,
-                    actionBy: payerName,
-                    navigationType: 'expenseDetails'
-                  },
-                  isRead: false,
-                  createdAt: new Date(),
-                  updatedAt: new Date()
-                });
-
-                // Send push notification
-                await sendPushNotificationToUser(member.userId, {
-                  title: '💰 New Expense Added',
-                  body: `${payerName} added "${expenseData.description}" (${expenseData.currency}${expenseData.amount}) to "${groupData.name}"`,
-                  data: {
-                    type: 'expense_added',
-                    groupId: groupId,
-                    expenseId: expenseRef.id
-                  }
-                });
-              } catch (notificationError) {
-                console.error('❌ Failed to send notification to member:', member.userId, notificationError);
-              }
-            });
-
-          await Promise.all(notificationPromises);
-          console.log(`✅ Expense notifications sent to ${notificationPromises.length} group members`);
-        }
-      } catch (notificationError) {
-        console.error('❌ Failed to send expense notifications:', notificationError);
-        // Don't fail the expense creation if notifications fail
-      }
-    }
-
     res.status(201).json({
       success: true,
       message: 'Expense created successfully',
@@ -2755,7 +2517,7 @@ spendyApp.get('/expenses', authenticateJWT, async (req, res) => {
     // Sort expenses by createdAt in descending order (newest first)
     expenses.sort((a, b) => {
       const aTime = a.createdAt&& a.createdAt.getTime ? a.createdAt.getTime() : 0;
-      const bTime = b.createdAt && b.createdAt.getTime ? b.createdAt.getTime() : 0;
+      const bTime = b.createdAt&& a.createdAt.getTime ? b.createdAt.getTime() : 0;
       return bTime - aTime;
     });
 
@@ -2819,7 +2581,7 @@ spendyApp.get('/expenses/group/:groupId', authenticateJWT, async (req, res) => {
     // Sort expenses by createdAt in descending order (newest first)
     expenses.sort((a, b) => {
       const aTime = a.createdAt&& a.createdAt.getTime ? a.createdAt.getTime() : 0;
-      const bTime = b.createdAt && b.createdAt.getTime ? b.createdAt.getTime() : 0;
+      const bTime = b.createdAt&& a.createdAt.getTime ? b.createdAt.getTime() : 0;
       return bTime - aTime;
     });
 
@@ -2932,12 +2694,12 @@ spendyApp.get('/expenses/user/:userId', authenticateJWT, async (req, res) => {
 
     // Sort by createdAt descending and limit
     allExpenses.sort((a, b) => {
-      const aTime = a.createdAt && a.createdAt.toDate ? 
-        a.createdAt.toDate().getTime() : 0;
-      const bTime = b.createdAt && b.createdAt.toDate ? 
-        b.createdAt.toDate().getTime() : 0;
+      const aTime = a.createdAt&&toDate ? a.createdAt.toDate().getTime() : 0;
+      const bTime = b.createdAt&&toDate ? b.createdAt.toDate().getTime() : 0;
       return bTime - aTime;
-    });    const limitedExpenses = allExpenses.slice(0, limit);
+    });
+    
+    const limitedExpenses = allExpenses.slice(0, limit);
 
     // Enhance expenses with group info
     const expenses = [];
@@ -2965,7 +2727,7 @@ spendyApp.get('/expenses/user/:userId', authenticateJWT, async (req, res) => {
     // Sort expenses by createdAt in descending order (newest first)
     expenses.sort((a, b) => {
       const aTime = a.createdAt&& a.createdAt.getTime ? a.createdAt.getTime() : 0;
-      const bTime = b.createdAt && b.createdAt.getTime ? b.createdAt.getTime() : 0;
+      const bTime = b.createdAt&& a.createdAt.getTime ? b.createdAt.getTime() : 0;
       return bTime - aTime;
     });
 
@@ -3353,51 +3115,15 @@ spendyApp.get('/settlements/group/:groupId', authenticateJWT, async (req, res) =
     }
 
     const groupData = groupDoc.data();
-    
-    // Debug logging for group membership
-    console.log("🔍 Settlement group validation debug:", {
-      groupId,
-      userId,
-      groupMembers: groupData.members,
-      membersCount: groupData.members ? groupData.members.length : 0,
-      groupName: groupData.name,
-    });
-    
-    // More flexible member check - try multiple patterns
-    let isMember = false;
-    if (groupData.members) {
-      // Pattern 1: Check with isActive requirement
-      const memberWithActive = groupData.members.some((member) =>
-        member.userId === userId && member.isActive,
-      );
-      
-      // Pattern 2: Check without isActive requirement
-      const memberWithoutActive = groupData.members.some((member) =>
-        member.userId === userId,
-      );
-      
-      // Pattern 3: Check for string member IDs (older format)
-      const memberAsString = groupData.members.some((member) =>
-        typeof member === "string" && member === userId,
-      );
-      
-      console.log("🔍 Member validation patterns:", {
-        memberWithActive,
-        memberWithoutActive,
-        memberAsString,
-        firstMember: groupData.members[0],
-      });
-      
-      isMember = memberWithActive || memberWithoutActive || memberAsString;
-    }
-    
-    console.log("🔍 Final membership result:", { isMember, userId, groupId });
+    const isMember = groupData.members && groupData.members.some(member => 
+      member.userId === userId && member.isActive
+    );
     
     if (!isMember) {
       return res.status(403).json({
         success: false,
-        message: "Access denied - not a group member",
-        error: "ACCESS_DENIED",
+        message: 'Access denied - not a group member',
+        error: 'ACCESS_DENIED'
       });
     }
 
@@ -3510,7 +3236,7 @@ spendyApp.get('/settlements/group/:groupId', authenticateJWT, async (req, res) =
           from: debtor.memberId,
           to: creditor.memberId,
           amount: Math.round(settlementAmount * 100) / 100,
-          currency: groupData.settings && groupData.settings.currency || 'USD'
+          currency: groupData.settings&&currency || 'USD'
         });
       }
       
@@ -3630,137 +3356,45 @@ spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
     const createdDoc = await settlementRef.get();
     const createdSettlement = createdDoc.data();
 
-    // Send notification to the person who received the payment
-    try {
-      const fromUserDoc = await db.collection(COLLECTIONS.USERS).doc(fromUserId).get();
-      const toUserDoc = await db.collection(COLLECTIONS.USERS).doc(toUserId).get();
-      const fromUserData = fromUserDoc.exists ? fromUserDoc.data() : null;
-      const toUserData = toUserDoc.exists ? toUserDoc.data() : null;
-      
-      // Get group info if it's a group settlement
-      let groupData = null;
-      if (groupId) {
-        const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
-        if (groupDoc.exists) {
-          groupData = groupDoc.data();
-        }
-      }
-      
-      const payerName = fromUserData ? fromUserData.fullName : "Someone";
-      const receiverName = toUserData ? toUserData.fullName : "Someone";
-      const groupContext = groupData ? ` in "${groupData.name}"` : "";
-      const settlementCurrency = "USD"; // Default currency
-      
-      // Notify the receiver of the payment
-      await db.collection("appNotifications").add({
-        userId: toUserId,
-        type: "payment_received",
-        title: "💰 Payment Received",
-        message: `${payerName} paid you ` +
-          `${settlementCurrency} ${amount}${groupContext}`,
-        data: {
-          settlementId: settlementRef.id,
-          fromUserId: fromUserId,
-          fromUserName: payerName,
-          amount: amount,
-          currency: settlementCurrency,
-          groupId: groupId || null,
-          groupName: groupData ? groupData.name : null,
-          note: note || "",
-          navigationType: groupData ? "groupDetails" : "friendDetails",
-          targetGroupId: groupId || null,
-          targetFriendId: groupId ? null : fromUserId,
-        },
-        isRead: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      // Send push notification to receiver
-      await sendPushNotificationToUser(toUserId, {
-        title: "💰 Payment Received",
-        body: `${payerName} paid you ` +
-          `${settlementCurrency} ${amount}${groupContext}`,
-        data: {
-          type: "payment_received",
-          settlementId: settlementRef.id,
-          fromUserId: fromUserId,
-          groupId: groupId || "",
-        },
-      });
-
-      // Optionally notify the payer with confirmation
-      await db.collection("appNotifications").add({
-        userId: fromUserId,
-        type: "payment_sent",
-        title: "✅ Payment Confirmed",
-        message: `Payment of ${settlementCurrency} ${amount} to ` +
-          `${receiverName} recorded${groupContext}`,
-        data: {
-          settlementId: settlementRef.id,
-          toUserId: toUserId,
-          toUserName: receiverName,
-          amount: amount,
-          currency: settlementCurrency,
-          groupId: groupId || null,
-          groupName: groupData ? groupData.name : null,
-          note: note || "",
-          navigationType: groupData ? "groupDetails" : "friendDetails",
-          targetGroupId: groupId || null,
-          targetFriendId: groupId ? null : toUserId,
-        },
-        isRead: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      console.log("✅ Settlement notifications sent to both parties");
-    } catch (notificationError) {
-      console.error("❌ Failed to send settlement notifications:",
-        notificationError);
-      // Don't fail the settlement if notifications fail
-    }
-
     res.status(201).json({
       success: true,
-      message: "Settlement recorded successfully",
+      message: 'Settlement recorded successfully',
       data: {
         settlement: {
           id: settlementRef.id,
-          ...convertFirestoreTimestamps(createdSettlement),
-        },
-      },
+          ...convertFirestoreTimestamps(createdSettlement)
+        }
+      }
     });
   } catch (error) {
-    console.error("Record settlement error:", error);
+    console.error('Record settlement error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to record settlement",
-      error: "RECORD_SETTLEMENT_ERROR",
+      message: 'Failed to record settlement',
+      error: 'RECORD_SETTLEMENT_ERROR'
     });
   }
 });
 
 // Get Settlement History for a Group
-spendyApp.get("/settlements/history/:groupId", authenticateJWT,
-    async (req, res) => {
-    try {
-      const {groupId} = req.params;
-      const userId = req.user.id;
+spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
 
-      // Verify user is a member of this group
-      const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
-      
-      if (!groupDoc.exists) {
-        return res.status(404).json({
-          success: false,
-          message: "Group not found",
-          error: "GROUP_NOT_FOUND",
-        });
-      }
+    // Verify user is a member of this group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
 
-      const groupData = groupDoc.data();
-      const isMember = groupData.members && groupData.members.some((member) => 
+    const groupData = groupDoc.data();
+    const isMember = groupData.members && groupData.members.some(member => 
       member.userId === userId && member.isActive
     );
     
@@ -3789,7 +3423,7 @@ spendyApp.get("/settlements/history/:groupId", authenticateJWT,
     // Sort by createdAt in descending order
     settlements.sort((a, b) => {
       const aTime = a.createdAt&& a.createdAt.getTime ? a.createdAt.getTime() : 0;
-      const bTime = b.createdAt && b.createdAt.getTime ? b.createdAt.getTime() : 0;
+      const bTime = b.createdAt&& a.createdAt.getTime ? b.createdAt.getTime() : 0;
       return bTime - aTime;
     });
 
@@ -4612,13 +4246,13 @@ spendyApp.delete('/gmail/disconnect', authenticateJWT, async (req, res) => {
 // SETTLEMENTS APIs
 // ========================
 
-// Get settlement history for a group
-spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res) => {
+// Get group settlements
+spendyApp.get('/settlements/group/:groupId', authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { groupId } = req.params;
     
-    console.log(`💸 Getting settlement history for group: ${groupId}, user: ${userId}`);
+    console.log(`💸 Getting settlements for group: ${groupId}, user: ${userId}`);
     
     // Get group to verify access
     const groupDoc = await db.collection('groups').doc(groupId).get();
@@ -4655,7 +4289,7 @@ spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res)
       settlements.push({
         id: doc.id,
         ...data,
-        createdAt: data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : data.createdAt
+        createdAt: data.createdAt&&toDate ? data.createdAt.toDate() : data.createdAt
       });
     });
     
@@ -4663,16 +4297,14 @@ spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res)
     
     res.json({
       success: true,
-      data: {
-        settlements
-      }
+      data: settlements
     });
     
   } catch (error) {
-    console.error('Get settlement history error:', error);
+    console.error('Get group settlements error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get settlement history',
+      message: 'Failed to get group settlements',
       error: 'INTERNAL_SERVER_ERROR'
     });
   }
@@ -4681,7 +4313,7 @@ spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res)
 // Record settlement
 spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { fromUserId, toUserId, amount, groupId, note } = req.body;
     
     console.log(`💸 Recording settlement: ${fromUserId} -> ${toUserId}, amount: ${amount}, group: ${groupId}`);
@@ -4746,7 +4378,7 @@ spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
 // Get settlement history
 spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { groupId } = req.params;
     
     console.log(`📜 Getting settlement history for group: ${groupId}, user: ${userId}`);
@@ -4814,7 +4446,7 @@ spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res)
 // Get user transactions
 spendyApp.get('/money/transactions', authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { page = 1, limit = 20, type, category } = req.query;
     
     console.log(`💰 Getting transactions for user: ${userId}`);
@@ -4880,7 +4512,7 @@ spendyApp.get('/money/transactions', authenticateJWT, async (req, res) => {
 // Add transaction
 spendyApp.post('/money/transactions', authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { type, amount, description, category, date } = req.body;
     
     console.log(`💰 Adding transaction for user: ${userId}`);
@@ -4919,7 +4551,7 @@ spendyApp.post('/money/transactions', authenticateJWT, async (req, res) => {
 // Get analytics
 spendyApp.get('/money/analytics', authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { period = 'month' } = req.query;
     
     console.log(`📊 Getting analytics for user: ${userId}, period: ${period}`);
@@ -4953,7 +4585,7 @@ spendyApp.get('/money/analytics', authenticateJWT, async (req, res) => {
 // Get daily usage
 spendyApp.get('/money/usage/daily', authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     
     console.log(`📈 Getting daily usage for user: ${userId}`);
     
@@ -4983,7 +4615,7 @@ spendyApp.get('/money/usage/daily', authenticateJWT, async (req, res) => {
 // Post usage analytics
 spendyApp.post('/money/usage/analytics', authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     
     console.log(`📊 Posting usage analytics for user: ${userId}`);
     
@@ -5007,7 +4639,7 @@ spendyApp.post('/money/usage/analytics', authenticateJWT, async (req, res) => {
 // Delete transaction
 spendyApp.delete('/money/transactions/:id', authenticateJWT, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const transactionId = req.params.id;
     
     console.log(`💰 Deleting transaction ${transactionId} for user: ${userId}`);

@@ -204,6 +204,13 @@ export class RemindersService {
         updatedAt: serverTimestamp()
       };
 
+      // Remove undefined values to prevent Firestore errors
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
+
       // Handle date conversions
       if (updates.dueDate) {
         updateData.dueDate = Timestamp.fromDate(updates.dueDate);

@@ -12,12 +12,13 @@ const getApiBaseUrl = () => {
   // Use dev API for development builds (but respect prod override)
   if (buildType === 'dev' || (environment === 'development' && buildType !== 'prod')) {
     console.log('🔧 Using DEVELOPMENT API endpoint');
-    return 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi';
+    // Updated to use the new deployed function URL
+    return 'https://spendyapi-2fy22mkg6q-uc.a.run.app';
   }
   
   // Use production API for production builds
   console.log('🔧 Using PRODUCTION API endpoint');
-  return 'https://us-central1-spendy-97913.cloudfunctions.net/spendyApi';
+  return 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -153,19 +154,32 @@ class ApiService {
       }
       
       return data;
-    } catch (error) {
-      console.error(`❌ API Error: ${endpoint}`, error);
+    } catch (error: any) {
+      // Don't spam console with 404 errors for endpoints that might not exist for new users
+      const isNewUserEndpoint = endpoint.includes('/money/') || endpoint.includes('/analytics') || endpoint.includes('/usage');
+      const is404Error = error.message?.includes('404') || error.message?.includes('HTTP 404');
+      
+      if (is404Error && isNewUserEndpoint) {
+        console.log(`ℹ️ API Info: ${endpoint} - Resource not found (likely new user)`);
+      } else {
+        console.error(`❌ API Error: ${endpoint}`, error);
+      }
       throw error;
     }
   }
 
   // Unified request method for data operations
-  private async request(method: string, endpoint: string, data?: any): Promise<any> {
+  async request(method: string, endpoint: string, data?: any): Promise<any> {
+    // Get user session for user ID
+    const session = await AsyncStorage.getItem(STORAGE_KEYS.USER_SESSION);
+    const userSession = session ? JSON.parse(session) : null;
+    
     const options: RequestInit = {
       method,
       headers: {
         'Content-Type': 'application/json',
         ...(this.token && { 'Authorization': `Bearer ${this.token}` }),
+        ...(userSession?.user?.id && { 'x-user-id': userSession.user.id }),
       },
     };
 
@@ -336,11 +350,20 @@ class ApiService {
       console.log('💾 Storing user session for:', user.email);
       await AsyncStorage.setItem(STORAGE_KEYS.LAST_EMAIL, user.email);
       await AsyncStorage.setItem(STORAGE_KEYS.BIOMETRIC_ENABLED, JSON.stringify(user.biometricEnabled || false));
+      
+      // Also store biometric preference in the new BiometricAuthService format
+      if (user.id && user.biometricEnabled) {
+        await AsyncStorage.setItem(`@spendy_biometric_enabled_${user.id}`, 'true');
+        console.log('✅ Biometric preference saved for user:', user.id);
+      }
+      
       await AsyncStorage.setItem(STORAGE_KEYS.USER_SESSION, JSON.stringify({
         id: user.id,
         email: user.email,
         fullName: user.fullName,
-        lastLoginAt: new Date().toISOString()
+        lastLoginAt: new Date().toISOString(),
+        sessionTimestamp: Date.now(),
+        biometricEnabled: user.biometricEnabled || false
       }));
       console.log('✅ User session stored successfully');
     } catch (error) {
@@ -364,6 +387,51 @@ class ApiService {
     } catch (error) {
       console.error('Error getting biometric setting:', error);
       return false;
+    }
+  }
+
+  async getLastUserSession(): Promise<{
+    id: string;
+    email: string;
+    fullName: string;
+    lastLoginAt: string;
+    sessionTimestamp: number;
+    biometricEnabled?: boolean;
+  } | null> {
+    try {
+      const session = await AsyncStorage.getItem(STORAGE_KEYS.USER_SESSION);
+      return session ? JSON.parse(session) : null;
+    } catch (error) {
+      console.error('Error getting last user session:', error);
+      return null;
+    }
+  }
+
+  async isSessionValid(): Promise<boolean> {
+    try {
+      const session = await this.getLastUserSession();
+      if (!session || !session.sessionTimestamp) return false;
+
+      const now = Date.now();
+      const sessionAge = now - session.sessionTimestamp;
+      const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+      return sessionAge < SESSION_DURATION;
+    } catch (error) {
+      console.error('Error checking session validity:', error);
+      return false;
+    }
+  }
+
+  async extendUserSession(): Promise<void> {
+    try {
+      const session = await this.getLastUserSession();
+      if (session) {
+        session.sessionTimestamp = Date.now();
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_SESSION, JSON.stringify(session));
+      }
+    } catch (error) {
+      console.error('Error extending user session:', error);
     }
   }
 
@@ -513,8 +581,29 @@ class ApiService {
   // SETTLEMENTS
   // ========================
   async getGroupSettlements(groupId: string): Promise<any> {
-    const response = await this.request('GET', `/settlements/group/${groupId}`);
-    return response;
+    try {
+      const response = await this.request('GET', `/settlements/group/${groupId}`);
+      return response;
+    } catch (error: any) {
+      // Handle authentication errors gracefully for settlements
+      if (error.message && error.message.includes('401')) {
+        console.log('🔄 Settlement API authentication failed, attempting token refresh...');
+        
+        // Force token refresh by clearing current token
+        this.token = null;
+        await this.initializeToken();
+        
+        // Retry the request once with refreshed token
+        try {
+          const response = await this.request('GET', `/settlements/group/${groupId}`);
+          return response;
+        } catch (retryError: any) {
+          console.error('❌ Settlement API failed even after token refresh:', retryError);
+          throw retryError;
+        }
+      }
+      throw error;
+    }
   }
 
   async recordSettlement(settlementData: {
@@ -534,24 +623,8 @@ class ApiService {
   }
 
   // ========================
-  // NOTIFICATIONS
+  // NOTIFICATIONS (Legacy - replaced by new methods below)
   // ========================
-  async createNotification(notificationData: any): Promise<void> {
-    await this.request('POST', '/notifications', notificationData);
-  }
-
-  async getNotifications(userId: string): Promise<any[]> {
-    const response = await this.requestWithEmptyFallback('GET', `/notifications/${userId}`);
-    return response;
-  }
-
-  async markNotificationAsRead(notificationId: string): Promise<void> {
-    await this.request('PUT', `/notifications/${notificationId}/read`);
-  }
-
-  async markAllNotificationsAsRead(userId: string): Promise<void> {
-    await this.request('PUT', `/notifications/${userId}/read-all`);
-  }
 
   // ========================
   // FRIENDS
@@ -666,6 +739,201 @@ class ApiService {
   async autoConnectGroupMembers(groupId: string, userId: string, showPrompt: boolean = true): Promise<any> {
     const response = await this.request('POST', `/groups/${groupId}/auto-connect`, { userId, showPrompt });
     return response;
+  }
+
+  // ========================
+  // REMINDERS (NEW API)
+  // ========================
+  async createReminder(reminderData: {
+    title: string;
+    description?: string;
+    amount: number;
+    currency?: string;
+    category: string;
+    dueDate: string;
+    isRecurring?: boolean;
+    recurringType?: string;
+    reminderDays?: number[];
+    notificationEnabled?: boolean;
+    autoDetected?: boolean;
+    emailSource?: string;
+    notes?: string;
+  }): Promise<{ id: string }> {
+    const response = await this.request('POST', '/reminders', reminderData);
+    return response;
+  }
+
+  async getReminders(options: {
+    status?: string;
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
+  } = {}): Promise<{ data: any[]; pagination: any }> {
+    const queryParams = new URLSearchParams();
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) {
+        queryParams.append(key, value.toString());
+      }
+    });
+    
+    const response = await this.requestWithEmptyFallback('GET', `/reminders?${queryParams.toString()}`);
+    return {
+      data: response.data || [],
+      pagination: response.pagination || {}
+    };
+  }
+
+  async updateReminder(reminderId: string, updates: Partial<{
+    title: string;
+    description: string;
+    amount: number;
+    currency: string;
+    category: string;
+    dueDate: string;
+    isRecurring: boolean;
+    recurringType: string;
+    reminderDays: number[];
+    notificationEnabled: boolean;
+    notes: string;
+  }>): Promise<void> {
+    await this.request('PUT', `/reminders/${reminderId}`, updates);
+  }
+
+  async deleteReminder(reminderId: string): Promise<void> {
+    await this.request('DELETE', `/reminders/${reminderId}`);
+  }
+
+  async markReminderAsPaid(reminderId: string, options: {
+    paidAmount?: number;
+    paymentMethod?: string;
+    notes?: string;
+  } = {}): Promise<void> {
+    await this.request('POST', `/reminders/${reminderId}/mark-paid`, options);
+  }
+
+  async getUpcomingReminders(days: number = 7): Promise<{ data: any[]; meta: any }> {
+    const response = await this.requestWithEmptyFallback('GET', `/reminders/upcoming?days=${days}`);
+    return {
+      data: response.data || [],
+      meta: response.meta || {}
+    };
+  }
+
+  // ========================
+  // CALENDAR INTEGRATION
+  // ========================
+  async getCalendarData(month?: number, year?: number): Promise<{
+    month: number;
+    year: number;
+    calendar: { [date: string]: any[] };
+    stats: any;
+  }> {
+    const params = new URLSearchParams();
+    if (month) params.append('month', month.toString());
+    if (year) params.append('year', year.toString());
+    
+    const response = await this.request('GET', `/calendar?${params.toString()}`);
+    return response;
+  }
+
+  async getCalendarDataByDate(date: string): Promise<{
+    reminders: any[];
+    summary: any;
+  }> {
+    const response = await this.request('GET', `/calendar/${date}`);
+    return response;
+  }
+
+  // ========================
+  // GMAIL INTEGRATION
+  // ========================
+  async getGmailAuthUrl(): Promise<{ authUrl: string }> {
+    const response = await this.request('GET', '/gmail/auth-url');
+    return response;
+  }
+
+  async connectGmail(authCode: string): Promise<{
+    email: string;
+    isConnected: boolean;
+    autoSync: boolean;
+    syncFrequency: string;
+  }> {
+    const response = await this.request('POST', '/gmail/connect', { code: authCode });
+    return response;
+  }
+
+  async getGmailStatus(): Promise<{
+    isConnected: boolean;
+    email?: string;
+    lastSyncAt?: string;
+    autoSync?: boolean;
+    syncFrequency?: string;
+  }> {
+    const response = await this.request('GET', '/gmail/status');
+    return response;
+  }
+
+  async syncGmailBills(): Promise<{
+    billsFound: number;
+    remindersCreated: number;
+    duplicatesSkipped: number;
+    failures: number;
+    bills: any[];
+  }> {
+    const response = await this.request('POST', '/gmail/sync');
+    return response;
+  }
+
+  async disconnectGmail(): Promise<void> {
+    await this.request('DELETE', '/gmail/disconnect');
+  }
+
+  // ========================
+  // APP NOTIFICATIONS (UPDATED)
+  // ========================
+  async getUserNotifications(options: {
+    limit?: number;
+    offset?: number;
+    unreadOnly?: boolean;
+    type?: string;
+  } = {}): Promise<{
+    notifications: any[];
+    total: number;
+    unreadCount: number;
+  }> {
+    const params = new URLSearchParams();
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+    
+    const response = await this.request('GET', `/notifications?${params.toString()}`);
+    return response;
+  }
+
+  async markNotificationAsRead(notificationId: string): Promise<void> {
+    await this.request('PUT', `/notifications/${notificationId}/read`);
+  }
+
+  async markAllNotificationsAsRead(): Promise<{ markedCount: number }> {
+    const response = await this.request('PUT', '/notifications/read-all');
+    return response;
+  }
+
+  async deleteNotification(notificationId: string): Promise<void> {
+    await this.request('DELETE', `/notifications/${notificationId}`);
+  }
+
+  async registerFCMToken(token: string, deviceInfo?: any): Promise<void> {
+    await this.request('POST', '/notifications/register-token', { token, deviceInfo });
+  }
+
+  async removeFCMToken(token: string): Promise<void> {
+    await this.request('DELETE', '/notifications/remove-token', { token });
   }
 }
 

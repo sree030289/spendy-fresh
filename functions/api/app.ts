@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.routes';
 import friendsRoutes from './routes/friends.routes';
 import groupsRoutes from './routes/groups.routes';
 import expensesRoutes from './routes/expenses.routes';
+import moneyRoutes from './routes/money.routes';
 
 const app = express();
 
@@ -65,6 +66,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/expenses', expensesRoutes);
+app.use('/api/money', moneyRoutes);
 
 // 404 handler for unknown routes
 app.use('*', (req, res) => {
