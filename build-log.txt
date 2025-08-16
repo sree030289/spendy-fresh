@@ -2305,3 +2305,14 @@ We recommend you instead use a development build to avoid limitations. Learn mor
  LOG  📊 Display: settled 0
  LOG  ❌ GroupDetailsModal: Not rendering - visible: false localGroupData: true
  LOG  🚨🚨🚨 CLAUDE FIX ACTIVE - EXPENSES STATE CHANGED: {"expenses": [{"amount": 100, "description": "Notifyexp", "id": "1yV36X9YxfiPBFG09Ds6"}, {"amount": 900, "description": "hoyts", "id": "Wrta16KboJTOrnjzZX6v"}, {"amount": 500, "description": "H&M", "id": "iIRwEuXz8Rm20aMlX06i"}, {"amount": 300, "description": "ubereats", "id": "3sQWZlV8fxwt4NMPFI0Z"}], "length": 4}
+ ERROR  node_modules/react-is/cjs/react-is.development.js: Cannot find module './delay/delay.factory'
+Require stack:
+- /Users/sreeramvennapusa/Documents/spendy-fresh/node_modules/exponential-backoff/dist/backoff.js
+- /Users/sreeramvennapusa/Documents/spendy-fresh/node_modules/metro-cache/src/stores/HttpStore.js
+- /Users/sreeramvennapusa/Documents/spendy-fresh/node_modules/metro-cache/src/stores/HttpGetStore.js
+- /Users/sreeramvennapusa/Documents/spendy-fresh/node_modules/metro-cache/src/index.js
+- /Users/sreeramvennapusa/Documents/spendy-fresh/node_modules/@expo/metro-config/build/transform-worker/metro-transform-worker.js
+- /Users/sreeramvennapusa/Documents/spendy-fresh/node_modules/@expo/metro-config/build/transform-worker/transform-worker.js
+- /Users/sreeramvennapusa/Documents/spendy-fresh/node_modules/metro/src/DeltaBundler/Worker.flow.js
+- /Users/sreeramvennapusa/Documents/spendy-fresh/node_modules/metro/src/DeltaBundler/Worker.js
+- /Users/sreeramvennapusa/Documents/spendy-fresh/node_modules/jest-worker/build/workers/processChild.js
