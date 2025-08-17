@@ -18,6 +18,11 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera for QR code scanning to quickly add expenses and split bills.",
         "NSFaceIDUsageDescription": "This app uses Face ID for secure and convenient authentication to access your financial data.",
+        "NSContactsUsageDescription": "This app needs access to contacts to help you add friends and split expenses with people in your contact list.",
+        "NSLocationWhenInUseUsageDescription": "This app uses location to provide location-based expense tracking and merchant suggestions.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses location to provide location-based expense tracking and merchant suggestions.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to save and share expense receipts and QR codes.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs access to save receipts and expense images to your photo library.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true,
           "NSAllowsLocalNetworking": true
@@ -61,7 +66,16 @@
         "android.permission.WAKE_LOCK",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.READ_CONTACTS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "notification": {
@@ -88,6 +102,41 @@
           "sounds": [
             "./assets/notification_sound.wav"
           ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Spendy to access your camera for QR code scanning and receipt capture.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-local-authentication", 
+        {
+          "faceIDPermission": "Allow Spendy to use Face ID for secure authentication."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Spendy to access your contacts to help you add friends and split expenses."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Spendy to use your location for expense tracking and merchant suggestions.",
+          "locationAlwaysPermission": "Allow Spendy to use your location for expense tracking and merchant suggestions.",
+          "locationWhenInUsePermission": "Allow Spendy to use your location for expense tracking and merchant suggestions."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Spendy to access your photo library to save and share expense receipts.",
+          "cameraPermission": "Allow Spendy to use the camera to take photos of receipts."
         }
       ],
       "expo-web-browser"

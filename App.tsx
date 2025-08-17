@@ -47,6 +47,7 @@ const AppNavigator = () => {
   const [tourCheckCompleted, setTourCheckCompleted] = useState(false);
   const [authFlowState, setAuthFlowState] = useState<'checking' | 'biometric' | 'login' | 'authenticated'>('checking');
   const [lastUserSession, setLastUserSession] = useState<any>(null);
+  const [biometricFailed, setBiometricFailed] = useState(false); // Track biometric failures
   const { startTour } = useTour();
 
   // Web-specific states
@@ -108,7 +109,11 @@ const AppNavigator = () => {
       if (isLoading) return; // Wait for auth to complete
       
       try {
-        console.log('🔍 Checking authentication flow...');
+        console.log('🔍 Checking authentication flow...', { 
+          hasUser: !!user, 
+          authFlowState, 
+          isLoading 
+        });
         const apiService = ApiService.getInstance();
         
         // If user is already authenticated, go to main app
@@ -116,7 +121,15 @@ const AppNavigator = () => {
           console.log('✅ User already authenticated, extending session');
           await apiService.extendUserSession();
           await BiometricAuthService.extendSession();
+          setBiometricFailed(false); // Reset biometric failed flag on successful auth
           setAuthFlowState('authenticated');
+          return;
+        }
+
+        // Don't run biometric checks if we're already in biometric or authenticated state
+        // This prevents race conditions when biometric auth succeeds
+        if (authFlowState === 'biometric' || authFlowState === 'authenticated') {
+          console.log('🔍 Already in biometric/authenticated flow, skipping check');
           return;
         }
 
@@ -126,7 +139,7 @@ const AppNavigator = () => {
           console.log('🔍 No user authenticated, checking for biometric flow');
           
           // If session expired or no session, check for biometric
-          if (lastSession) {
+          if (lastSession && !biometricFailed) { // Don't show biometric if it failed before
             console.log('🔍 Checking biometric for user:', lastSession.id, 'biometric enabled:', lastSession.biometricEnabled);
             
             // Check if biometric is available on device
@@ -153,6 +166,8 @@ const AppNavigator = () => {
                 notExceeded: !hasExceededAttempts
               });
             }
+          } else if (biometricFailed) {
+            console.log('❌ Biometric authentication failed previously, going to login');
           }
 
           // Default to login screen
@@ -167,7 +182,7 @@ const AppNavigator = () => {
     };
 
     checkAuthenticationFlow();
-  }, [user, isLoading]);
+  }, [user, isLoading, authFlowState, biometricFailed]);
 
   // Subscription check with proper premium user verification
   useEffect(() => {
@@ -399,19 +414,57 @@ const AppNavigator = () => {
     console.log('✅ Biometric authentication successful');
     try {
       if (lastUserSession) {
+        console.log('🔄 Restoring session for user:', lastUserSession.email);
+        console.log('🔍 Last user session data:', {
+          id: lastUserSession.id,
+          email: lastUserSession.email,
+          biometricEnabled: lastUserSession.biometricEnabled,
+          sessionTimestamp: lastUserSession.sessionTimestamp
+        });
+        
         const apiService = ApiService.getInstance();
+        
         // Extend session and mark as authenticated
         await apiService.extendUserSession();
         await BiometricAuthService.extendSession();
         
-        // Restore the user session from stored data
+        console.log('🔍 Sessions extended, now calling restoreSessionFromBiometric...');
+        
+        // Restore the user session from stored data FIRST
         await restoreSessionFromBiometric();
+        
+        // Only set to authenticated state AFTER successful restoration
         setAuthFlowState('authenticated');
         
         console.log('🔄 Session restored after biometric success');
+      } else {
+        console.error('❌ No lastUserSession found, falling back to login');
+        console.log('🔍 Available data for debugging:', {
+          lastUserSession: lastUserSession,
+          user: user,
+          authFlowState: authFlowState
+        });
+        setAuthFlowState('login');
       }
     } catch (error) {
-      console.error('Error handling biometric success:', error);
+      console.error('❌ Error handling biometric success:', error);
+      
+      // Check if this is a manual login required error
+      if (error.message === 'MANUAL_LOGIN_REQUIRED') {
+        console.log('🔄 Biometric succeeded but manual login required - redirecting to login');
+        setBiometricFailed(true);
+        setAuthFlowState('login');
+        return;
+      }
+      
+      // Set biometric failed flag to prevent endless loop
+      setBiometricFailed(true);
+      // Clear any potentially corrupt session data
+      try {
+        await AsyncStorage.multiRemove(['@spendy_auth_token', '@spendy_user_data']);
+      } catch (clearError) {
+        console.error('❌ Error clearing auth data:', clearError);
+      }
       setAuthFlowState('login');
     }
   };
@@ -419,6 +472,7 @@ const AppNavigator = () => {
   // Handle biometric authentication fallback to login
   const handleBiometricFallback = () => {
     console.log('⬇️ Falling back to login screen');
+    setBiometricFailed(true); // Mark biometric as failed
     setAuthFlowState('login');
   };
 

@@ -61,13 +61,27 @@ export class BiometricAuthService {
   static async isSessionValid(): Promise<boolean> {
     try {
       const sessionTimestamp = await AsyncStorage.getItem(this.STORAGE_KEYS.SESSION_TIMESTAMP);
-      if (!sessionTimestamp) return false;
+      console.log('🔍 BiometricAuthService.isSessionValid - sessionTimestamp:', sessionTimestamp);
+      
+      if (!sessionTimestamp) {
+        console.log('🔍 BiometricAuthService.isSessionValid - No session timestamp found');
+        return false;
+      }
 
       const timestamp = parseInt(sessionTimestamp, 10);
       const now = Date.now();
       const sessionAge = now - timestamp;
+      const isValid = sessionAge < this.SESSION_DURATION;
 
-      return sessionAge < this.SESSION_DURATION;
+      console.log('🔍 BiometricAuthService.isSessionValid - Session details:', {
+        timestamp,
+        now,
+        sessionAge,
+        sessionDuration: this.SESSION_DURATION,
+        isValid
+      });
+
+      return isValid;
     } catch (error) {
       console.error('Error checking session validity:', error);
       return false;
@@ -245,25 +259,38 @@ export class BiometricAuthService {
 
   static async shouldShowBiometricOnLaunch(userId?: string): Promise<boolean> {
     try {
+      console.log('🔍 BiometricAuthService.shouldShowBiometricOnLaunch - userId:', userId);
+      
       // If no user ID, can't check biometric settings
-      if (!userId) return false;
+      if (!userId) {
+        console.log('🔍 BiometricAuthService.shouldShowBiometricOnLaunch - No userId provided');
+        return false;
+      }
 
       // Check if biometric is available
       const isAvailable = await this.isHardwareAvailable();
+      console.log('🔍 BiometricAuthService.shouldShowBiometricOnLaunch - isAvailable:', isAvailable);
       if (!isAvailable) return false;
 
       // Check if user has biometric enabled
       const isBiometricEnabled = await this.isBiometricEnabledForUser(userId);
+      console.log('🔍 BiometricAuthService.shouldShowBiometricOnLaunch - isBiometricEnabled:', isBiometricEnabled);
       if (!isBiometricEnabled) return false;
 
       // Check if session is still valid (within 24 hours)
       const isSessionValid = await this.isSessionValid();
-      if (isSessionValid) return false; // Don't show biometric if session is still valid
+      console.log('🔍 BiometricAuthService.shouldShowBiometricOnLaunch - isSessionValid:', isSessionValid);
+      if (isSessionValid) {
+        console.log('🔍 BiometricAuthService.shouldShowBiometricOnLaunch - Session is still valid, not showing biometric');
+        return false; // Don't show biometric if session is still valid
+      }
 
       // Check if we've exceeded max attempts
       const exceededAttempts = await this.hasExceededMaxAttempts();
+      console.log('🔍 BiometricAuthService.shouldShowBiometricOnLaunch - exceededAttempts:', exceededAttempts);
       if (exceededAttempts) return false;
 
+      console.log('🔍 BiometricAuthService.shouldShowBiometricOnLaunch - All conditions met, showing biometric');
       return true;
     } catch (error) {
       console.error('Error checking if should show biometric on launch:', error);

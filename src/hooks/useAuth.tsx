@@ -143,6 +143,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updatedAt: new Date(),
       };
 
+      // Check for stored biometric preference to restore after manual login
+      const storedBiometric = await AsyncStorage.getItem('@spendy_biometric_enabled');
+      if (storedBiometric) {
+        const biometricEnabled = JSON.parse(storedBiometric);
+        user.biometricEnabled = biometricEnabled;
+        console.log('🔒 Restored biometric preference after manual login:', biometricEnabled);
+        // Re-enable biometric for future logins
+        await AsyncStorage.setItem('@spendy_biometric_enabled', JSON.stringify(biometricEnabled));
+      }
+
       // Store user data
       await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
       
@@ -358,51 +368,91 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🔄 Restoring session after biometric authentication');
       setIsLoading(true);
       
-      // Get stored user data and token
+      // Get stored auth data - BOTH are required for proper restoration
       const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
       const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
       
-      if (token && userData) {
-        const parsedUser = JSON.parse(userData);
+      console.log('🔍 Session restore - checking stored data:', {
+        hasToken: !!token,
+        hasUserData: !!userData,
+        tokenLength: token ? token.length : 0
+      });
+      
+      // If no token or userData, fallback to manual login
+      if (!token || !userData) {
+        console.log('⚠️ Session restore - missing auth data, falling back to manual login');
+        console.log('🔍 Session restore - checking for stored user session...');
         
-        // Try to get fresh profile data
-        try {
-          const profileData = await apiService.getProfile();
-          
-          // Check for stored biometric preference
-          const storedBiometric = await AsyncStorage.getItem('@spendy_biometric_enabled');
-          const biometricFromStorage = storedBiometric ? JSON.parse(storedBiometric) : false;
-          const biometricFromUser = parsedUser.biometricEnabled || false;
-          const finalBiometricSetting = biometricFromStorage || biometricFromUser;
-          
-          const user: User = {
-            id: profileData.id,
-            email: profileData.email,
-            fullName: profileData.fullName,
-            currency: profileData.currency,
-            profilePicture: profileData.profileImage,
-            profileImage: profileData.profileImage,
-            isPremium: profileData.isPremium,
-            biometricEnabled: finalBiometricSetting,
-            country: parsedUser.country || 'US',
-            mobile: parsedUser.mobile || '',
-            phoneNumber: parsedUser.mobile || '',
-            subscriptionStatus: profileData.isPremium ? 'premium' : 'expired',
-            createdAt: parsedUser.createdAt ? new Date(parsedUser.createdAt) : new Date(),
-            updatedAt: new Date(),
-          };
-          
-          setUser(user);
-          console.log('✅ Session restored successfully after biometric auth');
-        } catch (error) {
-          // If API call fails, use stored data
-          console.log('⚠️ Using stored user data after biometric auth');
-          setUser(parsedUser);
+        // Try to get last user session for email pre-fill
+        const sessionData = await apiService.getLastUserSession();
+        if (sessionData && sessionData.email) {
+          console.log('🔍 Found last user session, requiring manual login for:', sessionData.email);
+          // Clear the biometric preference temporarily to prevent infinite loop
+          await AsyncStorage.removeItem('@spendy_biometric_enabled');
+          throw new Error('MANUAL_LOGIN_REQUIRED');
+        } else {
+          console.error('❌ No session data found');
+          throw new Error('Authentication data not found. Please login again.');
         }
       }
+      
+      const parsedUser = JSON.parse(userData);
+      console.log('🔍 Session restore - parsed user from stored data:', {
+        id: parsedUser.id,
+        email: parsedUser.email,
+        fullName: parsedUser.fullName
+      });
+      
+      // CRITICAL: Set the auth token in ApiService instance
+      console.log('🔑 Setting auth token in ApiService instance...');
+      await apiService.restoreAuthToken(token);
+      console.log('✅ Auth token set in ApiService');
+      
+      // Verify the token works by getting fresh profile data
+      console.log('🔍 Session restore - calling API getProfile to verify token...');
+      const profileData = await apiService.getProfile();
+      console.log('🔍 Session restore - API profile data received:', {
+        id: profileData.id,
+        email: profileData.email,
+        isPremium: profileData.isPremium
+      });
+      
+      // Check for stored biometric preference
+      const storedBiometric = await AsyncStorage.getItem('@spendy_biometric_enabled');
+      const biometricFromStorage = storedBiometric ? JSON.parse(storedBiometric) : false;
+      const biometricFromUser = parsedUser.biometricEnabled || false;
+      const finalBiometricSetting = biometricFromStorage || biometricFromUser;
+      
+      const user: User = {
+        id: profileData.id,
+        email: profileData.email,
+        fullName: profileData.fullName,
+        currency: profileData.currency,
+        profilePicture: profileData.profileImage,
+        profileImage: profileData.profileImage,
+        isPremium: profileData.isPremium,
+        biometricEnabled: finalBiometricSetting,
+        country: parsedUser.country || 'US',
+        mobile: parsedUser.mobile || '',
+        phoneNumber: parsedUser.mobile || '',
+        subscriptionStatus: profileData.isPremium ? 'premium' : 'expired',
+        createdAt: parsedUser.createdAt ? new Date(parsedUser.createdAt) : new Date(),
+        updatedAt: new Date(),
+      };
+      
+      console.log('🔍 Session restore - setting user state:', {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName
+      });
+      
+      setUser(user);
+      console.log('✅ Session restored successfully after biometric auth with verified token');
     } catch (error) {
       console.error('❌ Failed to restore session after biometric auth:', error);
-      throw error;
+      // Clear any potentially corrupt auth data
+      await clearAuthData();
+      throw new Error('Authentication failed. Please login again.');
     } finally {
       setIsLoading(false);
     }

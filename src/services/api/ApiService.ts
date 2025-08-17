@@ -99,6 +99,11 @@ class ApiService {
     }
   }
 
+  // Public method to set auth token (for session restoration)
+  async restoreAuthToken(token: string): Promise<void> {
+    await this.setAuthToken(token);
+  }
+
   private async clearAuthToken(): Promise<void> {
     try {
       this.token = null;
