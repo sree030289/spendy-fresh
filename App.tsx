@@ -7,6 +7,10 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FirebaseNotificationService } from './src/services/smartMoney/firebaseNotificationService';
 import { CrossPlatformAlert } from './src/utils/alertUtils';
+import { hideDevIndicators } from './src/utils/devUtils';
+
+// Initialize development optimizations
+hideDevIndicators();
 
 // Import providers
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
@@ -45,9 +49,19 @@ const AppNavigator = () => {
   const [initializing, setInitializing] = useState(true);
   const [hasShownTour, setHasShownTour] = useState(false);
   const [tourCheckCompleted, setTourCheckCompleted] = useState(false);
-  const [authFlowState, setAuthFlowState] = useState<'checking' | 'biometric' | 'login' | 'authenticated'>('checking');
+  const [authFlowState, setAuthFlowState] = useState<'checking' | 'splash' | 'biometric' | 'login' | 'authenticated'>('checking');
   const [lastUserSession, setLastUserSession] = useState<any>(null);
   const [biometricFailed, setBiometricFailed] = useState(false); // Track biometric failures
+  const [showSplash, setShowSplash] = useState(true); // Track splash screen visibility
+
+  // Reset auth flow state when user becomes null (after logout)
+  useEffect(() => {
+    if (!user && !isLoading && authFlowState === 'authenticated') {
+      console.log('🔄 User logged out, resetting auth flow state to checking');
+      setAuthFlowState('checking');
+      setShowSplash(true); // Show splash screen again after logout
+    }
+  }, [user, isLoading, authFlowState]);
   const { startTour } = useTour();
 
   // Web-specific states
@@ -112,8 +126,17 @@ const AppNavigator = () => {
         console.log('🔍 Checking authentication flow...', { 
           hasUser: !!user, 
           authFlowState, 
-          isLoading 
+          isLoading,
+          showSplash 
         });
+
+        // If we haven't shown the splash screen yet and user is not authenticated, show splash first
+        if (showSplash && !user && authFlowState === 'checking') {
+          console.log('🎬 Showing splash screen first');
+          setAuthFlowState('splash');
+          return;
+        }
+
         const apiService = ApiService.getInstance();
         
         // If user is already authenticated, go to main app
@@ -126,15 +149,15 @@ const AppNavigator = () => {
           return;
         }
 
-        // Don't run biometric checks if we're already in biometric or authenticated state
-        // This prevents race conditions when biometric auth succeeds
-        if (authFlowState === 'biometric' || authFlowState === 'authenticated') {
-          console.log('🔍 Already in biometric/authenticated flow, skipping check');
+        // Don't run biometric checks if we're already in biometric state and have a user
+        // But DO run checks if user is null (after logout) even if authFlowState is authenticated
+        if (authFlowState === 'biometric' || (authFlowState === 'authenticated' && user)) {
+          console.log('🔍 Already in biometric/authenticated flow with user, skipping check');
           return;
         }
 
-        // Only check for biometric/login flow if no user and not loading
-        if (!user && !isLoading) {
+        // Only check for biometric/login flow if no user and not loading and splash has been shown
+        if (!user && !isLoading && !showSplash) {
           const lastSession = await apiService.getLastUserSession();
           console.log('🔍 No user authenticated, checking for biometric flow');
           
@@ -177,12 +200,14 @@ const AppNavigator = () => {
         
       } catch (error) {
         console.error('Error checking authentication flow:', error);
-        setAuthFlowState('login');
+        if (!showSplash) {
+          setAuthFlowState('login');
+        }
       }
     };
 
     checkAuthenticationFlow();
-  }, [user, isLoading, authFlowState, biometricFailed]);
+  }, [user, isLoading, authFlowState, biometricFailed, showSplash]);
 
   // Subscription check with proper premium user verification
   useEffect(() => {
@@ -450,7 +475,7 @@ const AppNavigator = () => {
       console.error('❌ Error handling biometric success:', error);
       
       // Check if this is a manual login required error
-      if (error.message === 'MANUAL_LOGIN_REQUIRED') {
+      if (error instanceof Error && error.message === 'MANUAL_LOGIN_REQUIRED') {
         console.log('🔄 Biometric succeeded but manual login required - redirecting to login');
         setBiometricFailed(true);
         setAuthFlowState('login');
@@ -582,13 +607,22 @@ const AppNavigator = () => {
               />
             )}
           />
+        ) : authFlowState === 'splash' ? (
+          // Show splash screen first
+          <Stack.Screen 
+            name="Splash" 
+            children={() => (
+              <SplashScreen 
+                onSplashComplete={() => {
+                  console.log('🎬 Splash completed, hiding splash screen');
+                  setShowSplash(false);
+                }}
+              />
+            )}
+          />
         ) : (
           // User is not authenticated - show auth screens
           <>
-            <Stack.Screen 
-              name="Splash" 
-              component={SplashScreen}
-            />
             <Stack.Screen 
               name="Login" 
               component={LoginScreen}

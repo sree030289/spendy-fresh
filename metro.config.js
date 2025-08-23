@@ -6,15 +6,24 @@ const config = getDefaultConfig(__dirname);
 config.resolver.sourceExts.push('cjs');
 config.resolver.unstable_enablePackageExports = false;
 
-// Fix iOS Simulator network issues
+
+
+// Firebase compatibility fixes for Expo SDK 53
+config.resolver.sourceExts.push('cjs');
+config.resolver.unstable_enablePackageExports = false;
+
+// Optimize for development to reduce reload indicators
 config.server = {
   ...config.server,
   enhanceMiddleware: (middleware, server) => {
     return (req, res, next) => {
-      // Add headers to prevent iOS Simulator network caching issues
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
+      // Only set no-cache for specific cases to reduce reload frequency
+      if (req.url && (req.url.includes('.bundle') || req.url.includes('hot-reload'))) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      } else {
+        // Allow caching for static assets to reduce reload indicators
+        res.setHeader('Cache-Control', 'public, max-age=300');
+      }
       return middleware(req, res, next);
     };
   },

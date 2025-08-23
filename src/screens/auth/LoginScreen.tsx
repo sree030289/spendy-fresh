@@ -298,61 +298,60 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <TouchableWithoutFeedback onPress={Platform.OS !== 'web' ? dismissKeyboard : undefined}>
-        <KeyboardAvoidingView 
-          behavior={Platform.select({ ios: 'padding', android: 'height', web: 'height' })}
-          style={[styles.keyboardView, Platform.OS === 'web' && { flex: 1 }]}
-          enabled={true} // Enable on all platforms
-        >
-          <ScrollView 
-            contentContainerStyle={[
-              styles.content,
-              Platform.OS === 'web' && { minHeight: '100%', justifyContent: 'center' }
-            ]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            bounces={Platform.OS !== 'web'}
-            {...(Platform.OS === 'web' && {
-              // Web-specific ScrollView props
-              scrollEnabled: true,
-              contentContainerStyle: { flexGrow: 1, justifyContent: 'center' }
-            })}
+    <View style={styles.container}>
+      {/* Red Header */}
+      <View style={styles.redHeader}>
+        <Text style={styles.brandLetter}>S</Text>
+      </View>
+
+      {/* White Content Area */}
+      <View style={styles.whiteContent}>
+        <TouchableWithoutFeedback onPress={Platform.OS !== 'web' ? dismissKeyboard : undefined}>
+          <KeyboardAvoidingView 
+            behavior={Platform.select({ ios: 'padding', android: 'height', web: 'height' })}
+            style={[styles.keyboardView, Platform.OS === 'web' && { flex: 1 }]}
+            enabled={true}
           >
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: theme.colors.text }]}>Welcome Back</Text>
-              <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                Sign in to your account
-              </Text>
-              
-              {/* Show session info if available */}
-              {lastUserEmail && (
-                <View style={styles.sessionInfo}>
-                  <Text style={[styles.sessionText, { color: theme.colors.textSecondary }]}>
-                    Last logged in as: {lastUserEmail}
-                  </Text>
-                  <TouchableOpacity onPress={handleClearSession}>
-                    <Text style={[styles.clearSessionText, { color: theme.colors.primary }]}>
-                      Switch Account
+            <ScrollView 
+              contentContainerStyle={[
+                styles.content,
+                Platform.OS === 'web' && { minHeight: '100%', justifyContent: 'center' }
+              ]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={Platform.OS !== 'web'}
+              {...(Platform.OS === 'web' && {
+                scrollEnabled: true,
+                contentContainerStyle: { flexGrow: 1, justifyContent: 'center' }
+              })}
+            >
+              <View style={styles.header}>
+                <Text style={styles.title}>Log in</Text>
+                
+                {/* Show session info if available */}
+                {lastUserEmail && (
+                  <View style={styles.sessionInfo}>
+                    <Text style={[styles.sessionText, { color: theme.colors.textSecondary }]}>
+                      Last logged in as: {lastUserEmail}
                     </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+                    <TouchableOpacity onPress={handleClearSession}>
+                      <Text style={[styles.clearSessionText, { color: theme.colors.primary }]}>
+                        Switch Account
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
 
             <View style={styles.form}>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={[
-                    styles.input, 
-                    { 
-                      backgroundColor: theme.colors.surface,
-                      borderColor: emailError ? theme.colors.error : theme.colors.border,
-                      color: theme.colors.text 
-                    }
+                    styles.input,
+                    emailError && { borderColor: '#EF4444' }
                   ]}
-                  placeholder="Email"
-                  placeholderTextColor={theme.colors.textSecondary}
+                  placeholder="Username"
+                  placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={(text) => {
                     setEmail(text);
@@ -364,16 +363,10 @@ export default function LoginScreen() {
                   returnKeyType="next"
                   blurOnSubmit={false}
                   {...(Platform.OS === 'web' && {
-                    // Web-specific props
                     autoComplete: 'email',
                     inputMode: 'email' as any,
                   })}
                 />
-                <Icon name="mail" 
-                  size={20} 
-                  color={emailError ? theme.colors.error : theme.colors.textSecondary} 
-                  style={styles.inputIcon}
-                 />
                 {emailError ? (
                   <Text style={[styles.errorText, { color: theme.colors.error }]}>
                     {emailError}
@@ -385,15 +378,11 @@ export default function LoginScreen() {
                 <TextInput
                   style={[
                     styles.input, 
-                    styles.passwordInput, 
-                    { 
-                      backgroundColor: theme.colors.surface,
-                      borderColor: passwordError ? theme.colors.error : theme.colors.border,
-                      color: theme.colors.text 
-                    }
+                    styles.passwordInput,
+                    passwordError && { borderColor: '#EF4444' }
                   ]}
                   placeholder="Password"
-                  placeholderTextColor={theme.colors.textSecondary}
+                  placeholderTextColor="#9CA3AF"
                   value={password}
                   onChangeText={(text) => {
                     setPassword(text);
@@ -404,16 +393,10 @@ export default function LoginScreen() {
                   onSubmitEditing={handleLogin}
                   blurOnSubmit={true}
                   {...(Platform.OS === 'web' && {
-                    // Web-specific props
                     autoComplete: 'current-password',
                     inputMode: 'text' as any,
                   })}
                 />
-                <Icon name="lock" 
-                  size={20} 
-                  color={passwordError ? theme.colors.error : theme.colors.textSecondary} 
-                  style={styles.inputIcon}
-                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.passwordToggle}
@@ -421,7 +404,7 @@ export default function LoginScreen() {
                   <Icon 
                     name={showPassword ? "eyeOff" : "eye"} 
                     size={20} 
-                    color={theme.colors.textSecondary} 
+                    color="#9CA3AF" 
                   />
                 </TouchableOpacity>
                 {passwordError ? (
@@ -432,7 +415,7 @@ export default function LoginScreen() {
               </View>
 
               <Button
-                title="Sign In"
+                title="Log in"
                 onPress={handleLogin}
                 loading={loading}
                 style={styles.loginButton}
@@ -452,53 +435,120 @@ export default function LoginScreen() {
                 onPress={() => navigation.navigate('ForgotPassword' as never)}
                 style={styles.forgotPassword}
               >
-                <Text style={[styles.forgotPasswordText, { color: theme.colors.primary }]}>
-                  Forgot Password?
+                <Text style={styles.forgotPasswordText}>
+                  Forgot password
                 </Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
               onPress={() => navigation.navigate('Register' as never)}
-              style={styles.registerLink}
+              style={styles.registerButton}
             >
-              <Text style={[styles.registerLinkText, { color: theme.colors.textSecondary }]}>
-                Don't have an account?{' '}
-                <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Sign Up</Text>
+              <Text style={styles.registerButtonText}>
+                Not yet joined Spendy?
               </Text>
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
-    </SafeAreaView>
+    </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#DC143C',
+  },
+  redHeader: {
+    backgroundColor: '#DC143C',
+    height: 140,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    // Enhanced gradient effect for modern look
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+    // Add subtle inner shadow
+    ...(Platform.OS === 'web' && {
+      background: 'linear-gradient(135deg, #DC143C 0%, #B91C3C 50%, #A91C3C 100%)',
+      boxShadow: '0 4px 20px rgba(220, 20, 60, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+    }),
+  },
+  brandLetter: {
+    color: '#ffffff',
+    fontSize: 64,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'Roboto',
+    letterSpacing: 0,
+    textAlign: 'center',
+    // Enhanced shadow for depth
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 2, height: 3 },
+    textShadowRadius: 8,
+    // Additional styling for modern look
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    // Create a subtle inner glow effect
+    borderWidth: Platform.OS === 'web' ? 0 : undefined,
+    ...(Platform.OS === 'web' && {
+      WebkitTextStroke: '1px rgba(255, 255, 255, 0.3)',
+      filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3))',
+      textShadow: '0 0 20px rgba(255, 255, 255, 0.5), 0 4px 8px rgba(0, 0, 0, 0.4)',
+    }),
+  },
+  whiteContent: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    marginTop: 120,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 50,
+    paddingHorizontal: 32,
+    width: '100%',
+    // Enhanced shadow for better depth perception
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   keyboardView: {
     flex: 1,
   },
   content: {
     flex: 1,
-    padding: 24,
     justifyContent: 'center',
+    paddingBottom: 80,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: 60,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 28,
+    fontWeight: '600',
+    marginBottom: 12,
     textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 16,
+    color: '#1F2937',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   sessionInfo: {
     alignItems: 'center',
@@ -516,58 +566,96 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   form: {
-    gap: 20,
-    marginBottom: 32,
+    gap: 24,
+    marginBottom: 40,
   },
   inputContainer: {
     position: 'relative',
+    marginBottom: 4,
   },
   input: {
-    paddingHorizontal: 48,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
     fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    color: '#374151',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    fontWeight: '400',
+    minHeight: 56,
   },
   passwordInput: {
-    paddingRight: 80,
+    paddingRight: 55,
   },
   inputIcon: {
     position: 'absolute',
-    left: 16,
+    right: 16,
     top: 18,
   },
   passwordToggle: {
     position: 'absolute',
-    right: 16,
-    top: 18,
+    right: 20,
+    top: 19,
     padding: 4,
   },
   errorText: {
-    fontSize: 14,
-    marginTop: 4,
-    marginLeft: 16,
+    fontSize: 13,
+    marginTop: 6,
+    marginLeft: 20,
+    color: '#EF4444',
   },
   loginButton: {
-    marginTop: 8,
+    backgroundColor: '#DC143C',
+    borderRadius: 25,
+    paddingVertical: 18,
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   biometricButton: {
-    marginTop: 8,
+    marginTop: 12,
   },
   forgotPassword: {
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 24,
+    marginBottom: 24,
     padding: 8,
   },
   forgotPasswordText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
+    color: '#3B82F6',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
-  registerLink: {
+  registerButton: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 25,
+    paddingVertical: 18,
     alignItems: 'center',
-    padding: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  registerLinkText: {
-    fontSize: 16,
+  registerButtonText: {
+    fontSize: 15,
+    color: '#6B7280',
+    fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
 });

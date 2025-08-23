@@ -380,53 +380,55 @@ export default function RegisterScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <TouchableWithoutFeedback onPress={Platform.OS !== 'web' ? dismissKeyboard : undefined}>
-        <KeyboardAvoidingView 
-          behavior={Platform.select({ ios: 'padding', android: 'height', web: 'height' })}
-          style={[styles.keyboardView, Platform.OS === 'web' && { flex: 1 }]}
-          enabled={true} // Enable on all platforms
+    <View style={styles.container}>
+      {/* Red Header */}
+      <View style={styles.redHeader}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
         >
-          <ScrollView 
-            contentContainerStyle={[
-              styles.scrollContent,
-              Platform.OS === 'web' && { minHeight: '100%' }
-            ]} 
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            bounces={Platform.OS !== 'web'}
-            {...(Platform.OS === 'web' && {
-              // Web-specific ScrollView props
-              scrollEnabled: true,
-              nestedScrollEnabled: true,
-            })}
+          <Icon name="back" size={24} color="#ffffff" />
+        </TouchableOpacity>
+        <Text style={styles.brandText}>Spendy</Text>
+      </View>
+
+      {/* White Content Area */}
+      <View style={styles.whiteContent}>
+        <TouchableWithoutFeedback onPress={Platform.OS !== 'web' ? dismissKeyboard : undefined}>
+          <KeyboardAvoidingView 
+            behavior={Platform.select({ ios: 'padding', android: 'height', web: 'height' })}
+            style={[styles.keyboardView, Platform.OS === 'web' && { flex: 1 }]}
+            enabled={true}
           >
-            <View style={styles.header}>
-              <TouchableOpacity
-                onPress={() => navigation.goBack()}
-                style={styles.backButton}
-              >
-                <Icon name="back" size={24} color={theme.colors.text}  />
-              </TouchableOpacity>
-              <Text style={[styles.title, { color: theme.colors.text }]}>Create Account</Text>
-              <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                Join Spendy to track and split expenses
-              </Text>
-            </View>
+            <ScrollView 
+              contentContainerStyle={[
+                styles.scrollContent,
+                Platform.OS === 'web' && { minHeight: '100%' }
+              ]} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={Platform.OS !== 'web'}
+              {...(Platform.OS === 'web' && {
+                scrollEnabled: true,
+                nestedScrollEnabled: true,
+              })}
+            >
+              <View style={styles.header}>
+                <Text style={styles.title}>Let's get started</Text>
+                <Text style={styles.subtitle}>
+                  Join Spendy to track and split expenses
+                </Text>
+              </View>
 
             <View style={styles.form}>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={[
-                    styles.input, 
-                    { 
-                      backgroundColor: theme.colors.surface,
-                      borderColor: errors.fullName ? theme.colors.error : theme.colors.border,
-                      color: theme.colors.text 
-                    }
+                    styles.input,
+                    errors.fullName && { borderColor: '#EF4444' }
                   ]}
                   placeholder="Full Name"
-                  placeholderTextColor={theme.colors.textSecondary}
+                  placeholderTextColor="#9CA3AF"
                   value={formData.fullName}
                   onChangeText={(text) => {
                     setFormData({ ...formData, fullName: text });
@@ -435,18 +437,12 @@ export default function RegisterScreen() {
                   returnKeyType="next"
                   blurOnSubmit={false}
                   {...(Platform.OS === 'web' && {
-                    // Web-specific props
                     autoComplete: 'name',
                     inputMode: 'text' as any,
                   })}
                 />
-                <Icon name="person" 
-                  size={20} 
-                  color={errors.fullName ? theme.colors.error : theme.colors.textSecondary} 
-                  style={styles.inputIcon}
-                 />
                 {errors.fullName ? (
-                  <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                  <Text style={styles.errorText}>
                     {errors.fullName}
                   </Text>
                 ) : null}
@@ -455,15 +451,11 @@ export default function RegisterScreen() {
               <View style={styles.inputContainer}>
                 <TextInput
                   style={[
-                    styles.input, 
-                    { 
-                      backgroundColor: theme.colors.surface,
-                      borderColor: errors.email ? theme.colors.error : theme.colors.border,
-                      color: theme.colors.text 
-                    }
+                    styles.input,
+                    errors.email && { borderColor: '#EF4444' }
                   ]}
                   placeholder="Email"
-                  placeholderTextColor={theme.colors.textSecondary}
+                  placeholderTextColor="#9CA3AF"
                   value={formData.email}
                   onChangeText={(text) => {
                     setFormData({ ...formData, email: text });
@@ -475,18 +467,12 @@ export default function RegisterScreen() {
                   returnKeyType="next"
                   blurOnSubmit={false}
                   {...(Platform.OS === 'web' && {
-                    // Web-specific props
                     autoComplete: 'email',
                     inputMode: 'email' as any,
                   })}
                 />
-                <Icon name="mail" 
-                  size={20} 
-                  color={errors.email ? theme.colors.error : theme.colors.textSecondary} 
-                  style={styles.inputIcon}
-                 />
                 {errors.email ? (
-                  <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                  <Text style={styles.errorText}>
                     {errors.email}
                   </Text>
                 ) : null}
@@ -545,11 +531,6 @@ export default function RegisterScreen() {
                       inputMode: 'numeric' as any,
                     })}
                   />
-                  <Icon name="call" 
-                    size={20} 
-                    color={errors.mobile ? theme.colors.error : theme.colors.textSecondary} 
-                    style={styles.inputIcon}
-                   />
                 </View>
               </View>
               {errors.mobile ? (
@@ -631,91 +612,139 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Login' as never)}
-              style={styles.loginLink}
-            >
-              <Text style={[styles.loginLinkText, { color: theme.colors.textSecondary }]}>
-                Already have an account?{' '}
-                <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Sign In</Text>
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </TouchableWithoutFeedback>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Login' as never)}
+                style={styles.loginLink}
+              >
+                <Text style={styles.loginLinkText}>
+                  Already have an account?{' '}
+                  <Text style={styles.loginLinkHighlight}>Sign In</Text>
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+      </View>
 
       <CountryPicker />
       <CurrencyPicker />
       <BiometricPrompt />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#DC143C',
+  },
+  redHeader: {
+    backgroundColor: '#DC143C',
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  brandText: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 24,
+    padding: 8,
+    zIndex: 10,
+  },
+  whiteContent: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    marginTop: 100,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    paddingTop: 30,
+    width: '100%',
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 24,
+    paddingHorizontal: 32,
+    paddingBottom: 40,
   },
   header: {
-    marginBottom: 32,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    padding: 8,
-    marginBottom: 16,
+    marginBottom: 40,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
+    color: '#1F2937',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
+    color: '#6B7280',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   form: {
-    gap: 20,
+    gap: 24,
     marginBottom: 32,
   },
   inputContainer: {
     position: 'relative',
+    marginBottom: 4,
   },
   input: {
-    paddingHorizontal: 48,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
     fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    color: '#374151',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    fontWeight: '400',
+    minHeight: 56,
   },
   passwordInput: {
-    paddingRight: 80,
+    paddingRight: 55,
   },
   inputIcon: {
     position: 'absolute',
-    left: 16,
-    top: 18,
+    right: 20,
+    top: 19,
   },
   passwordToggle: {
     position: 'absolute',
-    right: 16,
-    top: 18,
+    right: 20,
+    top: 19,
     padding: 4,
   },
   selector: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
     gap: 12,
+    minHeight: 56,
   },
   selectorFlag: {
     fontSize: 20,
@@ -723,18 +752,23 @@ const styles = StyleSheet.create({
   selectorText: {
     flex: 1,
     fontSize: 16,
+    color: '#374151',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   phoneContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   countryCode: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 20,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     minWidth: 80,
+    minHeight: 56,
   },
   phoneInputContainer: {
     flex: 1,
@@ -742,26 +776,52 @@ const styles = StyleSheet.create({
   },
   phoneInput: {
     flex: 1,
-    paddingHorizontal: 48,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
     fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    color: '#374151',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    fontWeight: '400',
+    minHeight: 56,
   },
   errorText: {
-    fontSize: 14,
-    marginTop: 4,
-    marginLeft: 16,
+    fontSize: 13,
+    marginTop: 6,
+    marginLeft: 20,
+    color: '#EF4444',
   },
   registerButton: {
-    marginTop: 8,
+    backgroundColor: '#DC143C',
+    borderRadius: 25,
+    paddingVertical: 18,
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   loginLink: {
     alignItems: 'center',
     padding: 8,
+    marginTop: 16,
   },
   loginLinkText: {
-    fontSize: 16,
+    fontSize: 15,
+    color: '#6B7280',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+  },
+  loginLinkHighlight: {
+    color: '#3B82F6',
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   modalContainer: {
     flex: 1,

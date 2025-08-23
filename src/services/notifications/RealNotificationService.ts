@@ -52,9 +52,10 @@ Notifications.setNotificationHandler({
 
 export class RealNotificationService {
   private static pushToken: string | null = null;
+  private static fcmService: FCMService | null = null;
   
   // Initialize notification system
-  static async initialize(): Promise<boolean> {
+  static async initialize(userId?: string): Promise<boolean> {
     try {
       console.log('🔔 Initializing notification service...');
       
@@ -84,6 +85,17 @@ export class RealNotificationService {
           [{ text: 'OK' }]
         );
         return false;
+      }
+
+      // Initialize FCM if userId is provided
+      if (userId) {
+        this.fcmService = FCMService.getInstance();
+        const fcmInitialized = await this.fcmService.initialize(userId);
+        if (fcmInitialized) {
+          console.log('✅ FCM service initialized');
+        } else {
+          console.log('⚠️ FCM service failed to initialize, continuing with local notifications');
+        }
       }
 
       await this.registerForPushNotifications();
@@ -887,9 +899,158 @@ export class RealNotificationService {
   // Cleanup
   static async cleanup(): Promise<void> {
     try {
+      if (this.fcmService) {
+        await this.fcmService.clearFCMData();
+      }
       console.log('🧹 Notification service cleanup completed');
     } catch (error) {
       console.error('Failed to cleanup notification service:', error);
+    }
+  }
+
+  // **NEW** FCM Integration Methods
+
+  /**
+   * Get FCM token for current user
+   */
+  static async getFCMToken(): Promise<string | null> {
+    try {
+      if (this.fcmService) {
+        return await this.fcmService.getToken();
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Failed to get FCM token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Subscribe to group notifications via FCM topic
+   */
+  static async subscribeToGroup(groupId: string): Promise<void> {
+    try {
+      if (this.fcmService) {
+        await this.fcmService.subscribeToTopic(`group_${groupId}`);
+        console.log(`✅ Subscribed to group notifications: ${groupId}`);
+      }
+    } catch (error) {
+      console.error(`❌ Failed to subscribe to group ${groupId}:`, error);
+    }
+  }
+
+  /**
+   * Unsubscribe from group notifications
+   */
+  static async unsubscribeFromGroup(groupId: string): Promise<void> {
+    try {
+      if (this.fcmService) {
+        await this.fcmService.unsubscribeFromTopic(`group_${groupId}`);
+        console.log(`✅ Unsubscribed from group notifications: ${groupId}`);
+      }
+    } catch (error) {
+      console.error(`❌ Failed to unsubscribe from group ${groupId}:`, error);
+    }
+  }
+
+  /**
+   * Check for pending FCM actions and handle them
+   */
+  static async handlePendingFCMActions(): Promise<void> {
+    try {
+      const pendingAction = await FCMService.getPendingAction();
+      if (pendingAction) {
+        console.log('📋 Handling pending FCM action:', pendingAction.type);
+        this.triggerAppNavigation(pendingAction);
+      }
+    } catch (error) {
+      console.error('❌ Error handling pending FCM actions:', error);
+    }
+  }
+
+  /**
+   * Send real push notification to specific user (via backend)
+   */
+  static async sendPushNotificationToUser(
+    targetUserId: string,
+    title: string,
+    body: string,
+    data?: any
+  ): Promise<void> {
+    try {
+      // This would call your backend API which then sends via FCM
+      const response = await fetch('/api/notifications/send-push', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetUserId,
+          notification: {
+            title,
+            body,
+            data: data || {}
+          }
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Push notification sent to user:', targetUserId);
+      } else {
+        console.error('❌ Failed to send push notification:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error sending push notification:', error);
+    }
+  }
+
+  /**
+   * Send push notification to group (via FCM topic)
+   */
+  static async sendPushNotificationToGroup(
+    groupId: string,
+    title: string,
+    body: string,
+    data?: any,
+    excludeUserId?: string
+  ): Promise<void> {
+    try {
+      // This would call your backend API which then sends to FCM topic
+      const response = await fetch('/api/notifications/send-group-push', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          groupId,
+          excludeUserId,
+          notification: {
+            title,
+            body,
+            data: data || {}
+          }
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Group push notification sent:', groupId);
+      } else {
+        console.error('❌ Failed to send group push notification:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error sending group push notification:', error);
+    }
+  }
+
+  /**
+   * Check if FCM is available and properly configured
+   */
+  static async isFCMAvailable(): Promise<boolean> {
+    try {
+      return await FCMService.isAvailable();
+    } catch (error) {
+      console.error('❌ Error checking FCM availability:', error);
+      return false;
     }
   }
 
@@ -977,6 +1138,9 @@ export class RealNotificationService {
           data: data || {},
           sound: 'default',
           badge: 1,
+          // Use consistent notification styling
+          color: '#10B981',
+          categoryIdentifier: data?.type || 'app_notification',
         },
         trigger: null, // Immediate notification
       });

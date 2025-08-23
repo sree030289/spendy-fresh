@@ -6,18 +6,18 @@
     "orientation": "portrait",
     "scheme": "spendy",
     "userInterfaceStyle": "automatic",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon-receipt.png",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./expo-splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#D6001C"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.svaag.spendy",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera for QR code scanning to quickly add expenses and split bills.",
-        "NSFaceIDUsageDescription": "This app uses Face ID for secure and convenient authentication to access your financial data.",
+        "NSFaceIDUsageDescription": "Allow Spendy to use Face ID for secure authentication.",
         "NSContactsUsageDescription": "This app needs access to contacts to help you add friends and split expenses with people in your contact list.",
         "NSLocationWhenInUseUsageDescription": "This app uses location to provide location-based expense tracking and merchant suggestions.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses location to provide location-based expense tracking and merchant suggestions.",
@@ -31,8 +31,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/adaptive-icon-receipt.png",
+        "backgroundColor": "#D6001C"
       },
       "package": "com.svaag.spendy",
       "intentFilters": [
@@ -88,7 +88,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single", 
+      "output": "single",
       "favicon": "./assets/favicon.png",
       "template": "./web/index.html"
     },
@@ -113,7 +113,7 @@
         }
       ],
       [
-        "expo-local-authentication", 
+        "expo-local-authentication",
         {
           "faceIDPermission": "Allow Spendy to use Face ID for secure authentication."
         }
@@ -139,7 +139,8 @@
           "cameraPermission": "Allow Spendy to use the camera to take photos of receipts."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {
