@@ -6,6 +6,11 @@ export interface AppTheme {
     surface: string;
     surfaceSecondary: string;
     
+    // Brand colors
+    brand: string;
+    brandLight: string;
+    brandDark: string;
+    
     // Primary brand colors
     primary: string;
     primaryLight: string;

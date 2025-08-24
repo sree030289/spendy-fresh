@@ -19,24 +19,6 @@ import FullscreenModal from '@/components/common/FullscreenModal';
 import { Friend, Group } from '@/services/firebase/splitting-disabled';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
-import ReceiptScannerModal from './ReceiptScannerModal';
-
-// Local interface to match ReceiptScannerModal
-interface ReceiptData {
-  merchant?: string;
-  total?: number;
-  date?: string;
-  items?: Array<{
-    name: string;
-    price: number;
-    quantity?: number;
-  }>;
-  tax?: number;
-  subtotal?: number;
-  paymentMethod?: string;
-  category?: string;
-  confidence?: number;
-}
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -90,7 +72,6 @@ export default function AddExpenseModal({
   const [notes, setNotes] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showReceiptScanner, setShowReceiptScanner] = useState(false);
 
   // Errors
   const [errors, setErrors] = useState<any>({});
@@ -426,41 +407,6 @@ const initializeSplitData = () => {
     ));
   };
 
- const handleReceiptData = (receiptData: ReceiptData) => {
-  // Set merchant/description
-  if (receiptData.merchant) {
-    setDescription(receiptData.merchant);
-  }
-  
-  // Set amount
-  if (receiptData.total) {
-    setAmount(receiptData.total.toString());
-  }
-  
-  // Set date
-  if (receiptData.date) {
-    setExpenseDate(new Date(receiptData.date));
-  }
-  
-  // Set category based on inferred category
-  if (receiptData.category) {
-    const matchedCategory = EXPENSE_CATEGORIES.find(cat => cat.id === receiptData.category);
-    if (matchedCategory) {
-      setSelectedCategory(matchedCategory);
-    }
-  }
-  
-  // Close scanner
-  setShowReceiptScanner(false);
-  
-  // Show success message
-  Alert.alert(
-    'Receipt Processed',
-    `Successfully extracted data with ${((receiptData.confidence || 0) * 100).toFixed(1)}% confidence.`,
-    [{ text: 'OK' }]
-  );
-};
-
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
       {['details', 'split', 'review'].map((step, index) => (
@@ -524,26 +470,6 @@ const initializeSplitData = () => {
 
   const renderDetailsStep = () => (
     <ScrollView contentContainerStyle={styles.stepContent}>
-      {/* Receipt Scanner */}
-      <TouchableOpacity
-        style={[styles.receiptScannerButton, { 
-          borderColor: theme.colors.primary, 
-          backgroundColor: theme.colors.primary + '10' 
-        }]}
-        onPress={() => setShowReceiptScanner(true)}
-      >
-        <Icon name="camera" size={24} color={theme.colors.primary}  />
-        <View style={styles.receiptScannerTextContainer}>
-          <Text style={[styles.receiptScannerTitle, { color: theme.colors.primary }]}>
-            Scan Receipt
-          </Text>
-          <Text style={[styles.receiptScannerSubtitle, { color: theme.colors.textSecondary }]}>
-            Auto-fill expense details from receipt
-          </Text>
-        </View>
-        <Icon name="forward" size={20} color={theme.colors.primary}  />
-      </TouchableOpacity>
-
       {/* Description */}
       <View style={styles.inputContainer}>
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>What was this expense for? *</Text>
@@ -1111,26 +1037,6 @@ const initializeSplitData = () => {
             </View>
           ))}
         </View>
-
-        {/* Receipt Scanner Button */}
-        <TouchableOpacity
-          style={[styles.receiptButton, { borderColor: theme.colors.border }]}
-          onPress={() => {
-            Alert.alert(
-              'Receipt Scanner',
-              'This feature allows you to scan receipts and automatically extract expense details.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Scanner', onPress: () => console.log('Open receipt scanner') }
-              ]
-            );
-          }}
-        >
-          <Icon name="camera" size={24} color={theme.colors.primary}  />
-          <Text style={[styles.receiptButtonText, { color: theme.colors.primary }]}>
-            Attach Receipt (Optional)
-          </Text>
-        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -1140,14 +1046,6 @@ const initializeSplitData = () => {
       visible={visible}
       onClose={onClose}
       title="Add Expense"
-      rightActions={
-        <TouchableOpacity
-          onPress={() => setShowReceiptScanner(true)}
-          style={{ padding: 4 }}
-        >
-          <Icon name="camera" size={24} color={theme.colors.text}  />
-        </TouchableOpacity>
-      }
     >
       {/* Step Indicator */}
       {renderStepIndicator()}
@@ -1191,13 +1089,6 @@ const initializeSplitData = () => {
           )}
         </View>
       </View>
-
-      {/* Receipt Scanner Modal */}
-      <ReceiptScannerModal
-        visible={showReceiptScanner}
-        onClose={() => setShowReceiptScanner(false)}
-        onReceiptProcessed={handleReceiptData}
-      />
 
     </FullscreenModal>
   );
@@ -1257,27 +1148,6 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 16,
-  },
-  receiptScannerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    marginBottom: 24,
-  },
-  receiptScannerTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  receiptScannerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  receiptScannerSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
   },
   amountInputContainer: {
     flexDirection: 'row',
@@ -1620,21 +1490,6 @@ const styles = StyleSheet.create({
   reviewSplitPercentage: {
     fontSize: 12,
     marginTop: 2,
-  },
-  receiptButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    marginTop: 16,
-  },
-  receiptButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
   },
   footer: {
     borderTopWidth: 1,

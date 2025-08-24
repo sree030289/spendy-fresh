@@ -136,6 +136,214 @@ export default function ForgotPasswordScreen() {
     Keyboard.dismiss();
   };
 
+  // Create dynamic styles based on theme
+  const getStyles = (colors: any) => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.brand,
+    },
+    redHeader: {
+      backgroundColor: colors.brand,
+      height: 120,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderBottomLeftRadius: 25,
+      borderBottomRightRadius: 25,
+      width: '100%',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      ...(Platform.OS === 'web' && {
+        background: `linear-gradient(135deg, ${colors.brand} 0%, ${colors.brandDark} 100%)`,
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+      }),
+    },
+    brandText: {
+      color: '#ffffff',
+      fontSize: 28,
+      fontWeight: '700',
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+      textAlign: 'center',
+      textShadowColor: 'rgba(0, 0, 0, 0.2)',
+      textShadowOffset: {width: 1, height: 1},
+      textShadowRadius: 2,
+    },
+    backButton: {
+      position: 'absolute',
+      top: 50,
+      left: 24,
+      padding: 8,
+      zIndex: 10,
+    },
+    whiteContent: {
+      flex: 1,
+      backgroundColor: '#ffffff',
+      marginTop: 120,
+      borderTopLeftRadius: 25,
+      borderTopRightRadius: 25,
+      paddingTop: 30,
+      paddingHorizontal: 32,
+      width: '100%',
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingBottom: 80,
+    },
+    header: {
+      marginBottom: 60,
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '600',
+      marginBottom: 12,
+      textAlign: 'center',
+      color: '#1F2937',
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    },
+    subtitle: {
+      fontSize: 16,
+      color: '#6B7280',
+      textAlign: 'center',
+      lineHeight: 24,
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    },
+    form: {
+      gap: 24,
+      marginBottom: 40,
+    },
+    inputContainer: {
+      marginBottom: 4,
+    },
+    input: {
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      borderRadius: 25,
+      borderWidth: 1,
+      borderColor: '#E5E7EB',
+      fontSize: 16,
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+      backgroundColor: '#ffffff',
+      color: '#1F2937',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    errorText: {
+      fontSize: 14,
+      marginTop: 8,
+      marginLeft: 20,
+      color: colors.error,
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    },
+    sendButton: {
+      backgroundColor: colors.brand,
+      borderRadius: 25,
+      paddingVertical: 18,
+      alignItems: 'center',
+      marginTop: 8,
+      shadowColor: colors.brand,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 6,
+      ...(Platform.OS === 'web' && {
+        background: `linear-gradient(135deg, ${colors.brand} 0%, ${colors.brandDark} 100%)`,
+        boxShadow: `0 8px 24px rgba(220, 20, 60, 0.3)`,
+      }),
+    },
+    backToLogin: {
+      alignItems: 'center',
+      marginTop: 32,
+      padding: 8,
+    },
+    backToLoginText: {
+      fontSize: 15,
+      color: colors.brand,
+      fontWeight: '500',
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    },
+    successContainer: {
+      alignItems: 'center',
+      paddingVertical: 40,
+    },
+    successIcon: {
+      width: 80,
+      height: 80,
+      backgroundColor: colors.success,
+      borderRadius: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 24,
+    },
+    successTitle: {
+      fontSize: 24,
+      fontWeight: '600',
+      color: '#1F2937',
+      marginBottom: 12,
+      textAlign: 'center',
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    },
+    successText: {
+      fontSize: 16,
+      color: '#6B7280',
+      textAlign: 'center',
+      lineHeight: 24,
+      marginBottom: 32,
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    },
+    redirectText: {
+      fontSize: 14,
+      color: '#9CA3AF',
+      textAlign: 'center',
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    },
+    resetButton: {
+      backgroundColor: colors.brand,
+    },
+    successInfo: {
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    emailContainer: {
+      backgroundColor: colors.surface,
+      padding: 12,
+      borderRadius: 8,
+      marginVertical: 16,
+    },
+    emailText: {
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'center',
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    },
+    instructionText: {
+      fontSize: 14,
+      textAlign: 'center',
+      lineHeight: 20,
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    },
+    actionButtons: {
+      gap: 12,
+      width: '100%',
+    },
+    resendButton: {
+      borderColor: colors.brand,
+    },
+    backToLoginButton: {
+      backgroundColor: colors.brand,
+    },
+  });
+
+  const styles = getStyles(theme.colors);
+
   return (
     <View style={styles.container}>
       {/* Red Header */}
@@ -146,7 +354,7 @@ export default function ForgotPasswordScreen() {
         >
           <Icon name="back" size={24} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.brandLetter}>S</Text>
+        <Text style={styles.brandText}>Spendy</Text>
       </View>
 
       {/* White Content Area */}
@@ -274,12 +482,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
-  brandLetter: {
+  brandText: {
     color: '#ffffff',
-    fontSize: 52,
-    fontWeight: '900',
-    fontFamily: Platform.OS === 'ios' ? 'Arial Black' : 'sans-serif-black',
-    letterSpacing: 2,
+    fontSize: 28,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: {width: 1, height: 1},
     textShadowRadius: 2,

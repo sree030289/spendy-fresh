@@ -48,17 +48,11 @@ export default function RegisterScreen() {
   });
 
   const selectedCountry = COUNTRIES.find(c => c.code === formData.country) || COUNTRIES[0];
+  const styles = getStyles(theme.colors);
   const currencies = [...new Set(COUNTRIES.map(c => c.currency))].sort();
 
-  // Navigate to main app when user is authenticated
-  React.useEffect(() => {
-    if (user) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Main' as never }],
-      });
-    }
-  }, [user, navigation]);
+  // Note: Navigation to main app happens automatically in App.tsx when user state changes
+  // No manual navigation needed here
 
   const validateFullName = (name: string): boolean => {
     if (!name.trim()) {
@@ -633,13 +627,13 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#DC143C',
+    backgroundColor: colors.brand,
   },
   redHeader: {
-    backgroundColor: '#DC143C',
+    backgroundColor: colors.brand,
     height: 120,
     justifyContent: 'center',
     alignItems: 'center',
@@ -667,7 +661,7 @@ const styles = StyleSheet.create({
   whiteContent: {
     flex: 1,
     backgroundColor: '#ffffff',
-    marginTop: 100,
+    marginTop: 120,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     paddingTop: 30,
@@ -795,7 +789,7 @@ const styles = StyleSheet.create({
     color: '#EF4444',
   },
   registerButton: {
-    backgroundColor: '#DC143C',
+    backgroundColor: colors.brand,
     borderRadius: 25,
     paddingVertical: 18,
     marginTop: 12,

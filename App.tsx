@@ -26,8 +26,8 @@ import RegisterScreen from './src/screens/auth/RegisterScreen';
 import SplashScreen from './src/screens/auth/SplashScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import BiometricAuthScreen from './src/screens/auth/BiometricAuthScreen';
-import MainTabNavigator from './src/navigation/MainTabNavigator';
 import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
+import ProfileScreen from '@/screens/profile/ProfileScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 import LandingPage from '@/components/web/LandingPage';
 import { QRCodeService } from '@/services/qr/QRCodeService';
@@ -591,8 +591,8 @@ const AppNavigator = () => {
         {(user || authFlowState === 'authenticated') ? (
           // User is authenticated - show main app
           <>
-            <Stack.Screen name="Main" component={MainTabNavigator} />
-            <Stack.Screen name="RealSplittingScreen" component={RealSplittingScreen} />
+            <Stack.Screen name="Main" component={RealSplittingScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
           </>
         ) : authFlowState === 'biometric' && lastUserSession ? (

@@ -16,6 +16,94 @@ export const COMMON_COLORS = {
   black: '#000000',
   transparent: 'transparent',
   
+  // =============================================================================
+  // 🎨 COLOR THEME OPTIONS - Change these 3 lines to switch themes instantly!
+  // =============================================================================
+  
+  // 🟣 CURRENT: Purple Theme
+  // brandRed: '#7C3AED',        // Purple primary
+  // brandRedLight: '#8B5CF6',   // Purple light
+  // brandRedDark: '#6D28D9',    // Purple dark
+  
+  // 📋 COPY & PASTE OPTIONS:
+  // 
+  // 🔴 Classic Red (Original)
+  // brandRed: '#DC143C',        
+  // brandRedLight: '#E6345B',   
+  // brandRedDark: '#B91033',    
+  //
+  // 🔵 Ocean Blue  
+  // brandRed: '#1E40AF',        
+  // brandRedLight: '#3B82F6',   
+  // brandRedDark: '#1E3A8A',    
+  //
+  // 🍷 Custom Burgundy Wine
+  brandRed: '#B0004F',        // Deep burgundy primary
+  brandRedLight: '#D91A72',   // Lighter burgundy  
+  brandRedDark: '#8B003F',    // Darker burgundy
+  //
+  // 🟠 Sunset Orange
+  // brandRed: '#EA580C',        
+  // brandRedLight: '#FB923C',   
+  // brandRedDark: '#C2410C',    
+  //
+  // 🟡 Golden Yellow
+  // brandRed: '#D97706',        
+  // brandRedLight: '#F59E0B',   
+  // brandRedDark: '#B45309',    
+  //
+  // ⚫ Sleek Black
+  // brandRed: '#1F2937',        
+  // brandRedLight: '#374151',   
+  // brandRedDark: '#111827',    
+  //
+  // 🔮 Royal Purple (Current)
+  // brandRed: '#7C3AED',        
+  // brandRedLight: '#8B5CF6',   
+  // brandRedDark: '#6D28D9',    
+  //
+  // 🩷 Rose Pink
+  // brandRed: '#E11D48',        
+  // brandRedLight: '#F43F5E',   
+  // brandRedDark: '#BE123C',    
+  //
+  // 🟦 Sky Blue
+  // brandRed: '#0EA5E9',        
+  // brandRedLight: '#38BDF8',   
+  // brandRedDark: '#0284C7',    
+  //
+  // 🟫 Coffee Brown
+  // brandRed: '#92400E',        
+  // brandRedLight: '#B45309',   
+  // brandRedDark: '#78350F',    
+  //
+  // 🔥 Fire Red
+  // brandRed: '#EF4444',        
+  // brandRedLight: '#F87171',   
+  // brandRedDark: '#DC2626',    
+  //
+  // 💎 Teal Gem
+  // brandRed: '#0D9488',        
+  // brandRedLight: '#14B8A6',   
+  // brandRedDark: '#0F766E',    
+  //
+  // 🌸 Soft Pink
+  // brandRed: '#DB2777',        
+  // brandRedLight: '#EC4899',   
+  // brandRedDark: '#BE185D',    
+  //
+  // 🍇 Grape Purple
+  // brandRed: '#9333EA',        
+  // brandRedLight: '#A855F7',   
+  // brandRedDark: '#7E22CE',    
+  //
+  // 🌊 Deep Ocean
+  // brandRed: '#1E3A8A',        
+  // brandRedLight: '#3B82F6',   
+  // brandRedDark: '#1E40AF',    
+  
+  // =============================================================================
+  
   // Gradient-based color palette
   primary: GRADIENT_COLORS.primary,
   primaryLight: '#8B92F7',
@@ -49,10 +137,15 @@ export const LIGHT_THEME: AppTheme = {
     surface: COMMON_COLORS.gray50,
     surfaceSecondary: COMMON_COLORS.gray100,
     
-    // Primary brand colors (gradient-based)
-    primary: COMMON_COLORS.primary,
-    primaryLight: COMMON_COLORS.primaryLight,
-    primaryDark: COMMON_COLORS.primaryDark,
+    // Brand colors
+    brand: COMMON_COLORS.brandRed,
+    brandLight: COMMON_COLORS.brandRedLight,
+    brandDark: COMMON_COLORS.brandRedDark,
+    
+    // Primary brand colors (now using red)
+    primary: COMMON_COLORS.brandRed,
+    primaryLight: COMMON_COLORS.brandRedLight,
+    primaryDark: COMMON_COLORS.brandRedDark,
     secondary: COMMON_COLORS.secondary,
     
     // Text colors
@@ -96,7 +189,7 @@ export const LIGHT_THEME: AppTheme = {
     modalBackground: COMMON_COLORS.white,
     
     // Tab and navigation
-    tabActive: COMMON_COLORS.primary,
+    tabActive: COMMON_COLORS.brandRed,
     tabInactive: COMMON_COLORS.gray500,
     tabBackground: COMMON_COLORS.white,
   },
@@ -157,10 +250,15 @@ export const DARK_THEME: AppTheme = {
     surface: COMMON_COLORS.gray800,
     surfaceSecondary: COMMON_COLORS.gray700,
     
-    // Primary brand colors (slightly adjusted for dark mode)
-    primary: COMMON_COLORS.primaryLight, // Lighter variant for better contrast
-    primaryLight: '#A5B4FC',
-    primaryDark: COMMON_COLORS.primary,
+    // Brand colors (same red color works well in dark mode)
+    brand: COMMON_COLORS.brandRed,
+    brandLight: COMMON_COLORS.brandRedLight,
+    brandDark: COMMON_COLORS.brandRedDark,
+    
+    // Primary brand colors (now using red for consistency)
+    primary: COMMON_COLORS.brandRed,
+    primaryLight: COMMON_COLORS.brandRedLight,
+    primaryDark: COMMON_COLORS.brandRedDark,
     secondary: '#9F7AEA', // Lighter purple for dark mode
     
     // Text colors
@@ -204,7 +302,7 @@ export const DARK_THEME: AppTheme = {
     modalBackground: COMMON_COLORS.gray800,
     
     // Tab and navigation
-    tabActive: COMMON_COLORS.primaryLight,
+    tabActive: COMMON_COLORS.brandRed,
     tabInactive: COMMON_COLORS.gray400,
     tabBackground: COMMON_COLORS.gray800,
   },

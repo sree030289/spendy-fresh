@@ -32,6 +32,11 @@ export interface AuthState {
 export interface AppTheme {
   isDark: boolean;
   colors: {
+    // Brand colors
+    brand: string;
+    brandLight: string;
+    brandDark: string;
+    
     primary: string;
     secondary: string;
     background: string;

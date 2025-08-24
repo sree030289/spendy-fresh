@@ -188,6 +188,13 @@ export default function RealSplittingScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   
+  // Animation for tab sliding - FIXED: Stable initialization to prevent useInsertion errors
+  const slideAnimation = useRef(new Animated.Value(0)).current;
+  const tabOpacity = useRef(new Animated.Value(1)).current;
+  
+  // REMOVED: Problematic animation initialization that could cause useInsertion errors
+  // Animation values are now properly initialized in the useRef declarations above
+  
   interface ContactData {
     name: string;
     phoneNumber: string;
@@ -677,35 +684,70 @@ export default function RealSplittingScreen() {
     sharedBalances.forceRefresh(); // FIXED: Force refresh instead of just notify
   }, [sharedBalances.notifyChange, sharedBalances.forceRefresh]);
 
-  // Reset to overview tab when the screen gains focus (when bottom tab is pressed)
-  useFocusEffect(
-    useCallback(() => {
-      setActiveTab('overview');
-    }, [])
-  );
-
-  // FIXED: Updated tab switching with unified balance refresh
+  // FIXED: Optimized tab switching to prevent useInsertion effect errors
   const handleTabSwitch = useCallback((tabId: string) => {
-    setActiveTab(tabId);
+    if (tabId === activeTab) return; // Don't animate if same tab
     
-    if (tabId === 'friends') {
-      sharedBalances.refresh();
-      loadFriendsAndRequests().catch(() => {
-        console.log('API service not ready for friends tab refresh');
+    // Use a stable reference to prevent timing conflicts
+    const previousTab = activeTab;
+    
+    // Schedule animation in the next frame to avoid timing conflicts
+    requestAnimationFrame(() => {
+      // First fade out current content
+      Animated.timing(tabOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start(() => {
+        // Update tab state after fade completes
+        setActiveTab(tabId);
+        
+        // Calculate slide direction
+        const tabs = ['overview', 'groups', 'friends'];
+        const previousIndex = tabs.indexOf(previousTab);
+        const newIndex = tabs.indexOf(tabId);
+        const slideDirection = newIndex > previousIndex ? 1 : -1;
+        
+        // Set initial slide position and animate in
+        slideAnimation.setValue(slideDirection * 300);
+        
+        // Animate slide and fade in together
+        Animated.parallel([
+          Animated.timing(slideAnimation, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(tabOpacity, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start();
       });
-    } else if (tabId === 'groups') {
-      loadGroups();
-    } else if (tabId === 'overview') {
-      sharedBalances.refresh();
-      Promise.all([
+    });
+    
+    // Handle data loading asynchronously to prevent conflicts
+    setTimeout(() => {
+      if (tabId === 'friends') {
+        sharedBalances.refresh();
         loadFriendsAndRequests().catch(() => {
-          console.log('API service not ready for overview refresh');
-        }),
-        loadGroups(), 
-        loadRecentExpenses()
-      ]);
-    }
-  }, [sharedBalances.refresh, sharedBalances.refresh]);
+          console.log('API service not ready for friends tab refresh');
+        });
+      } else if (tabId === 'groups') {
+        loadGroups();
+      } else if (tabId === 'overview') {
+        sharedBalances.refresh();
+        Promise.all([
+          loadFriendsAndRequests().catch(() => {
+            console.log('API service not ready for overview refresh');
+          }),
+          loadGroups(), 
+          loadRecentExpenses()
+        ]);
+      }
+    }, 50);
+  }, [activeTab]);
 
   // Real-time listeners
   useEffect(() => {
@@ -2349,58 +2391,54 @@ export default function RealSplittingScreen() {
         {/* Quick Actions (updated with subscription checks) */}
         <View style={styles.quickActions}>
           <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
+            style={[styles.modernActionCard, { backgroundColor: theme.colors.surface }]}
             onPress={() => setShowAddExpense(true)}
           >
-            <Icon name="add" size={24} color={theme.colors.primary} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Expense</Text>
-            <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-              Split bills with friends
-            </Text>
+            <Icon name="add" size={20} color={theme.colors.brand} />
+            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Split Expense</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
+            style={[styles.modernActionCard, { backgroundColor: theme.colors.surface }]}
             onPress={() => setShowCreateGroup(true)}
           >
-            <Icon name="people" size={24} color="#4F46E5"  />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Create Group</Text>
-            <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-              Start a new expense group
-            </Text>
+            <Icon name="people" size={20} color={theme.colors.brand} />
+            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Groups</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
+            style={[styles.modernActionCard, { backgroundColor: theme.colors.surface }]}
             onPress={() => setShowAddFriend(true)}
           >
-            <Icon name="person" size={24} color="#10B981" />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Add Friend</Text>
-            <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-              Invite friends to split expenses
-            </Text>
+            <Icon name="person" size={20} color={theme.colors.brand} />
+            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Friends</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
+            style={[styles.modernActionCard, { backgroundColor: theme.colors.surface }]}
             onPress={() => openSettlementScreen({ filter: 'all' })}
           >
-            <Icon name="cash" size={24} color="#F59E0B"  />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Settlements</Text>
-            <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-              Manage outstanding balances
-            </Text>
+            <Icon name="cash" size={20} color={theme.colors.brand} />
+            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Settlements</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
+            style={[styles.modernActionCard, { backgroundColor: theme.colors.surface }]}
+            onPress={() => {
+              setExpenseListTitle('All Expenses');
+              setShowSimpleExpenseList(true);
+            }}
+          >
+            <Icon name="receipt" size={20} color={theme.colors.brand} />
+            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>View All Expenses</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.modernActionCard, { backgroundColor: theme.colors.surface }]}
             onPress={handleAnalyticsAccess}
           >
-            <Icon name="analytics" size={24} color="#10B981"  />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Analytics</Text>
-            <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
-              View spending insights
-            </Text>
+            <Icon name="analytics" size={20} color={theme.colors.brand} />
+            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Analytics</Text>
           </TouchableOpacity>
         </View>
 
@@ -2515,7 +2553,7 @@ export default function RealSplittingScreen() {
               <TouchableOpacity onPress={() => setShowAddFriend(true)} style={styles.addButton}>
                 <Icon name="person" size={16} color={theme.colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveTab('friends')} style={styles.viewAllButton}>
+              <TouchableOpacity onPress={() => handleTabSwitch('friends')} style={styles.viewAllButton}>
                 <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
                 <Icon name="forward" size={16} color={theme.colors.primary}  />
               </TouchableOpacity>
@@ -2698,12 +2736,6 @@ export default function RealSplittingScreen() {
               style={[styles.cleanActionButton, { backgroundColor: theme.colors.surface }]}
             >
               <Icon name="refresh" size={18} color={theme.colors.primary}  />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.cleanActionButton, { backgroundColor: '#FF6B6B' }]}
-              onPress={debugFriendRequests}
-            >
-              <Icon name="warning" size={18} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.cleanActionButton, { backgroundColor: theme.colors.primary }]}
@@ -3507,38 +3539,6 @@ export default function RealSplittingScreen() {
     }
   };
 
-  // DEBUG: Function to test friend request API directly
-  const debugFriendRequests = async () => {
-    if (!user?.id) return;
-    
-    console.log('🔍 DEBUG: Testing friend request APIs directly...');
-    
-    try {
-      // Test API call directly
-      console.log('📞 DEBUG: Calling getFriendRequests API...');
-      const apiResponse = await apiService.getFriendRequests();
-      console.log('📊 DEBUG: Raw API response:', apiResponse);
-      
-      // Test FriendsManager
-      console.log('👥 DEBUG: Testing FriendsManager...');
-      const friendsData = friends;
-      console.log('📋 DEBUG: FriendsManager current data:', friendsData);
-      
-      // Force a refresh
-      console.log('🔄 DEBUG: Forcing FriendsManager refresh...');
-      await loadFriendsAndRequests();
-      const refreshedData = friends;
-      console.log('📋 DEBUG: FriendsManager after refresh:', refreshedData);
-      
-      // Check pending friends specifically
-      const pendingFriends = refreshedData.filter(f => f.status === 'pending' || f.status === 'invited');
-      console.log('⏳ DEBUG: Pending friends found:', pendingFriends);
-      
-    } catch (error) {
-      console.error('❌ DEBUG: Error testing friend requests:', error);
-    }
-  };
-
   // Tab navigation
   const tabs = [
     { id: 'overview', title: 'Overview', icon: 'home' },
@@ -3571,15 +3571,79 @@ export default function RealSplittingScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Dynamic Banner */}
-      <DynamicBanner 
-        scrollY={scrollY}
-        screenType="home"
-        showStats={false}
-        onQRScanPress={() => setShowQRCode(true)}
-        onAnalyticsPress={undefined}
-        onNotificationsPress={() => setShowNotifications(true)}
-      />
+      {/* Login-style Red Banner */}
+      <Animated.View 
+        style={[
+          styles.redBanner, 
+          { 
+            backgroundColor: theme.colors.brand,
+            borderBottomLeftRadius: scrollY.interpolate({
+              inputRange: [0, 100],
+              outputRange: [25, 0],
+              extrapolate: 'clamp'
+            }),
+            borderBottomRightRadius: scrollY.interpolate({
+              inputRange: [0, 100],
+              outputRange: [25, 0],
+              extrapolate: 'clamp'
+            }),
+            height: scrollY.interpolate({
+              inputRange: [0, 100],
+              outputRange: [120, 72],
+              extrapolate: 'clamp'
+            })
+          }
+        ]}
+      >
+        {/* Spendy Text - centers when not scrolled, moves to left when scrolled */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: [
+              { translateY: -14 },
+              { 
+                translateX: scrollY.interpolate({
+                  inputRange: [0, 100],
+                  outputRange: [-30, -150],
+                  extrapolate: 'clamp'
+                })
+              }
+            ]
+          }}
+        >
+          <Text style={styles.brandText}>Spendy</Text>
+        </Animated.View>
+
+        {/* Profile Circle - moves to right center when scrolled */}
+        <Animated.View
+          style={[
+            styles.profileCircle,
+            {
+              right: scrollY.interpolate({
+                inputRange: [0, 100],
+                outputRange: [20, 20],
+                extrapolate: 'clamp'
+              }),
+              top: scrollY.interpolate({
+                inputRange: [0, 100],
+                outputRange: [35, 11],
+                extrapolate: 'clamp'
+              })
+            }
+          ]}
+        >
+          <TouchableOpacity 
+            style={styles.profileCircleButton}
+            onPress={() => navigation.navigate('Profile' as never)}
+          >
+            <Text style={styles.profileText}>
+              {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
       
       {/* Tab Navigation */}
       <View style={[styles.tabNavigation, { backgroundColor: theme.colors.background }]}>
@@ -3611,12 +3675,20 @@ export default function RealSplittingScreen() {
         </View>
       </View>
 
-      {/* Tab Content */}
-      <View style={styles.tabContainer}>
+      {/* Tab Content - Animated */}
+      <Animated.View 
+        style={[
+          styles.tabContainer,
+          {
+            opacity: tabOpacity,
+            transform: [{ translateX: slideAnimation }]
+          }
+        ]}
+      >
         {activeTab === 'overview' && renderOverviewTab()}
         {activeTab === 'groups' && renderGroupsTab()}
         {activeTab === 'friends' && renderFriendsTab()}
-      </View>
+      </Animated.View>
 
       {/* All Modals - Keep existing modal implementations */}
       <AddExpenseModal
@@ -4142,6 +4214,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 12,
   },
+  modernActionContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-evenly',
+    marginBottom: 20,
+    gap: 12,
+  },
   actionCard: {
     width: '48%',
     padding: 16,
@@ -4161,6 +4240,86 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     lineHeight: 16,
+  },
+  // New modern card styles to match screenshot
+  modernActionCard: {
+    width: '30%',
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    minHeight: 110,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  modernActionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  // Login-style red banner styles
+  redBanner: {
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  brandText: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 2, height: 3 },
+    textShadowRadius: 8,
+  },
+  memberText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 4,
+    opacity: 0.9,
+  },
+  profileCircle: {
+    position: 'absolute',
+    top: 35,
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  profileText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  profileCircleButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   section: {
     borderRadius: 12,

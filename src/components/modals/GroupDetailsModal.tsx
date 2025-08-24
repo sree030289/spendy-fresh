@@ -40,10 +40,10 @@ const { width, height } = Dimensions.get('window');
 
 // Expense categories for icon lookup
 const EXPENSE_CATEGORIES = [
-  { id: 'all', name: 'All Categories', icon: '📋', color: '#667eea' },
+  { id: 'all', name: 'All Categories', icon: '📋', color: '#B0004F' },
   { id: 'food', name: 'Food', icon: '🍕', color: '#F59E0B' },
   { id: 'transport', name: 'Transport', icon: '🚗', color: '#3B82F6' },
-  { id: 'entertainment', name: 'Entertainment', icon: '🎬', color: '#8B5CF6' },
+  { id: 'entertainment', name: 'Entertainment', icon: '🎬', color: '#B0004F' },
   { id: 'shopping', name: 'Shopping', icon: '🛍️', color: '#EC4899' },
   { id: 'utilities', name: 'Utilities', icon: '⚡', color: '#F59E0B' },
   { id: 'healthcare', name: 'Healthcare', icon: '🏥', color: '#EF4444' },

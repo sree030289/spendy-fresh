@@ -320,6 +320,12 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
           <View style={styles.headerActions}>
             <TouchableOpacity onPress={startTour} style={styles.tourButton}>
@@ -327,7 +333,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             <TouchableOpacity onPress={toggleTheme}>
               <Icon 
-                name={isDark ? 'sunny' : 'moon'} 
+                name="settings" 
                 size={24} 
                 color={theme.colors.text} 
               />
@@ -686,6 +692,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 32,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
   },
   headerActions: {
     flexDirection: 'row',

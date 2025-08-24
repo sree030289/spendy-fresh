@@ -133,7 +133,7 @@ const SplittingAnalyticsModal: React.FC<SplittingAnalyticsModalProps> = ({ visib
 
   const renderHeader = () => (
     <LinearGradient
-      colors={['#667eea', '#764ba2']}
+      colors={['#B0004F', '#8B003F']}
       style={styles.header}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
@@ -158,7 +158,7 @@ const SplittingAnalyticsModal: React.FC<SplittingAnalyticsModalProps> = ({ visib
           icon="analytics"
           isActive={activeTab === 'overview'}
           onPress={() => setActiveTab('overview')}
-          color="#667eea"
+          color={theme.colors.brand}
         />
         <TabButton
           title="Groups"
@@ -179,7 +179,7 @@ const SplittingAnalyticsModal: React.FC<SplittingAnalyticsModalProps> = ({ visib
           icon="trending"
           isActive={activeTab === 'trends'}
           onPress={() => setActiveTab('trends')}
-          color="#8B5CF6"
+          color={theme.colors.brand}
         />
       </ScrollView>
     </View>
@@ -189,7 +189,7 @@ const SplittingAnalyticsModal: React.FC<SplittingAnalyticsModalProps> = ({ visib
     <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
       {/* Balance Overview */}
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={['#B0004F', '#8B003F']}
         style={styles.heroCard}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
