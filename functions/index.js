@@ -4095,8 +4095,8 @@ spendyApp.get('/gmail/auth-url', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // Use real Google OAuth credentials
-    const clientId = '827143652568-4bc26tin0r22lsfb4oea9hoscvmk4tao.apps.googleusercontent.com';
+    // Use Google OAuth credentials from environment variables
+    const clientId = process.env.GOOGLE_CLIENT_ID;
     const redirectUri = encodeURIComponent('https://us-central1-spendy-develop.cloudfunctions.net/spendyApi/gmail/callback');
     const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email');
     
@@ -4179,8 +4179,8 @@ spendyApp.post('/gmail/connect', authenticateJWT, async (req, res) => {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: '827143652568-4bc26tin0r22lsfb4oea9hoscvmk4tao.apps.googleusercontent.com',
-        client_secret: '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',
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
         code: code,
         grant_type: 'authorization_code',
         redirect_uri: 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi/gmail/callback'
@@ -5437,8 +5437,8 @@ spendyApp.get('/gmail/callback', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: '827143652568-4bc26tin0r22lsfb4oea9hoscvmk4tao.apps.googleusercontent.com',
-        client_secret: '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',
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
         code: code,
         grant_type: 'authorization_code',
         redirect_uri: 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi/gmail/callback'
