@@ -11,658 +11,7 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
-// OzBargain Categories with their URL paths
-const OZBARGAIN_CATEGORIES = {
-  'All Deals': '/deals',
-  'Long Running': '/deals/longrunning', 
-  'Freebies': '/freebies',
-  'Alcohol': '/cat/alcohol',
-  'Automotive': '/cat/automotive',
-  'Books & Magazines': '/cat/books-magazines',
-  'Computing': '/cat/computing',
-  'Dining & Takeaway': '/cat/dining-takeaway',
-  'Education': '/cat/education',
-  'Electrical & Electronics': '/cat/electrical-electronics',
-  'Entertainment': '/cat/entertainment',
-  'Fashion & Apparel': '/cat/fashion-apparel',
-  'Financial': '/cat/financial',
-  'Gaming': '/cat/gaming',
-  'Groceries': '/cat/groceries',
-  'Health & Beauty': '/cat/health-beauty',
-  'Home & Garden': '/cat/home-garden',
-  'Internet': '/cat/internet',
-  'Mobile': '/cat/mobile',
-  'Pets': '/cat/pets',
-  'Sports & Outdoors': '/cat/sports-outdoors',
-  'Toys & Kids': '/cat/toys-kids',
-  'Travel': '/cat/travel',
-  'Other': '/cat/other'
-};
 
-// Improved OzBargain scraping function with better parsing
-const scrapeOzBargainDeals = async (category = 'All Deals') => {
-  try {
-    const categoryPath = OZBARGAIN_CATEGORIES[category] || '/deals';
-    const url = `https://www.ozbargain.com.au${categoryPath}`;
-    
-    console.log(`Scraping OzBargain: ${url}`);
-    
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`OzBargain HTTP error! status: ${response.status}`);
-    }
-
-    const html = await response.text();
-    console.log(`OzBargain HTML received: ${html.length} characters`);
-    
-    // Log first 500 chars to see the structure
-    console.log('HTML Preview:', html.substring(0, 500));
-    
-    const deals = parseOzBargainHTML(html, category);
-    console.log(`Successfully parsed ${deals.length} deals from OzBargain ${category}`);
-    
-    return deals;
-  } catch (error) {
-    console.error('OzBargain scraping error:', error);
-    console.error('Error stack:', error.stack);
-    return generateFallbackOzBargainDeals(category);
-  }
-};
-
-// Updated HTML parsing based on current OzBargain structure
-const parseOzBargainHTML = (html, category) => {
-  try {
-    const deals = [];
-    
-    // Look for actual deal items - try multiple patterns
-    let dealMatches = [];
-    
-    // Pattern 1: Look for article elements
-    const articlePattern = /<article[^>]*class="[^"]*node[^"]*"[^>]*>(.*?)<\/article>/gis;
-    dealMatches = html.match(articlePattern) || [];
-    
-    if (dealMatches.length === 0) {
-      // Pattern 2: Look for div elements with node class
-      const divPattern = /<div[^>]*class="[^"]*node[^"]*"[^>]*>(.*?)<\/div>/gis;
-      dealMatches = html.match(divPattern) || [];
-    }
-    
-    if (dealMatches.length === 0) {
-      // Pattern 3: Look for any element with title and vote
-      const generalPattern = /<[^>]*class="[^"]*title[^"]*"[^>]*>.*?<\/[^>]*>/gis;
-      dealMatches = html.match(generalPattern) || [];
-    }
-    
-    console.log(`Found ${dealMatches.length} potential deal matches using pattern matching`);
-    
-    if (dealMatches.length === 0) {
-      // If no matches, try extracting titles and creating basic deals
-      const titleMatches = html.match(/<h2[^>]*>.*?<\/h2>/gis) || [];
-      console.log(`Fallback: Found ${titleMatches.length} titles`);
-      
-      titleMatches.slice(0, 10).forEach((titleHtml, index) => {
-        const titleText = titleHtml.replace(/<[^>]*>/g, '').trim();
-        if (titleText && titleText.length > 10) {
-          deals.push(createBasicDeal(titleText, category, index));
-        }
-      });
-    } else {
-      // Process the matched deals
-      dealMatches.slice(0, 20).forEach((dealHtml, index) => {
-        try {
-          const deal = extractDealFromHtml(dealHtml, category, index);
-          if (deal) {
-            deals.push(deal);
-          }
-        } catch (parseError) {
-          console.error(`Error parsing individual deal ${index}:`, parseError);
-        }
-      });
-    }
-    
-    // If still no deals, create some test deals
-    if (deals.length === 0) {
-      console.log('No deals parsed, creating test deals');
-      deals.push(...generateTestDeals(category));
-    }
-    
-    console.log(`Final result: ${deals.length} deals extracted for ${category}`);
-    return deals;
-  } catch (error) {
-    console.error('OzBargain HTML parsing error:', error);
-    return generateTestDeals(category);
-  }
-};
-
-// Extract deal information from HTML fragment
-const extractDealFromHtml = (dealHtml, category, index) => {
-  try {
-    // Extract title
-    const titlePatterns = [
-      /<h2[^>]*>.*?<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>.*?<\/h2>/is,
-      /<a[^>]*href="([^"]*)"[^>]*class="[^"]*title[^"]*"[^>]*>(.*?)<\/a>/is,
-      /<a[^>]*class="[^"]*title[^"]*"[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/is
-    ];
-    
-    let titleMatch = null;
-    let ozBargainPath = '';
-    let title = '';
-    
-    for (const pattern of titlePatterns) {
-      titleMatch = dealHtml.match(pattern);
-      if (titleMatch) {
-        ozBargainPath = titleMatch[1];
-        title = titleMatch[2].replace(/<[^>]*>/g, '').trim();
-        break;
-      }
-    }
-    
-    if (!title) {
-      // Fallback: extract any text that looks like a title
-      const textMatch = dealHtml.match(/>([^<]{20,100})</);
-      title = textMatch ? textMatch[1].trim() : `${category} Deal ${index + 1}`;
-    }
-    
-    // Extract vote count
-    const votePatterns = [
-      /class="voteup"[^>]*>\s*(\d+)\s*</is,
-      /class="vote"[^>]*>\s*(\d+)\s*</is,
-      /(\d+)\s*\+/
-    ];
-    
-    let votes = 0;
-    for (const pattern of votePatterns) {
-      const voteMatch = dealHtml.match(pattern);
-      if (voteMatch) {
-        votes = parseInt(voteMatch[1]) || 0;
-        break;
-      }
-    }
-    
-    if (votes === 0) {
-      votes = Math.floor(Math.random() * 100) + 5; // Random votes between 5-105
-    }
-    
-    // Extract username
-    const userPatterns = [
-      /class="username"[^>]*>([^<]+)</is,
-      /user\/\d+"[^>]*>([^<]+)</is
-    ];
-    
-    let username = '';
-    for (const pattern of userPatterns) {
-      const userMatch = dealHtml.match(pattern);
-      if (userMatch) {
-        username = userMatch[1].trim();
-        break;
-      }
-    }
-    
-    if (!username) {
-      username = `ozb_user_${Math.floor(Math.random() * 1000)}`;
-    }
-    
-    // Extract deal URL (goto link)
-    const dealUrlPatterns = [
-      /href="(https:\/\/www\.ozbargain\.com\.au\/goto\/\d+)"/,
-      /class="dealurl"[^>]*href="([^"]*)"/, 
-      /data-url="([^"]*)"/ 
-    ];
-    
-    let dealUrl = '';
-    for (const pattern of dealUrlPatterns) {
-      const urlMatch = dealHtml.match(pattern);
-      if (urlMatch) {
-        dealUrl = urlMatch[1];
-        break;
-      }
-    }
-    
-    // If no direct deal URL, use OzBargain page
-    if (!dealUrl && ozBargainPath) {
-      dealUrl = `https://www.ozbargain.com.au${ozBargainPath}`;
-    }
-    
-    // Extract prices if available
-    const priceMatches = title.match(/\$(\d+(?:\.\d{2})?)/g) || [];
-    let originalPrice = 0;
-    let discountedPrice = 0;
-    
-    if (priceMatches.length > 0) {
-      discountedPrice = parseFloat(priceMatches[0].replace('$', ''));
-      originalPrice = priceMatches.length > 1 ? 
-        parseFloat(priceMatches[1].replace('$', '')) :
-        discountedPrice * (1 + Math.random() * 0.5 + 0.2);
-    }
-    
-    const discount = originalPrice > discountedPrice ? 
-      Math.round(((originalPrice - discountedPrice) / originalPrice) * 100) : 0;
-    
-    // Determine category icon
-    const categoryIcon = getCategoryIcon(category, title);
-    
-    return {
-      id: `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}_${index}`,
-      title: title.length > 80 ? title.substring(0, 80) + '...' : title,
-      description: `${title} - Found on OzBargain in ${category} section`,
-      category: category,
-      originalPrice: parseFloat(originalPrice.toFixed(2)),
-      discountedPrice: parseFloat(discountedPrice.toFixed(2)),
-      discount: discount,
-      expiresAt: new Date(Date.now() + Math.random() * 14 * 24 * 60 * 60 * 1000).toISOString(),
-      postedBy: username,
-      likes: votes,
-      dislikes: Math.floor(votes * 0.03), 
-      userLiked: false,
-      userDisliked: false,
-      isGroupDeal: false,
-      chatEnabled: false,
-      isPartnership: false,
-      businessName: 'Various',
-      location: 'Australia',
-      source: 'ozbargain',
-      dealUrl: dealUrl || `https://www.ozbargain.com.au${ozBargainPath || '/deals'}`,
-      ozBargainUrl: ozBargainPath ? `https://www.ozbargain.com.au${ozBargainPath}` : '',
-      tags: [category.toLowerCase().replace(/\s+/g, '-'), 'ozbargain'],
-      stockLevel: Math.random() > 0.7 ? 'low' : 'high',
-      categoryIcon: categoryIcon,
-      timePosted: 'Recently'
-    };
-    
-  } catch (error) {
-    console.error('Error extracting deal from HTML:', error);
-    return null;
-  }
-};
-
-// Create a basic deal when parsing fails
-const createBasicDeal = (title, category, index) => {
-  return {
-    id: `ozbargain_basic_${category.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}_${index}`,
-    title: title,
-    description: `${title} - Found on OzBargain`,
-    category: category,
-    originalPrice: 0,
-    discountedPrice: 0,
-    discount: 0,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    postedBy: 'OzBargain',
-    likes: Math.floor(Math.random() * 50) + 5,
-    dislikes: Math.floor(Math.random() * 3),
-    userLiked: false,
-    userDisliked: false,
-    isGroupDeal: false,
-    chatEnabled: false,
-    isPartnership: false,
-    businessName: 'Various',
-    location: 'Australia',
-    source: 'ozbargain',
-    dealUrl: `https://www.ozbargain.com.au${OZBARGAIN_CATEGORIES[category] || '/deals'}`,
-    ozBargainUrl: `https://www.ozbargain.com.au${OZBARGAIN_CATEGORIES[category] || '/deals'}`,
-    tags: [category.toLowerCase().replace(/\s+/g, '-'), 'ozbargain'],
-    stockLevel: 'high',
-    categoryIcon: getCategoryIcon(category, title),
-    timePosted: 'Recently'
-  };
-};
-
-// Generate test deals when scraping completely fails
-const generateTestDeals = (category) => {
-  const testDeals = [
-    {
-      title: `${category} - Amazing Deal on Popular Item`,
-      price: Math.floor(Math.random() * 200) + 50,
-      votes: Math.floor(Math.random() * 100) + 10
-    },
-    {
-      title: `${category} - Flash Sale Limited Time`,
-      price: Math.floor(Math.random() * 150) + 30,
-      votes: Math.floor(Math.random() * 80) + 15
-    },
-    {
-      title: `${category} - Best Price We've Seen`,
-      price: Math.floor(Math.random() * 300) + 100,
-      votes: Math.floor(Math.random() * 150) + 20
-    },
-    {
-      title: `${category} - Clearance Sale Special`,
-      price: Math.floor(Math.random() * 120) + 25,
-      votes: Math.floor(Math.random() * 90) + 12
-    },
-    {
-      title: `${category} - End of Season Deal`,
-      price: Math.floor(Math.random() * 250) + 80,
-      votes: Math.floor(Math.random() * 120) + 18
-    }
-  ];
-  
-  return testDeals.map((deal, index) => ({
-    id: `ozbargain_test_${category.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}_${index}`,
-    title: deal.title,
-    description: `Test deal for ${category} category - This is sample data while we perfect the scraping`,
-    category: category,
-    originalPrice: deal.price * 1.3,
-    discountedPrice: deal.price,
-    discount: Math.round(((deal.price * 0.3) / (deal.price * 1.3)) * 100),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    postedBy: 'TestUser',
-    likes: deal.votes,
-    dislikes: Math.floor(deal.votes * 0.05),
-    userLiked: false,
-    userDisliked: false,
-    isGroupDeal: false,
-    chatEnabled: false,
-    isPartnership: false,
-    businessName: 'Test Store',
-    location: 'Australia',
-    source: 'ozbargain',
-    dealUrl: `https://www.ozbargain.com.au${OZBARGAIN_CATEGORIES[category] || '/deals'}`,
-    ozBargainUrl: `https://www.ozbargain.com.au${OZBARGAIN_CATEGORIES[category] || '/deals'}`,
-    tags: [category.toLowerCase().replace(/\s+/g, '-'), 'ozbargain', 'test'],
-    stockLevel: 'high',
-    categoryIcon: getCategoryIcon(category, deal.title),
-    timePosted: 'Just now'
-  }));
-};
-
-// Get category icon based on category and title
-const getCategoryIcon = (category, title = '') => {
-  const titleLower = title.toLowerCase();
-  
-  if (category.includes('Computing') || /laptop|computer|pc|cpu|gpu|ssd|ram/i.test(title)) {
-    return 'laptop';
-  } else if (category.includes('Mobile') || /phone|mobile|iphone|samsung|pixel/i.test(title)) {
-    return 'phone-portrait';
-  } else if (category.includes('Gaming') || /game|xbox|playstation|nintendo|steam/i.test(title)) {
-    return 'game-controller';
-  } else if (category.includes('Home') || /home|kitchen|vacuum|furniture/i.test(title)) {
-    return 'home';
-  } else if (category.includes('Fashion') || /clothes|shoes|shirt|dress/i.test(title)) {
-    return 'shirt';
-  } else if (category.includes('Groceries') || /food|grocery|coles|woolworths/i.test(title)) {
-    return 'basket';
-  } else if (category.includes('Travel') || /flight|hotel|travel|booking/i.test(title)) {
-    return 'airplane';
-  } else if (category.includes('Automotive') || /car|auto|tyres|oil/i.test(title)) {
-    return 'car';
-  } else if (category.includes('Sports') || /sport|fitness|gym|bike/i.test(title)) {
-    return 'fitness';
-  } else {
-    return 'pricetag';
-  }
-};
-
-// Fallback function 
-const generateFallbackOzBargainDeals = (category = 'All Deals') => {
-  console.log(`Using fallback OzBargain deals for ${category}`);
-  return generateTestDeals(category);
-};
-
-// Cache management functions
-const getCachedDeals = async (category) => {
-  try {
-    const cacheKey = `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}`;
-    const doc = await db.collection('deals_cache').doc(cacheKey).get();
-    if (doc.exists) {
-      const data = doc.data();
-      const cacheAge = Date.now() - data.timestamp;
-      const maxAge = 15 * 60 * 1000; // 15 minutes
-      
-      if (cacheAge < maxAge) {
-        console.log(`Using cached data for ${category}, age: ${Math.floor(cacheAge / 1000 / 60)} minutes`);
-        return data.deals;
-      } else {
-        console.log(`Cache expired for ${category}, age: ${Math.floor(cacheAge / 1000 / 60)} minutes`);
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error('Cache read error:', error);
-    return null;
-  }
-};
-
-const setCachedDeals = async (category, deals) => {
-  try {
-    const cacheKey = `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}`;
-    await db.collection('deals_cache').doc(cacheKey).set({
-      deals: deals,
-      timestamp: Date.now(),
-      lastUpdated: new Date().toISOString(),
-      count: deals.length,
-      category: category
-    });
-    console.log(`Cached ${deals.length} deals for ${category}`);
-  } catch (error) {
-    console.error('Cache write error:', error);
-  }
-};
-
-// Main endpoint
-exports.getDeals = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 20;
-      const category = req.query.category || 'All Deals';
-      const refresh = req.query.refresh === 'true';
-      
-      console.log('Fetching OzBargain deals:', { page, limit, category, refresh });
-
-      let deals = [];
-
-      // Check cache first unless refresh is requested
-      if (!refresh) {
-        const cachedDeals = await getCachedDeals(category);
-        if (cachedDeals && cachedDeals.length > 0) {
-          deals = cachedDeals;
-          console.log(`Using ${deals.length} cached deals for ${category}`);
-        }
-      }
-
-      // Fetch fresh data if no cache or refresh requested
-      if (deals.length === 0 || refresh) {
-        console.log(`Scraping fresh data for ${category}`);
-        deals = await scrapeOzBargainDeals(category);
-        if (deals.length > 0) {
-          await setCachedDeals(category, deals);
-        }
-      }
-
-      // Pagination
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedDeals = deals.slice(startIndex, endIndex);
-      
-      const totalDeals = deals.length;
-      const totalPages = Math.ceil(totalDeals / limit);
-
-      const response = {
-        deals: paginatedDeals,
-        pagination: {
-          currentPage: page,
-          totalPages: totalPages,
-          totalDeals: totalDeals,
-          hasNextPage: page < totalPages,
-          hasPreviousPage: page > 1,
-          dealsPerPage: limit
-        },
-        lastUpdated: new Date().toISOString(),
-        category: category,
-        availableCategories: Object.keys(OZBARGAIN_CATEGORIES),
-        source: 'ozbargain'
-      };
-
-      console.log(`Returning ${paginatedDeals.length}/${totalDeals} OzBargain deals for ${category}`);
-      res.json(response);
-      
-    } catch (error) {
-      console.error('Error in getDeals:', error);
-      res.status(500).json({ 
-        error: 'Failed to fetch OzBargain deals',
-        deals: [],
-        pagination: {
-          currentPage: 1,
-          totalPages: 1,
-          totalDeals: 0,
-          hasNextPage: false,
-          hasPreviousPage: false,
-          dealsPerPage: 20
-        },
-        lastUpdated: new Date().toISOString(),
-        availableCategories: Object.keys(OZBARGAIN_CATEGORIES)
-      });
-    }
-  });
-});
-
-// Debug endpoint to test scraping directly
-exports.debugScrape = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    try {
-      const category = req.query.category || 'All Deals';
-      console.log(`Debug scraping for ${category}`);
-      
-      const deals = await scrapeOzBargainDeals(category);
-      
-      res.json({
-        success: true,
-        category: category,
-        dealsFound: deals.length,
-        deals: deals,
-        timestamp: new Date().toISOString(),
-        message: `Debug scrape completed for ${category}`
-      });
-    } catch (error) {
-      console.error('Debug scrape error:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        stack: error.stack
-      });
-    }
-  });
-});
-
-// Refresh endpoint
-exports.refreshDeals = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    try {
-      const category = req.query.category || 'All Deals';
-      console.log('Refreshing OzBargain deals for category:', category);
-      
-      // Clear cache for the category
-      const cacheKey = `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}`;
-      try {
-        await db.collection('deals_cache').doc(cacheKey).delete();
-        console.log(`Cache cleared for ${category}`);
-      } catch (error) {
-        console.error(`Error clearing cache for ${category}:`, error);
-      }
-      
-      // Fetch fresh data
-      const deals = await scrapeOzBargainDeals(category);
-      
-      res.json({
-        success: true,
-        message: `Successfully refreshed ${deals.length} OzBargain deals for ${category}`,
-        totalDeals: deals.length,
-        category: category,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Refresh error:', error);
-      res.status(500).json({
-        success: false,
-        message: `Failed to refresh OzBargain deals for ${req.query.category || 'All Deals'}`,
-        error: error.message
-      });
-    }
-  });
-});
-
-// Health check endpoint  
-exports.healthCheck = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    try {
-      const categories = Object.keys(OZBARGAIN_CATEGORIES);
-      const categoryHealth = {};
-      let totalCachedDeals = 0;
-
-      for (const category of categories.slice(0, 5)) {
-        try {
-          const cacheKey = `ozbargain_${category.toLowerCase().replace(/\s+/g, '_')}`;
-          const doc = await db.collection('deals_cache').doc(cacheKey).get();
-          if (doc.exists) {
-            const data = doc.data();
-            const age = Date.now() - data.timestamp;
-            const isExpired = age > 15 * 60 * 1000;
-            
-            categoryHealth[category] = {
-              status: isExpired ? 'STALE' : 'HEALTHY',
-              lastUpdate: data.lastUpdated,
-              count: data.deals && data.deals.length ? data.deals.length : 0,
-              cacheAge: Math.floor(age / 1000 / 60)
-            };
-            
-            totalCachedDeals += data.deals && data.deals.length ? data.deals.length : 0;
-          } else {
-            categoryHealth[category] = {
-              status: 'NO_CACHE',
-              lastUpdate: null,
-              count: 0,
-              cacheAge: 0
-            };
-          }
-        } catch (error) {
-          categoryHealth[category] = {
-            status: 'ERROR',
-            error: error.message
-          };
-        }
-      }
-
-      res.json({
-        status: 'HEALTHY',
-        source: 'OzBargain Only',
-        cachedDeals: totalCachedDeals,
-        platform: 'Firebase Functions',
-        availableCategories: categories,
-        categoryHealth: categoryHealth,
-        timestamp: new Date().toISOString(),
-        version: '2.1.0 - Debug Enhanced'
-      });
-    } catch (error) {
-      console.error('Health check failed:', error);
-      res.status(500).json({
-        status: 'ERROR',
-        source: 'OzBargain Only',
-        error: error.message
-      });
-    }
-  });
-});
-
-// Get available categories endpoint
-exports.getCategories = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    res.json({
-      categories: Object.keys(OZBARGAIN_CATEGORIES),
-      paths: OZBARGAIN_CATEGORIES,
-      source: 'ozbargain',
-      timestamp: new Date().toISOString()
-    });
-  });
-});
 
 // ===== SPENDY API ===== 
 // Complete REST API for Spendy expense splitting application
@@ -1366,26 +715,43 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
         const recipientData = recipientDoc.data();
         const senderData = senderDoc.data();
         
+        console.log('📋 Push notification check:', {
+          hasRecipientToken: !!recipientData.pushToken,
+          recipientEmail: recipientData.email,
+          senderName: senderData.fullName
+        });
+        
         if (recipientData.pushToken) {
-          const notificationPayload = {
-            notification: {
-              title: '🤝 New Friend Request',
-              body: `${senderData.fullName} wants to be your friend on Spendy!`,
-              icon: 'https://firebasestorage.googleapis.com/v0/b/spendy-97913.appspot.com/o/app-icons%2Fnotification-icon.png?alt=media'
-            },
+          const expoPushNotification = {
+            title: "🤝 New Friend Request",
+            body: `${senderData.fullName} wants to be your friend on Spendy!`,
             data: {
-              type: 'friend_request',
+              type: "friend_request",
               friendRequestId: docRef.id,
               senderId: fromUserId,
               senderName: senderData.fullName,
               senderEmail: senderData.email,
-              action: 'view_friend_request'
+              action: "view_friend_request",
+              deepLink: {
+                screen: "FriendRequestModal",
+                params: { autoOpen: true }
+              }
             },
-            token: recipientData.pushToken
           };
 
-          await admin.messaging().send(notificationPayload);
-          console.log('📱 Push notification sent to recipient');
+          console.log("📱 Sending push notification with Expo API");
+          
+          try {
+            const pushResult = await sendExpoPushNotification(
+              recipientData.pushToken,
+              expoPushNotification
+            );
+            console.log("✅ Push notification result:", pushResult);
+          } catch (pushError) {
+            console.error("❌ Failed to send push notification:", pushError);
+          }
+        } else {
+          console.log("⚠️ No push token found for recipient:", recipientData.email);
         }
 
         // Also create an in-app notification
@@ -1404,7 +770,7 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
           createdAt: new Date()
         };
 
-        await db.collection(COLLECTIONS.NOTIFICATIONS).add(inAppNotification);
+        await db.collection("appNotifications").add(inAppNotification);
         console.log('🔔 In-app notification created');
       }
     } catch (notifError) {
@@ -1781,6 +1147,37 @@ spendyApp.post('/groups', authenticateJWT, async (req, res) => {
             });
             
             console.log('✅ Added member:', memberId);
+
+            // Send push notification to new member
+            try {
+              if (memberData.pushToken) {
+                const creatorDoc = await db.collection(COLLECTIONS.USERS).doc(createdBy).get();
+                const creatorData = creatorDoc.data();
+                
+                const expoPushNotification = {
+                  title: "👥 Added to Group",
+                  body: `${creatorData.fullName || 'Someone'} added you to "${groupName}" group`,
+                  data: {
+                    type: "group_created",
+                    groupId: groupRef.id,
+                    groupName: groupName,
+                    creatorName: creatorData.fullName || 'Unknown',
+                    deepLink: {
+                      screen: "GroupDetailsModal",
+                      params: { 
+                        groupId: groupRef.id,
+                        autoOpen: true
+                      }
+                    }
+                  }
+                };
+
+                await sendExpoPushNotification(memberData.pushToken, expoPushNotification);
+                console.log('📱 Sent group notification to member:', memberData.fullName);
+              }
+            } catch (notificationError) {
+              console.error('❌ Failed to send group notification to member:', memberData.fullName, notificationError);
+            }
           } else {
             console.log('⚠️ Member not found:', memberId);
           }
@@ -2680,7 +2077,14 @@ spendyApp.post('/expenses', authenticateJWT, async (req, res) => {
                   data: {
                     type: 'expense_added',
                     groupId: groupId,
-                    expenseId: expenseRef.id
+                    expenseId: expenseRef.id,
+                    deepLink: {
+                      screen: "GroupDetailsModal",
+                      params: { 
+                        groupId: groupId,
+                        autoOpen: true
+                      }
+                    }
                   }
                 });
               } catch (notificationError) {
@@ -3670,6 +3074,13 @@ spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
           navigationType: groupData ? "groupDetails" : "friendDetails",
           targetGroupId: groupId || null,
           targetFriendId: groupId ? null : fromUserId,
+          deepLink: {
+            screen: "SettlementModal",
+            params: { 
+              autoOpen: true,
+              openHistoryTab: true
+            }
+          }
         },
         isRead: false,
         createdAt: new Date(),
@@ -3686,6 +3097,13 @@ spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
           settlementId: settlementRef.id,
           fromUserId: fromUserId,
           groupId: groupId || "",
+          deepLink: {
+            screen: "SettlementModal",
+            params: { 
+              autoOpen: true,
+              openHistoryTab: true
+            }
+          }
         },
       });
 
@@ -3708,10 +3126,36 @@ spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
           navigationType: groupData ? "groupDetails" : "friendDetails",
           targetGroupId: groupId || null,
           targetFriendId: groupId ? null : toUserId,
+          deepLink: {
+            screen: "SettlementModal",
+            params: { 
+              autoOpen: true,
+              openHistoryTab: true
+            }
+          }
         },
         isRead: false,
         createdAt: new Date(),
         updatedAt: new Date(),
+      });
+
+      // Send push notification to sender
+      await sendPushNotificationToUser(fromUserId, {
+        title: "✅ Payment Confirmed",
+        body: `Payment of ${settlementCurrency} ${amount} to ${receiverName} recorded${groupContext}`,
+        data: {
+          type: "payment_sent",
+          settlementId: settlementRef.id,
+          toUserId: toUserId,
+          groupId: groupId || "",
+          deepLink: {
+            screen: "SettlementModal",
+            params: { 
+              autoOpen: true,
+              openHistoryTab: true
+            }
+          }
+        },
       });
 
       console.log("✅ Settlement notifications sent to both parties");
@@ -3813,6 +3257,156 @@ spendyApp.get("/settlements/history/:groupId", authenticateJWT,
 });
 
 // ===== NOTIFICATIONS ROUTES =====
+
+// Create Notification
+spendyApp.post('/notifications', authenticateJWT, async (req, res) => {
+  try {
+    const { userId, type, title, message, data, isRead = false } = req.body;
+    const createdBy = req.user.id;
+
+    // Validate required fields
+    if (!userId || !type || !title || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId, type, title, and message are required',
+        error: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Create notification data
+    const notificationData = {
+      userId,
+      type,
+      title,
+      message,
+      data: data || {},
+      isRead,
+      createdBy,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Save to appNotifications collection
+    const notificationRef = await db.collection('appNotifications').add(notificationData);
+    
+    // Get the created notification
+    const createdNotification = await notificationRef.get();
+    
+    console.log(`📬 Created notification for user ${userId}:`, title);
+    
+    // Send push notification
+    await sendPushNotificationToUser(userId, {
+      title: notificationData.title,
+      body: notificationData.message,
+      data: notificationData.data
+    });
+    
+    res.status(201).json({
+      success: true,
+      message: 'Notification created successfully',
+      data: {
+        id: createdNotification.id,
+        ...createdNotification.data()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error creating notification:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create notification',
+      error: 'NOTIFICATION_CREATE_ERROR'
+    });
+  }
+});
+
+// Create Payment Reminder Notification
+spendyApp.post('/notifications/payment-reminder', authenticateJWT, async (req, res) => {
+  try {
+    const { fromUserId, toUserId, amount, currency, expenseId, groupId, message } = req.body;
+    const reminderId = req.user.id;
+
+    // Validate required fields
+    if (!fromUserId || !toUserId || !amount || !currency) {
+      return res.status(400).json({
+        success: false,
+        message: 'fromUserId, toUserId, amount, and currency are required',
+        error: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Get user data for personalization
+    const fromUserDoc = await db.collection(COLLECTIONS.USERS).doc(fromUserId).get();
+    const toUserDoc = await db.collection(COLLECTIONS.USERS).doc(toUserId).get();
+    
+    const fromUserData = fromUserDoc.exists ? fromUserDoc.data() : null;
+    const toUserData = toUserDoc.exists ? toUserDoc.data() : null;
+
+    if (!fromUserData || !toUserData) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    // Create reminder notification
+    const reminderData = {
+      userId: toUserId,
+      type: 'payment_reminder',
+      title: '💸 Payment Reminder',
+      message: message || `${fromUserData.fullName} is reminding you about a payment of ${currency}${amount}`,
+      data: {
+        fromUserId,
+        toUserId,
+        amount,
+        currency,
+        expenseId,
+        groupId,
+        reminderId,
+        deepLink: {
+          screen: "SettlementModal",
+          params: { 
+            groupId,
+            autoOpen: true,
+            highlightUser: toUserId
+          }
+        }
+      },
+      isRead: false,
+      createdBy: reminderId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Save reminder notification
+    const reminderRef = await db.collection('appNotifications').add(reminderData);
+    
+    console.log(`💸 Created payment reminder from ${fromUserData.fullName} to ${toUserData.fullName}`);
+    
+    // Send push notification to receiver
+    await sendPushNotificationToUser(toUserId, {
+      title: reminderData.title,
+      body: reminderData.message,
+      data: reminderData.data
+    });
+    
+    res.status(201).json({
+      success: true,
+      message: 'Payment reminder sent successfully',
+      data: {
+        id: reminderRef.id,
+        ...reminderData
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error sending payment reminder:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send payment reminder',
+      error: 'PAYMENT_REMINDER_ERROR'
+    });
+  }
+});
 
 // Get User Notifications (no userId in path - uses authenticated user)
 spendyApp.get('/notifications', authenticateJWT, async (req, res) => {
@@ -5810,9 +5404,55 @@ spendyApp.post('/friends/requests/:requestId/accept', authenticateJWT, async (re
       createdAt: new Date()
     });
 
+    // Send push notification to friend request sender
+    try {
+      const senderDoc = await db.collection("users")
+          .doc(requestData.fromUserId).get();
+      const senderData = senderDoc.data();
+      
+      if (senderData && senderData.pushToken) {
+        console.log(
+            "📱 Sending push notification for friend accept to:",
+            senderData.email,
+        );
+        
+        const expoPushNotification = {
+          title: "🎉 Friend Request Accepted",
+          body: `${accepterData.fullName} accepted your friend request!`,
+          data: {
+            type: "friend_accepted",
+            friendId: userId,
+            friendName: accepterData.fullName,
+            navigationType: "friends",
+            deepLink: {
+              screen: "MainTabs",
+              params: { 
+                initialTab: "Split",
+                openFriendsTab: true 
+              }
+            }
+          }
+        };
+
+        const pushResult = await sendExpoPushNotification(
+          senderData.pushToken,
+          expoPushNotification
+        );
+        console.log("✅ Push notification sent successfully for friend accept:", pushResult);
+      } else {
+        console.log("⚠️ No push token found for user:", requestData.fromUserId);
+      }
+    } catch (pushError) {
+      console.error(
+          "❌ Failed to send push notification for friend accept:",
+          pushError,
+      );
+      // Don't fail the request if push notification fails
+    }
+
     res.json({
       success: true,
-      message: 'Friend request accepted successfully'
+      message: "Friend request accepted successfully",
     });
   } catch (error) {
     console.error('❌ Accept friend request error:', error);
@@ -5867,31 +5507,73 @@ spendyApp.post('/friends/requests/:requestId/decline', authenticateJWT, async (r
     const declinerDoc = await db.collection('users').doc(userId).get();
     const declinerData = declinerDoc.data();
 
-    // Send notification to friend request sender
-    await db.collection('appNotifications').add({
+    // Send push notification to friend request sender
+    try {
+      const senderDoc = await db.collection(COLLECTIONS.USERS)
+          .doc(requestData.fromUserId).get();
+      
+      if (senderDoc.exists) {
+        const senderData = senderDoc.data();
+        
+        if (senderData.pushToken) {
+          // Use Expo Push API instead of FCM
+          const expoPushNotification = {
+            title: "❌ Friend Request Declined",
+            body: `${declinerData.fullName} declined your friend request.`,
+            data: {
+              type: "friend_declined",
+              friendId: userId,
+              friendName: declinerData.fullName,
+              action: "view_friends",
+              deepLink: {
+                screen: "MainTabs",
+                params: { 
+                  initialTab: "Split",
+                  openFriendsTab: true 
+                }
+              }
+            }
+          };
+
+          const pushNotificationResult = await sendExpoPushNotification(
+            senderData.pushToken,
+            expoPushNotification
+          );
+          
+          console.log("📱 Push notification sent to friend request sender");
+          console.log("✅ Push notification result:", pushNotificationResult);
+        }
+      }
+    } catch (notifError) {
+      console.error("Failed to send decline notification:", notifError);
+      // Don't fail the request if notification fails
+    }
+
+    // Send in-app notification to friend request sender
+    await db.collection("appNotifications").add({
       userId: requestData.fromUserId,
-      type: 'friend_declined',
-      title: '❌ Friend Request Declined',
+      type: "friend_declined",
+      title: "❌ Friend Request Declined",
       message: `${declinerData.fullName} declined your friend request.`,
       data: {
         friendId: userId,
         friendName: declinerData.fullName,
-        navigationType: 'friends'
+        navigationType: "friends",
       },
       isRead: false,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
 
     res.json({
       success: true,
-      message: 'Friend request declined successfully'
+      message: "Friend request declined successfully",
     });
   } catch (error) {
-    console.error('❌ Decline friend request error:', error);
+    console.error("❌ Decline friend request error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to decline friend request',
-      error: error.message
+      message: "Failed to decline friend request",
+      error: error.message,
     });
   }
 });
@@ -5950,10 +5632,35 @@ spendyApp.delete('/friends/:friendId', authenticateJWT, async (req, res) => {
         friendId: userId,
         friendName: removerData.fullName,
         action,
-        navigationType: 'friends'
+        navigationType: 'friends',
+        deepLink: {
+          screen: "MainTabs",
+          params: { 
+            initialTab: "Split",
+            openFriendsTab: true 
+          }
+        }
       },
       isRead: false,
       createdAt: new Date()
+    });
+
+    // Send push notification to removed friend
+    await sendPushNotificationToUser(friendId, {
+      title: title,
+      body: message,
+      data: {
+        type: 'friend_removed',
+        friendId: userId,
+        friendName: removerData.fullName,
+        deepLink: {
+          screen: "MainTabs",
+          params: { 
+            initialTab: "Split",
+            openFriendsTab: true 
+          }
+        }
+      }
     });
 
     res.json({
@@ -6293,71 +6000,95 @@ spendyApp.post('/invites/send', async (req, res) => {
 
 // ===== NOTIFICATION FUNCTIONS =====
 
-// Helper function to send push notifications
-async function sendPushNotificationToUser(userId, notification) {
+/**
+ * Send push notification via Expo's push service with FCM V1 support
+ * @param {string} expoPushToken - Expo push token
+ * @param {Object} notification - Notification object with title, body, data
+ * @return {Promise<boolean>} Success status
+ */
+async function sendExpoPushNotification(expoPushToken, notification) {
   try {
-    // Get user's FCM tokens
-    const tokensQuery = await db.collection('fcmTokens')
-      .where('userId', '==', userId)
-      .where('isActive', '==', true)
-      .get();
-
-    if (tokensQuery.empty) {
-      console.log(`📱 No FCM tokens found for user ${userId}`);
+    console.log("📱 Sending Expo push notification to token:", 
+                expoPushToken.substring(0, 30) + "...");
+    
+    // Validate it's an Expo token
+    if (!expoPushToken.startsWith("ExponentPushToken[")) {
+      console.log("⚠️ Token is not an Expo push token:", expoPushToken);
+      console.log("❌ This function only handles Expo push tokens, not FCM tokens");
       return false;
     }
 
-    const tokens = tokensQuery.docs.map(doc => doc.data().token);
-    
-    // Send to all user's devices
-    const multicastMessage = {
-      notification: {
-        title: notification.title,
-        body: notification.body
-      },
-      data: notification.data || {},
-      tokens
+    const message = {
+      "to": expoPushToken,
+      "sound": "default",
+      "title": notification.title,
+      "body": notification.body,
+      "data": notification.data || {},
+      "badge": 1,
+      "priority": "high",
+      "channelId": "default",
     };
 
-    const response = await admin.messaging().sendMulticast(multicastMessage);
+    console.log("🚀 Expo push payload:", JSON.stringify(message, null, 2));
+
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      "method": "POST",
+      "headers": {
+        "Accept": "application/json",
+        "Accept-encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      "body": JSON.stringify(message),
+    });
+
+    const result = await response.json();
+    console.log("📱 Expo push response:", result);
+
+    if (result.data && result.data[0] && result.data[0].status === "ok") {
+      console.log("✅ Expo push notification sent successfully");
+      return true;
+    } else {
+      console.error("❌ Expo push notification failed:", result);
+      return false;
+    }
+  } catch (error) {
+    console.error("❌ Failed to send push notification:", error);
+    return false;
+  }
+}
+
+// Helper function to send push notifications
+async function sendPushNotificationToUser(userId, notification) {
+  try {
+    // Get user's Expo push token
+    const userDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
     
-    // Handle failed tokens
-    if (response.failureCount > 0) {
-      const batch = db.batch();
-      const failedTokens = [];
-      
-      response.responses.forEach((resp, idx) => {
-        if (!resp.success) {
-          failedTokens.push(tokens[idx]);
-          console.warn(`📱 Failed to send to token ${tokens[idx]}:`, resp.error);
-        }
-      });
-
-      // Remove invalid tokens
-      for (const token of failedTokens) {
-        const tokenQuery = await db.collection('fcmTokens')
-          .where('token', '==', token)
-          .limit(1)
-          .get();
-
-        if (!tokenQuery.empty) {
-          batch.update(tokenQuery.docs[0].ref, {
-            isActive: false,
-            deactivatedAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        }
-      }
-
-      if (failedTokens.length > 0) {
-        await batch.commit();
-        console.log(`📱 Removed ${failedTokens.length} invalid FCM tokens`);
-      }
+    if (!userDoc.exists) {
+      console.log(`📱 User ${userId} not found`);
+      return false;
+    }
+    
+    const userData = userDoc.data();
+    const pushToken = userData.pushToken;
+    
+    if (!pushToken) {
+      console.log(`📱 No push token found for user ${userId}`);
+      return false;
     }
 
-    console.log(`📱 Push notification sent to ${response.successCount}/${tokens.length} devices for user ${userId}`);
-    return response.successCount > 0;
-
+    console.log(`📱 Sending push notification to user ${userId} with token: ${pushToken.substring(0, 30)}...`);
+    
+    // Use Expo push notification service
+    const result = await sendExpoPushNotification(pushToken, notification);
+    
+    if (result) {
+      console.log(`📱 Successfully sent push notification to user ${userId}`);
+      return true;
+    } else {
+      console.log(`📱 Failed to send push notification to user ${userId}`);
+      return false;
+    }
+    
   } catch (error) {
     console.error('📱 Failed to send push notification:', error);
     return false;
@@ -6556,6 +6287,92 @@ exports.triggerNotificationProcessing = functions.https.onCall(async (data, cont
   }
 });
 
+// Send daily expense reminders at 8 PM UTC (scheduled function)
+exports.sendDailyExpenseReminders = functions.scheduler.onSchedule('0 20 * * *', async (event) => {
+    console.log('📅 Sending daily expense reminders to all users...');
+    
+    try {
+        // Get all users who have push tokens
+        const usersSnapshot = await db.collection(COLLECTIONS.USERS)
+            .where('pushToken', '!=', null)
+            .get();
+
+        if (usersSnapshot.empty) {
+            console.log('⚠️ No users with push tokens found');
+            return null;
+        }
+
+        const batch = db.batch();
+        let successCount = 0;
+        let failureCount = 0;
+
+        const promises = usersSnapshot.docs.map(async (userDoc) => {
+            const userData = userDoc.data();
+            const userId = userDoc.id;
+
+            try {
+                // Create app notification
+                const appNotificationData = {
+                    userId: userId,
+                    type: 'daily_reminder',
+                    title: '💰 Daily Expense Check',
+                    message: "Don't forget to log your expenses for today!",
+                    data: {
+                        reminderType: 'daily_expenses',
+                        deepLink: {
+                            screen: "MainTabs",
+                            params: { 
+                                initialTab: "Split"
+                            }
+                        }
+                    },
+                    isRead: false,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+
+                // Add to batch for app notifications
+                const notificationRef = db.collection('appNotifications').doc();
+                batch.set(notificationRef, appNotificationData);
+
+                // Send push notification
+                await sendPushNotificationToUser(userId, {
+                    title: '💰 Daily Expense Check',
+                    body: "Don't forget to log your expenses for today!",
+                    data: {
+                        type: 'daily_reminder',
+                        reminderType: 'daily_expenses',
+                        deepLink: {
+                            screen: "MainTabs",
+                            params: { 
+                                initialTab: "Split"
+                            }
+                        }
+                    }
+                });
+
+                successCount++;
+                console.log(`📱 Sent daily reminder to ${userData.fullName || userData.email}`);
+            } catch (error) {
+                failureCount++;
+                console.error(`❌ Failed to send daily reminder to ${userData.fullName || userData.email}:`, error);
+            }
+        });
+
+        await Promise.all(promises);
+        
+        // Commit all app notifications in batch
+        await batch.commit();
+
+        console.log(`✅ Daily expense reminders completed: ${successCount} successful, ${failureCount} failed`);
+        return { successCount, failureCount };
+
+    } catch (error) {
+        console.error('❌ Failed to send daily expense reminders:', error);
+        throw error;
+    }
+});
+
 // Clean up old notifications (runs daily)
 exports.cleanupOldNotifications = functions.scheduler.onSchedule('0 2 * * *', async (event) => {
     console.log('🧹 Cleaning up old notifications...');
@@ -6609,4 +6426,77 @@ exports.cleanupOldNotifications = functions.scheduler.onSchedule('0 2 * * *', as
         timestamp: new Date().toISOString()
       };
     }
+});
+
+// ==========================================
+// PUSH TOKEN MANAGEMENT
+// ==========================================
+
+// Save Push Token Endpoint
+spendyApp.post('/user/push-token', authenticateJWT, async (req, res) => {
+  try {
+    const { pushToken } = req.body;
+    const userId = req.user.id;
+
+    if (!pushToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Push token is required'
+      });
+    }
+
+    console.log("💾 Saving push token for user:", userId);
+    console.log("📱 Push token received:", pushToken);
+
+    // Update user document with push token
+    await db.collection(COLLECTIONS.USERS).doc(userId).update({
+      pushToken: pushToken,
+      pushTokenUpdatedAt: new Date()
+    });
+
+    console.log('✅ Push token saved successfully');
+
+    res.json({
+      success: true,
+      message: 'Push token saved successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Save push token error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save push token',
+      error: error.message
+    });
+  }
+});
+
+// Remove Push Token Endpoint (for logout)
+spendyApp.delete('/user/push-token', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    console.log('🗑️ Removing push token for user:', userId);
+
+    // Remove push token from user document
+    await db.collection(COLLECTIONS.USERS).doc(userId).update({
+      pushToken: admin.firestore.FieldValue.delete(),
+      pushTokenRemovedAt: new Date()
+    });
+
+    console.log('✅ Push token removed successfully');
+
+    res.json({
+      success: true,
+      message: 'Push token removed successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Remove push token error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to remove push token',
+      error: error.message
+    });
+  }
 });

@@ -73,14 +73,18 @@ export class GroupsController {
       const validInitialMembers = initialMembers?.filter(Boolean) || [];
       if (validInitialMembers.length > 0) {
         const memberPromises = validInitialMembers.map(async (memberId: string) => {
-          // Verify member is a friend
-          const friendship = await DatabaseService.queryDocuments(
+          // Verify member is a friend (bidirectional check - consistent with addMember)
+          const friendship = await DatabaseService.queryDocumentsWithOr(
             COLLECTIONS.FRIENDS,
-            { userId: createdBy, friendId: memberId, status: FRIEND_STATUS.ACCEPTED }
+            [
+              { userId: createdBy, friendId: memberId, status: FRIEND_STATUS.ACCEPTED },
+              { userId: memberId, friendId: createdBy, status: FRIEND_STATUS.ACCEPTED }
+            ]
           );
 
           if (friendship.length === 0) {
-            throw new ValidationError(`User ${memberId} is not your friend`);
+            console.warn(`⚠️ User ${memberId} friendship validation failed - skipping`);
+            return null; // Skip this member instead of failing the entire group creation
           }
 
           // Get member data
@@ -103,9 +107,9 @@ export class GroupsController {
           };
         });
 
-        const newMembers = await Promise.all(memberPromises);
+        const newMembers = (await Promise.all(memberPromises)).filter(Boolean);
         
-        // Update group with new members
+        // Update group with new members only if there are valid ones
         const updatedGroup = await DatabaseService.getDocument(COLLECTIONS.GROUPS, groupId) as Group;
         updatedGroup.members = [...updatedGroup.members, ...newMembers];
         

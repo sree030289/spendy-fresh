@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "827143652568",
+    "project_id": "spendy-develop",
+    "storage_bucket": "spendy-develop.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:827143652568:android:009110b8f4776b93b843ad",
+        "android_client_info": {
+          "package_name": "com.svaag.spendy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "827143652568-6qjbl83nhddj87fkdv41j4mr4iv6hins.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSXdCGFW4-cCIwQJuTE7ESH7Khr_qFhyE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "827143652568-4bc26tin0r22lsfb4oea9hoscvmk4tao.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "827143652568-dtet8a1ok8edvu42kscekgovu0htf6d2.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.svaag.spendy"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

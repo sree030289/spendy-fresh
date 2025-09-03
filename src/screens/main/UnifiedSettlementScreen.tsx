@@ -42,6 +42,26 @@ interface SettlementSuggestion {
   groupName: string;
 }
 
+interface SettlementTransaction {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  currency: string;
+  date: Date;
+  description?: string;
+  fromUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  toUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+}
+
 interface UnifiedSettlementScreenProps {
   // Entry modes
   mode: 'group-specific' | 'group-selector';
@@ -77,6 +97,11 @@ export default function UnifiedSettlementScreen({
   const [settlementSuggestions, setSettlementSuggestions] = useState<SettlementSuggestion[]>([]);
   const [groupMembers, setGroupMembers] = useState<Group['members']>([]);
   const [recordingPayment, setRecordingPayment] = useState(false);
+  
+  // Tab state for settlement screen
+  const [activeTab, setActiveTab] = useState<'settle' | 'history'>('settle');
+  const [settlementHistory, setSettlementHistory] = useState<SettlementTransaction[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   console.log('🔧 State after initialization:', { 
     mode, 
@@ -94,8 +119,12 @@ export default function UnifiedSettlementScreen({
   useEffect(() => {
     if (selectedGroupId) {
       loadGroupSettlements(selectedGroupId);
+      // Also load settlement history when switching to a group
+      if (activeTab === 'history') {
+        loadSettlementHistory(selectedGroupId);
+      }
     }
-  }, [selectedGroupId]);
+  }, [selectedGroupId, activeTab]);
 
   const loadInitialData = async () => {
     if (!user?.id) return;
@@ -257,6 +286,68 @@ export default function UnifiedSettlementScreen({
       }));
   };
 
+  // Load settlement history for the selected group
+  const loadSettlementHistory = async (targetGroupId: string) => {
+    if (!targetGroupId) return;
+    
+    try {
+      setHistoryLoading(true);
+      console.log('📜 Loading settlement history for group:', targetGroupId);
+      
+      const apiService = ApiService.getInstance();
+      const response: any = await apiService.getSettlementHistory(targetGroupId);
+      
+      console.log('📜 Settlement history API response:', response);
+      
+      // Handle both empty array (no data) and data object (with settlements) cases
+      let settlementsArray: any[] = [];
+      if (Array.isArray(response)) {
+        // Empty response case
+        settlementsArray = response;
+      } else if (response?.settlements && Array.isArray(response.settlements)) {
+        // Data object case
+        settlementsArray = response.settlements;
+      }
+      
+      if (settlementsArray.length > 0) {
+        // Convert to settlement transactions format
+        const transactions: SettlementTransaction[] = settlementsArray
+          .filter((settlement: any) => settlement.status === 'completed') // Only show completed settlements
+          .map((settlement: any) => ({
+            id: settlement.id || `${settlement.fromUserId}-${settlement.toUserId}-${settlement.createdAt}`,
+            fromUserId: settlement.fromUserId,
+            toUserId: settlement.toUserId,
+            amount: settlement.amount,
+            currency: settlement.currency || 'USD',
+            date: settlement.createdAt ? new Date(settlement.createdAt) : new Date(),
+            description: settlement.note || 'Settlement payment',
+            fromUserData: {
+              fullName: getUserNameFromId(settlement.fromUserId, groupMembers) || 'Unknown User',
+              email: '',
+              avatar: settlement.fromAvatar
+            },
+            toUserData: {
+              fullName: getUserNameFromId(settlement.toUserId, groupMembers) || 'Unknown User', 
+              email: '',
+              avatar: settlement.toAvatar
+            }
+          }))
+          .sort((a: SettlementTransaction, b: SettlementTransaction) => b.date.getTime() - a.date.getTime()); // Sort by date descending
+        
+        setSettlementHistory(transactions);
+        console.log('📜 Loaded settlement history:', transactions.length, 'transactions');
+      } else {
+        setSettlementHistory([]);
+        console.log('📜 No settlement history found');
+      }
+    } catch (error) {
+      console.error('❌ Failed to load settlement history:', error);
+      setSettlementHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     
@@ -336,6 +427,8 @@ export default function UnifiedSettlementScreen({
                 if (selectedGroupId) {
                   console.log('🔄 Refreshing settlements after payment recording...');
                   await loadGroupSettlements(selectedGroupId);
+                  // Also refresh settlement history to show the new transaction
+                  await loadSettlementHistory(selectedGroupId);
                 }
                 
               } catch (error) {
@@ -526,6 +619,153 @@ export default function UnifiedSettlementScreen({
     </ScrollView>
   );
 
+  // Render tab navigation for settlement screen
+  const renderTabNavigation = () => (
+    <View style={[styles.tabContainer, { backgroundColor: theme.colors.surface }]}>
+      <TouchableOpacity
+        style={[
+          styles.tab,
+          activeTab === 'settle' && [styles.activeTab, { backgroundColor: theme.colors.primary }]
+        ]}
+        onPress={() => setActiveTab('settle')}
+      >
+        <Text style={[
+          styles.tabText,
+          { color: activeTab === 'settle' ? 'white' : theme.colors.textSecondary }
+        ]}>
+          Settle
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.tab,
+          activeTab === 'history' && [styles.activeTab, { backgroundColor: theme.colors.primary }]
+        ]}
+        onPress={() => {
+          setActiveTab('history');
+          if (selectedGroupId) {
+            loadSettlementHistory(selectedGroupId);
+          }
+        }}
+      >
+        <Text style={[
+          styles.tabText,
+          { color: activeTab === 'history' ? 'white' : theme.colors.textSecondary }
+        ]}>
+          History
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Render settlement history
+  const renderSettlementHistory = () => (
+    <ScrollView
+      style={styles.content}
+      refreshControl={<RefreshControl refreshing={historyLoading} onRefresh={() => {
+        if (selectedGroupId) loadSettlementHistory(selectedGroupId);
+      }} />}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        Settlement History
+      </Text>
+      <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
+        {selectedGroupName}
+      </Text>
+      
+      {historyLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+            Loading history...
+          </Text>
+        </View>
+      ) : settlementHistory.length === 0 ? (
+        <View style={[styles.allSettledContainer, { backgroundColor: theme.colors.surface }]}>
+          <View style={[styles.settledIcon, { backgroundColor: `${theme.colors.primary}15` }]}>
+            <Icon name="time" size={48} color={theme.colors.primary} />
+          </View>
+          <Text style={[styles.allSettledTitle, { color: theme.colors.text }]}>
+            No Settlement History
+          </Text>
+          <Text style={[styles.allSettledSubtitle, { color: theme.colors.textSecondary }]}>
+            Settlement transactions will appear here once payments are recorded
+          </Text>
+        </View>
+      ) : (
+        <>
+          {settlementHistory.map((transaction, index) => (
+            <View key={transaction.id || index} style={[styles.historyCard, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.historyHeader}>
+                <View style={styles.historyFlow}>
+                  <View style={styles.historyUser}>
+                    <View style={[styles.userAvatar, { backgroundColor: theme.colors.primary }]}>
+                      <Text style={styles.userAvatarText}>
+                        {transaction.fromUserData.fullName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={[styles.historyUserName, { color: theme.colors.text }]}>
+                      {transaction.fromUserData.fullName}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.historyAmount}>
+                    <Text style={[styles.historyAmountText, { color: theme.colors.success }]}>
+                      {getCurrencySymbol(transaction.currency)}{transaction.amount.toFixed(0)}
+                    </Text>
+                    <Icon name="forward" size={16} color={theme.colors.textSecondary} />
+                  </View>
+                  
+                  <View style={styles.historyUser}>
+                    <View style={[styles.userAvatar, { backgroundColor: theme.colors.secondary }]}>
+                      <Text style={styles.userAvatarText}>
+                        {transaction.toUserData.fullName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={[styles.historyUserName, { color: theme.colors.text }]}>
+                      {transaction.toUserData.fullName}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              
+              <View style={styles.historyDetails}>
+                <View style={styles.historyMeta}>
+                  <View style={styles.historyMetaItem}>
+                    <Icon name="calendar" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.historyMetaText, { color: theme.colors.textSecondary }]}>
+                      {transaction.date.toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <View style={styles.historyMetaItem}>
+                    <Icon name="success" size={16} color={theme.colors.success} />
+                    <Text style={[styles.historyMetaText, { color: theme.colors.success }]}>
+                      Settled
+                    </Text>
+                  </View>
+                </View>
+                {transaction.description && (
+                  <Text style={[styles.historyDescription, { color: theme.colors.textSecondary }]}>
+                    {transaction.description}
+                  </Text>
+                )}
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+    </ScrollView>
+  );
+
+  // Render settlement content with tabs
+  const renderSettlementContent = () => (
+    <View style={{ flex: 1 }}>
+      {renderTabNavigation()}
+      {activeTab === 'settle' ? renderSettlementSuggestions() : renderSettlementHistory()}
+    </View>
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -562,7 +802,7 @@ export default function UnifiedSettlementScreen({
       </View>
 
       {/* Content */}
-      {selectedGroupId ? renderSettlementSuggestions() : renderGroupSelection()}
+      {selectedGroupId ? renderSettlementContent() : renderGroupSelection()}
     </SafeAreaView>
   );
 }
@@ -797,5 +1037,99 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
+  },
+  
+  // Tab Navigation Styles
+  tabContainer: {
+    flexDirection: 'row',
+    margin: 20,
+    marginBottom: 0,
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTab: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Settlement History Styles
+  historyCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  historyHeader: {
+    marginBottom: 12,
+  },
+  historyFlow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  historyUser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  historyUserName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+    flex: 1,
+  },
+  historyAmount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  historyAmountText: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  historyDetails: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+    paddingTop: 12,
+  },
+  historyMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  historyMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  historyMetaText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  historyDescription: {
+    fontSize: 14,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });

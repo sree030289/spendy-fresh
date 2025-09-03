@@ -6,12 +6,6 @@ const config = getDefaultConfig(__dirname);
 config.resolver.sourceExts.push('cjs');
 config.resolver.unstable_enablePackageExports = false;
 
-
-
-// Firebase compatibility fixes for Expo SDK 53
-config.resolver.sourceExts.push('cjs');
-config.resolver.unstable_enablePackageExports = false;
-
 // Optimize for development to reduce reload indicators
 config.server = {
   ...config.server,

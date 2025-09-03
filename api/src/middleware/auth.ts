@@ -55,6 +55,9 @@ export class AuthMiddleware {
           id: user.id,
           email: user.email,
           fullName: user.fullName,
+          currency: user.currency,
+          profileImage: user.profileImage || user.profilePicture,
+          profilePicture: user.profilePicture || user.profileImage,
           isPremium: user.isPremium || false
         };
 
@@ -112,6 +115,9 @@ export class AuthMiddleware {
           id: user.id,
           email: user.email,
           fullName: user.fullName,
+          currency: user.currency,
+          profileImage: user.profileImage || user.profilePicture,
+          profilePicture: user.profilePicture || user.profileImage,
           isPremium: user.isPremium || false
         };
 

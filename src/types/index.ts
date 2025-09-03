@@ -219,3 +219,71 @@ export type ReminderCategory =
 
 export type RecurringType = 
   | 'none' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+// Group Splitting Types
+export interface GroupExpense {
+  id: string;
+  groupId: string;
+  description: string;
+  amount: number;
+  currency: string;
+  category: string;
+  categoryIcon: string;
+  paidBy: string;
+  paidByData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  splitType: 'equal' | 'custom' | 'percentage';
+  splitData: ExpenseSplit[];
+  receiptUrl?: string;
+  receiptData?: ReceiptData;
+  tags: string[];
+  notes?: string;
+  date: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  isSettled: boolean;
+  isSettlementTransaction?: boolean; // Flag to mark this as a settlement transaction
+}
+
+export interface ExpenseSplit {
+  userId: string;
+  amount: number;
+  percentage?: number;
+  isPaid: boolean;
+  paidAt?: Date;
+}
+
+export interface ReceiptData {
+  items: Array<{
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
+  total: number;
+  tax?: number;
+  tip?: number;
+  merchant?: string;
+}
+
+export interface SettlementTransaction {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  currency: string;
+  date: Date;
+  description?: string;
+  fromUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  toUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+}

@@ -2015,3 +2015,116 @@ export const removeFCMToken = async (req: AuthenticatedRequest, res: Response) =
     });
   }
 };
+
+export const createNotification = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { userId, type, title, message, data, isRead = false } = req.body;
+    const createdBy = req.user.id;
+
+    // Validate required fields
+    if (!userId || !type || !title || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId, type, title, and message are required',
+        error: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Create notification document
+    const notificationData = {
+      userId,
+      type,
+      title,
+      message,
+      data: data || {},
+      isRead,
+      createdBy,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const docRef = await db.collection(COLLECTIONS.NOTIFICATIONS).add(notificationData);
+
+    res.json({
+      success: true,
+      data: { id: docRef.id, ...notificationData },
+      message: 'Notification created successfully'
+    });
+
+  } catch (error) {
+    console.error('Create notification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create notification',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+};
+
+export const sendPaymentReminder = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { fromUserId, toUserId, amount, currency, expenseId, groupId, message } = req.body;
+
+    // Validate required fields
+    if (!fromUserId || !toUserId || !amount || !currency) {
+      return res.status(400).json({
+        success: false,
+        message: 'fromUserId, toUserId, amount, and currency are required',
+        error: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Get user data for personalization
+    const fromUserDoc = await db.collection(COLLECTIONS.USERS).doc(fromUserId).get();
+    const toUserDoc = await db.collection(COLLECTIONS.USERS).doc(toUserId).get();
+    
+    const fromUserData = fromUserDoc.exists ? fromUserDoc.data() : null;
+    const toUserData = toUserDoc.exists ? toUserDoc.data() : null;
+
+    if (!fromUserData || !toUserData) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    // Create notification for the recipient
+    const notificationData = {
+      userId: toUserId,
+      type: 'payment_reminder',
+      title: 'Payment Reminder',
+      message: message || `${fromUserData.fullName || fromUserData.email} is requesting payment of ${currency} ${amount}`,
+      data: {
+        fromUserId,
+        toUserId,
+        amount,
+        currency,
+        expenseId,
+        groupId,
+        fromUserName: fromUserData.fullName || fromUserData.email,
+        toUserName: toUserData.fullName || toUserData.email
+      },
+      isRead: false,
+      createdBy: fromUserId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const docRef = await db.collection(COLLECTIONS.NOTIFICATIONS).add(notificationData);
+
+    res.json({
+      success: true,
+      data: { id: docRef.id, ...notificationData },
+      message: 'Payment reminder sent successfully'
+    });
+
+  } catch (error) {
+    console.error('Send payment reminder error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send payment reminder',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+};

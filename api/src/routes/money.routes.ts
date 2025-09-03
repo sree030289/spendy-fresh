@@ -83,6 +83,8 @@ router.delete('/gmail/disconnect', moneyController.disconnectGmail);
 
 // Notifications
 router.get('/notifications', moneyController.getUserNotifications);
+router.post('/notifications', moneyController.createNotification);
+router.post('/notifications/payment-reminder', moneyController.sendPaymentReminder);
 router.put('/notifications/:id/read', moneyController.markNotificationAsRead);
 router.put('/notifications/read-all', moneyController.markAllNotificationsAsRead);
 router.delete('/notifications/:id', moneyController.deleteNotification);

@@ -11,8 +11,8 @@ const getApiBaseUrl = () => {
   
   // Use dev API for development builds (but respect prod override)
   if (buildType === 'dev' || (environment === 'development' && buildType !== 'prod')) {
-    console.log('🔧 Using DEVELOPMENT API endpoint');
-    // Updated to use the new deployed function URL
+    console.log('🔧 Using DEVELOPMENT CLOUD RUN API endpoint');
+    // Use Cloud Run API for development
     return 'https://spendyapi-2fy22mkg6q-uc.a.run.app';
   }
   
@@ -639,6 +639,28 @@ class ApiService {
     return response;
   }
 
+  async savePushToken(pushToken: string): Promise<void> {
+    try {
+      console.log('💾 Saving push token to server');
+      await this.request('POST', '/user/push-token', { pushToken });
+      console.log('✅ Push token saved successfully');
+    } catch (error) {
+      console.error('❌ Failed to save push token:', error);
+      throw error;
+    }
+  }
+
+  async removePushToken(): Promise<void> {
+    try {
+      console.log('🗑️ Removing push token from server');
+      await this.request('DELETE', '/user/push-token');
+      console.log('✅ Push token removed successfully');
+    } catch (error) {
+      console.error('❌ Failed to remove push token:', error);
+      throw error;
+    }
+  }
+
   async getFriends(userId?: string): Promise<any[]> {
     // API expects current user's friends via auth token, not userId parameter
     const response = await this.requestWithEmptyFallback('GET', `/friends`);
@@ -665,7 +687,7 @@ class ApiService {
   }
 
   async declineFriendRequest(requestId: string): Promise<void> {
-    await this.request('POST', `/friends/requests/decline`, { requestId });
+    await this.request('POST', `/friends/requests/${requestId}/decline`);
   }
 
   async removeFriend(userId: string, friendId: string, friendRequestId?: string): Promise<void> {
@@ -939,6 +961,32 @@ class ApiService {
 
   async removeFCMToken(token: string): Promise<void> {
     await this.request('DELETE', '/notifications/remove-token', { token });
+  }
+
+  async createNotification(notificationData: {
+    userId: string;
+    type: string;
+    title: string;
+    message: string;
+    data?: any;
+    isRead?: boolean;
+    createdAt?: Date;
+  }): Promise<any> {
+    const response = await this.request('POST', '/notifications', notificationData);
+    return response;
+  }
+
+  async sendPaymentReminder(data: {
+    fromUserId: string;
+    toUserId: string;
+    amount: number;
+    currency: string;
+    expenseId?: string;
+    groupId?: string;
+    message?: string;
+  }): Promise<any> {
+    const response = await this.request('POST', '/notifications/payment-reminder', data);
+    return response;
   }
 }
 

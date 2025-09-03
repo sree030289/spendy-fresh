@@ -8,13 +8,14 @@
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon-receipt.png",
     "splash": {
-      "image": "./expo-splash-icon.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#D6001C"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.svaag.spendy",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera for QR code scanning to quickly add expenses and split bills.",
         "NSFaceIDUsageDescription": "Allow Spendy to use Face ID for secure authentication.",
@@ -35,6 +36,7 @@
         "backgroundColor": "#D6001C"
       },
       "package": "com.svaag.spendy",
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",

@@ -63,6 +63,8 @@ interface GroupDetailsModalProps {
   onEditExpense?: (expense: Expense) => void;
   onRefresh?: () => void;
   friends?: Friend[];
+  initialTab?: 'expenses' | 'members' | 'settings';
+  onOpenSettlement?: (config: { filter: 'groups'; groupId: string }) => void;
 }
 
 export default function GroupDetailsModal({ 
@@ -75,7 +77,9 @@ export default function GroupDetailsModal({
   onGroupLeft,
   onEditExpense,
   onRefresh,
-  friends = []
+  friends = [],
+  initialTab = 'expenses',
+  onOpenSettlement
 }: GroupDetailsModalProps) {
   const { theme } = useTheme();
   const { calculateGroupBalance } = useBalances();
@@ -90,7 +94,7 @@ export default function GroupDetailsModal({
   
   const [groupExpenses, setGroupExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'expenses' | 'members' | 'settings'>('expenses');
+  const [activeTab, setActiveTab] = useState<'expenses' | 'members' | 'settings'>(initialTab);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showInviteContact, setShowInviteContact] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
@@ -941,6 +945,26 @@ export default function GroupDetailsModal({
             <Icon name="back" size={20} color="white"  />
           </TouchableOpacity>
           
+          {/* Settle Button - Top Right */}
+          <TouchableOpacity 
+            style={styles.settleBtn}
+            onPress={() => {
+              if (onOpenSettlement && localGroupData?.id) {
+                onClose();
+                // Small delay to allow modal to close before opening settlement
+                setTimeout(() => {
+                  onOpenSettlement({
+                    filter: 'groups',
+                    groupId: localGroupData.id
+                  });
+                }, 100);
+              }
+            }}
+          >
+            <Icon name="receipt" size={18} color="white"  />
+            <Text style={styles.settleBtnText}>Settle</Text>
+          </TouchableOpacity>
+          
           <View style={styles.groupHeader}>
             <View style={styles.groupAvatar}>
               <Text style={styles.groupAvatarText}>{localGroupData.avatar || '🏢'}</Text>
@@ -1526,27 +1550,15 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#667eea',
-    paddingTop: 40,
+    paddingTop: 60, // Increased to avoid status bar overlap
     paddingHorizontal: 24,
     paddingBottom: 40,
     position: 'relative',
     overflow: 'hidden',
   },
-  closeBtn: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
   backBtn: {
     position: 'absolute',
-    top: 20,
+    top: 35, // Moved down to avoid status bar overlap
     left: 20,
     width: 40,
     height: 40,
@@ -1555,6 +1567,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+  settleBtn: {
+    position: 'absolute',
+    top: 35, // Same position as back button
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 10,
+    gap: 6,
+  },
+  settleBtnText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   groupHeader: {
     alignItems: 'center',

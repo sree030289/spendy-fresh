@@ -187,6 +187,37 @@ export interface Payment {
   completedAt?: Date;
 }
 
+export interface Settlement {
+  id: string;
+  groupId: string;
+  fromUserId: string;
+  fromUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  toUserId: string;
+  toUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  amount: number;
+  currency: string;
+  description?: string;
+  settledBy: string;
+  settledByUserData: {
+    fullName: string;
+    email: string;
+    avatar?: string;
+  };
+  settledAt: Date;
+  status: 'completed' | 'pending' | 'cancelled';
+  relatedExpenses?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Reminder {
   id: string;
   userId: string;

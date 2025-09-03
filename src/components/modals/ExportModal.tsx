@@ -101,7 +101,7 @@ export default function ExportModal({
   ];
 
   return (
-    <FullscreenModal visible={visible} onClose={onClose}>
+    <FullscreenModal visible={visible} onClose={onClose} title="Export Group Data" showBackButton={false}>
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header */}
         <View style={styles.header}>
@@ -204,7 +204,7 @@ export default function ExportModal({
             onPress={handleExport}
             disabled={isExporting}
             style={[styles.exportButton, { backgroundColor: theme.colors.primary }]}
-            icon={isExporting ? undefined : 'download'}
+            icon={isExporting ? undefined : <Icon name="download" size={20} color={theme.colors.textInverse} />}
           />
           {isExporting && (
             <View style={styles.loadingContainer}>

@@ -4,6 +4,7 @@ import { View, ActivityIndicator, Text, StyleSheet, TouchableOpacity, Platform }
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FirebaseNotificationService } from './src/services/smartMoney/firebaseNotificationService';
 import { CrossPlatformAlert } from './src/utils/alertUtils';
@@ -32,6 +33,7 @@ import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 import LandingPage from '@/components/web/LandingPage';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { RealNotificationService } from './src/services/notifications/RealNotificationService';
+// import { NotificationService } from './src/services/notifications/NotificationService';
 import { ApiService } from '@/services/api/ApiService';
 import { notificationManager } from '@/services/NotificationManager';
 import SmartMoneyApp from '@/screens/main/SmartMoneyApp';
@@ -310,6 +312,29 @@ const AppNavigator = () => {
   }, [user?.id]);
 
   useEffect(() => {
+    // Initialize main notification service for friend requests and other app notifications
+    const initializeMainNotifications = async () => {
+      try {
+        console.log('🔔 Initializing main notification service...');
+        // const { NotificationService } = await import('./src/services/notifications/NotificationService');
+        // const initialized = await NotificationService.initialize();
+        const initialized = true; // Temporarily disabled
+        
+        if (initialized) {
+          console.log('✅ Main notification service initialized (temporarily disabled)');
+        } else {
+          console.log('⚠️ Main notification service not initialized (may be on web platform or permissions denied)');
+        }
+      } catch (error) {
+        console.error('❌ Failed to initialize main notification service:', error);
+        // Don't block app initialization if notifications fail
+      }
+    };
+
+    initializeMainNotifications();
+  }, []);
+
+  useEffect(() => {
     // Add a small delay to ensure auth state is properly checked
     const timer = setTimeout(() => {
       setInitializing(false);
@@ -375,6 +400,58 @@ const AppNavigator = () => {
     const cleanup = QRCodeService.initializeDeepLinkListener();
     return cleanup;
   }, []);
+
+  // Initialize notification deep link handler with navigation ref
+  const navigationRef = React.useRef<any>(null);
+  
+  useEffect(() => {
+    const handleNotificationResponse = async (response) => {
+      const data = response?.notification?.request?.content?.data;
+      if (data && user && navigationRef.current) {
+        console.log('🔗 Handling notification deep link:', data);
+        
+        try {
+          // Import PushNotificationManager and handle the navigation
+          const { PushNotificationManager } = await import('./src/services/notifications/PushNotificationManager');
+          await PushNotificationManager.handleNotificationTap(data, navigationRef.current);
+        } catch (error) {
+          console.error('❌ Error handling notification deep link:', error);
+        }
+      }
+    };
+
+    // Set up notification response listener
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+    
+    return () => {
+      subscription?.remove?.();
+    };
+  }, [user]);
+
+  // Check for pending navigation intents when user becomes authenticated
+  useEffect(() => {
+    const checkPendingNavigation = async () => {
+      if (user && navigationRef.current && authFlowState === 'authenticated') {
+        try {
+          // Check if RealNotificationService has any stored navigation intents
+          const { RealNotificationService } = await import('./src/services/notifications/RealNotificationService');
+          const pendingIntent = await RealNotificationService.getAndClearNavigationIntent();
+          
+          if (pendingIntent) {
+            console.log('🔗 Handling pending navigation intent:', pendingIntent);
+            const { PushNotificationManager } = await import('./src/services/notifications/PushNotificationManager');
+            await PushNotificationManager.handleNotificationTap(pendingIntent, navigationRef.current);
+          }
+        } catch (error) {
+          console.error('❌ Error checking pending navigation:', error);
+        }
+      }
+    };
+
+    // Small delay to ensure navigation is fully ready
+    const timer = setTimeout(checkPendingNavigation, 1500);
+    return () => clearTimeout(timer);
+  }, [user, authFlowState]);
 
   useEffect(() => {
     const processRecurring = async () => {
@@ -585,7 +662,7 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <StatusBar style="auto" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {(user || authFlowState === 'authenticated') ? (

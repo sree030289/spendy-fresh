@@ -88,6 +88,17 @@ export class NotificationService {
       if (token) {
         console.log('✅ Push token obtained');
         this.pushToken = token;
+        
+        // Save push token to server
+        try {
+          const { ApiService } = await import('@/services/api/ApiService');
+          const apiService = ApiService.getInstance();
+          await apiService.savePushToken(token);
+          console.log('✅ Push token saved to server');
+        } catch (saveError) {
+          console.error('❌ Failed to save push token to server:', saveError);
+          // Don't fail initialization if token save fails
+        }
       }
 
       // Set up listeners
@@ -207,10 +218,85 @@ export class NotificationService {
     const { notification } = response;
     const { data } = notification.request.content;
 
+    console.log('🔗 Handling notification tap with data:', data);
+
     // Navigate to relevant screen based on notification data
-    if (data?.reminderId) {
+    if (data?.type === 'friend_request') {
+      // Navigate to friends tab when friend request notification is tapped
+      console.log('🤝 Opening friends tab for friend request');
+      
+      // Store navigation intent for the app to pick up
+      this.storeNavigationIntent({
+        type: 'friend_request',
+        action: 'view_friend_requests',
+        friendRequestId: data.friendRequestId,
+        senderId: data.senderId,
+        senderName: data.senderName
+      });
+      
+    } else if (data?.type === 'friend_accepted') {
+      // Navigate to friends tab when friend accepts request
+      console.log('🎉 Opening friends tab for accepted friend request');
+      
+      this.storeNavigationIntent({
+        type: 'friend_request_accepted',
+        action: 'view_friends',
+        friendRequestId: data.friendRequestId,
+        friendId: data.friendId,
+        friendName: data.friendName
+      });
+      
+    } else if (data?.type === 'friend_declined') {
+      // Navigate to friends tab when friend declines request
+      console.log('❌ Opening friends tab for declined friend request');
+      
+      this.storeNavigationIntent({
+        type: 'friend_declined',
+        action: 'view_friends',
+        friendRequestId: data.friendRequestId,
+        friendName: data.friendName
+      });
+      
+    } else if (data?.reminderId) {
       // In a real app, you'd use navigation to go to reminder details
       console.log('🔗 Opening reminder:', data.reminderId);
+    }
+  }
+
+  // Store navigation intent for app to handle when ready
+  private static async storeNavigationIntent(intent: any): Promise<void> {
+    try {
+      await AsyncStorage.setItem('@navigation_intent', JSON.stringify({
+        ...intent,
+        timestamp: Date.now()
+      }));
+      console.log('💾 Navigation intent stored:', intent);
+    } catch (error) {
+      console.error('❌ Failed to store navigation intent:', error);
+    }
+  }
+
+  // Get and clear navigation intent
+  static async getAndClearNavigationIntent(): Promise<any | null> {
+    try {
+      const stored = await AsyncStorage.getItem('@navigation_intent');
+      if (stored) {
+        await AsyncStorage.removeItem('@navigation_intent');
+        const intent = JSON.parse(stored);
+        
+        // Only return intents that are less than 30 seconds old to avoid stale navigations
+        if (Date.now() - intent.timestamp < 30000) {
+          console.log('🎯 Retrieved navigation intent:', intent);
+          return intent;
+        } else {
+          console.log('⏰ Navigation intent expired, ignoring');
+          return null;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Failed to get navigation intent:', error);
+      return null;
     }
   }
 

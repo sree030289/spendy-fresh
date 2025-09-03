@@ -55,7 +55,17 @@ const [selectedFriends, setSelectedFriends] = useState<string[]>([]); // Keep th
     return true;
   };
 
-  const toggleFriendSelection = (friendId: string) => {
+  const toggleFriendSelection = (friendId: string, friendStatus: string) => {
+    // Only allow selection of accepted friends
+    if (friendStatus !== 'accepted') {
+      Alert.alert(
+        'Cannot Add Friend',
+        'You can only add friends who have accepted your friend request. Please wait for them to accept before creating a group together.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
     setSelectedFriends(prev => 
       prev.includes(friendId) 
         ? prev.filter(id => id !== friendId)
@@ -171,12 +181,20 @@ const renderFriendSelector = () => (
       </View>
     ) : (
       <ScrollView style={styles.friendsList} nestedScrollEnabled>
-        {friends.map((friend) => (
-          <TouchableOpacity
-            key={friend.id}
-            style={[styles.friendItem, { backgroundColor: theme.colors.surface }]}
-            onPress={() => toggleFriendSelection(friend.id)}
-          >
+        {friends.map((friend) => {
+          const isAccepted = friend.status === 'accepted';
+          return (
+            <TouchableOpacity
+              key={friend.id}
+              style={[
+                styles.friendItem, 
+                { 
+                  backgroundColor: theme.colors.surface,
+                  opacity: isAccepted ? 1 : 0.6 // Dim non-accepted friends
+                }
+              ]}
+              onPress={() => toggleFriendSelection(friend.id, friend.status)}
+            >
             <View style={styles.friendInfo}>
               <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
                 <Text style={styles.friendAvatarText}>
@@ -215,7 +233,8 @@ const renderFriendSelector = () => (
               </View>
             </View>
           </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
     )}
   </View>

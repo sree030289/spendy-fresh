@@ -125,22 +125,47 @@ export class RealNotificationService {
   // Register for push notifications and get token
   private static async registerForPushNotifications(): Promise<string | null> {
     try {
-      // For demo purposes, we'll skip getting the actual push token
-      // In production, you'd need a real Expo project ID
-      console.log('📱 Simulating push token registration (demo mode)');
+      // Check if device supports push notifications
+      if (!Device.isDevice) {
+        console.log('📱 Push notifications are not supported on simulators');
+        return null;
+      }
+
+      // Request permissions
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
       
-      // Generate a mock token for demo purposes
-      const mockToken = `ExponentPushToken[demo-${Math.random().toString(36).substr(2, 20)}]`;
-      this.pushToken = mockToken;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
       
+      if (finalStatus !== 'granted') {
+        console.log('❌ Push notification permissions not granted');
+        return null;
+      }
+
+      // Get Expo push token
+      const token = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+      });
+      
+      this.pushToken = token.data;
       await AsyncStorage.setItem(STORAGE_KEYS.PUSH_TOKEN, this.pushToken);
       
-      console.log('📱 Mock push token generated for demo:', this.pushToken.substring(0, 30) + '...');
+      console.log('✅ Push token obtained:', this.pushToken);
       return this.pushToken;
     } catch (error) {
       console.error('Failed to get push token:', error);
       return null;
     }
+  }
+
+  // Force refresh push token (useful for fixing stale tokens)
+  static async refreshPushToken(userId: string): Promise<void> {
+    console.log('🔄 Refreshing push token...');
+    this.pushToken = null; // Clear cached token
+    await this.registerTokenWithBackend(userId);
   }
 
   // **MISSING METHOD ADDED** - Register token with backend
@@ -151,15 +176,18 @@ export class RealNotificationService {
       }
       
       if (this.pushToken) {
-        // Store token associated with user
+        // Store token associated with user locally
         await AsyncStorage.setItem(`${STORAGE_KEYS.PUSH_TOKEN}_${userId}`, this.pushToken);
         console.log(`✅ Registered push token for user ${userId}`);
         
-        // In a real app, you'd send this to your backend:
-        // await fetch('/api/users/register-push-token', {
-        //   method: 'POST',
-        //   body: JSON.stringify({ userId, token: this.pushToken })
-        // });
+        // Send token to backend server
+        try {
+          const ApiService = (await import('@/services/api/ApiService')).ApiService;
+          await ApiService.getInstance().savePushToken(this.pushToken);
+          console.log('✅ Push token saved to server');
+        } catch (serverError) {
+          console.error('❌ Failed to save push token to server:', serverError);
+        }
       }
     } catch (error) {
       console.error('Failed to register token with backend:', error);
@@ -420,6 +448,12 @@ export class RealNotificationService {
       console.log('🤝 Friend request notification received - triggering modal');
       this.triggerAppNavigation(data);
     }
+    
+    // For balance-affecting notifications, trigger balance refresh
+    if (data && this.isBalanceAffectingNotification(data.type)) {
+      console.log('💰 Balance-affecting notification received - triggering refresh');
+      this.triggerBalanceRefresh();
+    }
   }
 
   // Handle notification response (tapped/action)
@@ -526,6 +560,12 @@ export class RealNotificationService {
       default:
         this.handleDefaultNotificationTap(data);
         break;
+    }
+    
+    // For balance-affecting notification actions, also trigger refresh
+    if (this.isBalanceAffectingAction(actionIdentifier) || this.isBalanceAffectingNotification(data?.type)) {
+      console.log('💰 Balance-affecting action performed - triggering refresh');
+      this.triggerBalanceRefresh();
     }
   }
 
@@ -760,11 +800,29 @@ export class RealNotificationService {
   private static triggerAppNavigation(data: any): void {
     console.log('Triggering app navigation:', data);
     
-    // In a real implementation, this would use a navigation service or event emitter
-    // to communicate with the app's navigation system
-    
-    // For now, we'll store the navigation intent and let the app pick it up
+    // Store the navigation intent for the app to pick up
     this.setNavigationIntent(data);
+    
+    // Also try to trigger immediate navigation if app is in foreground
+    this.triggerImmediateNavigation(data);
+  }
+
+  // **NEW** Add navigation response listener method for external use
+  static addNotificationResponseListener(handler: (response: any) => void): any {
+    return Notifications.addNotificationResponseReceivedListener(handler);
+  }
+
+  // **NEW** Try to trigger immediate navigation (used by App.tsx)
+  private static triggerImmediateNavigation(data: any): void {
+    // This will be picked up by the notification handler in App.tsx
+    // The data contains deepLink information for PushNotificationManager
+    console.log('📱 Immediate navigation trigger for deep link data:', data);
+    
+    // Emit a custom event that can be picked up by App.tsx
+    if (typeof window !== 'undefined') {
+      const event = new CustomEvent('notificationNavigation', { detail: data });
+      window.dispatchEvent(event);
+    }
   }
 
   // **NEW** Store navigation intent for app to pick up
@@ -1172,5 +1230,64 @@ export class RealNotificationService {
     }
     
     return `${urgencyText}${reminder.description || 'Tap to view details.'}`;
+  }
+
+  // **NEW** Check if notification type affects balances
+  private static isBalanceAffectingNotification(type: string): boolean {
+    const balanceAffectingTypes = [
+      'expense_added',
+      'expense_edited', 
+      'expense_deleted',
+      'expense_settled',
+      'payment_confirmed',
+      'payment_reminder',
+      'group_created',
+      'group_member_added',
+      'group_member_removed',
+      'friend_request_accepted'
+    ];
+    
+    return balanceAffectingTypes.includes(type);
+  }
+
+  // **NEW** Check if notification action affects balances
+  private static isBalanceAffectingAction(actionIdentifier: string): boolean {
+    const balanceAffectingActions = [
+      'mark_paid',
+      'pay_now',
+      'accept_friend',
+      'join_group'
+    ];
+    
+    return balanceAffectingActions.includes(actionIdentifier);
+  }
+
+  // **NEW** Trigger balance refresh across the app
+  private static async triggerBalanceRefresh(): Promise<void> {
+    try {
+      console.log('💰 Triggering balance refresh...');
+      
+      // Clear settlement cache to ensure fresh calculations
+      try {
+        const { UnifiedSettlementService } = await import('@/hooks/useBalances');
+        UnifiedSettlementService.clearBalanceCache();
+        console.log('🧹 Settlement cache cleared');
+      } catch (cacheError) {
+        console.log('ℹ️ Settlement cache clear skipped (service not available)');
+      }
+      
+      // Emit a custom event for balance refresh
+      if (typeof window !== 'undefined') {
+        const event = new CustomEvent('balanceRefreshRequired');
+        window.dispatchEvent(event);
+      }
+      
+      // Store a flag in AsyncStorage for components to pick up
+      await AsyncStorage.setItem('@balance_refresh_required', Date.now().toString());
+      
+      console.log('✅ Balance refresh triggered with cache clearing');
+    } catch (error) {
+      console.error('❌ Error triggering balance refresh:', error);
+    }
   }
 }

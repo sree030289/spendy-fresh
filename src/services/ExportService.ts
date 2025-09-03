@@ -1,8 +1,43 @@
 // src/services/ExportService.ts
-import { Group, Expense, SplittingService } from '@/services/firebase/splitting-disabled';
 import { getCurrencySymbol } from '@/utils/currency';
+import { ApiService } from '@/services/api/ApiService';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+
+// Types for export - matching the Group interface from RealSplittingScreen
+interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  avatar: string;
+  createdBy: string;
+  members: Array<{
+    userId: string;
+    userData: {
+      fullName: string;
+      email: string;
+      avatar?: string;
+    };
+    role: 'admin' | 'member';
+    balance: number;
+  }>;
+  currency: string;
+  createdAt: Date;
+}
+
+interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  category: string;
+  createdAt: string | Date;
+  paidByData: {
+    fullName: string;
+  };
+  splitType: string;
+  status?: string;
+}
 
 export class ExportService {
   static async exportGroupData(group: Group, format: 'csv' | 'pdf'): Promise<void> {
@@ -10,7 +45,8 @@ export class ExportService {
       console.log(`📤 Exporting group ${group.name} as ${format.toUpperCase()}`);
       
       // Get all expenses for the group
-      const expenses = await SplittingService.getGroupExpenses(group.id);
+      const apiService = ApiService.getInstance();
+      const expenses = await apiService.getGroupExpenses(group.id);
       
       if (format === 'csv') {
         await this.exportAsCSV(group, expenses);
@@ -40,9 +76,10 @@ export class ExportService {
     
     // Members section
     csvContent += `Members\n`;
-    csvContent += `Name,Email,Role,Status\n`;
+    csvContent += `Name,Email,Role,Balance\n`;
     group.members.forEach(member => {
-      csvContent += `"${member.userData.fullName}","${member.userData.email}","${member.role}","${member.isActive ? 'Active' : 'Inactive'}"\n`;
+      const currencySymbol = getCurrencySymbol(group.currency);
+      csvContent += `"${member.userData.fullName}","${member.userData.email}","${member.role}","${currencySymbol}${member.balance.toFixed(2)}"\n`;
     });
     csvContent += `\n`;
     

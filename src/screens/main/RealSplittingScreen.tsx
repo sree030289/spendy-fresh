@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Icon } from '../../components/common/Icon';
 import DynamicBanner from '../../components/common/DynamicBanner';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -128,6 +129,7 @@ import FullScreenErrorSimple from '@/components/animations/FullScreenErrorSimple
 import { PaymentService } from '@/services/payments/PaymentService';
 import { PushNotificationService } from '@/services/notifications/PushNotificationService';
 import { RealNotificationService } from '@/services/notifications/RealNotificationService';
+import { SimpleNotificationService } from '@/services/notifications/SimpleNotificationService';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 // REMOVED: friendsManager import - using only API service
 
@@ -136,7 +138,6 @@ import AddExpenseModal from '@/components/modals/AddExpenseModal';
 import AddFriendModal from '@/components/modals/AddFriendModal';
 import CreateGroupModal from '@/components/modals/CreateGroupModal';
 import QRCodeModal from '@/components/modals/QRCodeModal';
-import PaymentModal from '@/components/modals/PaymentModal';
 import GroupChatModal from '@/components/modals/GroupChatModal';
 import ReceiptScannerModal from '@/components/modals/ReceiptScannerModal';
 import GroupDetailsModal from '@/components/modals/GroupDetailsModal';
@@ -147,7 +148,6 @@ import ExpenseDeletionModal from '@/components/modals/ExpenseDeletionModal';
 import ExpenseSettlementModal from '@/components/modals/ExpenseSettlementModal';
 import FriendRequestModal from '@/components/modals/FriendRequestModal';
 import UnifiedSettlementScreen from './UnifiedSettlementScreen';
-import ImportSplitwiseModal from '@/components/modals/ImportSplitwise';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimestamp } from '@/utils/timestamp';
 import QRCodeScanner from '@/components/QRCodeScanner';
@@ -463,7 +463,7 @@ export default function RealSplittingScreen() {
     // Add debounce to prevent excessive calculations
     const timeoutId = setTimeout(calculateAllGroupBalances, 500);
     return () => clearTimeout(timeoutId);
-  }, [groups, user?.id, sharedBalances]);
+  }, [groups, user?.id]); // FIXED: Removed sharedBalances dependency to prevent useInsertionEffect error
 
   // Load settlement balances for Friends tab (moved to top level to avoid conditional hooks)
   useEffect(() => {
@@ -674,15 +674,31 @@ export default function RealSplittingScreen() {
     };
 
     loadSettlementBalances();
-  }, [sharedBalances, friends, user?.id]); // Added friends dependency back since we're using it
+  }, [friends, user?.id]); // FIXED: Removed sharedBalances dependency to prevent useInsertionEffect error
   
   // FIXED: Unified balance change notification with cache clearing
+  // FIXED: Use ref for debouncing balance change notifications and friends loading
+  const balanceChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const friendsLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isLoadingFriendsRef = useRef(false);
+  
   const notifyBalanceChange = useCallback(() => {
     console.log('🔄 Notifying balance change and clearing cache...');
-    UnifiedSettlementService.clearBalanceCache(); // FIXED: Clear cache when balance changes
+    UnifiedSettlementService.clearBalanceCache(); // Clear cache when balance changes
+    
+    // FIXED: Immediate refresh for critical operations
     sharedBalances.notifyChange();
-    sharedBalances.forceRefresh(); // FIXED: Force refresh instead of just notify
-  }, [sharedBalances.notifyChange, sharedBalances.forceRefresh]);
+    
+    // Also debounce a force refresh to ensure all components are updated
+    if (balanceChangeTimeoutRef.current) {
+      clearTimeout(balanceChangeTimeoutRef.current);
+    }
+    
+    balanceChangeTimeoutRef.current = setTimeout(() => {
+      sharedBalances.forceRefresh();
+      balanceChangeTimeoutRef.current = null;
+    }, 100); // Reduced debounce to 100ms for faster response
+  }, []); // FIXED: Removed all dependencies to prevent useInsertionEffect error as sharedBalances methods are stable
 
   // FIXED: Optimized tab switching to prevent useInsertion effect errors
   const handleTabSwitch = useCallback((tabId: string) => {
@@ -760,6 +776,16 @@ export default function RealSplittingScreen() {
       try {
         setLoading(true);
         
+        // Initialize push notifications first
+        console.log('⏰ Step 0: Initializing push notifications...');
+        try {
+          await SimpleNotificationService.initialize();
+          console.log('✅ Step 0 complete: Push notifications initialized');
+        } catch (notificationError) {
+          console.error('⚠️ Push notification initialization failed:', notificationError);
+          // Don't fail the entire initialization if notifications fail
+        }
+        
         // Load friends and requests FIRST
         console.log('🚀 Starting data loading - user ID:', user?.id);
         console.log('⏰ Step 1: Loading friends and requests...');
@@ -816,6 +842,39 @@ export default function RealSplittingScreen() {
     };
   }, [user?.id, notifyBalanceChange]);
 
+  // Add focus-based balance refresh for notification-triggered updates
+  useFocusEffect(
+    useCallback(() => {
+      const checkNotificationTriggeredRefresh = async () => {
+        try {
+          // Check if there's a pending balance refresh flag from notifications
+          const refreshFlag = await AsyncStorage.getItem('@balance_refresh_required');
+          if (refreshFlag) {
+            const flagTime = parseInt(refreshFlag);
+            const now = Date.now();
+            
+            // Only refresh if flag is recent (within last 60 seconds)
+            if ((now - flagTime) < 60000) {
+              console.log('💰 Found notification-triggered balance refresh flag - refreshing balances');
+              await sharedBalances.forceRefresh();
+              console.log('✅ Notification-triggered balance refresh completed');
+            }
+            
+            // Clear the flag after checking
+            await AsyncStorage.removeItem('@balance_refresh_required');
+          }
+        } catch (error) {
+          console.error('❌ Error checking notification-triggered refresh flag:', error);
+        }
+      };
+
+      // Small delay to ensure the screen is fully focused before checking
+      const timer = setTimeout(checkNotificationTriggeredRefresh, 500);
+      
+      return () => clearTimeout(timer);
+    }, [sharedBalances])
+  );
+
   useEffect(() => {
     const refreshService = ExpenseRefreshService.getInstance();
     const unsubscribe = refreshService.addListener(() => {
@@ -835,7 +894,7 @@ export default function RealSplittingScreen() {
   useEffect(() => {
     const checkNavigationIntent = async () => {
       try {
-        const intent = await RealNotificationService.getAndClearNavigationIntent();
+        const intent = await SimpleNotificationService.getAndClearNavigationIntent();
         if (intent && user?.id) {
           console.log('Processing navigation intent:', intent);
           await handleNavigationIntent(intent);
@@ -855,10 +914,16 @@ export default function RealSplittingScreen() {
     try {
       if (!user?.id) return;
       const notificationsResponse = await apiService.getUserNotifications({ limit: 20 });
-      const notificationsData = notificationsResponse.notifications;
+      
+      console.log('🔔 Notifications response:', notificationsResponse);
+      
+      // FIXED: Handle the correct response format from backend
+      const notificationsData = (notificationsResponse as any).data?.notifications || notificationsResponse.notifications || [];
       
       // Ensure notificationsData is an array before processing
       const dataArray = Array.isArray(notificationsData) ? notificationsData : [];
+      
+      console.log('🔔 Processing notifications:', dataArray.length);
       
       const processedNotifications = dataArray.map(notification => ({
         ...notification,
@@ -868,6 +933,7 @@ export default function RealSplittingScreen() {
       }));
       
       setNotifications(processedNotifications);
+      console.log('✅ Notifications loaded:', processedNotifications.length);
     } catch (error) {
       console.error('Load notifications error:', error);
     }
@@ -1206,11 +1272,18 @@ export default function RealSplittingScreen() {
     }
   };
 
-  // FIXED: Load friends and friend requests
-  const loadFriendsAndRequests = async (): Promise<Friend[]> => {
+  // FIXED: Load friends and friend requests with debouncing to prevent multiple rapid calls
+  const loadFriendsAndRequests = useCallback(async (): Promise<Friend[]> => {
     try {
       if (!user?.id) return [];
       
+      // Prevent multiple simultaneous calls
+      if (isLoadingFriendsRef.current) {
+        console.log('⚠️ Friends loading already in progress, skipping...');
+        return friends; // Return current friends if already loading
+      }
+      
+      isLoadingFriendsRef.current = true;
       console.log('🔄 Loading friends and friend requests...');
       
       // Get both friends and friend requests
@@ -1283,7 +1356,8 @@ export default function RealSplittingScreen() {
         }
         
         // Determine if this is a new user invite based on available data
-        const isNewUserInvite = !request.recipientName && !request.receiverData && !request.toUserData;
+        // If there's a toUserId, recipientId, or toUserData, it's an existing user
+        const isNewUserInvite = !request.toUserId && !request.recipientId && !request.toUserData && !request.receiverData && request.type === 'email_invite';
         
         console.log('🔍 Processing request:', { 
           friendId, 
@@ -1336,31 +1410,55 @@ export default function RealSplittingScreen() {
       setPendingFriends([]);
       setFriendRequests({incoming: [], outgoing: []});
       return [];
+    } finally {
+      isLoadingFriendsRef.current = false;
     }
-  };
+  }, [user?.id, friends]); // Dependencies for useCallback
+
+  // FIXED: Debounced wrapper for loadFriendsAndRequests to prevent multiple rapid calls
+  const debouncedLoadFriends = useCallback(() => {
+    if (friendsLoadTimeoutRef.current) {
+      clearTimeout(friendsLoadTimeoutRef.current);
+    }
+    
+    friendsLoadTimeoutRef.current = setTimeout(async () => {
+      try {
+        await loadFriendsAndRequests();
+        // Also refresh notifications when friends data changes
+        await loadNotifications();
+      } catch (error) {
+        console.error('Error in debounced friends loading:', error);
+      }
+      friendsLoadTimeoutRef.current = null;
+    }, 500); // 500ms debounce
+  }, [loadFriendsAndRequests]);
 
   // FIXED: Unified refresh function
   // OPTIMIZED: Memoize refresh function and reduce parallel calls
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
+      // Check for notification-triggered balance refresh flags
+      console.log('💰 Checking for notification-triggered balance refresh...');
+      
       // Load data sequentially to avoid overwhelming the server
       const loadedFriends = await loadFriendsAndRequests();
       const loadedGroups = await loadGroups();
       
       // Then refresh balances and other data in parallel
       await Promise.all([
-        sharedBalances.forceRefresh(),
-        sharedBalances.forceRefresh(),
+        sharedBalances.forceRefresh(), // Force refresh balances
         loadRecentExpenses(loadedFriends, loadedGroups),
         loadNotifications()
       ]);
+      
+      console.log('✅ Complete refresh finished - all balance data updated');
     } catch (error) {
       console.error('Refresh error:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [sharedBalances, sharedBalances]);
+  }, []); // FIXED: Removed sharedBalances dependencies to prevent useInsertionEffect error
 
   const markAllNotificationsRead = async () => {
     try {
@@ -1453,9 +1551,20 @@ export default function RealSplittingScreen() {
     onRestart?: () => void
   ) => {
     const handleRestart = onRestart || (() => {
-      // Default restart behavior - you might want to implement app restart logic
-      console.log('App restart requested');
+      // Close error modal and reset app state
       setShowFullScreenError(false);
+      
+      // Reset all modal states to clean up any stuck states
+      setShowExportModal(false);
+      setSelectedGroupForExport(null);
+      setShowErrorModal(false);
+      setShowAnimatedModal(false);
+      setShowFullScreenSuccess(false);
+      
+      // Navigate back to main tab to ensure clean state
+      navigation.navigate('Split' as never);
+      
+      console.log('App state reset completed');
     });
 
     setFullScreenErrorProps({
@@ -1581,7 +1690,12 @@ export default function RealSplittingScreen() {
           loadRecentExpenses()
         ]);
         
-        // FIXED: Notify unified balance system
+        // FIXED: Immediate balance refresh without debounce for critical operations
+        console.log('🔄 EXPENSE ADDED: Forcing immediate balance refresh...');
+        UnifiedSettlementService.clearBalanceCache();
+        await sharedBalances.forceRefresh();
+        
+        // Also trigger the regular notification for other components
         notifyBalanceChange();
         
         setShowAddExpense(false);
@@ -1592,12 +1706,16 @@ export default function RealSplittingScreen() {
           'Expense Added! 🧾', 
           'Expense has been added and split successfully!',
           fromGroupDetails ? `Added to ${fromGroupDetails.name}` : 'Check your groups for updates',
-          fromGroupDetails ? 'View Group Details' : 'Continue',
+          fromGroupDetails ? 'View Expense' : 'Continue',
           () => {
             setShowFullScreenSuccess(false);
             if (fromGroupDetails) {
+              // Open the specific group's details modal
               setSelectedGroup(fromGroupDetails);
               setShowGroupDetails(true);
+            } else {
+              // Navigate to groups tab to see all groups
+              setActiveTab('groups');
             }
           }
         );
@@ -1668,11 +1786,10 @@ export default function RealSplittingScreen() {
             showAnimatedSuccess('Friend Request Sent! 🤝', message || 'Friend request sent successfully! They will be notified.');
           }
           
-          // Refresh friends list to show new pending request
-          setTimeout(async () => {
-            await loadFriendsAndRequests();
-            notifyBalanceChange();
-          }, 1500); // Increased delay to account for database consistency
+          // FIXED: Use debounced loading to prevent multiple rapid refreshes
+          setTimeout(() => {
+            debouncedLoadFriends();
+          }, 800); // Slightly reduced delay for faster UI update
         } else {
           showAnimatedSuccess('Request Failed', message || 'Failed to send friend request', 'error');
         }
@@ -1694,20 +1811,18 @@ export default function RealSplittingScreen() {
           
           setShowAddFriend(false);
           
-          // Refresh friends to show pending invitations
-          setTimeout(async () => {
-            await loadFriendsAndRequests();
-            notifyBalanceChange();
+          // FIXED: Use debounced loading for SMS/WhatsApp invitations
+          setTimeout(() => {
+            debouncedLoadFriends();
           }, 500);
         }
       } else if (method === 'qr') {
-        setQrScanSource('addFriend');
-        setShowQRScanner(true);
+        // Show QR code for sharing (not scanning)
+        setShowQRCode(true);
         setShowAddFriend(false);
       }
       
-      // FIXED: Notify balance system of potential friend addition
-      notifyBalanceChange();
+      // REMOVED: Duplicate notifyBalanceChange call that was causing multiple refreshes
       
     } catch (error: any) {
       console.error('Add friend error:', error);
@@ -1840,12 +1955,35 @@ export default function RealSplittingScreen() {
         'View Group',
         () => {
           setShowFullScreenSuccess(false);
-          // Find and show the newly created group
+          // Find and show the newly created group in GroupDetailsModal
           setTimeout(async () => {
             await loadGroups(); // Refresh groups to get the new one
-            // The group should now be in the groups list, but we'll need the ID
-            // For now, just close and let user find it in the groups tab
-            setActiveTab('groups');
+            // Find the newly created group by ID from the response
+            const groupId = response?.group?.id || response?.id;
+            if (groupId) {
+              try {
+                console.log('🔗 Fetching created group with ID:', groupId);
+                const createdGroup = await apiService.getGroup(groupId);
+                if (createdGroup) {
+                  console.log('✅ Opening GroupDetailsModal for created group:', createdGroup.name);
+                  setSelectedGroup(createdGroup);
+                  setShowGroupDetails(true);
+                  setActiveTab('groups'); // Also switch to groups tab for context
+                } else {
+                  console.warn('❌ Created group not found, falling back to groups tab');
+                  setActiveTab('groups');
+                }
+              } catch (error) {
+                console.error('Error fetching created group:', error);
+                // Fallback to groups tab
+                setActiveTab('groups');
+              }
+            } else {
+              console.warn('❌ No group ID in response, falling back to groups tab');
+              console.log('Response structure:', response);
+              // Fallback to groups tab
+              setActiveTab('groups');
+            }
           }, 100);
         }
       );
@@ -2114,7 +2252,11 @@ export default function RealSplittingScreen() {
         loadRecentExpenses()
       ]);
       
-      // FIXED: Notify balance system
+      // FIXED: Immediate balance refresh for expense updates
+      console.log('🔄 EXPENSE UPDATED: Forcing immediate balance refresh...');
+      await sharedBalances.forceRefresh();
+      
+      // Also trigger the regular notification for other components
       notifyBalanceChange();
       
       console.log('✅ Local data refreshed after expense update');
@@ -2356,14 +2498,14 @@ export default function RealSplittingScreen() {
           <View style={styles.balanceGrid}>
             <View style={styles.balanceItem}>
               <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
-                {getCurrencySymbol(user?.currency || 'USD')}{(totalOwed || 0).toFixed(2)}
+                <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{(totalOwed || 0).toFixed(2)}</Text>
               </Text>
               <Text style={styles.balanceLabel}>You're owed</Text>
             </View>
             
             <View style={styles.balanceItem}>
               <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
-                {getCurrencySymbol(user?.currency || 'USD')}{(totalOwing || 0).toFixed(2)}
+                <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{(totalOwing || 0).toFixed(2)}</Text>
               </Text>
               <Text style={styles.balanceLabel}>You owe</Text>
             </View>
@@ -2377,7 +2519,7 @@ export default function RealSplittingScreen() {
                 numberOfLines={1} 
                 adjustsFontSizeToFit
               >
-                {(netBalance || 0) >= 0 ? '+' : ''}{getCurrencySymbol(user?.currency || 'USD')}{Math.abs(netBalance || 0).toFixed(2)}
+                <Text>{(netBalance || 0) >= 0 ? '+' : ''}</Text><Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{Math.abs(netBalance || 0).toFixed(2)}</Text>
               </Text>
               <Text style={styles.balanceLabel}>Net balance</Text>
             </View>
@@ -2497,7 +2639,7 @@ export default function RealSplittingScreen() {
                     </Text>
                     <View style={styles.expenseCardMeta}>
                       <Text style={[styles.expenseCardPaidBy, { color: theme.colors.textSecondary }]}>
-                        Paid by {expense.paidByData?.fullName || (expense.paidBy === user?.id ? 'You' : 'Unknown')}
+                        <Text>Paid by </Text><Text>{expense.paidByData?.fullName || (expense.paidBy === user?.id ? 'You' : 'Unknown')}</Text>
                       </Text>
                       <Text style={[styles.metaSeparator, { color: theme.colors.textSecondary }]}>•</Text>
                       <Text style={[styles.expenseCardDate, { color: theme.colors.textSecondary }]}>
@@ -2533,7 +2675,7 @@ export default function RealSplittingScreen() {
                   {/* Right: Amount */}
                   <View style={styles.expenseCardAmount}>
                     <Text style={[styles.expenseCardAmountText, { color: theme.colors.text }]}>
-                      {getCurrencySymbol(user?.currency || 'USD')}{expense.amount.toFixed(2)}
+                      <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{expense.amount.toFixed(2)}</Text>
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -2652,14 +2794,14 @@ export default function RealSplittingScreen() {
                     ) : detail.balance > 0 ? (
                       <>
                         <Text style={[styles.friendCardRowBalanceText, { color: theme.colors.success }]}>
-                          +{getCurrencySymbol(user?.currency || 'USD')}{(detail.balance || 0).toFixed(2)}
+                          <Text>+</Text><Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{(detail.balance || 0).toFixed(2)}</Text>
                         </Text>
                         <Icon name="arrowUp" size={16} color={theme.colors.success} />
                       </>
                     ) : (
                       <>
                         <Text style={[styles.friendCardRowBalanceText, { color: theme.colors.error }]}>
-                          {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(detail.balance).toFixed(2)}
+                          <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{Math.abs(detail.balance).toFixed(2)}</Text>
                         </Text>
                         <Icon name="arrowDown" size={16} color={theme.colors.error} />
                       </>
@@ -2727,10 +2869,23 @@ export default function RealSplittingScreen() {
           <View style={styles.headerTitleSection}>
             <Text style={[styles.cleanTabTitle, { color: theme.colors.text }]}>Friends</Text>
             <Text style={[styles.cleanTabSubtitle, { color: theme.colors.textSecondary }]}>
-              {(acceptedFriends?.length || 0)} active • {(invitedFriends?.length || 0)} pending
+              <Text>{(acceptedFriends?.length || 0)}</Text><Text> active • </Text><Text>{(invitedFriends?.length || 0)}</Text><Text> pending</Text>
             </Text>
           </View>
           <View style={styles.cleanHeaderActions}>
+            <TouchableOpacity 
+              onPress={() => setShowNotifications(true)}
+              style={[styles.cleanActionButton, { backgroundColor: theme.colors.surface }]}
+            >
+              <Icon name="notifications" size={18} color={theme.colors.primary}  />
+              {notifications.length > 0 && notifications.some(n => !n.read) && (
+                <View style={[styles.notificationBadge, { backgroundColor: theme.colors.warning }]}>
+                  <Text style={styles.notificationBadgeText}>
+                    {notifications.filter(n => !n.read).length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
             <TouchableOpacity 
               onPress={() => sharedBalances.refresh()} 
               style={[styles.cleanActionButton, { backgroundColor: theme.colors.surface }]}
@@ -2794,7 +2949,7 @@ export default function RealSplittingScreen() {
                 styles.modernTabBadgeText,
                 { color: 'white' }
               ]}>
-                {(invitedFriends?.length || 0)}
+                <Text>{(invitedFriends?.length || 0)}</Text>
               </Text>
             </View>
           </TouchableOpacity>
@@ -2896,7 +3051,7 @@ export default function RealSplittingScreen() {
                             <Text style={[styles.cleanBalanceAmount, { 
                               color: owesYou ? theme.colors.success : theme.colors.error 
                             }]}>
-                              {getCurrencySymbol(user?.currency || 'USD')}{(amount || 0).toFixed(2)}
+                              <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{(amount || 0).toFixed(2)}</Text>
                             </Text>
                             <Text style={[styles.cleanBalanceLabel, { 
                               color: owesYou ? theme.colors.success : theme.colors.error 
@@ -2920,7 +3075,7 @@ export default function RealSplittingScreen() {
                   </TouchableOpacity>
                 );
               })
-              .filter(Boolean)} {/* Filter out any null entries */}
+              .filter(Boolean)}
             </View>
           )
         ) : (
@@ -3141,7 +3296,7 @@ export default function RealSplittingScreen() {
                     Total spent
                   </Text>
                   <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                    {getCurrencySymbol(group.currency)}{(((group as any).totalExpenses || 0)).toFixed(2)}
+                    <Text>{getCurrencySymbol(group.currency)}</Text><Text>{(((group as any).totalExpenses || 0)).toFixed(2)}</Text>
                   </Text>
                 </View>
                 <View style={styles.groupStat}>
@@ -3359,6 +3514,16 @@ export default function RealSplittingScreen() {
           notifyBalanceChange(); // FIXED: Notify balance system
           if (intent.friendRequestId) {
             Alert.alert('Friend Added! 🎉', 'You are now connected and can split expenses together.');
+          }
+          break;
+
+        case 'friend_declined':
+          console.log('❌ Handling friend_declined navigation intent:', intent);
+          setActiveTab('friends');
+          await loadFriendsAndRequests();
+          await loadNotifications(); // Also refresh notifications
+          if (intent.friendName) {
+            Alert.alert('Friend Request Declined', `${intent.friendName} declined your friend request.`);
           }
           break;
 
@@ -3725,6 +3890,10 @@ export default function RealSplittingScreen() {
           setShowGroupDetails(false);
           handleGroupChatAccess(selectedGroup!);
         }}
+        onOpenSettlement={(config) => {
+          setShowGroupDetails(false);
+          openSettlementScreen(config);
+        }}
         onGroupLeft={() => {
           loadGroups();
           notifyBalanceChange(); // FIXED: Notify balance system
@@ -3743,14 +3912,6 @@ export default function RealSplittingScreen() {
         selectedGroup={selectedGroup}
       />
       
-      <PaymentModal
-        visible={showPayment}
-        onClose={() => setShowPayment(false)}
-        friend={selectedFriend}
-        onPayment={handlePayment}
-        userCurrency={user?.currency || 'AUD'}
-        userCountry={user?.country || 'AU'}
-      />
       
       <GroupChatModal
         visible={showGroupChat}
@@ -3818,7 +3979,12 @@ export default function RealSplittingScreen() {
             loadGroups(),
             loadRecentExpenses()
           ]);
-          notifyBalanceChange(); // FIXED: Notify balance system
+          
+          // FIXED: Immediate balance refresh for expense deletion
+          console.log('🔄 EXPENSE DELETED: Forcing immediate balance refresh...');
+          UnifiedSettlementService.clearBalanceCache();
+          sharedBalances.forceRefresh();
+          notifyBalanceChange(); // Also trigger the regular notification
           
           // Show success animation for deletion
           showAnimatedSuccess('Expense Deleted! 🗑️', 'Your expense has been deleted successfully');
@@ -3833,7 +3999,12 @@ export default function RealSplittingScreen() {
         onSettlementComplete={() => {
           loadRecentExpenses();
           loadGroups();
-          notifyBalanceChange(); // FIXED: Notify balance system
+          
+          // FIXED: Immediate balance refresh for settlement completion
+          console.log('🔄 SETTLEMENT COMPLETED: Forcing immediate balance refresh...');
+          UnifiedSettlementService.clearBalanceCache();
+          sharedBalances.forceRefresh();
+          notifyBalanceChange(); // Also trigger the regular notification
         }}
       />
 
@@ -3845,7 +4016,12 @@ export default function RealSplittingScreen() {
         onDeletionComplete={() => {
           loadRecentExpenses();
           loadGroups();
-          notifyBalanceChange(); // FIXED: Notify balance system
+          
+          // FIXED: Immediate balance refresh for expense deletion
+          console.log('🔄 EXPENSE DELETION COMPLETED: Forcing immediate balance refresh...');
+          UnifiedSettlementService.clearBalanceCache();
+          sharedBalances.forceRefresh();
+          notifyBalanceChange(); // Also trigger the regular notification
         }}
         isUserAdmin={groups.find(g => g.id === selectedExpenseForAction?.groupId)
           ?.members.find(m => m.userId === user?.id)?.role === 'admin'}

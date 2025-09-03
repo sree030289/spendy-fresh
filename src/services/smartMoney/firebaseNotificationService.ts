@@ -250,6 +250,9 @@ export class FirebaseNotificationService {
     // Custom handling for different notification types
     const data = notification.request.content.data;
     
+    // Check if this is a recurring notification that needs to be rescheduled
+    this.handleRecurringNotificationReschedule(data);
+    
     switch (data?.type) {
       case 'expense_reminder':
         // Track expense reminder received
@@ -263,12 +266,19 @@ export class FirebaseNotificationService {
         // Track salary notification
         this.trackNotificationEvent('salary_notification_received');
         break;
+      case 'weekly_analytics':
+        // Track weekly analytics notification
+        this.trackNotificationEvent('weekly_analytics_received');
+        break;
     }
   }
 
   private handleNotificationResponse(response: Notifications.NotificationResponse): void {
     const { notification, actionIdentifier } = response;
     const data = notification.request.content.data;
+
+    // Check if this is a recurring notification that needs to be rescheduled
+    this.handleRecurringNotificationReschedule(data);
 
     switch (actionIdentifier) {
       case 'ADD_EXPENSE':
@@ -290,6 +300,26 @@ export class FirebaseNotificationService {
       default:
         // Default tap - open relevant screen
         this.handleDefaultTap(data);
+    }
+  }
+
+  // Handle automatic rescheduling of recurring notifications
+  private async handleRecurringNotificationReschedule(data: any): Promise<void> {
+    try {
+      switch (data?.type) {
+        case 'expense_reminder':
+          // Reschedule daily expense reminder for next day
+          await this.scheduleDailyExpenseReminder();
+          console.log('🔄 Rescheduled daily expense reminder');
+          break;
+        case 'weekly_analytics':
+          // Reschedule weekly analytics for next week
+          await this.scheduleWeeklyAnalytics();
+          console.log('🔄 Rescheduled weekly analytics');
+          break;
+      }
+    } catch (error) {
+      console.error('❌ Failed to reschedule notification:', error);
     }
   }
 
@@ -340,7 +370,7 @@ export class FirebaseNotificationService {
           categoryIdentifier: notificationData.categoryId,
         },
         trigger: {
-          type: 'date',
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: triggerDate,
         },
       });
@@ -355,29 +385,57 @@ export class FirebaseNotificationService {
 
   // Schedule daily expense reminder
   async scheduleDailyExpenseReminder(): Promise<void> {
-    // Cancel existing daily reminders
-    await this.cancelNotificationsByTag('daily-expense');
-    
-    // Schedule for 8 PM daily
-    const trigger = {
-      hour: 20,
-      minute: 0,
-      repeats: true,
-    };
+    try {
+      // Cancel existing daily reminders
+      await this.cancelNotificationsByTag('daily-expense');
+      
+      // Calculate seconds until next 8 PM
+      const now = new Date();
+      const next8PM = new Date();
+      next8PM.setHours(20, 0, 0, 0); // 8 PM
+      
+      // If it's already past 8 PM today, schedule for tomorrow
+      if (now.getHours() >= 20) {
+        next8PM.setDate(next8PM.getDate() + 1);
+      }
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: '💰 Daily Expense Check',
-        body: 'Don\'t forget to log your expenses for today!',
-        data: {
-          type: 'expense_reminder',
-          screen: 'AddExpense',
-          tag: 'daily-expense'
+      const secondsUntil8PM = Math.floor((next8PM.getTime() - now.getTime()) / 1000);
+
+      // Ensure minimum seconds (at least 60 seconds from now)
+      const triggerSeconds = Math.max(secondsUntil8PM, 60);
+
+      // Use time-based trigger (Android compatible)
+      const trigger: Notifications.TimeIntervalTriggerInput = {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: triggerSeconds,
+        repeats: false, // We'll reschedule daily through the notification handler
+      };
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💰 Daily Expense Check',
+          body: 'Don\'t forget to log your expenses for today!',
+          data: {
+            type: 'daily_reminder',
+            screen: 'AddExpense',
+            tag: 'daily-expense',
+            deepLink: {
+              screen: "MainTabs",
+              params: { 
+                initialTab: "Split"
+              }
+            }
+          },
+          categoryIdentifier: 'EXPENSE_REMINDER',
         },
-        categoryIdentifier: 'EXPENSE_REMINDER',
-      },
-      trigger,
-    });
+        trigger,
+      });
+
+      console.log(`✅ Daily expense reminder scheduled for ${triggerSeconds} seconds (${next8PM.toLocaleString()})`);
+    } catch (error) {
+      console.error('❌ Failed to schedule daily expense reminder:', error);
+      throw error;
+    }
   }
 
   // Schedule bill reminder
@@ -424,25 +482,53 @@ export class FirebaseNotificationService {
 
   // Schedule weekly analytics
   async scheduleWeeklyAnalytics(): Promise<void> {
-    const trigger = {
-      type: 'calendar' as const,
-      weekday: 1, // Sunday
-      hour: 10,
-      minute: 0,
-      repeats: true,
-    };
+    try {
+      // Cancel existing weekly analytics
+      await this.cancelNotificationsByTag('weekly-analytics');
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: '📊 Weekly Financial Summary',
-        body: 'Check out your weekly spending analysis and insights!',
-        data: {
-          type: 'weekly_analytics',
-          screen: 'Analytics'
+      // Calculate seconds until next Sunday at 10 AM
+      const now = new Date();
+      const nextSunday = new Date();
+      const daysUntilSunday = 7 - now.getDay(); // 0 = Sunday, so we want next Sunday
+      
+      nextSunday.setDate(now.getDate() + daysUntilSunday);
+      nextSunday.setHours(10, 0, 0, 0); // 10 AM
+
+      // If it's already past 10 AM on Sunday, schedule for next Sunday
+      if (now.getDay() === 0 && now.getHours() >= 10) {
+        nextSunday.setDate(nextSunday.getDate() + 7);
+      }
+
+      const secondsUntilSunday = Math.floor((nextSunday.getTime() - now.getTime()) / 1000);
+
+      // Ensure minimum seconds (at least 60 seconds from now)
+      const triggerSeconds = Math.max(secondsUntilSunday, 60);
+
+      // Use time-based trigger instead of calendar (Android compatible)
+      const trigger: Notifications.TimeIntervalTriggerInput = {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: triggerSeconds,
+        repeats: false, // We'll reschedule after each trigger
+      };
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '📊 Weekly Financial Summary',
+          body: 'Check out your weekly spending analysis and insights!',
+          data: {
+            type: 'weekly_analytics',
+            screen: 'Analytics',
+            tag: 'weekly-analytics'
+          },
         },
-      },
-      trigger,
-    });
+        trigger,
+      });
+
+      console.log(`✅ Weekly analytics notification scheduled for ${triggerSeconds} seconds (${nextSunday.toLocaleString()})`);
+    } catch (error) {
+      console.error('❌ Failed to schedule weekly analytics:', error);
+      throw error;
+    }
   }
 
   // Cancel notifications by tag

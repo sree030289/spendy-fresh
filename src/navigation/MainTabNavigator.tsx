@@ -2,28 +2,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, TouchableOpacity, StyleSheet, Animated, Dimensions, Text } from 'react-native';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Icon } from '../components/common/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { GRADIENTS } from '@/constants/theme';
-import { Group, Friend } from '@/services/firebase/splitting-disabled';
 import { ApiService } from '@/services/api/ApiService';
 
 // Import modals
 import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
 import AddExpenseModal from '@/components/modals/AddExpenseModal';
-import AddReminderModal from '@/components/reminders/AddReminderModal';
-import GmailSyncModal from '@/components/modals/GmailSyncModal';
-import MoneyManagementScreen from '@/screens/main/MoneyManagementScreen';
-import Reminders from '@/screens/main/RemindersScreen';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
 
 const Tab = createBottomTabNavigator();
-const { width: screenWidth } = Dimensions.get('window');
 
 // Custom Plus Button Component
 function PlusTabButton({ children, onPress }: any) {
@@ -48,15 +41,10 @@ function PlusTabButton({ children, onPress }: any) {
 }
 
 // Tab routes configuration (excluding the center action button)
-const TAB_ROUTES = [
-  { name: 'Split', component: RealSplittingScreen, index: 0 },
-  { name: 'MoneyManagement', component: MoneyManagementScreen, index: 1 },
-  { name: 'Reminders', component: Reminders, index: 3 }, // Skip index 2 (AddAction)
-  { name: 'Profile', component: ProfileScreen, index: 4 }
-];
 
-// Custom Tab Navigator with Working Swipe Support
-function SwipeableTabNavigator() {
+
+// Custom Tab Navigator with Enhanced Button Animations
+function MainTabNavigatorComponent() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const apiService = ApiService.getInstance();
@@ -68,8 +56,8 @@ function SwipeableTabNavigator() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const navigation = useNavigation();
   
-  // Pan gesture handler for swipe navigation
-  const translateX = useRef(new Animated.Value(0)).current;
+  // Tab animation for smooth transitions
+  const tabSlideAnimation = useRef(new Animated.Value(0)).current;
   
   // Fetch groups and friends data
   useEffect(() => {
@@ -95,6 +83,27 @@ function SwipeableTabNavigator() {
     
     loadData();
   }, [user?.id]);
+
+  // Listen for tab press events to trigger animations
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', (e) => {
+      // Trigger slide animation when any tab is pressed
+      Animated.sequence([
+        Animated.timing(tabSlideAnimation, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(tabSlideAnimation, {
+          toValue: 0,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+
+    return unsubscribe;
+  }, [navigation, tabSlideAnimation]);
   
   const handleAddExpense = async (expenseData: any) => {
     try {
@@ -169,60 +178,6 @@ function SwipeableTabNavigator() {
     }
   };
   
-  const handleSwipeGesture = (event: any) => {
-    const { translationX, velocityX, state } = event.nativeEvent;
-    
-    if (state === State.ACTIVE) {
-      // Update translation during gesture with damping
-      translateX.setValue(translationX * 0.3);
-    } else if (state === State.END) {
-      const swipeThreshold = screenWidth * 0.2; // 20% of screen width
-      const velocityThreshold = 800;
-      
-      // Get current navigation state
-      const currentState = navigation.getState();
-      if (!currentState) return;
-      
-      const currentIndex = currentState.index;
-      
-      // Find current tab in our routes
-      const currentTabRouteIndex = TAB_ROUTES.findIndex(route => {
-        const tabIndex = currentState.routes.findIndex(r => r.name === route.name);
-        return tabIndex === currentIndex;
-      });
-      
-      let targetTabIndex = currentTabRouteIndex;
-      
-      // Determine swipe direction and target tab
-      if ((translationX > swipeThreshold || velocityX > velocityThreshold) && currentTabRouteIndex > 0) {
-        // Swipe right - go to previous tab
-        targetTabIndex = currentTabRouteIndex - 1;
-      } else if ((translationX < -swipeThreshold || velocityX < -velocityThreshold) && currentTabRouteIndex < TAB_ROUTES.length - 1) {
-        // Swipe left - go to next tab
-        targetTabIndex = currentTabRouteIndex + 1;
-      }
-      
-      // Navigate to target tab if it's different from current
-      if (targetTabIndex !== currentTabRouteIndex && targetTabIndex >= 0 && targetTabIndex < TAB_ROUTES.length) {
-        const targetRoute = TAB_ROUTES[targetTabIndex];
-        console.log(`🔄 Swiping to: ${targetRoute.name}`);
-        
-        navigation.dispatch(
-          CommonActions.navigate({
-            name: targetRoute.name
-          })
-        );
-      }
-      
-      // Reset translation with animation
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }).start();
-    }
-  };
 
   // Enhanced Action Modal Component
   const ActionModal = () => (
@@ -235,21 +190,19 @@ function SwipeableTabNavigator() {
 
   return (
     <>
-      <PanGestureHandler
-        onGestureEvent={handleSwipeGesture}
-        onHandlerStateChange={handleSwipeGesture}
-        activeOffsetX={[-20, 20]}
-        failOffsetY={[-50, 50]}
-        shouldCancelWhenOutside={true}
+      <Animated.View 
+        style={[
+          styles.tabContainer,
+          {
+            transform: [{
+              scale: tabSlideAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 1.02],
+              })
+            }]
+          }
+        ]}
       >
-        <Animated.View 
-          style={[
-            styles.swipeContainer,
-            {
-              transform: [{ translateX }]
-            }
-          ]}
-        >
           <Tab.Navigator
             screenOptions={({ route }) => ({
               tabBarIcon: ({ focused, color, size }) => {
@@ -295,6 +248,10 @@ function SwipeableTabNavigator() {
                 shadowOffset: { width: 0, height: -2 },
                 shadowOpacity: 0.1,
                 shadowRadius: 8,
+                borderTopWidth: 1,
+              },
+              tabBarItemStyle: {
+                paddingVertical: 4,
               },
               tabBarLabelStyle: {
                 fontSize: 12,
@@ -350,8 +307,7 @@ function SwipeableTabNavigator() {
               }}
             />
           </Tab.Navigator>
-        </Animated.View>
-      </PanGestureHandler>
+      </Animated.View>
 
       {/* Action Modal */}
       <ActionModal />
@@ -387,11 +343,11 @@ function SwipeableTabNavigator() {
 }
 
 export default function MainTabNavigator() {
-  return <SwipeableTabNavigator />;
+  return <MainTabNavigatorComponent />;
 }
 
 const styles = StyleSheet.create({
-  swipeContainer: {
+  tabContainer: {
     flex: 1,
   },
   plusButton: {

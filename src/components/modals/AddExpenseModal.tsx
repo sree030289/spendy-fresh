@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { Icon } from '../common/Icon';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -161,18 +162,23 @@ const initializeSplitData = () => {
 
   const validateStep = (step: string): boolean => {
     const newErrors: any = {};
+    const errorMessages: string[] = [];
 
     if (step === 'details') {
       if (!description.trim()) {
         newErrors.description = 'Description is required';
+        errorMessages.push('• Description is required');
       }
       if (!amount.trim()) {
         newErrors.amount = 'Amount is required';
+        errorMessages.push('• Amount is required');
       } else if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
         newErrors.amount = 'Please enter a valid amount';
+        errorMessages.push('• Please enter a valid amount');
       }
       if (!selectedGroup) {
         newErrors.group = 'Please select a group';
+        errorMessages.push('• Please select a group');
       }
     }
 
@@ -182,21 +188,35 @@ const initializeSplitData = () => {
       
       if (Math.abs(splitTotal - totalAmount) > 0.01) {
         newErrors.split = `Split amounts must equal exactly ${getCurrencySymbol(user?.currency || 'USD')}${totalAmount.toFixed(2)}. Current total: ${getCurrencySymbol(user?.currency || 'USD')}${splitTotal.toFixed(2)}`;
+        errorMessages.push(`• Split amounts must equal ${getCurrencySymbol(user?.currency || 'USD')}${totalAmount.toFixed(2)}`);
       }
       
       if (splitData.filter(split => split.isIncluded).length === 0) {
         newErrors.split = 'At least one person must be included in the split';
+        errorMessages.push('• At least one person must be included in the split');
       }
       
       if (splitType === 'percentage') {
         const totalPercentage = splitData.reduce((sum, split) => sum + (split.isIncluded ? split.percentage : 0), 0);
         if (Math.abs(totalPercentage - 100) > 0.1) {
           newErrors.split = `Percentages must total exactly 100%. Current total: ${totalPercentage.toFixed(1)}%`;
+          errorMessages.push(`• Percentages must total exactly 100% (currently ${totalPercentage.toFixed(1)}%)`);
         }
       }
     }
 
     setErrors(newErrors);
+    
+    // Show alert if there are validation errors
+    if (errorMessages.length > 0) {
+      const stepName = step === 'details' ? 'Expense Details' : 'Split Configuration';
+      Alert.alert(
+        `${stepName} Error`,
+        `Please fix the following issues:\n\n${errorMessages.join('\n')}`,
+        [{ text: 'OK', style: 'default' }]
+      );
+    }
+    
     return Object.keys(newErrors).length === 0;
   };
 
@@ -521,7 +541,13 @@ const initializeSplitData = () => {
               setAmount(text);
               if (errors.amount) setErrors((prev: any) => ({ ...prev, amount: '' }));
             }}
-            keyboardType="decimal-pad"
+            keyboardType="numeric"
+            returnKeyType="done"
+            onSubmitEditing={() => {
+              // Dismiss keyboard after amount entry
+              Keyboard.dismiss();
+            }}
+            blurOnSubmit={true}
           />
         </View>
         {errors.amount && (
@@ -873,7 +899,10 @@ const initializeSplitData = () => {
                       const newAmount = parseFloat(text) || 0;
                       updateSplitAmount(split.userId, newAmount);
                     }}
-                    keyboardType="decimal-pad"
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                    onSubmitEditing={() => Keyboard.dismiss()}
+                    blurOnSubmit={true}
                     placeholder="0.00"
                     placeholderTextColor={theme.colors.textSecondary}
                   />
@@ -887,7 +916,10 @@ const initializeSplitData = () => {
                         const newPercentage = parseFloat(text) || 0;
                         updateSplitPercentage(split.userId, newPercentage);
                       }}
-                      keyboardType="decimal-pad"
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                      onSubmitEditing={() => Keyboard.dismiss()}
+                      blurOnSubmit={true}
                     />
                     <Text style={[styles.percentageSymbol, { color: theme.colors.textSecondary }]}>%</Text>
                   </View>

@@ -419,10 +419,14 @@ export default function RegisterScreen() {
                 <TextInput
                   style={[
                     styles.input,
-                    errors.fullName && { borderColor: '#EF4444' }
+                    { 
+                      backgroundColor: theme.colors.surface,
+                      borderColor: errors.fullName ? theme.colors.error : theme.colors.border,
+                      color: theme.colors.text 
+                    }
                   ]}
                   placeholder="Full Name"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={theme.colors.textSecondary}
                   value={formData.fullName}
                   onChangeText={(text) => {
                     setFormData({ ...formData, fullName: text });
@@ -436,7 +440,7 @@ export default function RegisterScreen() {
                   })}
                 />
                 {errors.fullName ? (
-                  <Text style={styles.errorText}>
+                  <Text style={[styles.errorText, { color: theme.colors.error }]}>
                     {errors.fullName}
                   </Text>
                 ) : null}
@@ -446,10 +450,14 @@ export default function RegisterScreen() {
                 <TextInput
                   style={[
                     styles.input,
-                    errors.email && { borderColor: '#EF4444' }
+                    { 
+                      backgroundColor: theme.colors.surface,
+                      borderColor: errors.email ? theme.colors.error : theme.colors.border,
+                      color: theme.colors.text 
+                    }
                   ]}
                   placeholder="Email"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={theme.colors.textSecondary}
                   value={formData.email}
                   onChangeText={(text) => {
                     setFormData({ ...formData, email: text });
@@ -466,7 +474,7 @@ export default function RegisterScreen() {
                   })}
                 />
                 {errors.email ? (
-                  <Text style={styles.errorText}>
+                  <Text style={[styles.errorText, { color: theme.colors.error }]}>
                     {errors.email}
                   </Text>
                 ) : null}
@@ -706,13 +714,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 20,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
     fontSize: 16,
-    backgroundColor: '#FFFFFF',
-    color: '#374151',
     fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
     fontWeight: '400',
     minHeight: 56,
+    // backgroundColor, borderColor, and color will be overridden by theme
   },
   passwordInput: {
     paddingRight: 55,
@@ -735,10 +741,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 20,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
     gap: 12,
     minHeight: 56,
+    // backgroundColor and borderColor will be overridden by theme
   },
   selectorFlag: {
     fontSize: 20,
@@ -746,8 +751,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   selectorText: {
     flex: 1,
     fontSize: 16,
-    color: '#374151',
     fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    // color will be overridden by theme
   },
   phoneContainer: {
     flexDirection: 'row',
@@ -758,11 +763,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 20,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     minWidth: 80,
     minHeight: 56,
+    // backgroundColor and borderColor will be overridden by theme
   },
   phoneInputContainer: {
     flex: 1,
@@ -774,19 +778,17 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 20,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
     fontSize: 16,
-    backgroundColor: '#FFFFFF',
-    color: '#374151',
     fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
     fontWeight: '400',
     minHeight: 56,
+    // backgroundColor, borderColor, and color will be overridden by theme
   },
   errorText: {
     fontSize: 13,
     marginTop: 6,
     marginLeft: 20,
-    color: '#EF4444',
+    // color will be overridden by theme
   },
   registerButton: {
     backgroundColor: colors.brand,

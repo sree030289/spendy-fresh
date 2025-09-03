@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { ApiService } from '@/services/api/ApiService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Import the existing balance types and service
 import { UnifiedSettlementService } from './useBalances';
@@ -102,8 +103,64 @@ class SharedBalanceManager {
   static getInstance(): SharedBalanceManager {
     if (!SharedBalanceManager.instance) {
       SharedBalanceManager.instance = new SharedBalanceManager();
+      SharedBalanceManager.instance.setupRefreshListeners();
     }
     return SharedBalanceManager.instance;
+  }
+
+  private setupRefreshListeners(): void {
+    // Listen for balance refresh events from notifications
+    if (typeof window !== 'undefined') {
+      window.addEventListener('balanceRefreshRequired', () => {
+        console.log('💰 SharedBalanceManager: Received balance refresh event from notification');
+        // Get the current user ID from stored data
+        this.checkAndRefreshFromNotification();
+      });
+    }
+    
+    // Check for refresh flags periodically
+    setInterval(() => {
+      this.checkRefreshFlag();
+    }, 5000); // Check every 5 seconds
+  }
+
+  private async checkAndRefreshFromNotification(): Promise<void> {
+    try {
+      // Import AuthProvider to get current user
+      const { useAuth } = await import('./useAuth');
+      // Since we can't call hooks outside component, we'll check AsyncStorage for user data
+      const userData = await AsyncStorage.getItem('@spendy_user_data');
+      if (userData) {
+        const user = JSON.parse(userData);
+        if (user?.id) {
+          console.log('💰 Triggering force refresh for user:', user.id);
+          await this.forceRefresh(user.id);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing from notification:', error);
+    }
+  }
+
+  private async checkRefreshFlag(): Promise<void> {
+    try {
+      const refreshFlag = await AsyncStorage.getItem('@balance_refresh_required');
+      if (refreshFlag) {
+        const flagTime = parseInt(refreshFlag);
+        const now = Date.now();
+        
+        // Only refresh if flag is recent (within last 30 seconds) to avoid stale refreshes
+        if ((now - flagTime) < 30000) {
+          console.log('💰 Found balance refresh flag - triggering refresh');
+          await this.checkAndRefreshFromNotification();
+        }
+        
+        // Clear the flag after checking
+        await AsyncStorage.removeItem('@balance_refresh_required');
+      }
+    } catch (error) {
+      console.error('❌ Error checking refresh flag:', error);
+    }
   }
 
   subscribe(callback: (data: any) => void): () => void {
@@ -129,6 +186,13 @@ class SharedBalanceManager {
       isLoading: this.isLoading,
       error: this.error
     };
+    
+    console.log('📡 SharedBalanceManager: Notifying', this.subscribers.size, 'subscribers with updated data:', {
+      totalOwed: this.balances?.totalOwed ?? 0,
+      totalOwing: this.balances?.totalOwing ?? 0,
+      netBalance: this.balances?.netBalance ?? 0,
+      isLoading: this.isLoading
+    });
     
     this.subscribers.forEach(callback => callback(data));
   }
@@ -200,8 +264,14 @@ class SharedBalanceManager {
 
   // Force clear cache and refresh
   forceRefresh(userId: string): Promise<void> {
+    console.log('🚀 SharedBalanceManager: Force refresh requested - clearing all caches');
     this.lastRefreshTime = 0;
     SettlementCache.getInstance().clearCache(); // Clear cache on force refresh
+    
+    // Immediately notify subscribers with loading state
+    this.isLoading = true;
+    this.notifySubscribers();
+    
     return this.refresh(userId, true);
   }
 
