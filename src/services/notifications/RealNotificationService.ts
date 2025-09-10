@@ -147,7 +147,7 @@ export class RealNotificationService {
 
       // Get Expo push token
       const token = await Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+        projectId: Constants.expoConfig?.extra?.external?.expoProjectId || '8ba655ab-7839-4196-9893-2a71413248ed',
       });
       
       this.pushToken = token.data;
@@ -180,18 +180,59 @@ export class RealNotificationService {
         await AsyncStorage.setItem(`${STORAGE_KEYS.PUSH_TOKEN}_${userId}`, this.pushToken);
         console.log(`✅ Registered push token for user ${userId}`);
         
-        // Send token to backend server
-        try {
-          const ApiService = (await import('@/services/api/ApiService')).ApiService;
-          await ApiService.getInstance().savePushToken(this.pushToken);
-          console.log('✅ Push token saved to server');
-        } catch (serverError) {
-          console.error('❌ Failed to save push token to server:', serverError);
-        }
+        // Send token to backend server with retry mechanism
+        await this.savePushTokenWithRetry(this.pushToken);
       }
     } catch (error) {
       console.error('Failed to register token with backend:', error);
       throw error;
+    }
+  }
+
+  // **NEW** - Save push token with retry mechanism to handle auth timing issues
+  private static async savePushTokenWithRetry(pushToken: string, maxRetries: number = 3): Promise<void> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`💾 Saving push token to server (attempt ${attempt}/${maxRetries})`);
+        const ApiService = (await import('@/services/api/ApiService')).ApiService;
+        const apiService = ApiService.getInstance();
+        
+        // Check if ApiService has auth token before making request
+        const hasToken = await this.checkApiServiceAuth(apiService);
+        if (!hasToken && attempt < maxRetries) {
+          console.log(`⏳ Auth token not ready yet, waiting before retry (${attempt}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Progressive delay
+          continue;
+        }
+        
+        await apiService.savePushToken(pushToken);
+        console.log('✅ Push token saved to server');
+        return; // Success - exit retry loop
+        
+      } catch (serverError) {
+        console.error(`❌ Failed to save push token to server (attempt ${attempt}/${maxRetries}):`, serverError);
+        
+        if (attempt === maxRetries) {
+          console.log('⚠️ Push token save failed after all retries, but continuing app initialization');
+          // Don't throw error - push token save is non-critical
+          return;
+        }
+        
+        // Wait before retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+  }
+
+  // **NEW** - Check if ApiService has auth token set
+  private static async checkApiServiceAuth(apiService: any): Promise<boolean> {
+    try {
+      // Try to check if the service has an auth token by calling a lightweight endpoint
+      // This is better than checking private properties
+      const authToken = await AsyncStorage.getItem('@spendy_auth_token');
+      return !!authToken;
+    } catch (error) {
+      return false;
     }
   }
 
@@ -818,10 +859,12 @@ export class RealNotificationService {
     // The data contains deepLink information for PushNotificationManager
     console.log('📱 Immediate navigation trigger for deep link data:', data);
     
-    // Emit a custom event that can be picked up by App.tsx
-    if (typeof window !== 'undefined') {
-      const event = new CustomEvent('notificationNavigation', { detail: data });
-      window.dispatchEvent(event);
+    // Use React Native DeviceEventEmitter instead of CustomEvent
+    try {
+      const { DeviceEventEmitter } = require('react-native');
+      DeviceEventEmitter.emit('notificationNavigation', data);
+    } catch (error) {
+      console.log('DeviceEventEmitter not available, relying on setNavigationIntent');
     }
   }
 
@@ -1277,9 +1320,11 @@ export class RealNotificationService {
       }
       
       // Emit a custom event for balance refresh
-      if (typeof window !== 'undefined') {
-        const event = new CustomEvent('balanceRefreshRequired');
-        window.dispatchEvent(event);
+      try {
+        const { DeviceEventEmitter } = require('react-native');
+        DeviceEventEmitter.emit('balanceRefreshRequired');
+      } catch (error) {
+        console.log('DeviceEventEmitter not available for balance refresh event');
       }
       
       // Store a flag in AsyncStorage for components to pick up

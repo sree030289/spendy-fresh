@@ -1,0 +1,105 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient for background -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D6001C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF4D6D;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for bill/receipt -->
+    <linearGradient id="receiptGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F8F9FA;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for coins -->
+    <linearGradient id="coinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="3" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.4)"/>
+    </filter>
+    
+    <!-- Glow filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background Circle -->
+  <circle cx="512" cy="512" r="490" fill="url(#bgGradient)"/>
+  
+  <!-- Main Receipt/Bill -->
+  <rect x="320" y="220" width="280" height="360" rx="24" ry="24" 
+        fill="url(#receiptGradient)" 
+        stroke="#E5E7EB" 
+        stroke-width="4" 
+        filter="url(#shadow)"/>
+  
+  <!-- Receipt perforated top -->
+  <path d="M320 245 L330 235 L340 245 L350 235 L360 245 L370 235 L380 245 L390 235 L400 245 L410 235 L420 245 L430 235 L440 245 L450 235 L460 245 L470 235 L480 245 L490 235 L500 245 L510 235 L520 245 L530 235 L540 245 L550 235 L560 245 L570 235 L580 245 L590 235 L600 245" 
+        fill="#D1D5DB" stroke="none"/>
+  
+  <!-- Receipt Lines (representing items) -->
+  <rect x="360" y="280" width="200" height="12" rx="6" fill="#6B7280"/>
+  <rect x="360" y="310" width="160" height="10" rx="5" fill="#9CA3AF"/>
+  <rect x="360" y="340" width="180" height="10" rx="5" fill="#9CA3AF"/>
+  <rect x="360" y="370" width="140" height="10" rx="5" fill="#9CA3AF"/>
+  
+  <!-- Central Splitting Line (Dashed line through middle) -->
+  <line x1="460" y1="400" x2="460" y2="520" 
+        stroke="#FFFFFF" 
+        stroke-width="8" 
+        stroke-dasharray="20,12" 
+        filter="url(#glow)"/>
+  
+  <!-- Split Arrow pointing down -->
+  <path d="M445 500 L460 520 L475 500" 
+        fill="none" 
+        stroke="#FFFFFF" 
+        stroke-width="8" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        filter="url(#glow)"/>
+  
+  <!-- Dollar signs on either side -->
+  <text x="400" y="430" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#374151" text-anchor="middle">$</text>
+  <text x="520" y="430" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#374151" text-anchor="middle">$</text>
+  
+  <!-- Two coins representing split payment -->
+  <!-- Left coin -->
+  <circle cx="400" cy="620" r="45" fill="url(#coinGradient)" stroke="#B45309" stroke-width="3" filter="url(#shadow)"/>
+  <text x="400" y="632" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#92400E" text-anchor="middle">$</text>
+  
+  <!-- Right coin -->
+  <circle cx="520" cy="620" r="45" fill="url(#coinGradient)" stroke="#B45309" stroke-width="3" filter="url(#shadow)"/>
+  <text x="520" y="632" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#92400E" text-anchor="middle">$</text>
+  
+  <!-- People icons (simplified) -->
+  <!-- Left person -->
+  <circle cx="250" cy="500" r="35" fill="#FFFFFF" stroke="#FF6B85" stroke-width="4" filter="url(#shadow)"/>
+  <circle cx="250" cy="485" r="16" fill="#FF6B85"/>
+  <rect x="234" y="515" width="32" height="40" rx="16" fill="#FF6B85"/>
+  
+  <!-- Right person -->
+  <circle cx="670" cy="500" r="35" fill="#FFFFFF" stroke="#FF6B85" stroke-width="4" filter="url(#shadow)"/>
+  <circle cx="670" cy="485" r="16" fill="#FF6B85"/>
+  <rect x="654" y="515" width="32" height="40" rx="16" fill="#FF6B85"/>
+  
+  <!-- Connection lines from people to coins -->
+  <line x1="285" y1="520" x2="355" y2="600" stroke="#FFFFFF" stroke-width="4" stroke-dasharray="12,6" opacity="0.9" filter="url(#glow)"/>
+  <line x1="635" y1="520" x2="565" y2="600" stroke="#FFFFFF" stroke-width="4" stroke-dasharray="12,6" opacity="0.9" filter="url(#glow)"/>
+  
+  <!-- Small sparkles for visual appeal -->
+  <circle cx="180" cy="320" r="6" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="750" cy="380" r="8" fill="#FFFFFF" opacity="0.6"/>
+  <circle cx="200" cy="700" r="5" fill="#FFFFFF" opacity="0.7"/>
+  <circle cx="720" cy="680" r="7" fill="#FFFFFF" opacity="0.5"/>
+</svg>

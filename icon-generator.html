@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Icon Generator - Let'Split</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .icon-preview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        .icon-item {
+            text-align: center;
+            padding: 20px;
+            border: 1px solid #e5e5e7;
+            border-radius: 12px;
+        }
+        .icon-item h3 {
+            margin-bottom: 15px;
+            color: #424245;
+        }
+        canvas {
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            margin-bottom: 15px;
+        }
+        .download-btn {
+            background: #D6001C;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .download-btn:hover {
+            background: #B30019;
+            transform: translateY(-2px);
+        }
+        .instructions {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .icon-sizes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .size-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e5e7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Let'Split App Icon Generator</h1>
+        
+        <div class="icon-preview">
+            <div class="icon-item">
+                <h3>📱 App Store Icon (1024×1024)</h3>
+                <canvas id="icon1024" width="200" height="200"></canvas>
+                <br>
+                <button class="download-btn" onclick="downloadIcon('icon1024', 1024, 'app-store-icon-1024.png')">
+                    Download 1024×1024
+                </button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>📲 iPhone Icon (180×180)</h3>
+                <canvas id="icon180" width="180" height="180"></canvas>
+                <br>
+                <button class="download-btn" onclick="downloadIcon('icon180', 180, 'iphone-icon-180.png')">
+                    Download 180×180
+                </button>
+            </div>
+            
+            <div class="icon-item">
+                <h3>🤖 Android Icon (512×512)</h3>
+                <canvas id="icon512" width="200" height="200"></canvas>
+                <br>
+                <button class="download-btn" onclick="downloadIcon('icon512', 512, 'android-icon-512.png')">
+                    Download 512×512
+                </button>
+            </div>
+        </div>
+
+        <div class="icon-sizes">
+            <div class="size-item">
+                <canvas id="icon60" width="60" height="60"></canvas>
+                <p>60×60</p>
+                <button class="download-btn" onclick="downloadIcon('icon60', 60, 'icon-60.png')">Download</button>
+            </div>
+            <div class="size-item">
+                <canvas id="icon120" width="60" height="60"></canvas>
+                <p>120×120</p>
+                <button class="download-btn" onclick="downloadIcon('icon120', 120, 'icon-120.png')">Download</button>
+            </div>
+            <div class="size-item">
+                <canvas id="icon167" width="60" height="60"></canvas>
+                <p>167×167</p>
+                <button class="download-btn" onclick="downloadIcon('icon167', 167, 'icon-167.png')">Download</button>
+            </div>
+            <div class="size-item">
+                <canvas id="icon192" width="60" height="60"></canvas>
+                <p>192×192</p>
+                <button class="download-btn" onclick="downloadIcon('icon192', 192, 'icon-192.png')">Download</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Instructions:</h3>
+            <ol>
+                <li><strong>Download all required sizes</strong> by clicking the download buttons above</li>
+                <li><strong>For iOS:</strong> Use the 1024×1024 for App Store, and various sizes for app bundle</li>
+                <li><strong>For Android:</strong> Use 512×512 for Play Store, adaptive icon in res/mipmap folders</li>
+                <li><strong>Replace existing icons</strong> in your assets folder with the downloaded files</li>
+                <li><strong>Update app.json</strong> to reference the new icon paths</li>
+            </ol>
+            
+            <p><strong>💡 Tip:</strong> The icon features "Let'Split" in bold white text on your app's maroon red gradient background, perfectly matching your brand theme!</p>
+        </div>
+    </div>
+
+    <script>
+        function drawIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const actualSize = size;
+            
+            // Set canvas actual size
+            canvas.width = actualSize;
+            canvas.height = actualSize;
+            
+            // Scale for high DPI
+            const ratio = window.devicePixelRatio || 1;
+            canvas.width = actualSize * ratio;
+            canvas.height = actualSize * ratio;
+            canvas.style.width = Math.min(actualSize, 200) + 'px';
+            canvas.style.height = Math.min(actualSize, 200) + 'px';
+            ctx.scale(ratio, ratio);
+            
+            // Create gradient background
+            const gradient = ctx.createLinearGradient(0, 0, actualSize, actualSize);
+            gradient.addColorStop(0, '#D6001C');
+            gradient.addColorStop(1, '#B30019');
+            
+            // Draw rounded rectangle background
+            const cornerRadius = actualSize * 0.176; // iOS standard corner radius
+            ctx.fillStyle = gradient;
+            roundRect(ctx, 0, 0, actualSize, actualSize, cornerRadius);
+            ctx.fill();
+            
+            // Add subtle overlay
+            const overlayGradient = ctx.createLinearGradient(0, 0, actualSize, actualSize);
+            overlayGradient.addColorStop(0, 'rgba(255,255,255,0.1)');
+            overlayGradient.addColorStop(0.5, 'rgba(255,255,255,0.0)');
+            overlayGradient.addColorStop(1, 'rgba(0,0,0,0.05)');
+            ctx.fillStyle = overlayGradient;
+            roundRect(ctx, 0, 0, actualSize, actualSize, cornerRadius);
+            ctx.fill();
+            
+            // Draw text
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Responsive font size
+            let fontSize = actualSize * 0.117; // Responsive to icon size
+            ctx.font = `900 ${fontSize}px -apple-system, BlinkMacSystemFont, SF Pro Display, Helvetica Neue, Arial, sans-serif`;
+            
+            // Add text shadow
+            ctx.shadowColor = 'rgba(0,0,0,0.4)';
+            ctx.shadowBlur = actualSize * 0.004;
+            ctx.shadowOffsetX = actualSize * 0.003;
+            ctx.shadowOffsetY = actualSize * 0.006;
+            
+            // Draw main text
+            ctx.fillText("Let'Split", actualSize / 2, actualSize / 2);
+            
+            // Add decorative dots
+            ctx.shadowColor = 'transparent';
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            
+            // Top and bottom dots
+            ctx.beginPath();
+            ctx.arc(actualSize / 2, actualSize * 0.27, actualSize * 0.004, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(actualSize / 2, actualSize * 0.73, actualSize * 0.004, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Side dots
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.arc(actualSize * 0.215, actualSize / 2, actualSize * 0.003, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(actualSize * 0.785, actualSize / 2, actualSize * 0.003, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+        
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+        
+        function downloadIcon(canvasId, size, filename) {
+            const canvas = document.getElementById(canvasId);
+            
+            // Create a new canvas at actual size
+            const downloadCanvas = document.createElement('canvas');
+            downloadCanvas.width = size;
+            downloadCanvas.height = size;
+            
+            // Redraw at full resolution
+            const tempCanvasId = 'temp-' + canvasId;
+            downloadCanvas.id = tempCanvasId;
+            document.body.appendChild(downloadCanvas);
+            
+            drawIcon(tempCanvasId, size);
+            
+            // Download
+            downloadCanvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                document.body.removeChild(downloadCanvas);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        }
+        
+        // Initialize all icons
+        window.onload = function() {
+            drawIcon('icon1024', 1024);
+            drawIcon('icon180', 180);
+            drawIcon('icon512', 512);
+            drawIcon('icon60', 60);
+            drawIcon('icon120', 120);
+            drawIcon('icon167', 167);
+            drawIcon('icon192', 192);
+        };
+    </script>
+</body>
+</html>

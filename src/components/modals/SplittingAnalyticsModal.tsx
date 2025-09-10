@@ -143,10 +143,6 @@ const SplittingAnalyticsModal: React.FC<SplittingAnalyticsModalProps> = ({ visib
       </TouchableOpacity>
       
       <Text style={styles.headerTitle}>Splitting Analytics</Text>
-      
-      <TouchableOpacity style={styles.shareButton}>
-        <Icon name="share" size={24} color="white" />
-      </TouchableOpacity>
     </LinearGradient>
   );
 
@@ -496,14 +492,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   tabContainer: {
     paddingVertical: 16,

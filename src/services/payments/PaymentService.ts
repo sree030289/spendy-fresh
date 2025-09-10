@@ -470,41 +470,80 @@ export class InviteService {
   // Send SMS invite
   static async sendSMSInvite(phoneNumber: string, message: string): Promise<void> {
     try {
+      // Validate inputs
+      if (!phoneNumber?.trim()) {
+        throw new Error('Phone number is required for SMS invitation');
+      }
+      if (!message?.trim()) {
+        throw new Error('Message is required for SMS invitation');
+      }
+
+      const cleanPhoneNumber = phoneNumber.trim();
       const smsUrl = Platform.OS === 'ios' 
-        ? `sms:${phoneNumber}&body=${encodeURIComponent(message)}`
-        : `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
+        ? `sms:${cleanPhoneNumber}&body=${encodeURIComponent(message)}`
+        : `sms:${cleanPhoneNumber}?body=${encodeURIComponent(message)}`;
         
       const canOpen = await Linking.canOpenURL(smsUrl);
       if (canOpen) {
         await Linking.openURL(smsUrl);
       } else {
-        throw new Error('SMS not available');
+        throw new Error('SMS not available on this device. Please share the app link manually.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Send SMS error:', error);
-      throw error;
+      // Provide user-friendly error messages
+      if (error.message.includes('not available')) {
+        throw new Error('SMS not available on this device');
+      } else if (error.message.includes('required')) {
+        throw error;
+      } else {
+        throw new Error('Failed to open SMS app. Please check your device settings.');
+      }
     }
   }
   
   // Send WhatsApp invite
   static async sendWhatsAppInvite(phoneNumber: string, message: string): Promise<void> {
     try {
+      // Validate inputs
+      if (!phoneNumber?.trim()) {
+        throw new Error('Phone number is required for WhatsApp invitation');
+      }
+      if (!message?.trim()) {
+        throw new Error('Message is required for WhatsApp invitation');
+      }
+
       // Format phone number (remove + and spaces)
-      const formattedNumber = phoneNumber.replace(/[\s+]/g, '');
+      const formattedNumber = phoneNumber.replace(/[\s+\-()]/g, '');
       
+      if (!formattedNumber || formattedNumber.length < 10) {
+        throw new Error('Please provide a valid phone number');
+      }
+
       const whatsappUrl = `whatsapp://send?phone=${formattedNumber}&text=${encodeURIComponent(message)}`;
       
       const canOpen = await Linking.canOpenURL(whatsappUrl);
       if (canOpen) {
         await Linking.openURL(whatsappUrl);
       } else {
-        // Fallback to web WhatsApp
-        const webUrl = `https://wa.me/${formattedNumber}?text=${encodeURIComponent(message)}`;
-        await Linking.openURL(webUrl);
+        try {
+          // Fallback to web WhatsApp
+          const webUrl = `https://wa.me/${formattedNumber}?text=${encodeURIComponent(message)}`;
+          await Linking.openURL(webUrl);
+        } catch (webError) {
+          throw new Error('WhatsApp not available on this device. Please share the app link manually.');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Send WhatsApp error:', error);
-      throw error;
+      // Provide user-friendly error messages
+      if (error.message.includes('not available')) {
+        throw new Error('WhatsApp not available on this device');
+      } else if (error.message.includes('required') || error.message.includes('valid phone number')) {
+        throw error;
+      } else {
+        throw new Error('Failed to open WhatsApp. Please check if WhatsApp is installed.');
+      }
     }
   }
   

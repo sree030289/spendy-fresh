@@ -22,7 +22,7 @@ import * as Linking from 'expo-linking';
 export interface AppNotification {
   id?: string;
   userId: string;
-  type: 'friend_request' | 'friend_accepted' | 'friend_declined' | 'friend_removed' | 
+  type: 'friend_request' | 'friend_request_reminder' | 'friend_accepted' | 'friend_declined' | 'friend_removed' | 
         'group_created' | 'group_member_added' | 'group_admin_changed' | 'group_member_removed' |
         'expense_added' | 'expense_edited' | 'expense_deleted' | 'expense_settled' |
         'group_message' | 'system';
@@ -386,6 +386,7 @@ export class AppNotificationService {
   private getCategoryForNotificationType(type: AppNotification['type']): string {
     switch (type) {
       case 'friend_request':
+      case 'friend_request_reminder':
         return 'friend_request';
       case 'group_created':
       case 'group_member_added':

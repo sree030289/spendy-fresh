@@ -1,0 +1,79 @@
+{
+  "appConfig": {
+    "subscriptionConfig": {
+      "pricing": {
+        "monthly": {
+          "price": 2.99,
+          "currency": "USD",
+          "originalPrice": 3.99
+        },
+        "yearly": {
+          "price": 25.99,
+          "currency": "USD",
+          "originalPrice": 35.88,
+          "monthlyEquivalent": 2.17
+        },
+        "savings": {
+          "percentage": 28,
+          "amount": 10.89
+        }
+      },
+      "features": {
+        "keyFeatures": [
+          "Unlimited Groups & Members",
+          "Unlimited Transactions",
+          "AI Receipt Scanning",
+          "Advanced Analytics",
+          "Export & Integration",
+          "Priority Support"
+        ],
+        "detailedFeatures": {
+          "Core Features": [
+            "Unlimited groups and members",
+            "Unlimited daily transactions",
+            "Advanced expense tracking",
+            "Smart categorization"
+          ],
+          "AI & Automation": [
+            "Smart receipt scanning",
+            "Auto expense categorization",
+            "Intelligent split suggestions",
+            "OCR text extraction"
+          ],
+          "Analytics & Insights": [
+            "Detailed spending analytics",
+            "Category-wise breakdowns", 
+            "Monthly/yearly reports",
+            "Export to CSV/PDF",
+            "Trend analysis"
+          ],
+          "Collaboration": [
+            "Group chat integration",
+            "Email notifications",
+            "Payment reminders",
+            "Shared expense notifications",
+            "Real-time sync"
+          ],
+          "Support": [
+            "Priority customer support",
+            "24/7 email assistance",
+            "Feature request priority",
+            "Beta access to new features"
+          ]
+        }
+      },
+      "displayConfig": {
+        "defaultPlan": "yearly",
+        "showSavings": true,
+        "highlightYearly": true,
+        "promoCodeEnabled": true
+      },
+      "metadata": {
+        "lastUpdated": "2025-09-06T10:00:00.000Z",
+        "version": "1.0.0",
+        "isActive": true,
+        "notes": "Initial subscription configuration"
+      }
+    }
+  }
+}

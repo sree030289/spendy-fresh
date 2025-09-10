@@ -1,18 +1,19 @@
-// src/components/modals/SubscriptionModal.tsx - Fixed version
+// src/components/modals/SubscriptionModal.tsx - Updated with Firebase-driven configuration
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   TextInput,
   Alert,
   Dimensions,
-  StatusBar,
   Platform,
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
+import SubscriptionConfigService, { SubscriptionConfig } from '@/services/firebase/SubscriptionConfigService';
+import { useAuth } from '@/hooks/useAuth';
+import { formatCurrency } from '@/utils/currency';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,37 +25,9 @@ interface SubscriptionModalProps {
   featureName?: string;
   canClose?: boolean;
   autoCloseAfter?: number; // seconds
+  onCountdownComplete?: () => void;
+  autoCloseOnComplete?: boolean; // automatically close modal when countdown finishes
 }
-
-interface PlanFeature {
-  text: string;
-  icon: string;
-  premium?: boolean;
-}
-
-const PLAN_FEATURES: PlanFeature[] = [
-  { text: 'Unlimited Groups', icon: '👥', premium: true },
-  { text: 'Unlimited Group Members', icon: '👤', premium: true },
-  { text: 'Unlimited Daily Transactions', icon: '💳', premium: true },
-  { text: 'Advanced Analytics & Insights', icon: '📊', premium: true },
-  { text: 'Receipt Scanning (AI Powered)', icon: '📷', premium: true },
-  { text: 'Group Chat & Messaging', icon: '💬', premium: true },
-  { text: 'QR Code Sharing', icon: '📱', premium: true },
-  { text: 'Gmail Integration', icon: '📧', premium: true },
-  { text: 'Priority Customer Support', icon: '🎧', premium: true },
-  { text: 'Export Data (PDF, Excel)', icon: '📥', premium: true },
-  { text: 'Advanced Splitting Options', icon: '🧮', premium: true },
-  { text: 'Recurring Expenses', icon: '🔄', premium: true },
-];
-
-const FREE_FEATURES: PlanFeature[] = [
-  { text: 'Up to 3 Groups', icon: '👥' },
-  { text: 'Up to 10 Members per Group', icon: '👤' },
-  { text: '3 Transactions per Day', icon: '💳' },
-  { text: 'Basic Expense Tracking', icon: '📝' },
-  { text: 'Simple Split Calculations', icon: '🧮' },
-  { text: 'Basic Notifications', icon: '🔔' },
-];
 
 export default function SubscriptionModal({
   visible,
@@ -63,7 +36,9 @@ export default function SubscriptionModal({
   reason = 'firstTime',
   featureName,
   canClose = true,
-  autoCloseAfter
+  autoCloseAfter,
+  onCountdownComplete,
+  autoCloseOnComplete = false
 }: SubscriptionModalProps) {
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
   const [promoCode, setPromoCode] = useState('');
@@ -72,47 +47,171 @@ export default function SubscriptionModal({
   const [countdown, setCountdown] = useState(autoCloseAfter || 0);
   const [loading, setLoading] = useState(false);
 
-  console.log('🔍 Fixed SubscriptionModal render:', { visible, reason, canClose, autoCloseAfter });
-  
-  // Additional debugging to ensure modal is actually shown
-  useEffect(() => {
-    if (visible) {
-      console.log('📱 SubscriptionModal becoming visible with reason:', reason);
-    }
-  }, [visible, reason]);
+  // Subscription configuration state
+  const [subscriptionConfig, setSubscriptionConfig] = useState<SubscriptionConfig | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
 
+  // Get user info for currency
+  const { user } = useAuth();
+
+  // Initialize subscription configuration
   useEffect(() => {
-    if (autoCloseAfter && !canClose && visible) {
+    const configService = SubscriptionConfigService.getInstance();
+    
+    const initializeConfig = async () => {
+      setConfigLoading(true);
+      try {
+        await configService.initialize();
+        
+        // Get config converted to user's currency
+        const userCurrency = user?.currency || 'USD';
+        console.log('💱 Using user currency:', userCurrency);
+        
+        const config = configService.getCurrentConfigForUser(userCurrency);
+        setSubscriptionConfig(config);
+        setSelectedPlan(config.displayConfig.defaultPlan);
+        setShowPromoInput(config.displayConfig.promoCodeEnabled);
+      } catch (error) {
+        console.error('Failed to initialize subscription config:', error);
+        // Use fallback config
+        const fallbackConfig = configService.getCurrentConfig();
+        setSubscriptionConfig(fallbackConfig);
+      } finally {
+        setConfigLoading(false);
+      }
+    };
+
+    if (user) {
+      initializeConfig();
+    }
+
+    // Listen for real-time config updates
+    const unsubscribe = configService.onConfigUpdate((config) => {
+      console.log('📊 Subscription config updated:', config);
+      
+      // Convert to user's currency before setting
+      const userCurrency = user?.currency || 'USD';
+      const convertedConfig = configService.getCurrentConfigForUser(userCurrency);
+      
+      setSubscriptionConfig(convertedConfig);
+      // Update selected plan if default changed
+      if (convertedConfig.displayConfig.defaultPlan !== selectedPlan) {
+        setSelectedPlan(convertedConfig.displayConfig.defaultPlan);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user]);
+
+  // Get current pricing from config
+  const getCurrentPricing = () => {
+    console.log('💰 getCurrentPricing called with subscriptionConfig:', subscriptionConfig);
+    if (!subscriptionConfig) {
+      console.log('⚠️ No subscription config, using fallback pricing');
+      const userCurrency = user?.currency || 'USD';
+      return { 
+        monthlyPrice: 2.99, 
+        yearlyPrice: 25.99, 
+        yearlyMonthlyPrice: 2.17, 
+        savings: 28, 
+        currency: userCurrency 
+      };
+    }
+    
+    const { pricing } = subscriptionConfig;
+    console.log('📈 Using Firebase pricing:', pricing);
+    const result = {
+      monthlyPrice: pricing.monthly.price,
+      yearlyPrice: pricing.yearly.price,
+      yearlyMonthlyPrice: pricing.yearly.monthlyEquivalent || pricing.yearly.price / 12,
+      savings: pricing.savings?.percentage || 0,
+      currency: pricing.monthly.currency || user?.currency || 'USD'
+    };
+    console.log('💸 Final pricing result:', result);
+    return result;
+  };
+
+  // Get current features from config
+  const getCurrentFeatures = () => {
+    if (!subscriptionConfig) return [];
+    return subscriptionConfig.features.keyFeatures;
+  };
+
+  // Reset states when props change
+  useEffect(() => {
+    console.log('🔄 SubscriptionModal props changed:', { canClose, autoCloseAfter, visible });
+    // Only update canCloseModal if there's no countdown running
+    if (!autoCloseAfter || autoCloseAfter <= 0 || canClose) {
+      setCanCloseModal(canClose);
+    }
+    // Always reset countdown when props change
+    if (visible) {
+      setCountdown(autoCloseAfter || 0);
+    }
+  }, [canClose, autoCloseAfter, visible]);
+
+  // Handle countdown timer
+  useEffect(() => {
+    console.log('⏱️ Countdown effect triggered:', { autoCloseAfter, canClose, visible, countdown });
+    
+    // Reset countdown state when props change
+    if (visible && autoCloseAfter && autoCloseAfter > 0 && !canClose) {
+      console.log('🚀 Starting countdown timer for', autoCloseAfter, 'seconds');
       setCountdown(autoCloseAfter);
+      setCanCloseModal(false); // Ensure close button is hidden during countdown
+      
       const timer = setInterval(() => {
         setCountdown((prev) => {
+          console.log('⏲️ Countdown tick:', prev - 1);
           if (prev <= 1) {
+            console.log('✅ Countdown finished, enabling close button');
             setCanCloseModal(true);
             clearInterval(timer);
+            
+            // Call completion callback and auto-close in next tick to avoid setState during render
+            setTimeout(() => {
+              onCountdownComplete?.();
+              
+              // Auto-close modal if requested
+              if (autoCloseOnComplete) {
+                console.log('🚪 Auto-closing modal after countdown');
+                setTimeout(() => onClose(), 500); // Small delay for smooth UX
+              }
+            }, 0);
+            
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
 
-      return () => clearInterval(timer);
+      return () => {
+        console.log('🧹 Cleaning up countdown timer');
+        clearInterval(timer);
+      };
+    } else {
+      console.log('❌ Not starting countdown:', { autoCloseAfter, canClose, visible });
+      // If we're not showing a countdown, reset the countdown state
+      if (visible && canClose) {
+        setCountdown(0);
+      }
     }
   }, [visible, autoCloseAfter, canClose]);
 
   const getModalTitle = () => {
     switch (reason) {
       case 'firstTime':
-        return '🎉 Welcome to Spendy Premium!';
-      case 'dailyPrompt':
-        return '✨ Upgrade to Premium Today!';
+        return '🎉 Welcome to Premium!';
       case 'groupLimit':
-        return '📊 You\'ve reached your group limit';
+        return '📊 Upgrade for More Groups';
       case 'memberLimit':
-        return '👥 Group member limit reached';
+        return '👥 Upgrade for More Members';
       case 'transactionLimit':
-        return '💳 Daily transaction limit reached';
+        return '💳 Upgrade for Unlimited';
       case 'premium_feature':
-        return `🚀 ${featureName} is a Premium Feature`;
+        return `🚀 Unlock ${featureName}`;
       default:
         return '✨ Upgrade to Premium';
     }
@@ -121,26 +220,24 @@ export default function SubscriptionModal({
   const getModalSubtitle = () => {
     switch (reason) {
       case 'firstTime':
-        return 'Unlock all features and take your expense tracking to the next level!';
-      case 'dailyPrompt':
-        return 'Start your day with unlimited access to all premium features!';
+        return 'Unlock all features and take control of your expenses';
       case 'groupLimit':
-        return 'Create unlimited groups with Premium access';
+        return 'Create unlimited groups and manage all your expenses';
       case 'memberLimit':
-        return 'Add unlimited members to your groups with Premium';
+        return 'Add unlimited members to collaborate seamlessly';
       case 'transactionLimit':
-        return 'Track unlimited transactions daily with Premium access';
+        return 'Track unlimited transactions without restrictions';
       case 'premium_feature':
-        return `Upgrade to Premium to access ${featureName} and many more features!`;
+        return `Access ${featureName} and all premium features`;
       default:
-        return 'Get the most out of Spendy with Premium features!';
+        return 'Get the most out of Spendy with premium features';
     }
   };
 
   const handleSubscribe = async () => {
     setLoading(true);
     try {
-      await onSubscribe(selectedPlan, promoCode || undefined);
+      onSubscribe(selectedPlan, promoCode || undefined);
     } catch (error) {
       Alert.alert('Error', 'Failed to process subscription. Please try again.');
     } finally {
@@ -154,14 +251,33 @@ export default function SubscriptionModal({
     }
   };
 
-  const monthlyPrice = 2.99;
-  const yearlyPrice = 25.99;
-  const yearlyMonthlyPrice = yearlyPrice / 12;
-  const savings = Math.round(((monthlyPrice * 12 - yearlyPrice) / (monthlyPrice * 12)) * 100);
+  const { monthlyPrice, yearlyPrice, yearlyMonthlyPrice, savings, currency } = getCurrentPricing();
+  const keyFeatures = getCurrentFeatures();
 
   if (!visible) {
     return null;
   }
+
+  // Show loading state while config is being fetched
+  if (configLoading) {
+    return (
+      <FullscreenModal visible={visible} onClose={onClose} title="Loading...">
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.loadingText}>Loading subscription options...</Text>
+          </View>
+        </View>
+      </FullscreenModal>
+    );
+  }
+
+  // Debug countdown display
+  console.log('🎨 Rendering SubscriptionModal with:', { 
+    canCloseModal, 
+    countdown, 
+    shouldShowCountdown: !canCloseModal && countdown > 0,
+    autoCloseAfter 
+  });
 
   return (
     <FullscreenModal
@@ -171,369 +287,302 @@ export default function SubscriptionModal({
       showBackButton={canCloseModal}
       rightActions={
         !canCloseModal && countdown > 0 ? (
-          <View style={styles.countdownContainer}>
-            <Text style={styles.countdownText}>{countdown}</Text>
-          </View>
-        ) : null
+          <>
+            {console.log('🔴 RENDERING TIMER:', { canCloseModal, countdown, willShow: !canCloseModal && countdown > 0 })}
+            <View style={styles.countdownContainer}>
+              <Text style={styles.countdownText}>{countdown}</Text>
+              <Text style={styles.countdownLabel}>SEC</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            {console.log('❌ NOT RENDERING TIMER:', { canCloseModal, countdown, willShow: !canCloseModal && countdown > 0 })}
+            {null}
+          </>
+        )
       }
     >
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Subtitle */}
-        <Text style={styles.subtitle}>{getModalSubtitle()}</Text>
-            {/* Plan Selection */}
-            <View style={styles.planContainer}>
-              <Text style={styles.sectionTitle}>Choose Your Plan</Text>
-              
-              <View style={styles.planOptions}>
-                {/* Yearly Plan */}
-                <TouchableOpacity
-                  style={[
-                    styles.planOption,
-                    selectedPlan === 'yearly' && styles.selectedPlan
-                  ]}
-                  onPress={() => setSelectedPlan('yearly')}
-                >
-                  <View style={styles.planBadge}>
-                    <Text style={styles.planBadgeText}>SAVE {savings}%</Text>
-                  </View>
-                  <View style={styles.planHeader}>
-                    <Text style={styles.planName}>Yearly</Text>
-                    <Text style={styles.planPrice}>${yearlyPrice.toFixed(2)}</Text>
-                    <Text style={styles.planPriceSubtext}>
-                      ${yearlyMonthlyPrice.toFixed(2)}/month
-                    </Text>
-                  </View>
-                  <View style={styles.planFeatures}>
-                    <Text style={styles.planFeatureText}>✓ 2 months FREE</Text>
-                    <Text style={styles.planFeatureText}>✓ Best value</Text>
-                  </View>
-                  {selectedPlan === 'yearly' && (
-                    <View style={styles.selectedIndicator}>
-                      <Text style={styles.selectedIndicatorText}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* Monthly Plan */}
-                <TouchableOpacity
-                  style={[
-                    styles.planOption,
-                    selectedPlan === 'monthly' && styles.selectedPlan
-                  ]}
-                  onPress={() => setSelectedPlan('monthly')}
-                >
-                  <View style={styles.planHeader}>
-                    <Text style={styles.planName}>Monthly</Text>
-                    <Text style={styles.planPrice}>${monthlyPrice.toFixed(2)}</Text>
-                    <Text style={styles.planPriceSubtext}>per month</Text>
-                  </View>
-                  <View style={styles.planFeatures}>
-                    <Text style={styles.planFeatureText}>✓ Cancel anytime</Text>
-                    <Text style={styles.planFeatureText}>✓ Flexible billing</Text>
-                  </View>
-                  {selectedPlan === 'monthly' && (
-                    <View style={styles.selectedIndicator}>
-                      <Text style={styles.selectedIndicatorText}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Premium Features */}
-            <View style={styles.featuresContainer}>
-              <Text style={styles.sectionTitle}>Premium Features</Text>
-              <View style={styles.featureGrid}>
-                {PLAN_FEATURES.map((feature, index) => (
-                  <View key={index} style={styles.featureItem}>
-                    <Text style={styles.featureIcon}>{feature.icon}</Text>
-                    <Text style={styles.featureText}>{feature.text}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Free vs Premium Comparison */}
-            <View style={styles.comparisonContainer}>
-              <Text style={styles.sectionTitle}>Free vs Premium</Text>
-              
-              <View style={styles.comparisonGrid}>
-                <View style={styles.comparisonColumn}>
-                  <Text style={styles.comparisonHeader}>Free</Text>
-                  {FREE_FEATURES.map((feature, index) => (
-                    <View key={index} style={styles.comparisonItem}>
-                      <Text style={styles.comparisonIcon}>{feature.icon}</Text>
-                      <Text style={styles.comparisonText}>{feature.text}</Text>
-                    </View>
-                  ))}
-                </View>
-                
-                <View style={styles.comparisonColumn}>
-                  <Text style={styles.comparisonHeader}>Premium</Text>
-                  {PLAN_FEATURES.slice(0, 6).map((feature, index) => (
-                    <View key={index} style={styles.comparisonItem}>
-                      <Text style={styles.comparisonIcon}>{feature.icon}</Text>
-                      <Text style={styles.comparisonText}>{feature.text}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-
-            {/* Promo Code */}
-            <View style={styles.promoContainer}>
-              <TouchableOpacity
-                style={styles.promoToggle}
-                onPress={() => setShowPromoInput(!showPromoInput)}
-              >
-                <Text style={styles.promoToggleText}>
-                  Have a promo code? {showPromoInput ? 'Hide' : 'Click here'}
-                </Text>
-                <Text style={styles.chevron}>{showPromoInput ? '▲' : '▼'}</Text>
-              </TouchableOpacity>
-              
-              {showPromoInput && (
-                <View style={styles.promoInputContainer}>
-                  <TextInput
-                    style={styles.promoInput}
-                    placeholder="Enter promo code"
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    value={promoCode}
-                    onChangeText={setPromoCode}
-                    autoCapitalize="characters"
-                  />
-                </View>
-              )}
-            </View>
+      <View style={styles.container}>
+        {/* Header Section */}
+        <View style={styles.header}>
+          <Text style={styles.subtitle}>{getModalSubtitle()}</Text>
           
-          {/* Footer */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.subscribeButton, loading && styles.subscribeButtonDisabled]}
-              onPress={handleSubscribe}
-              disabled={loading}
-            >
-              <Text style={styles.subscribeButtonText}>
-                {loading 
-                  ? 'Processing...' 
-                  : `Start Premium - $${selectedPlan === 'yearly' ? yearlyPrice.toFixed(2) : monthlyPrice.toFixed(2)}`
-                }
-              </Text>
-            </TouchableOpacity>
-            
-            <Text style={styles.termsText}>
-              By subscribing, you agree to our Terms of Service and Privacy Policy.
-              Cancel anytime in your account settings.
-            </Text>
+          {/* Key Features Grid */}
+          <View style={styles.featuresGrid}>
+            {keyFeatures.map((feature: string, index: number) => (
+              <View key={index} style={styles.featureChip}>
+                <Text style={styles.featureChipText}>✓ {feature}</Text>
+              </View>
+            ))}
           </View>
-        </ScrollView>
+        </View>
+
+        {/* Plan Selection */}
+        <View style={styles.planSection}>
+          <View style={styles.planOptions}>
+            {/* Yearly Plan */}
+            <TouchableOpacity
+              style={[
+                styles.planOption,
+                selectedPlan === 'yearly' && styles.selectedPlan
+              ]}
+              onPress={() => setSelectedPlan('yearly')}
+            >
+              <View style={styles.planBadge}>
+                <Text style={styles.planBadgeText}>SAVE {savings}%</Text>
+              </View>
+              <Text style={styles.planName}>Yearly</Text>
+              <Text style={styles.planPrice}>{formatCurrency(yearlyPrice, currency)}</Text>
+              <Text style={styles.planPriceSubtext}>{formatCurrency(yearlyMonthlyPrice, currency)}/month</Text>
+              <Text style={styles.planBenefit}>2 months FREE</Text>
+            </TouchableOpacity>
+
+            {/* Monthly Plan */}
+            <TouchableOpacity
+              style={[
+                styles.planOption,
+                selectedPlan === 'monthly' && styles.selectedPlan
+              ]}
+              onPress={() => setSelectedPlan('monthly')}
+            >
+              <Text style={styles.planName}>Monthly</Text>
+              <Text style={styles.planPrice}>{formatCurrency(monthlyPrice, currency)}</Text>
+              <Text style={styles.planPriceSubtext}>per month</Text>
+              <Text style={styles.planBenefit}>Cancel anytime</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Promo Code */}
+        {subscriptionConfig?.displayConfig.promoCodeEnabled && (
+          showPromoInput ? (
+            <View style={styles.promoInputContainer}>
+              <TextInput
+                style={styles.promoInput}
+                placeholder="Enter promo code"
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                value={promoCode}
+                onChangeText={setPromoCode}
+                autoCapitalize="characters"
+              />
+              <TouchableOpacity
+                style={styles.promoCloseButton}
+                onPress={() => setShowPromoInput(false)}
+              >
+                <Text style={styles.promoCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.promoToggle}
+              onPress={() => setShowPromoInput(true)}
+            >
+              <Text style={styles.promoToggleText}>Have a promo code?</Text>
+            </TouchableOpacity>
+          )
+        )}
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.subscribeButton, loading && styles.subscribeButtonDisabled]}
+            onPress={handleSubscribe}
+            disabled={loading}
+          >
+            <Text style={styles.subscribeButtonText}>
+              {loading 
+                ? 'Processing...' 
+                : `Start Premium - ${formatCurrency(selectedPlan === 'yearly' ? yearlyPrice : monthlyPrice, currency)}`
+              }
+            </Text>
+          </TouchableOpacity>
+          
+          <Text style={styles.termsText}>
+            Cancel anytime • Secure payment • 30-day guarantee
+          </Text>
+        </View>
+      </View>
     </FullscreenModal>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
+  container: {
     flex: 1,
     backgroundColor: '#667eea',
     paddingHorizontal: 20,
+    justifyContent: 'space-between',
+  },
+  header: {
+    paddingTop: 20,
   },
   subtitle: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.9)',
     lineHeight: 22,
     textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 32,
+    marginBottom: 24,
+  },
+  featuresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+  featureChip: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  featureChipText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
   },
   countdownContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FF0000',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 10,
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    zIndex: 1000,
   },
   countdownText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  sectionTitle: {
+    color: '#FFFFFF',
     fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 16,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
     textAlign: 'center',
+    includeFontPadding: false,
+    lineHeight: 22,
   },
-  planContainer: {
-    marginBottom: 30,
+  countdownLabel: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    textAlign: 'center',
+    marginTop: -2,
+    includeFontPadding: false,
+  },
+  planSection: {
+    flex: 1,
+    justifyContent: 'center',
+    marginVertical: 20,
   },
   planOptions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
   },
   planOption: {
     flex: 1,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.2)',
     position: 'relative',
+    minHeight: 160,
+    justifyContent: 'center',
   },
   selectedPlan: {
     borderColor: 'white',
     backgroundColor: 'rgba(255,255,255,0.25)',
+    transform: [{ scale: 1.02 }],
   },
   planBadge: {
     position: 'absolute',
     top: -8,
-    right: 8,
     backgroundColor: '#FFD700',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   planBadgeText: {
     color: '#667eea',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 'bold',
-  },
-  planHeader: {
-    alignItems: 'center',
-    marginBottom: 12,
   },
   planName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
-  },
-  planPrice: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  planPriceSubtext: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  planFeatures: {
-    alignItems: 'center',
-  },
-  planFeatureText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 2,
-  },
-  selectedIndicator: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedIndicatorText: {
-    color: '#667eea',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  featuresContainer: {
-    marginBottom: 30,
-  },
-  featureGrid: {
-    gap: 12,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: 12,
-    borderRadius: 12,
-  },
-  featureIcon: {
-    marginRight: 12,
-    fontSize: 20,
-  },
-  featureText: {
-    flex: 1,
-    fontSize: 14,
-    color: 'white',
-    fontWeight: '500',
-  },
-  comparisonContainer: {
-    marginBottom: 30,
-  },
-  comparisonGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  comparisonColumn: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    padding: 16,
-  },
-  comparisonHeader: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  comparisonItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: 8,
   },
-  comparisonIcon: {
-    fontSize: 16,
-    marginRight: 8,
+  planPrice: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
   },
-  comparisonText: {
+  planPriceSubtext: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 8,
+  },
+  planBenefit: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.9)',
-    flex: 1,
+    fontWeight: '500',
   },
-  promoContainer: {
-    marginBottom: 20,
-  },
-  promoToggle: {
+  promoInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 12,
+    marginBottom: 16,
+    paddingRight: 4,
+  },
+  promoInput: {
+    flex: 1,
+    padding: 12,
+    color: 'white',
+    fontSize: 14,
+  },
+  promoCloseButton: {
+    padding: 8,
+    marginRight: 4,
+  },
+  promoCloseText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+  },
+  promoToggle: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    marginBottom: 16,
   },
   promoToggleText: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 14,
-    marginRight: 8,
-  },
-  chevron: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-  },
-  promoInputContainer: {
-    marginTop: 12,
-  },
-  promoInput: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12,
-    padding: 12,
-    color: 'white',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    textDecorationLine: 'underline',
   },
   footer: {
-    padding: 20,
-    paddingTop: 10,
     paddingBottom: Platform.OS === 'ios' ? 40 : 20,
   },
   subscribeButton: {
@@ -543,10 +592,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   subscribeButtonDisabled: {
     backgroundColor: 'rgba(255,255,255,0.7)',
@@ -555,6 +604,12 @@ const styles = StyleSheet.create({
     color: '#667eea',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#667eea',
+    textAlign: 'center',
+    marginTop: 20,
   },
   termsText: {
     fontSize: 12,

@@ -189,7 +189,7 @@ export class FirebaseNotificationService {
       
       // Get Expo push token for mobile
       this.expoPushToken = (await Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId,
+        projectId: Constants.expoConfig?.extra?.external?.expoProjectId || '8ba655ab-7839-4196-9893-2a71413248ed',
       })).data;
       
       console.log('📱 Expo Push Token:', this.expoPushToken);

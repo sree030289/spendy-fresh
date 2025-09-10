@@ -21,6 +21,7 @@ export class FriendsController {
    */
   static async sendFriendRequest(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      console.log('🔍 sendFriendRequest body:', req.body);
       const { recipientEmail, recipientPhoneNumber, message } = req.body;
       const senderId = req.user!.id;
 
@@ -53,13 +54,13 @@ export class FriendsController {
       const existingFriendship = await DatabaseService.queryDocumentsWithOr(
         COLLECTIONS.FRIENDS,
         [
-          { userId: senderId, friendId: recipient.id },
-          { userId: recipient.id, friendId: senderId }
+          { userId: senderId, friendId: recipient.id, status: FRIEND_STATUS.ACCEPTED },
+          { userId: recipient.id, friendId: senderId, status: FRIEND_STATUS.ACCEPTED }
         ]
       );
 
       if (existingFriendship.length > 0) {
-        throw new ValidationError('Users are already friends or have a pending request');
+        throw new ValidationError('Already friends');
       }
 
       // Check if there's already a pending request
@@ -72,7 +73,7 @@ export class FriendsController {
       );
 
       if (existingRequest.length > 0) {
-        throw new ValidationError('Friend request already exists');
+        throw new ValidationError('Friend request already pending');
       }
 
       // Create friend request
@@ -233,15 +234,41 @@ export class FriendsController {
     try {
       const userId = req.user!.id;
 
-      const friends = await DatabaseService.queryDocuments(
+      const friendships = await DatabaseService.queryDocuments(
         COLLECTIONS.FRIENDS,
         { userId, status: FRIEND_STATUS.ACCEPTED }
+      );
+
+      // Enrich with friend user details
+      const enrichedFriends = await Promise.all(
+        friendships.map(async (friendship: any) => {
+          try {
+            const friendUser = await DatabaseService.getDocument(
+              COLLECTIONS.USERS,
+              friendship.friendId
+            ) as User;
+
+            return {
+              ...friendship,
+              friendData: friendUser ? {
+                id: friendUser.id,
+                fullName: friendUser.fullName,
+                email: friendUser.email,
+                mobile: friendUser.mobile || friendUser.phoneNumber,
+                avatar: friendUser.profileImage || friendUser.profilePicture
+              } : null
+            };
+          } catch (error) {
+            console.error(`Error enriching friend ${friendship.friendId}:`, error);
+            return friendship; // Return original friendship if enrichment fails
+          }
+        })
       );
 
       res.json({
         success: true,
         message: 'Friends retrieved successfully',
-        data: friends
+        data: enrichedFriends
       });
     } catch (error) {
       throw error;
@@ -317,11 +344,24 @@ export class FriendsController {
       }
 
       // Remove friendship records
-      const deletePromises = friendships.map((friendship: any) =>
+      const deleteFriendshipsPromises = friendships.map((friendship: any) =>
         DatabaseService.deleteDocument(COLLECTIONS.FRIENDS, friendship.id)
       );
 
-      await Promise.all(deletePromises);
+      // Also remove all related friend requests (accepted, rejected, or pending)
+      const friendRequests = await DatabaseService.queryDocumentsWithOr(
+        COLLECTIONS.FRIEND_REQUESTS,
+        [
+          { senderId: userId, recipientId: friendId },
+          { senderId: friendId, recipientId: userId }
+        ]
+      );
+
+      const deleteFriendRequestsPromises = friendRequests.map((request: any) =>
+        DatabaseService.deleteDocument(COLLECTIONS.FRIEND_REQUESTS, request.id)
+      );
+
+      await Promise.all([...deleteFriendshipsPromises, ...deleteFriendRequestsPromises]);
 
       res.json({
         success: true,

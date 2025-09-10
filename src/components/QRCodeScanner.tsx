@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,8 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
   const [permission, requestPermission] = useCameraPermissions();
   
   const scannerManager = QRScannerManager.getInstance();
+  const isProcessingRef = useRef(false);
+  const lastScanTimeRef = useRef<number>(0);
 
   useEffect(() => {
     (async () => {
@@ -44,6 +46,8 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
     if (visible) {
       setScanned(false);
       setProcessing(false);
+      isProcessingRef.current = false;
+      lastScanTimeRef.current = 0;
     }
   }, [visible]);
 
@@ -56,11 +60,30 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
   }, [visible]);
 
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
-    // Prevent multiple rapid scans
+    // Strong protection against multiple rapid scans
+    const now = Date.now();
+    
+    // Check ref-based flags first (immediate)
+    if (isProcessingRef.current) {
+      console.log('🚫 QR scan blocked by ref - already processing');
+      return;
+    }
+    
+    // Time-based protection
+    if (lastScanTimeRef.current && (now - lastScanTimeRef.current) < 2000) {
+      console.log('🚫 QR scan blocked by time - too soon after last scan');
+      return;
+    }
+    
+    // State-based protection (backup)
     if (scanned || processing) {
+      console.log('🚫 QR scan blocked by state - already scanned or processing');
       return;
     }
 
+    // Set all protection flags
+    isProcessingRef.current = true;
+    lastScanTimeRef.current = now;
     setScanned(true);
     setProcessing(true);
     
@@ -90,6 +113,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
         console.log('❌ Invalid QR format');
         setProcessing(false);
         setScanned(false);
+        isProcessingRef.current = false;
         onQRCodeScanned('INVALID_QR_FORMAT');
         return;
       }
@@ -104,6 +128,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
       console.error('❌ QR scan error:', error);
       setProcessing(false);
       setScanned(false);
+      isProcessingRef.current = false;
       onQRCodeScanned('SCAN_ERROR');
     }
   };

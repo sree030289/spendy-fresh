@@ -14,8 +14,26 @@ import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
-import { Friend } from '@/services/firebase/splitting-disabled';
 import { getCurrencySymbol } from '@/utils/currency';
+
+// Define Friend interface locally to avoid import issues
+interface Friend {
+  id: string;
+  userId: string;
+  friendId: string;
+  friendData: {
+    id: string;
+    fullName: string;
+    email: string;
+    mobile?: string;
+    avatar?: string;
+    profilePicture?: string;
+  };
+  status: 'pending' | 'accepted' | 'blocked' | 'invited';
+  balance: number;
+  lastActivity: Date;
+  createdAt: Date;
+}
 
 interface RemindModalProps {
   visible: boolean;
@@ -139,18 +157,8 @@ export default function RemindModal({
   };
 
   return (
-    <FullscreenModal visible={visible} onClose={onClose}>
+    <FullscreenModal visible={visible} onClose={onClose} title="Send Reminder">
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Icon name="close" size={24} color={theme.colors.text}  />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Send Reminder
-          </Text>
-          <View style={styles.placeholder} />
-        </View>
 
         {/* Friend Info */}
         <View style={[styles.friendInfo, { backgroundColor: theme.colors.surface }]}>
@@ -223,7 +231,7 @@ export default function RemindModal({
             onPress={() => handleSendReminder('whatsapp')}
             disabled={isSending}
           >
-            <Icon name="logo-whatsapp" size={24} color="#25D366" />
+            <Icon name="send" size={24} color="#25D366" />
             <View style={styles.optionContent}>
               <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
                 Send WhatsApp
@@ -269,24 +277,6 @@ export default function RemindModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  closeButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  placeholder: {
-    width: 40,
   },
   friendInfo: {
     flexDirection: 'row',

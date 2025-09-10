@@ -19,6 +19,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import CurrencyModal from '@/components/modals/CurrencyModal';
 import SubscriptionModal from '@/components/modals/SubscriptionModal';
+import { TermsPrivacyModal } from '@/components/modals/TermsPrivacyModal';
 import { useTour } from '@/components/tour/TourProvider';
 import { SubscriptionService, UserSubscription, SubscriptionPlan } from '@/services/SubscriptionService';
 
@@ -29,6 +30,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showTermsPrivacyModal, setShowTermsPrivacyModal] = useState(false);
   const { startTour, resetTour } = useTour();
 
   // Subscription states
@@ -327,18 +329,7 @@ export default function ProfileScreen() {
             <Icon name="back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity onPress={startTour} style={styles.tourButton}>
-              <Icon name="help" size={24} color={theme.colors.text}  />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={toggleTheme}>
-              <Icon 
-                name="settings" 
-                size={24} 
-                color={theme.colors.text} 
-              />
-            </TouchableOpacity>
-          </View>
+          <View style={{ width: 32 }} />
         </View>
 
         {/* Profile Info */}
@@ -493,32 +484,6 @@ export default function ProfileScreen() {
                   </View>
                 )}
               </View>
-
-              {/* Premium Features Preview (for free users) */}
-              {subscription?.plan === 'free' && (
-                <View style={[styles.premiumPreview, { backgroundColor: theme.colors.surface }]}>
-                  <Text style={[styles.premiumTitle, { color: theme.colors.text }]}>
-                    🚀 Premium Features
-                  </Text>
-                  <View style={styles.premiumFeatures}>
-                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
-                      ✓ Unlimited groups & members
-                    </Text>
-                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
-                      ✓ Unlimited daily transactions
-                    </Text>
-                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
-                      ✓ Advanced analytics & insights
-                    </Text>
-                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
-                      ✓ Receipt scanning & QR codes
-                    </Text>
-                    <Text style={[styles.premiumFeature, { color: theme.colors.textSecondary }]}>
-                      ✓ Group chat & Gmail integration
-                    </Text>
-                  </View>
-                </View>
-              )}
             </>
           )}
         </View>
@@ -571,13 +536,6 @@ export default function ProfileScreen() {
             value={isDark ? 'Dark' : 'Light'}
             onPress={toggleTheme}
           />
-          
-          <ProfileItem
-            icon="language-outline"
-            title="Language"
-            value="English"
-            onPress={() => Alert.alert('Feature', 'Language settings coming soon')}
-          />
         </View>
 
         {/* Support */}
@@ -617,14 +575,8 @@ export default function ProfileScreen() {
           
           <ProfileItem
             icon="document-text-outline"
-            title="Privacy Policy"
-            onPress={() => Alert.alert('Privacy', 'Privacy policy will be available soon')}
-          />
-          
-          <ProfileItem
-            icon="shield-checkmark-outline"
-            title="Terms of Service"
-            onPress={() => Alert.alert('Terms', 'Terms of service will be available soon')}
+            title="Legal"
+            onPress={() => setShowTermsPrivacyModal(true)}
           />
         </View>
 
@@ -674,6 +626,12 @@ export default function ProfileScreen() {
         reason="premium_feature"
         featureName="Premium Subscription"
         canClose={true}
+      />
+
+      {/* Terms & Privacy Modal */}
+      <TermsPrivacyModal
+        visible={showTermsPrivacyModal}
+        onClose={() => setShowTermsPrivacyModal(false)}
       />
     </SafeAreaView>
   );
@@ -872,22 +830,6 @@ const styles = StyleSheet.create({
   usageValue: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  premiumPreview: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  premiumTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  premiumFeatures: {
-    gap: 6,
-  },
-  premiumFeature: {
-    fontSize: 14,
   },
   accountInfo: {
     padding: 16,

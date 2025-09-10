@@ -474,6 +474,304 @@ spendyApp.get('/auth/profile', authenticateJWT, async (req, res) => {
   }
 });
 
+// ===== PASSWORD RESET OTP ROUTES =====
+
+// Send OTP for password reset
+spendyApp.post('/auth/send-password-reset-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log(`📧 Sending password reset OTP to: ${normalizedEmail}`);
+
+    // Check if user exists
+    const usersSnapshot = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', normalizedEmail)
+      .get();
+
+    if (usersSnapshot.empty) {
+      // For security, don't reveal if email exists or not
+      return res.status(404).json({
+        success: false,
+        message: 'If this email is registered, you will receive a reset code.'
+      });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Create session ID for this OTP request
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    
+    // Store OTP session in database (expires in 10 minutes)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+    
+    await db.collection('otp_sessions').doc(sessionId).set({
+      email: normalizedEmail,
+      otp: otp,
+      type: 'password_reset',
+      verified: false,
+      createdAt: new Date(),
+      expiresAt: expiresAt
+    });
+
+    // Send email with OTP
+    try {
+      const nodemailer = require('nodemailer');
+      
+      // Create transporter (you'll need to configure this with your email service)
+      const transporter = nodemailer.createTransporter({
+        service: 'gmail', // or your email service
+        auth: {
+          user: process.env.EMAIL_USER || 'your-email@gmail.com',
+          pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+        }
+      });
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER || 'noreply@spendy.com',
+        to: normalizedEmail,
+        subject: 'Password Reset - Verification Code',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #667eea; margin: 0;">🔐 Spendy</h1>
+              <h2 style="color: #333; margin: 10px 0;">Password Reset Code</h2>
+            </div>
+            
+            <div style="background-color: #f8f9ff; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 30px;">
+              <p style="color: #666; margin-bottom: 15px;">Your verification code is:</p>
+              <div style="font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 4px; margin: 20px 0;">${otp}</div>
+              <p style="color: #888; font-size: 14px;">This code will expire in 10 minutes</p>
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+              <p style="color: #333; line-height: 1.6;">
+                You requested a password reset for your Spendy account. Enter the verification code above in the app to continue resetting your password.
+              </p>
+              <p style="color: #666; line-height: 1.6;">
+                If you didn't request this code, please ignore this email. Your account remains secure.
+              </p>
+            </div>
+            
+            <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
+              <p style="color: #888; font-size: 12px;">
+                This is an automated message from Spendy. Please do not reply to this email.
+              </p>
+            </div>
+          </div>
+        `
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log(`✅ OTP email sent successfully to: ${normalizedEmail}`);
+      
+    } catch (emailError) {
+      console.error('❌ Failed to send OTP email:', emailError);
+      // Still return success but log the error - don't expose email sending failures
+    }
+
+    res.json({
+      success: true,
+      message: 'If this email is registered, you will receive a reset code.',
+      sessionId: sessionId
+    });
+
+  } catch (error) {
+    console.error('❌ Send OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send verification code',
+      error: 'OTP_SEND_ERROR'
+    });
+  }
+});
+
+// Verify OTP for password reset
+spendyApp.post('/auth/verify-password-reset-otp', async (req, res) => {
+  try {
+    const { email, otp, sessionId } = req.body;
+
+    if (!email || !otp || !sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, OTP, and session ID are required'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log(`🔍 Verifying OTP for: ${normalizedEmail}`);
+
+    // Get OTP session
+    const sessionDoc = await db.collection('otp_sessions').doc(sessionId).get();
+    
+    if (!sessionDoc.exists) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification session'
+      });
+    }
+
+    const session = sessionDoc.data();
+
+    // Check if session is expired
+    if (new Date() > session.expiresAt.toDate()) {
+      // Clean up expired session
+      await db.collection('otp_sessions').doc(sessionId).delete();
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired. Please request a new one.'
+      });
+    }
+
+    // Verify email matches
+    if (session.email !== normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification session'
+      });
+    }
+
+    // Verify OTP
+    if (session.otp !== otp.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code'
+      });
+    }
+
+    // Mark session as verified
+    await db.collection('otp_sessions').doc(sessionId).update({
+      verified: true,
+      verifiedAt: new Date()
+    });
+
+    console.log(`✅ OTP verified successfully for: ${normalizedEmail}`);
+
+    res.json({
+      success: true,
+      message: 'Verification code verified successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Verify OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify code',
+      error: 'OTP_VERIFY_ERROR'
+    });
+  }
+});
+
+// Reset password using verified OTP session
+spendyApp.post('/auth/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword, sessionId } = req.body;
+
+    if (!email || !newPassword || !sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, new password, and session ID are required'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log(`🔄 Resetting password for: ${normalizedEmail}`);
+
+    // Get and validate OTP session
+    const sessionDoc = await db.collection('otp_sessions').doc(sessionId).get();
+    
+    if (!sessionDoc.exists) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification session'
+      });
+    }
+
+    const session = sessionDoc.data();
+
+    // Check if session is expired
+    if (new Date() > session.expiresAt.toDate()) {
+      await db.collection('otp_sessions').doc(sessionId).delete();
+      return res.status(400).json({
+        success: false,
+        message: 'Verification session has expired. Please start over.'
+      });
+    }
+
+    // Check if session is verified
+    if (!session.verified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please verify your code first'
+      });
+    }
+
+    // Check email matches
+    if (session.email !== normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification session'
+      });
+    }
+
+    // Find and update user
+    const usersSnapshot = await db.collection(COLLECTIONS.USERS)
+      .where('email', '==', normalizedEmail)
+      .get();
+
+    if (usersSnapshot.empty) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const userDoc = usersSnapshot.docs[0];
+    
+    // Hash new password
+    const hashedPassword = await CryptoUtils.hashPassword(newPassword);
+    
+    // Update user password
+    await userDoc.ref.update({
+      password: hashedPassword,
+      updatedAt: new Date()
+    });
+
+    // Clean up OTP session
+    await db.collection('otp_sessions').doc(sessionId).delete();
+
+    console.log(`✅ Password reset successfully for: ${normalizedEmail}`);
+
+    res.json({
+      success: true,
+      message: 'Password has been reset successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+      error: 'PASSWORD_RESET_ERROR'
+    });
+  }
+});
+
 // ===== FRIENDS ROUTES =====
 
 // Get Friends
@@ -598,19 +896,19 @@ spendyApp.get('/friends/search', authenticateJWT, async (req, res) => {
 // Send Friend Request Endpoint
 spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
   try {
-    const { userId, toEmail, message } = req.body;
+    const { userId, recipientEmail, message } = req.body;
     
-    if (!toEmail) {
+    if (!recipientEmail) {
       return res.status(400).json({
         success: false,
-        message: 'Target email is required',
+        message: 'Recipient email is required',
         error: 'MISSING_EMAIL'
       });
     }
 
     // Find target user by email
     const targetUserSnapshot = await db.collection(COLLECTIONS.USERS)
-      .where('email', '==', toEmail.toLowerCase())
+      .where('email', '==', recipientEmail.toLowerCase())
       .limit(1)
       .get();
 
@@ -619,10 +917,10 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
       const newUserInvite = {
         fromUserId: req.user.id,
         toUserId: null, // No user ID for new users
-        toEmail: toEmail.toLowerCase(),
+        toEmail: recipientEmail.toLowerCase(),
         toUser: {
-          email: toEmail.toLowerCase(),
-          fullName: toEmail.split('@')[0], // Use email prefix as temporary name
+          email: recipientEmail.toLowerCase(),
+          fullName: recipientEmail.split('@')[0], // Use email prefix as temporary name
           isNewUser: true
         },
         message: message || '',
@@ -654,7 +952,7 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
     if (!existingFriendship.empty) {
       return res.json({
         success: false,
-        message: 'Already friends or request pending'
+        message: 'You are already friends with this person'
       });
     }
 
@@ -1838,7 +2136,7 @@ spendyApp.delete('/groups/:groupId/members/:userId', authenticateJWT, async (req
     const groupData = groupDoc.data();
     
     // Check if requester is admin or the user being removed
-    const requesterMember = groupData.members&&find(member => 
+    const requesterMember = groupData.members.find(member => 
       member.userId === requesterId && member.isActive
     );
     
@@ -1860,7 +2158,7 @@ spendyApp.delete('/groups/:groupId/members/:userId', authenticateJWT, async (req
     }
 
     // Find the target member
-    const targetMemberIndex = groupData.members&&findIndex(member => 
+    const targetMemberIndex = groupData.members.findIndex(member => 
       member.userId === targetUserId && member.isActive
     );
     
@@ -1901,6 +2199,156 @@ spendyApp.delete('/groups/:groupId/members/:userId', authenticateJWT, async (req
       success: false,
       message: 'Failed to remove group member',
       error: 'REMOVE_MEMBER_ERROR'
+    });
+  }
+});
+
+// Update Member Role
+spendyApp.put('/groups/:groupId/members/:userId/role', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId, userId: targetUserId } = req.params;
+    const { role } = req.body;
+    const requesterId = req.user.id;
+
+    console.log('👑 Updating member role:', { groupId, targetUserId, role, requesterId });
+
+    // Validate role
+    if (!['admin', 'member'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role. Must be "admin" or "member"',
+        error: 'INVALID_ROLE'
+      });
+    }
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if requester is admin
+    const requesterMember = groupData.members.find((member) => 
+      member.userId === requesterId && member.isActive
+    );
+    
+    if (!requesterMember || requesterMember.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group admins can change member roles',
+        error: 'INSUFFICIENT_PERMISSIONS'
+      });
+    }
+
+    // Find the target member
+    const targetMemberIndex = groupData.members.findIndex((member) => 
+      member.userId === targetUserId && member.isActive
+    );
+    
+    if (targetMemberIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found in group',
+        error: 'MEMBER_NOT_FOUND'
+      });
+    }
+
+    // Prevent changing creator's role
+    if (groupData.createdBy === targetUserId && role !== 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot change group creator role from admin',
+        error: 'CREATOR_ROLE_PROTECTED'
+      });
+    }
+
+    // Update member role
+    const updatedMembers = [...groupData.members];
+    updatedMembers[targetMemberIndex].role = role;
+
+    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
+      members: updatedMembers,
+      updatedAt: new Date()
+    });
+
+    // Get target user info for notification
+    const targetUserDoc = await db.collection(COLLECTIONS.USERS).doc(targetUserId).get();
+    const requesterUserDoc = await db.collection(COLLECTIONS.USERS).doc(requesterId).get();
+    
+    const targetUserData = targetUserDoc.data();
+    const requesterUserData = requesterUserDoc.data();
+
+    // Send notification to target user
+    if (targetUserData && requesterUserData) {
+      const roleChangeMessage = role === 'admin' ? 
+        `${requesterUserData.fullName} made you an admin in "${groupData.name}"` :
+        `${requesterUserData.fullName} changed your role to member in "${groupData.name}"`;
+
+      // Send push notification
+      if (targetUserData.pushToken) {
+        try {
+          const expoPushNotification = {
+            title: role === 'admin' ? '👑 You\'re now an Admin!' : '👤 Role Updated',
+            body: roleChangeMessage,
+            data: {
+              type: 'role_changed',
+              groupId: groupId,
+              groupName: groupData.name,
+              newRole: role,
+              action: 'view_group',
+              deepLink: {
+                screen: 'GroupDetails',
+                params: { groupId }
+              }
+            }
+          };
+
+          await sendExpoPushNotification(targetUserData.pushToken, expoPushNotification);
+          console.log('📱 Role change notification sent');
+        } catch (notifError) {
+          console.error('Failed to send role change notification:', notifError);
+        }
+      }
+
+      // Send in-app notification
+      await db.collection('appNotifications').add({
+        userId: targetUserId,
+        type: 'role_changed',
+        title: role === 'admin' ? '👑 You\'re now an Admin!' : '👤 Role Updated',
+        message: roleChangeMessage,
+        data: {
+          groupId: groupId,
+          groupName: groupData.name,
+          newRole: role,
+          navigationType: 'group'
+        },
+        isRead: false,
+        createdAt: new Date()
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Member role updated to ${role} successfully`,
+      data: {
+        groupId,
+        userId: targetUserId,
+        newRole: role
+      }
+    });
+  } catch (error) {
+    console.error('Update member role error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update member role',
+      error: 'UPDATE_ROLE_ERROR'
     });
   }
 });
@@ -2121,6 +2569,53 @@ spendyApp.post('/expenses', authenticateJWT, async (req, res) => {
   }
 });
 
+// Get User by ID
+spendyApp.get('/users/:userId', authenticateJWT, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requestingUserId = req.user.id;
+
+    console.log(`🔍 Getting user: ${userId} (requested by: ${requestingUserId})`);
+
+    // Get user document
+    const userDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        error: "USER_NOT_FOUND"
+      });
+    }
+
+    const userData = userDoc.data();
+
+    // Return public user data (don't expose sensitive info)
+    const publicUserData = {
+      id: userDoc.id,
+      fullName: userData.fullName,
+      email: userData.email,
+      profileImage: userData.profileImage || userData.profilePicture,
+      country: userData.country,
+      currency: userData.currency,
+      createdAt: userData.createdAt
+    };
+
+    res.json({
+      success: true,
+      message: "User retrieved successfully",
+      data: publicUserData
+    });
+
+  } catch (error) {
+    console.error("❌ Get user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: "SERVER_ERROR"
+    });
+  }
+});
 // Get User Expenses
 spendyApp.get('/expenses', authenticateJWT, async (req, res) => {
   try {
@@ -2393,7 +2888,110 @@ spendyApp.get('/expenses/user/:userId', authenticateJWT, async (req, res) => {
 });
 
 // ===== MONEY MANAGEMENT ROUTES =====
+// Update expense endpoint
+spendyApp.put('/expenses/:expenseId', authenticateJWT, async (req, res) => {
+  try {
+    const { expenseId } = req.params;
+    const userId = req.user.id;
+    const updateData = req.body;
 
+    console.log(`🔍 Updating expense: ${expenseId} by user: ${userId}`);
+
+    // Get the expense to verify permissions
+    const expenseDoc = await db.collection(COLLECTIONS.EXPENSES).doc(expenseId).get();
+    
+    if (!expenseDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Expense not found',
+        error: 'EXPENSE_NOT_FOUND'
+      });
+    }
+
+    const expenseData = expenseDoc.data();
+
+    // Check if user can edit (expense payer or group member)
+    if (expenseData.paidBy !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only edit expenses you created',
+        error: 'PERMISSION_DENIED'
+      });
+    }
+
+    // Update the expense
+    const updatedExpense = {
+      ...updateData,
+      updatedAt: new Date()
+    };
+
+    await db.collection(COLLECTIONS.EXPENSES).doc(expenseId).update(updatedExpense);
+
+    const updatedDoc = await db.collection(COLLECTIONS.EXPENSES).doc(expenseId).get();
+
+    res.json({
+      success: true,
+      message: 'Expense updated successfully',
+      data: { id: expenseId, ...updatedDoc.data() }
+    });
+
+  } catch (error) {
+    console.error('❌ Update expense error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: 'SERVER_ERROR'
+    });
+  }
+});
+
+// Delete expense endpoint
+spendyApp.delete('/expenses/:expenseId', authenticateJWT, async (req, res) => {
+  try {
+    const { expenseId } = req.params;
+    const userId = req.user.id;
+
+    console.log(`🔍 Deleting expense: ${expenseId} by user: ${userId}`);
+
+    // Get the expense to verify permissions
+    const expenseDoc = await db.collection(COLLECTIONS.EXPENSES).doc(expenseId).get();
+    
+    if (!expenseDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Expense not found',
+        error: 'EXPENSE_NOT_FOUND'
+      });
+    }
+
+    const expenseData = expenseDoc.data();
+
+    // Check if user can delete (expense payer or group member with admin rights)
+    if (expenseData.paidBy !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only delete expenses you created',
+        error: 'PERMISSION_DENIED'
+      });
+    }
+
+    // Delete the expense
+    await db.collection(COLLECTIONS.EXPENSES).doc(expenseId).delete();
+
+    res.json({
+      success: true,
+      message: 'Expense deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Delete expense error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: 'SERVER_ERROR'
+    });
+  }
+});
 // Add Personal Transaction
 spendyApp.post('/money/transactions', authenticateJWT, async (req, res) => {
   try {
@@ -3408,6 +4006,108 @@ spendyApp.post('/notifications/payment-reminder', authenticateJWT, async (req, r
   }
 });
 
+// Send notification endpoint
+spendyApp.post('/notifications/send', authenticateJWT, async (req, res) => {
+  try {
+    const { userId, title, body, data, type } = req.body;
+    const senderId = req.user.id;
+
+    console.log(`📤 Sending notification to user: ${userId} from: ${senderId}`);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required',
+        error: 'MISSING_USER_ID'
+      });
+    }
+
+    // Get recipient user to get push token
+    const userDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    const userData = userDoc.data();
+    const pushToken = userData.pushToken;
+
+    if (!pushToken) {
+      console.log(`⚠️ User ${userId} has no push token, skipping notification`);
+      return res.json({
+        success: true,
+        message: 'User has no push token, notification skipped'
+      });
+    }
+
+    // Create notification record
+    const notificationData = {
+      userId,
+      senderId,
+      title: title || 'Spendy Notification',
+      body: body || '',
+      data: data || {},
+      type: type || 'general',
+      isRead: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const notificationRef = await db.collection(COLLECTIONS.NOTIFICATIONS).add(notificationData);
+
+    // Send push notification
+    const message = {
+      to: pushToken,
+      sound: 'default',
+      title: notificationData.title,
+      body: notificationData.body,
+      data: {
+        ...notificationData.data,
+        notificationId: notificationRef.id,
+        type: notificationData.type
+      }
+    };
+
+    try {
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+
+      const result = await response.json();
+      console.log('📤 Push notification sent:', result);
+
+    } catch (pushError) {
+      console.error('❌ Push notification error:', pushError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Notification sent successfully',
+      data: {
+        notificationId: notificationRef.id
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Send notification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: 'SERVER_ERROR'
+    });
+  }
+});
+
 // Get User Notifications (no userId in path - uses authenticated user)
 spendyApp.get('/notifications', authenticateJWT, async (req, res) => {
   try {
@@ -3666,6 +4366,83 @@ spendyApp.delete('/notifications/:userId/all', authenticateJWT, async (req, res)
       success: false,
       message: 'Failed to clear notifications',
       error: 'CLEAR_NOTIFICATIONS_ERROR'
+    });
+  }
+});
+// Send notification endpoint
+spendyApp.post('/notifications/send', authenticateJWT, async (req, res) => {
+  try {
+    const { userId, title, body, data, type } = req.body;
+    const senderId = req.user.id;
+
+    console.log(`📤 Sending notification to user: ${userId} from: ${senderId}`);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required',
+        error: 'MISSING_USER_ID'
+      });
+    }
+
+    // Get recipient user to get push token
+    const userDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    const userData = userDoc.data();
+    const pushToken = userData.pushToken;
+
+    if (!pushToken) {
+      console.log(`⚠️ User ${userId} has no push token, skipping`);
+      return res.json({
+        success: true,
+        message: 'User has no push token, notification skipped'
+      });
+    }
+
+    // Send push notification
+    const message = {
+      to: pushToken,
+      sound: 'default',
+      title: title || 'Spendy Notification',
+      body: body || '',
+      data: data || {}
+    };
+
+    try {
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message)
+      });
+
+      const result = await response.json();
+      console.log('📤 Push sent:', result);
+    } catch (pushError) {
+      console.error('❌ Push error:', pushError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Notification sent successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Send notification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: 'SERVER_ERROR'
     });
   }
 });
@@ -5345,7 +6122,7 @@ spendyApp.post('/friends/requests/:requestId/accept', authenticateJWT, async (re
 
     console.log('🤝 Accepting friend request:', requestId);
 
-    const requestRef = db.collection('friendRequests').doc(requestId);
+    const requestRef = db.collection(COLLECTIONS.FRIEND_REQUESTS).doc(requestId);
     const requestDoc = await requestRef.get();
 
     if (!requestDoc.exists) {
@@ -5464,15 +6241,15 @@ spendyApp.post('/friends/requests/:requestId/accept', authenticateJWT, async (re
   }
 });
 
-// Decline Friend Request with Notification
+// Decline Friend Request with Notification (or Cancel Own Request)
 spendyApp.post('/friends/requests/:requestId/decline', authenticateJWT, async (req, res) => {
   try {
     const { requestId } = req.params;
     const userId = req.user.id;
 
-    console.log('❌ Declining friend request:', requestId);
+    console.log('❌ Processing friend request decline/cancel:', requestId);
 
-    const requestRef = db.collection('friendRequests').doc(requestId);
+    const requestRef = db.collection(COLLECTIONS.FRIEND_REQUESTS).doc(requestId);
     const requestDoc = await requestRef.get();
 
     if (!requestDoc.exists) {
@@ -5483,7 +6260,12 @@ spendyApp.post('/friends/requests/:requestId/decline', authenticateJWT, async (r
     }
 
     const requestData = requestDoc.data();
-    if (requestData.toUserId !== userId) {
+    
+    // Check if user is authorized (either recipient declining or sender canceling)
+    const isRecipientDeclining = requestData.toUserId === userId;
+    const isSenderCanceling = requestData.fromUserId === userId;
+    
+    if (!isRecipientDeclining && !isSenderCanceling) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to decline this request'
@@ -5498,81 +6280,115 @@ spendyApp.post('/friends/requests/:requestId/decline', authenticateJWT, async (r
     }
 
     // Update request status
-    await requestRef.update({
-      status: 'declined',
+    const updateData = {
       respondedAt: new Date()
-    });
+    };
 
-    // Get user data for notification
-    const declinerDoc = await db.collection('users').doc(userId).get();
-    const declinerData = declinerDoc.data();
-
-    // Send push notification to friend request sender
-    try {
-      const senderDoc = await db.collection(COLLECTIONS.USERS)
-          .doc(requestData.fromUserId).get();
-      
-      if (senderDoc.exists) {
-        const senderData = senderDoc.data();
-        
-        if (senderData.pushToken) {
-          // Use Expo Push API instead of FCM
-          const expoPushNotification = {
-            title: "❌ Friend Request Declined",
-            body: `${declinerData.fullName} declined your friend request.`,
-            data: {
-              type: "friend_declined",
-              friendId: userId,
-              friendName: declinerData.fullName,
-              action: "view_friends",
-              deepLink: {
-                screen: "MainTabs",
-                params: { 
-                  initialTab: "Split",
-                  openFriendsTab: true 
-                }
-              }
-            }
-          };
-
-          const pushNotificationResult = await sendExpoPushNotification(
-            senderData.pushToken,
-            expoPushNotification
-          );
-          
-          console.log("📱 Push notification sent to friend request sender");
-          console.log("✅ Push notification result:", pushNotificationResult);
-        }
-      }
-    } catch (notifError) {
-      console.error("Failed to send decline notification:", notifError);
-      // Don't fail the request if notification fails
+    if (isRecipientDeclining) {
+      updateData.status = 'declined';
+      console.log('📤 Recipient declining friend request');
+    } else if (isSenderCanceling) {
+      updateData.status = 'cancelled';
+      console.log('🗑️ Sender canceling friend request');
     }
 
-    // Send in-app notification to friend request sender
-    await db.collection("appNotifications").add({
-      userId: requestData.fromUserId,
-      type: "friend_declined",
-      title: "❌ Friend Request Declined",
-      message: `${declinerData.fullName} declined your friend request.`,
-      data: {
-        friendId: userId,
-        friendName: declinerData.fullName,
-        navigationType: "friends",
-      },
-      isRead: false,
-      createdAt: new Date(),
-    });
+    await requestRef.update(updateData);
+
+    // Get user data for notification
+    const currentUserDoc = await db.collection('users').doc(userId).get();
+    const currentUserData = currentUserDoc.data();
+
+    // Send notification to the other party
+    let notificationRecipientId, notificationTitle, notificationMessage, notificationType;
+    
+    if (isRecipientDeclining) {
+      // Notify sender that their request was declined
+      notificationRecipientId = requestData.fromUserId;
+      notificationTitle = '❌ Friend Request Declined';
+      notificationMessage = `${currentUserData.fullName} declined your friend request.`;
+      notificationType = 'friend_declined';
+    } else if (isSenderCanceling) {
+      // Notify recipient that the request was cancelled (if they exist)
+      if (requestData.toUserId) {
+        notificationRecipientId = requestData.toUserId;
+        notificationTitle = '🗑️ Friend Request Cancelled';
+        notificationMessage = `${currentUserData.fullName} cancelled their friend request.`;
+        notificationType = 'friend_cancelled';
+      }
+    }
+
+    // Send push notification if there's a recipient
+    if (notificationRecipientId) {
+      try {
+        const recipientDoc = await db.collection(COLLECTIONS.USERS)
+            .doc(notificationRecipientId).get();
+      
+        if (recipientDoc.exists) {
+          const recipientData = recipientDoc.data();
+          
+          if (recipientData.pushToken) {
+            // Use Expo Push API instead of FCM
+            const expoPushNotification = {
+              title: notificationTitle,
+              body: notificationMessage,
+              data: {
+                type: notificationType,
+                friendId: userId,
+                friendName: currentUserData.fullName,
+                action: "view_friends",
+                deepLink: {
+                  screen: "MainTabs",
+                  params: { 
+                    initialTab: "Split",
+                    openFriendsTab: true 
+                  }
+                }
+              }
+            };
+
+            const pushNotificationResult = await sendExpoPushNotification(
+              recipientData.pushToken,
+              expoPushNotification
+            );
+            
+            console.log("📱 Push notification sent to recipient");
+            console.log("✅ Push notification result:", pushNotificationResult);
+          }
+        }
+      } catch (notifError) {
+        console.error("Failed to send notification:", notifError);
+        // Don't fail the request if notification fails
+      }
+
+      // Send in-app notification to recipient
+      await db.collection("appNotifications").add({
+        userId: notificationRecipientId,
+        type: notificationType,
+        title: notificationTitle,
+        message: notificationMessage,
+        data: {
+          friendId: userId,
+          friendName: currentUserData.fullName,
+          navigationType: "friends",
+        },
+        isRead: false,
+        createdAt: new Date(),
+      });
+    }
+
+    const responseMessage = isRecipientDeclining ? 
+      "Friend request declined successfully" : 
+      "Friend invitation cancelled successfully";
 
     res.json({
       success: true,
-      message: "Friend request declined successfully",
+      message: responseMessage,
     });
   } catch (error) {
-    console.error("❌ Decline friend request error:", error);
+    console.error("❌ Decline/cancel friend request error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to decline friend request",
+      message: "Failed to process friend request",
       error: error.message,
     });
   }
@@ -5672,6 +6488,338 @@ spendyApp.delete('/friends/:friendId', authenticateJWT, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to remove friend',
+      error: error.message
+    });
+  }
+});
+
+// Resend Friend Request Notification with enhanced reminder options
+spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { reminderMethod = 'auto' } = req.body; // 'auto', 'push', 'email', 'sms'
+    const userId = req.user.id;
+
+    console.log('📤 Resending friend request notification:', requestId, 'via', reminderMethod);
+
+    // Get the friend request
+    let requestRef = db.collection(COLLECTIONS.FRIEND_REQUESTS).doc(requestId);
+    let requestDoc = await requestRef.get();
+
+    console.log('🔍 Friend request lookup:', {
+      requestId,
+      exists: requestDoc.exists,
+      collection: COLLECTIONS.FRIEND_REQUESTS
+    });
+
+    if (!requestDoc.exists) {
+      // Try alternative collection name for backwards compatibility
+      requestRef = db.collection('friendRequests').doc(requestId);
+      requestDoc = await requestRef.get();
+      
+      console.log('🔍 Alternative collection lookup:', {
+        requestId,
+        exists: requestDoc.exists,
+        collection: 'friendRequests'
+      });
+      
+      if (!requestDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: 'Friend request not found in either collection'
+        });
+      }
+    }
+
+    const requestData = requestDoc.data();
+
+    // Verify the current user is the sender
+    if (requestData.fromUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to remind this request'
+      });
+    }
+
+    // Check if request is still pending
+    if (requestData.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Friend request is no longer pending'
+      });
+    }
+
+    // Get sender data
+    const senderDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    const senderData = senderDoc.data();
+
+    // Get receiver data to check registration status and available contact methods
+    let receiverData = null;
+    let isUserRegistered = false;
+    let availableMethods = [];
+    let originalInviteMethod = null;
+
+    if (requestData.toUserId) {
+      // User is registered - get their data
+      const receiverDoc = await db.collection(COLLECTIONS.USERS).doc(requestData.toUserId).get();
+      if (receiverDoc.exists) {
+        receiverData = receiverDoc.data();
+        isUserRegistered = true;
+        
+        // Check what contact methods are available
+        if (receiverData.pushToken) availableMethods.push('push');
+        if (receiverData.email) availableMethods.push('email');
+        if (receiverData.mobile || receiverData.phoneNumber) availableMethods.push('sms');
+      }
+    }
+
+    // Check for original invite method from the request data or related records
+    originalInviteMethod = requestData.inviteMethod || requestData.contactMethod;
+
+    // If user is not registered, check if this was an email/SMS invite to unregistered user
+    if (!isUserRegistered) {
+      if (requestData.toEmail) {
+        originalInviteMethod = 'email';
+        availableMethods = ['email'];
+      } else if (requestData.toPhone) {
+        originalInviteMethod = 'sms';
+        availableMethods = ['sms'];
+      }
+    }
+
+    // Determine the best reminder method
+    let finalReminderMethod = reminderMethod;
+    if (reminderMethod === 'auto') {
+      if (isUserRegistered) {
+        // For registered users, prefer push notification
+        finalReminderMethod = availableMethods.includes('push') ? 'push' : (originalInviteMethod || 'email');
+      } else {
+        // For unregistered users, use the original invite method
+        finalReminderMethod = originalInviteMethod || 'email';
+      }
+    }
+
+    // Validate the chosen method is available
+    if (!availableMethods.includes(finalReminderMethod) && isUserRegistered) {
+      return res.status(400).json({
+        success: false,
+        message: `Reminder method '${finalReminderMethod}' not available for this user`,
+        availableMethods,
+        isUserRegistered,
+        originalInviteMethod
+      });
+    }
+
+    let reminderTitle = '🤝 Friend Request Reminder';
+    let reminderMessage = `${senderData.fullName} is still waiting for you to respond to their friend request`;
+    let methodUsed = finalReminderMethod;
+
+    // Handle different reminder methods
+    if (finalReminderMethod === 'email') {
+      const recipientEmail = isUserRegistered ? receiverData.email : requestData.toEmail;
+      if (recipientEmail) {
+        console.log('📧 Sending email reminder to:', recipientEmail);
+        reminderMessage += ' (sent via email)';
+        
+        // Send email reminder to both registered and unregistered users
+        try {
+          const nodemailer = require('nodemailer');
+          
+          const transporter = nodemailer.createTransporter({
+            service: 'gmail',
+            auth: {
+              user: process.env.EMAIL_USER || 'noreply@spendy.com',
+              pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+            }
+          });
+
+          const subject = isUserRegistered ? 
+            `${senderData.fullName} sent you a friend request reminder on Spendy` :
+            `${senderData.fullName} is waiting for you to join Spendy!`;
+
+          const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #667eea; margin: 0;">🤝 Spendy</h1>
+                <h2 style="color: #333; margin: 10px 0;">${isUserRegistered ? 'Friend Request Reminder' : 'Join Spendy!'}</h2>
+              </div>
+              
+              <div style="background-color: #f8f9ff; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">Hi there! 👋</p>
+                <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
+                  <strong>${senderData.fullName}</strong> ${isUserRegistered ? 
+                    'is still waiting for you to respond to their friend request on Spendy.' :
+                    'has invited you to join Spendy and wants to be your friend!'}
+                </p>
+                ${isUserRegistered ? '' : `
+                <p style="font-size: 14px; color: #666; margin: 0;">
+                  Join Spendy to start splitting expenses and managing shared costs with your friends!
+                </p>
+                `}
+              </div>
+              
+              <div style="text-align: center; margin-bottom: 30px;">
+                <a href="https://spendy.app/download" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                  ${isUserRegistered ? 'Open Spendy App' : 'Download Spendy'}
+                </a>
+              </div>
+              
+              <div style="border-top: 1px solid #eee; padding-top: 20px;">
+                <p style="color: #888; font-size: 12px; margin: 0;">
+                  This reminder was sent by ${senderData.fullName} (${senderData.email}).
+                </p>
+                <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
+                  Spendy - Smart Money Management | This is an automated message.
+                </p>
+              </div>
+            </div>
+          `;
+
+          const mailOptions = {
+            from: `"Spendy" <${process.env.EMAIL_USER || 'noreply@spendy.com'}>`,
+            to: recipientEmail,
+            subject: subject,
+            html: htmlContent
+          };
+
+          await transporter.sendMail(mailOptions);
+          console.log(`✅ Email reminder sent successfully to: ${recipientEmail}`);
+          
+        } catch (emailError) {
+          console.error('❌ Failed to send email reminder:', emailError);
+        }
+        
+        // For unregistered users, also send external email invite through the service
+        if (!isUserRegistered) {
+          // Call external invite service
+          try {
+            const inviteResponse = await fetch(`${process.env.FUNCTIONS_EMULATOR_URL || 'https://us-central1-spendy-develop.cloudfunctions.net'}/spendyApi/invites/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'friend_reminder',
+                fromUserName: senderData.fullName,
+                fromUserEmail: senderData.email,
+                toUserEmail: recipientEmail,
+                inviteMethod: 'email',
+                message: `${senderData.fullName} is still waiting for you to join Spendy and accept their friend request!`,
+                deepLink: `spendy://friend-request/${requestId}`,
+                appStoreLink: 'https://spendy.app/download',
+                friendRequestId: requestId
+              })
+            });
+            
+            if (inviteResponse.ok) {
+              console.log('✅ Email reminder sent to unregistered user');
+            }
+          } catch (emailError) {
+            console.error('❌ Failed to send email reminder:', emailError);
+          }
+        }
+      }
+    } else if (finalReminderMethod === 'sms') {
+      const recipientPhone = isUserRegistered ? (receiverData.mobile || receiverData.phoneNumber) : requestData.toPhone;
+      if (recipientPhone) {
+        // Send SMS reminder (implement your SMS service here)
+        console.log('📱 Would send SMS reminder to:', recipientPhone);
+        reminderMessage += ' (sent via SMS)';
+        
+        // For unregistered users, send external SMS invite
+        if (!isUserRegistered) {
+          try {
+            const inviteResponse = await fetch(`${process.env.FUNCTIONS_EMULATOR_URL || 'https://us-central1-spendy-develop.cloudfunctions.net'}/spendyApi/invites/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'friend_reminder',
+                fromUserName: senderData.fullName,
+                toUserPhone: recipientPhone,
+                inviteMethod: 'phone',
+                message: `${senderData.fullName} is still waiting for you to join Spendy! Download: https://spendy.app/download`,
+                deepLink: `spendy://friend-request/${requestId}`,
+                friendRequestId: requestId
+              })
+            });
+            
+            if (inviteResponse.ok) {
+              console.log('✅ SMS reminder sent to unregistered user');
+            }
+          } catch (smsError) {
+            console.error('❌ Failed to send SMS reminder:', smsError);
+          }
+        }
+      }
+    }
+
+    // Always create in-app notification for registered users
+    if (isUserRegistered) {
+      const reminderNotification = {
+        userId: requestData.toUserId,
+        type: 'friend_request_reminder',
+        title: reminderTitle,
+        message: reminderMessage,
+        data: {
+          friendRequestId: requestId,
+          friendId: userId,
+          friendName: senderData.fullName || "",
+          friendEmail: senderData.email || "",
+          friendAvatar: senderData.profilePicture || "",
+          navigationType: "friends",
+          isReminder: true,
+          reminderMethod: finalReminderMethod,
+          originalInviteMethod: originalInviteMethod || "",
+          deepLink: {
+            screen: "FriendRequestModal",
+            params: { 
+              friendRequestId: requestId,
+              autoOpen: true 
+            }
+          }
+        },
+        isRead: false,
+        createdAt: new Date()
+      };
+
+      // Save notification
+      await db.collection('appNotifications').add(reminderNotification);
+
+      // Send push notification if method is push and user has push token
+      if (finalReminderMethod === 'push' && receiverData.pushToken) {
+        try {
+          await sendPushNotificationToUser(requestData.toUserId, {
+            title: reminderNotification.title,
+            body: reminderNotification.message,
+            data: {
+              type: 'friend_request_reminder',
+              friendRequestId: requestId,
+              friendId: userId,
+              friendName: senderData.fullName,
+              navigationType: 'friends'
+            }
+          });
+          console.log("✅ Friend request reminder push notification sent");
+        } catch (pushError) {
+          console.error("❌ Failed to send push notification for friend request reminder:", pushError);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Friend request reminder sent successfully',
+      data: {
+        method: methodUsed,
+        isUserRegistered,
+        originalInviteMethod,
+        availableMethods,
+        recipient: isUserRegistered ? receiverData.email : (requestData.toEmail || requestData.toPhone)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Resend friend request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send friend request reminder',
       error: error.message
     });
   }
@@ -5960,15 +7108,126 @@ spendyApp.post('/invites/send', async (req, res) => {
     // For now, we'll just log and return success
     
     if (inviteMethod === 'email' && toUserEmail) {
-      // Send email invite
-      console.log('📧 Would send email to:', toUserEmail);
+      // Send email invite using nodemailer
+      console.log('📧 Sending email to:', toUserEmail);
       console.log('📧 Deep link:', deepLink);
       console.log('📧 App Store link:', appStoreLink);
       
-      // In a real implementation, you'd use services like:
-      // - SendGrid for email
-      // - Twilio for SMS
-      // - Firebase Auth for app links
+      try {
+        const nodemailer = require('nodemailer');
+        
+        // Create transporter using the same configuration as password reset
+        const transporter = nodemailer.createTransporter({
+          service: 'gmail',
+          auth: {
+            user: process.env.EMAIL_USER || 'noreply@spendy.com',
+            pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+          }
+        });
+
+        // Determine email content based on invite type
+        let subject, htmlContent;
+        
+        if (type === 'friend_reminder') {
+          subject = `${fromUserName} is waiting for your response on Spendy`;
+          htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #667eea; margin: 0;">🤝 Spendy</h1>
+                <h2 style="color: #333; margin: 10px 0;">Friend Request Reminder</h2>
+              </div>
+              
+              <div style="background-color: #f8f9ff; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
+                  Hi there! 👋
+                </p>
+                <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
+                  <strong>${fromUserName}</strong> is still waiting for you to respond to their friend request on Spendy.
+                </p>
+                <p style="font-size: 14px; color: #666; margin: 0;">
+                  ${message || 'Join Spendy to start splitting expenses and managing shared costs with your friends!'}
+                </p>
+              </div>
+              
+              <div style="text-align: center; margin-bottom: 30px;">
+                ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Open in App</a>` : ''}
+                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Spendy</a>` : ''}
+              </div>
+              
+              <div style="border-top: 1px solid #eee; padding-top: 20px;">
+                <p style="color: #888; font-size: 12px; margin: 0;">
+                  This reminder was sent by ${fromUserName} (${fromUserEmail}). If you don't want to receive these reminders, you can ignore this email.
+                </p>
+                <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
+                  Spendy - Smart Money Management | This is an automated message.
+                </p>
+              </div>
+            </div>
+          `;
+        } else {
+          // Regular friend invite
+          subject = `${fromUserName} invited you to join Spendy!`;
+          htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #667eea; margin: 0;">💰 Spendy</h1>
+                <h2 style="color: #333; margin: 10px 0;">You're Invited!</h2>
+              </div>
+              
+              <div style="background-color: #f8f9ff; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
+                  Hi! 👋
+                </p>
+                <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
+                  <strong>${fromUserName}</strong> invited you to join Spendy - the smart way to split expenses and manage shared costs with friends!
+                </p>
+                <p style="font-size: 14px; color: #666; margin: 0;">
+                  ${message || 'Start tracking shared expenses, split bills fairly, and never worry about who owes what again!'}
+                </p>
+              </div>
+              
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h3 style="color: #333; margin: 0 0 15px 0;">✨ What you can do with Spendy:</h3>
+                <ul style="text-align: left; color: #666; font-size: 14px; margin: 0; padding-left: 20px;">
+                  <li>Split bills and expenses with friends</li>
+                  <li>Track who owes what in real-time</li>
+                  <li>Send payment reminders</li>
+                  <li>Manage group expenses for trips and events</li>
+                  <li>Connect your email for automatic bill detection</li>
+                </ul>
+              </div>
+              
+              <div style="text-align: center; margin-bottom: 30px;">
+                ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Accept Invitation</a>` : ''}
+                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Spendy</a>` : ''}
+              </div>
+              
+              <div style="border-top: 1px solid #eee; padding-top: 20px;">
+                <p style="color: #888; font-size: 12px; margin: 0;">
+                  This invitation was sent by ${fromUserName} (${fromUserEmail}). If you don't want to receive invitations from this person, you can ignore this email.
+                </p>
+                <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
+                  Spendy - Smart Money Management | This is an automated message.
+                </p>
+              </div>
+            </div>
+          `;
+        }
+
+        const mailOptions = {
+          from: `"Spendy" <${process.env.EMAIL_USER || 'noreply@spendy.com'}>`,
+          to: toUserEmail,
+          subject: subject,
+          html: htmlContent
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ Email ${type} sent successfully to: ${toUserEmail}`);
+        
+      } catch (emailError) {
+        console.error('❌ Failed to send email:', emailError);
+        throw emailError; // Re-throw to handle in outer catch
+      }
     }
 
     if (inviteMethod === 'phone' && toUserPhone) {

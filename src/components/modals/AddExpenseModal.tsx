@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   Keyboard,
+  Image,
 } from 'react-native';
 import { Icon } from '../common/Icon';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -18,8 +19,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import { Friend, Group } from '@/services/firebase/splitting-disabled';
+import DatePickerCalendarModal from './DatePickerCalendarModal';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
+import * as ImagePicker from 'expo-image-picker';
+import { AdvancedOCRService, OCRResult } from '@/services/ocrService';
+import { SubscriptionHelper } from '@/utils/SubscriptionHelper';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -74,6 +79,11 @@ export default function AddExpenseModal({
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Receipt scanning
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [isProcessingReceipt, setIsProcessingReceipt] = useState(false);
+  const [receiptScanComplete, setReceiptScanComplete] = useState(false);
+
   // Errors
   const [errors, setErrors] = useState<any>({});
 
@@ -110,6 +120,11 @@ export default function AddExpenseModal({
     setExpenseDate(new Date());
     setErrors({});
     setActiveStep('details');
+    
+    // Reset receipt scanning
+    setReceiptImage(null);
+    setIsProcessingReceipt(false);
+    setReceiptScanComplete(false);
   };
 
 const initializeSplitData = () => {
@@ -273,6 +288,12 @@ const initializeSplitData = () => {
         notes: notes.trim(),
         tags: [],
         expenseDate,
+        // Receipt data
+        receipt: receiptImage ? {
+          imageUri: receiptImage,
+          isScanned: receiptScanComplete,
+          scannedAt: receiptScanComplete ? new Date().toISOString() : null,
+        } : null,
       };
 
       await onSubmit(expenseData);
@@ -427,6 +448,220 @@ const initializeSplitData = () => {
     ));
   };
 
+  // Receipt scanning functions
+  const handleReceiptScan = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Please log in to use receipt scanning');
+      return;
+    }
+
+    // Check if user has access to premium receipt scanning
+    const subscriptionHelper = SubscriptionHelper.getInstance();
+    const hasAccess = await subscriptionHelper.checkReceiptScanningAccess(user.id);
+    
+    if (!hasAccess) {
+      return; // Subscription modal will be shown by the helper
+    }
+
+    // Request camera permissions
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera permission is needed to scan receipts');
+      return;
+    }
+
+    // Show image picker options
+    Alert.alert(
+      'Scan Receipt',
+      'Choose how to capture your receipt',
+      [
+        { text: 'Camera', onPress: () => openCamera() },
+        { text: 'Gallery', onPress: () => openGallery() },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const openCamera = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setReceiptImage(result.assets[0].uri);
+        await processReceiptImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      Alert.alert('Error', 'Failed to open camera');
+    }
+  };
+
+  const openGallery = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setReceiptImage(result.assets[0].uri);
+        await processReceiptImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Gallery error:', error);
+      Alert.alert('Error', 'Failed to open gallery');
+    }
+  };
+
+  const processReceiptImage = async (imageUri: string) => {
+    setIsProcessingReceipt(true);
+    
+    try {
+      const ocrService = new AdvancedOCRService({
+        useCloudVision: true,
+        useMLKit: false,
+        useTesseract: false,
+        language: 'en',
+        confidenceThreshold: 0.7
+      });
+
+      const ocrResult = await ocrService.processImage(imageUri);
+      await parseReceiptData(ocrResult);
+      
+      setReceiptScanComplete(true);
+      Alert.alert(
+        'Receipt Scanned!', 
+        'We\'ve extracted the information from your receipt. Please review the details below.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('OCR processing failed:', error);
+      Alert.alert(
+        'Processing Failed',
+        'We couldn\'t read your receipt. Please enter the details manually or try a clearer image.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsProcessingReceipt(false);
+    }
+  };
+
+  const parseReceiptData = async (ocrResult: OCRResult) => {
+    const text = ocrResult.text;
+    
+    // Extract amount using regex patterns
+    const amountPatterns = [
+      /\$[\d,]+\.?\d{0,2}/g,
+      /total[:\s]*\$?[\d,]+\.?\d{0,2}/i,
+      /amount[:\s]*\$?[\d,]+\.?\d{0,2}/i,
+      /[\d,]+\.?\d{2}/g
+    ];
+
+    let extractedAmount = '';
+    for (const pattern of amountPatterns) {
+      const matches = text.match(pattern);
+      if (matches) {
+        // Get the last/largest amount as it's likely the total
+        const amounts = matches
+          .map(match => parseFloat(match.replace(/[^\d.]/g, '')))
+          .filter(amt => !isNaN(amt) && amt > 0)
+          .sort((a, b) => b - a);
+        
+        if (amounts.length > 0) {
+          extractedAmount = amounts[0].toString();
+          break;
+        }
+      }
+    }
+
+    // Extract date
+    const datePatterns = [
+      /\d{1,2}\/\d{1,2}\/\d{2,4}/g,
+      /\d{1,2}-\d{1,2}-\d{2,4}/g,
+      /\d{4}-\d{1,2}-\d{1,2}/g
+    ];
+
+    let extractedDate = new Date();
+    for (const pattern of datePatterns) {
+      const matches = text.match(pattern);
+      if (matches) {
+        const dateStr = matches[0];
+        const parsedDate = new Date(dateStr);
+        if (!isNaN(parsedDate.getTime())) {
+          extractedDate = parsedDate;
+          break;
+        }
+      }
+    }
+
+    // Extract category based on keywords
+    const categoryKeywords = {
+      'food': ['restaurant', 'food', 'cafe', 'coffee', 'pizza', 'burger', 'dinner', 'lunch', 'breakfast', 'dining'],
+      'transport': ['uber', 'taxi', 'gas', 'fuel', 'parking', 'transport', 'bus', 'train'],
+      'shopping': ['store', 'shop', 'retail', 'mart', 'mall', 'purchase'],
+      'entertainment': ['movie', 'cinema', 'theater', 'game', 'entertainment', 'ticket'],
+      'utilities': ['electric', 'water', 'gas', 'utility', 'bill', 'phone', 'internet'],
+      'healthcare': ['pharmacy', 'hospital', 'medical', 'health', 'doctor', 'clinic'],
+      'travel': ['hotel', 'flight', 'airline', 'booking', 'travel'],
+      'other': []
+    };
+
+    let detectedCategory = EXPENSE_CATEGORIES.find(cat => cat.id === 'other')!;
+    const lowerText = text.toLowerCase();
+    
+    for (const [categoryId, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(keyword => lowerText.includes(keyword))) {
+        const category = EXPENSE_CATEGORIES.find(cat => cat.id === categoryId);
+        if (category) {
+          detectedCategory = category;
+          break;
+        }
+      }
+    }
+
+    // Extract description from merchant name or first line
+    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    let extractedDescription = '';
+    
+    if (lines.length > 0) {
+      // Try to find merchant name (usually first non-address line)
+      for (const line of lines) {
+        const cleanLine = line.trim();
+        if (cleanLine.length > 3 && 
+            !cleanLine.match(/^\d/) && 
+            !cleanLine.includes('$') &&
+            !cleanLine.match(/\d{1,2}\/\d{1,2}\/\d{2,4}/)) {
+          extractedDescription = cleanLine.slice(0, 50); // Limit length
+          break;
+        }
+      }
+    }
+
+    // Update form fields with extracted data
+    if (extractedAmount) {
+      setAmount(extractedAmount);
+    }
+    
+    if (extractedDescription) {
+      setDescription(extractedDescription);
+    }
+    
+    setSelectedCategory(detectedCategory);
+    setExpenseDate(extractedDate);
+  };
+
+  const removeReceiptImage = () => {
+    setReceiptImage(null);
+    setReceiptScanComplete(false);
+  };
+
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
       {['details', 'split', 'review'].map((step, index) => (
@@ -490,6 +725,61 @@ const initializeSplitData = () => {
 
   const renderDetailsStep = () => (
     <ScrollView contentContainerStyle={styles.stepContent}>
+      {/* Receipt Scanning Section */}
+      <View style={styles.inputContainer}>
+        <View style={styles.scanReceiptHeader}>
+          <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Receipt Scanning</Text>
+          <View style={styles.premiumBadge}>
+            <Icon name="star" size={12} color="#FFD700" />
+            <Text style={[styles.premiumText, { color: '#FFD700' }]}>Premium</Text>
+          </View>
+        </View>
+        
+        {!receiptImage ? (
+          <TouchableOpacity
+            style={[
+              styles.scanReceiptButton,
+              { 
+                backgroundColor: theme.colors.primary + '10',
+                borderColor: theme.colors.primary,
+              }
+            ]}
+            onPress={handleReceiptScan}
+            disabled={isProcessingReceipt}
+          >
+            <Icon 
+              name="camera" 
+              size={24} 
+              color={theme.colors.primary} 
+            />
+            <Text style={[styles.scanReceiptText, { color: theme.colors.primary }]}>
+              {isProcessingReceipt ? 'Processing...' : 'Scan Receipt'}
+            </Text>
+            <Text style={[styles.scanReceiptSubtext, { color: theme.colors.textSecondary }]}>
+              Auto-fill details from your receipt
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.scannedReceiptContainer, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.scannedReceiptHeader}>
+              <Icon name="checkmark-circle" size={20} color={theme.colors.success} />
+              <Text style={[styles.scannedReceiptText, { color: theme.colors.success }]}>
+                Receipt Scanned Successfully
+              </Text>
+              <TouchableOpacity onPress={removeReceiptImage}>
+                <Icon name="close" size={16} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Image source={{ uri: receiptImage }} style={styles.receiptPreview} />
+            {receiptScanComplete && (
+              <Text style={[styles.receiptStatusText, { color: theme.colors.textSecondary }]}>
+                ✨ Information extracted and filled below
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+
       {/* Description */}
       <View style={styles.inputContainer}>
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>What was this expense for? *</Text>
@@ -614,20 +904,15 @@ const initializeSplitData = () => {
             <Icon name="calendar" size={20} color={theme.colors.textSecondary}  />
           </TouchableOpacity>
         </TouchableOpacity>
-        {showDatePicker && (
-          <DateTimePicker
-            value={expenseDate}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={(event, selectedDate) => {
-              setShowDatePicker(Platform.OS === 'ios');
-              if (selectedDate) {
-                setExpenseDate(selectedDate);
-              }
-            }}
-            maximumDate={new Date()}
-          />
-        )}
+        <DatePickerCalendarModal
+          visible={showDatePicker}
+          selectedDate={expenseDate}
+          maximumDate={new Date()}
+          onDateSelect={(selectedDate) => {
+            setExpenseDate(selectedDate);
+          }}
+          onClose={() => setShowDatePicker(false)}
+        />
       </View>
 
       {/* Group Selection */}
@@ -1036,6 +1321,34 @@ const initializeSplitData = () => {
               <Text style={[styles.reviewValue, { color: theme.colors.text }]}>{notes}</Text>
             </View>
           )}
+
+          {/* Receipt Section */}
+          <View style={styles.reviewItem}>
+            <Text style={[styles.reviewLabel, { color: theme.colors.textSecondary }]}>Receipt</Text>
+            {receiptImage ? (
+              <View style={styles.reviewReceiptContainer}>
+                <View style={styles.reviewReceiptPreview}>
+                  <Image source={{ uri: receiptImage }} style={styles.reviewReceiptImage} />
+                  <View style={styles.reviewReceiptOverlay}>
+                    <Icon name="document" size={16} color="white" />
+                  </View>
+                </View>
+                <Text style={[styles.reviewReceiptText, { color: theme.colors.text }]}>
+                  Receipt attached {receiptScanComplete && '(Auto-scanned)'}
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity 
+                style={[styles.reviewUploadButton, { borderColor: theme.colors.border }]}
+                onPress={handleReceiptScan}
+              >
+                <Icon name="camera" size={16} color={theme.colors.textSecondary} />
+                <Text style={[styles.reviewUploadText, { color: theme.colors.textSecondary }]}>
+                  Add receipt (Premium)
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Split Details */}
@@ -1536,5 +1849,110 @@ const styles = StyleSheet.create({
   },
   fullWidthButton: {
     flex: 1,
+  },
+  // Receipt scanning styles
+  scanReceiptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF9E6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    gap: 4,
+  },
+  premiumText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  scanReceiptButton: {
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  scanReceiptText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  scanReceiptSubtext: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  scannedReceiptContainer: {
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  scannedReceiptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  scannedReceiptText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  receiptPreview: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    resizeMode: 'cover',
+    marginBottom: 8,
+  },
+  receiptStatusText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  reviewReceiptContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  reviewReceiptPreview: {
+    position: 'relative',
+  },
+  reviewReceiptImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    resizeMode: 'cover',
+  },
+  reviewReceiptOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reviewReceiptText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  reviewUploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  reviewUploadText: {
+    fontSize: 12,
   },
 });

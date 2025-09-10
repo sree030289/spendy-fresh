@@ -45,34 +45,54 @@ export class Validator {
 // Validation middleware factory
 export const validateRequest = (validationRules: any) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    console.log('🔍 Validation middleware called for:', req.path);
-    console.log('🔍 Validation rules:', JSON.stringify(validationRules, null, 2));
-    console.log('🔍 Request body:', JSON.stringify(req.body, null, 2));
-    
     const errors: Array<{field: string, message: string}> = [];
 
-    // Apply validation rules
-    for (const field in validationRules) {
-      const rules = validationRules[field];
-      const value = req.body[field] || req.params[field] || req.query[field];
-
-      for (const rule of rules) {
-        if (!rule.validator(value)) {
+    // Handle array format for simple required field validation
+    if (Array.isArray(validationRules)) {
+      console.log('🔍 Array validation for fields:', validationRules);
+      console.log('🔍 Request body:', req.body);
+      for (const field of validationRules) {
+        const value = req.body[field] || req.params[field] || req.query[field];
+        console.log(`🔍 Checking field '${field}', value:`, value);
+        if (!Validator.isRequired(value)) {
+          const errorMessage = `${field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1').toLowerCase()} is required`;
+          console.log(`❌ Validation failed for '${field}':`, errorMessage);
           errors.push({
             field: field,
-            message: rule.message
+            message: errorMessage
           });
-          break; // Stop at first error for this field
+        }
+      }
+    } else {
+      // Handle object format for complex validation rules
+      for (const field in validationRules) {
+        const rules = validationRules[field];
+        const value = req.body[field] || req.params[field] || req.query[field];
+
+        for (const rule of rules) {
+          if (!rule.validator(value)) {
+            errors.push({
+              field: field,
+              message: rule.message
+            });
+            break; // Stop at first error for this field
+          }
         }
       }
     }
 
     if (errors.length > 0) {
-      console.log('❌ Validation failed with errors:', errors);
+      console.log('❌ Validation errors:', errors);
+      // Check if any error has the "Target email" message
+      const targetEmailError = errors.find(err => err.message.includes('Target email'));
+      if (targetEmailError) {
+        console.log('🔍 Found Target email error:', targetEmailError);
+        // Override with a more descriptive error
+        throw new ValidationError(targetEmailError.message);
+      }
       throw new ValidationError('Validation failed', errors);
     }
 
-    console.log('✅ Validation passed, calling next()');
     next();
   };
 };
@@ -118,6 +138,9 @@ export const ValidationRules = {
     name: [
       { validator: (v: any) => Validator.isRequired(v), message: 'Group name is required' },
       { validator: (v: any) => Validator.isLength(v.trim(), 1, 100), message: 'Group name must be 1-100 characters' }
+    ],
+    avatar: [
+      { validator: (v: any) => Validator.isRequired(v), message: 'Avatar is required' }
     ]
   },
 

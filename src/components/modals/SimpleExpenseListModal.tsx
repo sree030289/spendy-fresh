@@ -304,8 +304,10 @@ export default function SimpleExpenseListModal({
     return EXPENSE_CATEGORIES.find(cat => cat.id === categoryId)?.color || theme.colors.textSecondary;
   };
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    return `${getCurrencySymbol(currency)}${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number, currency?: string) => {
+    // Use user's preferred currency for display consistency
+    const displayCurrency = user?.currency || currency || 'USD';
+    return `${getCurrencySymbol(displayCurrency)}${amount.toFixed(2)}`;
   };
 
   const formatDate = (dateInput: Date | string | number) => {
@@ -396,7 +398,7 @@ export default function SimpleExpenseListModal({
         {/* Amount */}
         <View style={styles.rightSection}>
           <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-            {formatCurrency(expense.amount, expense.currency)}
+            {formatCurrency(expense.amount)}
           </Text>
         </View>
       </TouchableOpacity>

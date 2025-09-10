@@ -43,6 +43,7 @@ export default function NotificationsModal({
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'friend_request':
+      case 'friend_request_reminder':
         return 'person-add';
       case 'expense_added':
         return 'receipt';

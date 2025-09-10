@@ -92,7 +92,14 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
 
   const requestContactsPermission = async (): Promise<boolean> => {
     try {
+      // First check if the Contacts API is available
+      if (!Contacts.requestPermissionsAsync) {
+        console.error('Contacts API not available');
+        return false;
+      }
+      
       const { status } = await Contacts.requestPermissionsAsync();
+      console.log('Contact permission status:', status);
       return status === 'granted';
     } catch (error) {
       console.error('Permission request error:', error);
@@ -201,6 +208,16 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         Alert.alert(
           'Maximum Contacts Reached',
           `You can only select up to ${MAX_CONTACTS} contacts at once.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Check if contacts API is available before proceeding
+      if (!Contacts.presentContactPickerAsync) {
+        Alert.alert(
+          'Feature Unavailable',
+          'Contact picker is not available on this device. Please add contacts manually.',
           [{ text: 'OK' }]
         );
         return;

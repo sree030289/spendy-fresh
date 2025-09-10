@@ -12,6 +12,7 @@ import {
   Linking,
   Modal,
   Animated,
+  Image,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -50,10 +51,18 @@ interface Friend {
     fullName: string; 
     email: string;
     avatar?: string;
+    profilePicture?: string;
+    profileImage?: string;
   };
-  status: 'pending' | 'accepted' | 'blocked';
+  status: 'pending' | 'accepted' | 'blocked' | 'invited';
   balance: number;
   createdAt: Date;
+  requestId?: string; // For pending friend requests
+  requestType?: 'sent' | 'received'; // Type of request
+  isNewUser?: boolean; // For new user invites
+  type?: string; // Additional type field for invites
+  inviteMethod?: string; // Method used for invitation
+  message?: string; // Request message
 }
 
 interface Group {
@@ -158,6 +167,8 @@ import RemindModal from '@/components/modals/RemindModal';
 import SuccessAnimationModal from '@/components/modals/SuccessAnimationModal';
 import GenericErrorModal from '@/components/modals/GenericErrorModal';
 import ExportModal from '@/components/modals/ExportModal';
+import ExpenseDetailModal from '@/components/modals/ExpenseDetailModal';
+// SubscriptionModal handled globally by App.tsx
 import { ExportService } from '@/services/ExportService';
 import { CrossPlatformAlert } from '@/utils/alertUtils';
 
@@ -277,6 +288,12 @@ export default function RealSplittingScreen() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedGroupForExport, setSelectedGroupForExport] = useState<Group | null>(null);
   
+  // Expense detail modal state
+  const [showExpenseDetail, setShowExpenseDetail] = useState(false);
+  const [selectedExpenseForDetail, setSelectedExpenseForDetail] = useState<Expense | null>(null);
+  
+  // Subscription modal handled by App.tsx globally now
+  
   // Full-screen animation states
   const [showFullScreenSuccess, setShowFullScreenSuccess] = useState(false);
   const [fullScreenSuccessProps, setFullScreenSuccessProps] = useState<{
@@ -349,11 +366,44 @@ export default function RealSplittingScreen() {
     groupId?: string;
   }>>([]);
 
+  // Function to show subscription modal
+  // Handle opening expense detail modal
+  const handleExpenseDetail = (expense: Expense) => {
+    console.log('👁️ Opening expense detail modal for:', expense.id);
+    setSelectedExpenseForDetail(expense);
+    setShowExpenseDetail(true);
+  };
+
+  // Check if expense is editable (created after last settlement)
+  const isExpenseEditable = (expense: Expense): boolean => {
+    // TODO: Implement logic to check if expense was created after last settlement
+    // For now, we'll assume all expenses are editable
+    // In a real implementation, you'd compare expense.createdAt with the last settlement date
+    return true;
+  };
+
+  // Handle editing expense from detail modal
+  const handleEditFromDetail = (expense: Expense) => {
+    console.log('✏️ Opening edit modal for expense:', expense.id);
+    setSelectedExpenseForAction(expense);
+    setShowEditExpense(true);
+    setShowExpenseDetail(false);
+  };
+
+  // Subscription modal is now handled globally by App.tsx
+
+  // Handle subscription purchase
+  // Subscription purchase handled globally by App.tsx
+
   // Set up subscription helper when component mounts
   useEffect(() => {
-    if ((global as any).showSubscriptionModal) {
-      subscriptionHelper.setShowSubscriptionModal((global as any).showSubscriptionModal);
-    }
+    // Removed local subscription modal handler - using global App.tsx handler now
+    
+    // Set up global function to open Add Expense modal
+    (global as any).openAddExpenseModal = () => {
+      console.log('🚀 Opening Add Expense modal via global function');
+      setShowAddExpense(true);
+    };
     
     // Set up global function to process pending expenses after countdown
     (window as any).processPendingExpense = async (expenseData: any, fromGroupDetails?: Group | null) => {
@@ -383,11 +433,23 @@ export default function RealSplittingScreen() {
         setShowAddExpense(false);
         setSelectedGroupForExpense(null);
         
-        // Show success animation
+        // Show success animation with navigation to group details
         showFullScreenSuccessAnimation(
           'Expense Added! 🧾', 
           'Expense has been added and split successfully!',
-          fromGroupDetails ? `Added to ${fromGroupDetails.name}` : 'Check your groups for updates'
+          fromGroupDetails ? `Added to ${fromGroupDetails.name}` : 'Check your groups for updates',
+          fromGroupDetails ? 'View Group' : 'Continue',
+          () => {
+            setShowFullScreenSuccess(false);
+            if (fromGroupDetails) {
+              // Open the specific group's details modal
+              setSelectedGroup(fromGroupDetails);
+              setShowGroupDetails(true);
+            } else {
+              // Navigate to groups tab if no specific group context
+              setActiveTab('groups');
+            }
+          }
         );
       } catch (error) {
         console.error('Error processing pending expense:', error);
@@ -1308,7 +1370,9 @@ export default function RealSplittingScreen() {
             id: friend.id, // Use friend.id as the friend's user ID
             fullName: friend.friendName || friend.fullName,
             email: friend.email,
-            avatar: friend.avatar
+            avatar: friend.avatar || friend.profilePicture || friend.profileImage,
+            profilePicture: friend.profilePicture || friend.profileImage || friend.avatar,
+            profileImage: friend.profileImage || friend.profilePicture || friend.avatar
           },
           status: friend.status,
           balance: 0, // Balance will be calculated separately
@@ -1376,13 +1440,19 @@ export default function RealSplittingScreen() {
             id: friendId,
             fullName: displayName,
             email: email,
-            avatar: request.recipientAvatar || '' // API might not store avatar for requests
+            avatar: request.recipientAvatar || request.recipientProfilePicture || request.recipientProfileImage || '',
+            profilePicture: request.recipientProfilePicture || request.recipientProfileImage || request.recipientAvatar || '',
+            profileImage: request.recipientProfileImage || request.recipientProfilePicture || request.recipientAvatar || ''
           },
           status: 'pending' as const,
           balance: 0,
           createdAt: request.createdAt ? new Date(request.createdAt) : new Date(),
           requestType: 'sent', // Mark as sent request for UI
-          isNewUserInvite: isNewUserInvite // Track if this is invitation to new user
+          isNewUserInvite: isNewUserInvite, // Track if this is invitation to new user
+          // Add required fields for reminder functionality
+          requestId: request.id, // Use the request ID for reminders
+          inviteMethod: request.type || request.inviteMethod || (isNewUserInvite ? 'email' : 'push'), // Determine method from request type
+          isNewUser: isNewUserInvite // Boolean flag for new user invites
         };
       });
       
@@ -1653,20 +1723,12 @@ export default function RealSplittingScreen() {
     try {
       if (!user?.id) return;
       
-      // Check transaction limit before proceeding
-      const canCreateTransaction = await subscriptionHelper.checkTransactionLimit(user.id);
-      if (!canCreateTransaction) {
-        // Store the expense data to be processed after the modal allows continuation
-        const subscription = await subscriptionHelper.getUserSubscriptionStatus(user.id);
-        if (!subscription.isPremium) {
-          // Modal will show with 10-second countdown and then allow user to continue
-          // We need to set up a way for the modal to trigger the expense creation
-          (window as any).pendingExpenseData = { expenseData, fromGroupDetails };
-          return;
-        } else {
-          return; // Premium users shouldn't hit this, but just in case
-        }
-      }
+      // FIXED: Since transaction limit was already checked when opening the modal,
+      // we just need to increment the usage count and create the expense
+      console.log('🔍 Creating expense after limit check was already passed');
+      
+      // Increment usage count since the expense is being created
+      await subscriptionHelper.incrementTransactionUsage(user.id);
       
       await proceedWithExpenseCreation();
       
@@ -1799,10 +1861,8 @@ export default function RealSplittingScreen() {
         if (contactData) {
           const contacts = Array.isArray(contactData) ? contactData : [contactData];
           
-          for (const contact of contacts) {
-            await createPendingFriendInvitation(contact, method);
-          }
-          
+          // For SMS/WhatsApp invitations, we don't need to create server records
+          // since these are local invitations that will be resolved when users sign up
           const contactNames = contacts.map(c => c.name || 'Friend').join(', ');
           showAnimatedSuccess(
             'Invitation Sent!', 
@@ -1811,10 +1871,7 @@ export default function RealSplittingScreen() {
           
           setShowAddFriend(false);
           
-          // FIXED: Use debounced loading for SMS/WhatsApp invitations
-          setTimeout(() => {
-            debouncedLoadFriends();
-          }, 500);
+          console.log(`📱 ${method.toUpperCase()} invitations sent to:`, contacts.map(c => c.name || 'Friend'));
         }
       } else if (method === 'qr') {
         // Show QR code for sharing (not scanning)
@@ -1826,20 +1883,18 @@ export default function RealSplittingScreen() {
       
     } catch (error: any) {
       console.error('Add friend error:', error);
-      showAnimatedSuccess('Error', error.message || 'Failed to add friend. Please try again.', 'error');
+      Alert.alert(
+        'Add Friend Failed',
+        error.message || 'Failed to add friend. Please check your internet connection and try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
-  // SUBSCRIPTION-AWARE: Create group with limit checking
+  // Create group (subscription check is done before opening modal)
   const handleCreateGroup = async (groupData: any) => {
     try {
       if (!user?.id) return;
-      
-      // Check group creation limit
-      const canCreateGroup = await subscriptionHelper.checkGroupCreationLimit(user.id);
-      if (!canCreateGroup) {
-        return; // Modal will be shown by the helper
-      }
       
       const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       
@@ -2133,14 +2188,14 @@ export default function RealSplittingScreen() {
       insights.push({
         type: 'settlement' as const,
         title: 'You\'re in the green! 💚',
-        description: `You're owed $${(totalOwed - totalOwing).toFixed(2)} more than you owe. Consider collecting from friends.`,
+        description: `You're owed ${getCurrencySymbol(user?.currency || 'USD')}${(totalOwed - totalOwing).toFixed(2)} more than you owe. Consider collecting from friends.`,
         icon: '💰'
       });
     } else if (totalOwing > totalOwed) {
       insights.push({
         type: 'settlement' as const,
         title: 'Time to settle up! 💳',
-        description: `You owe $${(totalOwing - totalOwed).toFixed(2)} more than you're owed. Consider making payments.`,
+        description: `You owe ${getCurrencySymbol(user?.currency || 'USD')}${(totalOwing - totalOwed).toFixed(2)} more than you're owed. Consider making payments.`,
         icon: '💸'
       });
     }
@@ -2198,39 +2253,6 @@ export default function RealSplittingScreen() {
   };
 
   // Helper functions (keep existing implementations but add balance notifications where needed)
-  const createPendingFriendInvitation = async (contactData: ContactData, method: 'sms' | 'whatsapp') => {
-    try {
-      if (!user?.id) return;
-      
-      const fullName = contactData.name?.trim() || 'Friend';
-      
-      const pendingInvitation = {
-        fromUserId: user.id,
-        fromUserData: {
-          fullName: user.fullName,
-          email: user.email,
-          avatar: user.profilePicture || '',
-          mobile: user.mobile || ''
-        },
-        toUserData: {
-          fullName: fullName,
-          email: '',
-          mobile: contactData.phoneNumber,
-          avatar: ''
-        },
-        contactMethod: method,
-        phoneNumber: contactData.phoneNumber,
-        status: 'invited' as const,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      await addDoc(collection(db, 'pendingInvitations'), pendingInvitation);
-      console.log('Pending invitation created for:', contactData.name);
-    } catch (error) {
-      console.error('Create pending invitation error:', error);
-    }
-  };
 
   // FIXED: Expense update with balance notification
   const handleExpenseUpdate = async (expenseData: any) => {
@@ -2268,9 +2290,9 @@ export default function RealSplittingScreen() {
   };
 
   // Handle various friend and group actions (keep existing implementations but add balance notifications)
-  const handleEditExpenseFromDetails = (expense: Expense) => {
-    setSelectedExpenseForAction(expense);
-    setShowEditExpense(true);
+  const handleExpenseDetailFromOverview = (expense: Expense) => {
+    setSelectedExpenseForDetail(expense);
+    setShowExpenseDetail(true);
   };
 
   // New function for pending friend actions
@@ -2326,7 +2348,7 @@ export default function RealSplittingScreen() {
     }
   };
 
-  // Function to handle resending invitations
+  // Function to handle resending invitations - SIMPLIFIED: Auto-send without dialogs
   const handleResendInvitation = async (friend: Friend) => {
     try {
       if (!user?.id) return;
@@ -2336,39 +2358,24 @@ export default function RealSplittingScreen() {
         friendName: friend.friendData.fullName,
         inviteMethod: friend.inviteMethod,
         requestId: friend.requestId,
-        isNewUser: friend.isNewUser
+        isNewUser: friend.isNewUser,
+        fullFriendObject: friend
       });
       
       if (friend.isNewUser || friend.type === 'email_invite') {
-        // For new users (not on Spendy yet) - just show a reminder message
-        Alert.alert(
-          'Invite Pending',
-          `${friend.friendData.fullName || friend.friendData.email} hasn't joined Spendy yet. They'll appear as your friend once they sign up and accept your invitation.`,
-          [{ text: 'OK' }]
-        );
+        // For new users - try to send email reminder, fallback to message if no request ID
+        if (friend.requestId) {
+          await handleSendFriendRequestReminder(friend, 'auto');
+        } else {
+          Alert.alert(
+            'Invite Pending',
+            `${friend.friendData.fullName || friend.friendData.email} hasn't joined Spendy yet. They'll appear as your friend once they sign up and accept your invitation.`,
+            [{ text: 'OK' }]
+          );
+        }
       } else {
-        // For existing users - resend the friend request notification
-        Alert.alert(
-          'Resend Friend Request',
-          `Resend friend request notification to ${friend.friendData.fullName}?`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Resend',
-              onPress: async () => {
-                try {
-                  // Here you could call an API to resend notification
-                  showAnimatedSuccess(
-                    'Notification Sent!',
-                    `Reminded ${friend.friendData.fullName} about your friend request.`
-                  );
-                } catch (error) {
-                  Alert.alert('Error', 'Failed to send reminder.');
-                }
-              }
-            }
-          ]
-        );
+        // For existing users - automatically send smart reminder
+        await handleSendFriendRequestReminder(friend, 'auto');
       }
       
       // Refresh friends data
@@ -2377,6 +2384,90 @@ export default function RealSplittingScreen() {
     } catch (error: any) {
       console.error('Failed to resend invitation:', error);
       Alert.alert('Error', error.message || 'Failed to resend invitation');
+    }
+  };
+
+  // Function to handle sending friend request reminders
+  const handleSendFriendRequestReminder = async (friend: Friend, method: 'auto' | 'push' | 'email' | 'sms') => {
+    try {
+      // Try to find requestId from different possible sources
+      let requestId = friend.requestId || friend.id;
+      
+      // If still no requestId, try to get it from the friend object structure
+      if (!requestId && typeof friend === 'object') {
+        // Check if this is a pending friend request object
+        if ('requestType' in friend && friend.requestType === 'sent') {
+          requestId = friend.id;
+        }
+      }
+      
+      if (!requestId) {
+        console.error('❌ No friend request ID found for:', friend);
+        Alert.alert('Error', 'Unable to send reminder - friend request ID not found. Please try refreshing the page.');
+        return;
+      }
+
+      console.log('📤 Sending friend request reminder:', {
+        requestId,
+        method,
+        friendName: friend.friendData.fullName
+      });
+
+      const response = await apiService.sendFriendRequestReminder(requestId, method);
+      
+      console.log('📥 Reminder API response:', {
+        success: response.success,
+        data: response.data,
+        message: response.message,
+        fullResponse: response
+      });
+      
+      if (response.success) {
+        let successMessage = 'Reminder sent successfully!';
+        
+        if (response.data) {
+          const { method: actualMethod, isUserRegistered, originalInviteMethod, recipient } = response.data;
+          
+          if (isUserRegistered) {
+            successMessage = `✅ Reminder sent via ${actualMethod} to ${friend.friendData.fullName}`;
+            if (actualMethod === 'push') {
+              successMessage += ' (app notification)';
+            } else if (actualMethod === 'email') {
+              successMessage += ' (email)';
+            } else if (actualMethod === 'sms') {
+              successMessage += ' (text message)';
+            }
+          } else {
+            successMessage = `✅ Invitation sent via ${actualMethod} to ${recipient}`;
+            successMessage += `\n\n${friend.friendData.fullName} will receive your friend request once they join Spendy!`;
+          }
+          
+          if (originalInviteMethod && originalInviteMethod !== actualMethod) {
+            successMessage += `\n\n📝 Note: Originally invited via ${originalInviteMethod}`;
+          }
+        }
+        
+        Alert.alert('Reminder Sent', successMessage);
+      } else {
+        // Handle case where user isn't registered yet
+        if (response.isUnregistered && response.availableMethods) {
+          const methods = response.availableMethods.join(', ');
+          Alert.alert(
+            'User Not Registered',
+            `${friend.friendData.fullName} hasn't installed Spendy yet.\n\nAvailable reminder methods: ${methods}`,
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('Failed', response.message || 'Failed to send reminder');
+        }
+      }
+      
+      // Refresh friends data
+      notifyBalanceChange();
+      
+    } catch (error: any) {
+      console.error('Failed to send friend request reminder:', error);
+      Alert.alert('Error', error.message || 'Failed to send friend request reminder');
     }
   };
 
@@ -2392,23 +2483,35 @@ export default function RealSplittingScreen() {
             style: 'destructive',
             onPress: async () => {
               try {
+                console.log('🗑️ Canceling invitation for friend:', {
+                  friendId: friend.friendId,
+                  requestId: friend.requestId,
+                  name: friend.friendData.fullName
+                });
+                
                 if (friend.requestId) {
                   // For existing Spendy users, delete the friend request
+                  console.log('📡 Calling API to decline friend request:', friend.requestId);
                   await apiService.declineFriendRequest(friend.requestId);
+                  console.log('✅ API call successful, friend request cancelled');
                   showAnimatedSuccess(
                     'Request Cancelled',
                     `Friend request to ${friend.friendData.fullName} has been cancelled.`
                   );
                 } else {
                   // For new user invites, just remove from local state
+                  console.log('⚠️ No requestId found, treating as local invite');
                   showAnimatedSuccess(
                     'Invitation Cancelled',
                     `Invitation to ${friend.friendData.fullName} has been cancelled.`
                   );
                 }
-                await loadFriendsAndRequests();
+                
+                console.log('🔄 Invitation cancelled, notifying balance change...');
                 notifyBalanceChange();
+                console.log('✅ Friend request cancelled successfully');
               } catch (error: any) {
+                console.error('❌ Failed to cancel invitation:', error);
                 Alert.alert('Error', error.message || 'Failed to cancel request');
               }
             }
@@ -2534,7 +2637,22 @@ export default function RealSplittingScreen() {
         <View style={styles.quickActions}>
           <TouchableOpacity
             style={[styles.modernActionCard, { backgroundColor: theme.colors.surface }]}
-            onPress={() => setShowAddExpense(true)}
+            onPress={async () => {
+              console.log('💰 Split Expense button pressed');
+              if (!user?.id) {
+                console.log('❌ No user ID found');
+                return;
+              }
+              console.log('🔍 Checking transaction limit for user:', user.id);
+              const canCreate = await subscriptionHelper.canCreateTransaction(user.id);
+              console.log('📊 Can create transaction?', canCreate);
+              if (canCreate) {
+                console.log('✅ Opening AddExpenseModal');
+                setShowAddExpense(true);
+              } else {
+                console.log('🚫 Transaction limit reached, modal should be showing');
+              }
+            }}
           >
             <Icon name="add" size={20} color={theme.colors.brand} />
             <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Split Expense</Text>
@@ -2542,18 +2660,39 @@ export default function RealSplittingScreen() {
 
           <TouchableOpacity
             style={[styles.modernActionCard, { backgroundColor: theme.colors.surface }]}
-            onPress={() => setShowCreateGroup(true)}
+            onPress={async () => {
+              if (!user?.id) return;
+              const canCreate = await subscriptionHelper.checkGroupCreationLimit(user.id);
+              if (canCreate) {
+                setShowCreateGroup(true);
+              }
+            }}
           >
             <Icon name="people" size={20} color={theme.colors.brand} />
-            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Groups</Text>
+            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}> Create Groups</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.modernActionCard, { backgroundColor: theme.colors.surface }]}
             onPress={() => setShowAddFriend(true)}
           >
-            <Icon name="person" size={20} color={theme.colors.brand} />
-            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Friends</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              <Icon name="people" size={16} color={theme.colors.brand} />
+              <View style={{ 
+                position: 'absolute', 
+                top: -6, 
+                right: -6, 
+                backgroundColor: theme.colors.brand, 
+                borderRadius: 8, 
+                width: 14, 
+                height: 14, 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                <Icon name="add" size={10} color="white" />
+              </View>
+            </View>
+            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Add Friend</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -2561,7 +2700,7 @@ export default function RealSplittingScreen() {
             onPress={() => openSettlementScreen({ filter: 'all' })}
           >
             <Icon name="cash" size={20} color={theme.colors.brand} />
-            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Settlements</Text>
+            <Text style={[styles.modernActionTitle, { color: theme.colors.text, fontSize: 12 }]}>Settle Expenses</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -2602,7 +2741,13 @@ export default function RealSplittingScreen() {
           })() ? (
             <TouchableOpacity 
               style={styles.emptyStateContainer}
-              onPress={() => setShowAddExpense(true)}
+              onPress={async () => {
+                if (!user?.id) return;
+                const canCreate = await subscriptionHelper.canCreateTransaction(user.id);
+                if (canCreate) {
+                  setShowAddExpense(true);
+                }
+              }}
               activeOpacity={0.7}
             >
               <Icon name="receipt" size={40} color={theme.colors.textSecondary}  />
@@ -2622,7 +2767,7 @@ export default function RealSplittingScreen() {
                 <TouchableOpacity
                   key={expense.id}
                   style={[styles.expenseCardRow, { backgroundColor: theme.colors.background }]}
-                  onPress={() => handleEditExpenseFromDetails(expense)}
+                  onPress={() => handleExpenseDetailFromOverview(expense)}
                   activeOpacity={0.7}
                 >
                   {/* Left: Category Icon */}
@@ -2693,7 +2838,22 @@ export default function RealSplittingScreen() {
                 <Icon name="refresh" size={16} color={theme.colors.primary}  />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowAddFriend(true)} style={styles.addButton}>
-                <Icon name="person" size={16} color={theme.colors.primary} />
+                <View style={{ position: 'relative' }}>
+                  <Icon name="people" size={16} color={theme.colors.primary} />
+                  <View style={{ 
+                    position: 'absolute', 
+                    top: -4, 
+                    right: -4, 
+                    backgroundColor: theme.colors.primary, 
+                    borderRadius: 6, 
+                    width: 10, 
+                    height: 10, 
+                    alignItems: 'center', 
+                    justifyContent: 'center' 
+                  }}>
+                    <Icon name="add" size={7} color="white" />
+                  </View>
+                </View>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleTabSwitch('friends')} style={styles.viewAllButton}>
                 <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
@@ -2874,19 +3034,6 @@ export default function RealSplittingScreen() {
           </View>
           <View style={styles.cleanHeaderActions}>
             <TouchableOpacity 
-              onPress={() => setShowNotifications(true)}
-              style={[styles.cleanActionButton, { backgroundColor: theme.colors.surface }]}
-            >
-              <Icon name="notifications" size={18} color={theme.colors.primary}  />
-              {notifications.length > 0 && notifications.some(n => !n.read) && (
-                <View style={[styles.notificationBadge, { backgroundColor: theme.colors.warning }]}>
-                  <Text style={styles.notificationBadgeText}>
-                    {notifications.filter(n => !n.read).length}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity 
               onPress={() => sharedBalances.refresh()} 
               style={[styles.cleanActionButton, { backgroundColor: theme.colors.surface }]}
             >
@@ -2896,7 +3043,7 @@ export default function RealSplittingScreen() {
               style={[styles.cleanActionButton, { backgroundColor: theme.colors.primary }]}
               onPress={() => setShowAddFriend(true)}
             >
-              <Icon name="person" size={18} color="white" />
+              <Icon name="add" size={20} color="white" />
             </TouchableOpacity>
           </View>
         </View>
@@ -2968,7 +3115,10 @@ export default function RealSplittingScreen() {
               </Text>
             </View>
           ) : (
-            <View style={styles.cleanFriendsList}>
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              style={styles.friendCardsList}
+            >
               {/* Show accepted friends regardless of balance status */}
               {acceptedFriends.map((friend, index) => {
                 // Get balance from sharedBalances if available, otherwise default to 0
@@ -2990,7 +3140,7 @@ export default function RealSplittingScreen() {
                 return (
                   <TouchableOpacity
                     key={entryKey}
-                    style={[styles.cleanFriendCard, { backgroundColor: theme.colors.surface }]}
+                    style={[styles.cleanActiveFriendCard, { backgroundColor: theme.colors.surface }]}
                     onPress={() => {
                       // If this has a group-specific balance, open settlement screen with group filter
                       if (balanceEntry?.groupId) {
@@ -3007,27 +3157,41 @@ export default function RealSplittingScreen() {
                         });
                       }
                     }}
+                    onLongPress={() => {
+                      // Show friend actions menu on long press, especially useful for settled friends
+                      showFriendActionsMenu(friend);
+                    }}
                   >
                     {/* Left section: Avatar + Info */}
-                    <View style={styles.cleanFriendLeft}>
-                      <View style={[styles.cleanAvatar, { 
+                    <View style={styles.cleanActiveFriendLeft}>
+                      <View style={[styles.cleanActiveAvatar, { 
                         backgroundColor: isSettled ? theme.colors.success : (owesYou ? theme.colors.success : theme.colors.error)
                       }]}>
-                        <Text style={styles.cleanAvatarText}>{friendInitial}</Text>
+                        {(friend.friendData?.avatar || friend.friendData?.profilePicture || friend.friendData?.profileImage) ? (
+                          <Image 
+                            source={{ uri: friend.friendData.avatar || friend.friendData.profilePicture || friend.friendData.profileImage }} 
+                            style={styles.cleanActiveAvatarImage}
+                            onError={() => {
+                              console.log('Friend avatar failed to load, showing initials');
+                            }}
+                          />
+                        ) : (
+                          <Text style={styles.cleanActiveAvatarText}>{friendInitial}</Text>
+                        )}
                       </View>
-                      <View style={styles.cleanFriendInfo}>
-                        <Text style={[styles.cleanFriendName, { color: theme.colors.text }]} numberOfLines={1}>
+                      <View style={styles.cleanActiveFriendInfo}>
+                        <Text style={[styles.cleanActiveFriendName, { color: theme.colors.text }]} numberOfLines={1}>
                           {friendName}
                         </Text>
                         {balanceEntry?.groupName ? (
-                          <View style={styles.cleanGroupIndicator}>
-                            <Icon name="people" size={12} color={theme.colors.primary}  />
-                            <Text style={[styles.cleanGroupText, { color: theme.colors.primary }]} numberOfLines={1}>
+                          <View style={styles.cleanActiveGroupIndicator}>
+                            <Icon name="people" size={14} color={theme.colors.primary}  />
+                            <Text style={[styles.cleanActiveGroupText, { color: theme.colors.primary }]} numberOfLines={1}>
                               {balanceEntry.groupName}
                             </Text>
                           </View>
                         ) : (
-                          <Text style={[styles.cleanDirectText, { color: theme.colors.textSecondary }]}>
+                          <Text style={[styles.cleanActiveDirectText, { color: theme.colors.textSecondary }]}>
                             Direct friendship
                           </Text>
                         )}
@@ -3035,7 +3199,7 @@ export default function RealSplittingScreen() {
                     </View>
 
                     {/* Right section: Balance + Actions */}
-                    <View style={styles.cleanFriendRight}>
+                    <View style={styles.cleanActiveFriendRight}>
                       {isSettled ? (
                         <View style={styles.cleanSettledBadge}>
                           <Icon name="success" size={16} color={theme.colors.success}  />
@@ -3045,15 +3209,15 @@ export default function RealSplittingScreen() {
                         </View>
                       ) : (
                         <>
-                          <View style={[styles.cleanBalanceBadge, { 
+                          <View style={[styles.cleanActiveBalanceBadge, { 
                             backgroundColor: owesYou ? `${theme.colors.success}15` : `${theme.colors.error}15`
                           }]}>
-                            <Text style={[styles.cleanBalanceAmount, { 
+                            <Text style={[styles.cleanActiveBalanceAmount, { 
                               color: owesYou ? theme.colors.success : theme.colors.error 
                             }]}>
                               <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{(amount || 0).toFixed(2)}</Text>
                             </Text>
-                            <Text style={[styles.cleanBalanceLabel, { 
+                            <Text style={[styles.cleanActiveBalanceLabel, { 
                               color: owesYou ? theme.colors.success : theme.colors.error 
                             }]}>
                               {owesYou ? 'owes you' : 'you owe'}
@@ -3076,7 +3240,7 @@ export default function RealSplittingScreen() {
                 );
               })
               .filter(Boolean)}
-            </View>
+            </ScrollView>
           )
         ) : (
           // Clean Pending Invitations Design
@@ -3091,7 +3255,10 @@ export default function RealSplittingScreen() {
               </Text>
             </View>
           ) : (
-            <View style={styles.cleanFriendsList}>
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              style={styles.friendCardsList}
+            >
               {invitedFriends.map((friend, index) => {
                 // Determine if this is a received friend request or sent invitation
                 const isReceivedRequest = friend.requestType === 'received' && friend.status === 'pending_incoming';
@@ -3102,21 +3269,33 @@ export default function RealSplittingScreen() {
                 return (
                   <TouchableOpacity
                     key={`invited-${friend.id}-${index}`}
-                    style={[styles.cleanFriendCard, { backgroundColor: theme.colors.surface }]}
+                    style={[styles.friendCardRow, { backgroundColor: theme.colors.background }]}
                     onPress={() => showPendingFriendActionsMenu(friend)}
                   >
-                    {/* Left section: Avatar + Info */}
-                    <View style={styles.cleanFriendLeft}>
-                      <View style={[styles.cleanAvatar, { 
-                        backgroundColor: isReceivedRequest ? theme.colors.success : theme.colors.warning 
-                      }]}>
-                        <Text style={styles.cleanAvatarText}>{friendInitial}</Text>
-                      </View>
-                      <View style={styles.cleanFriendInfo}>
-                        <Text style={[styles.cleanFriendName, { color: theme.colors.text }]} numberOfLines={1}>
-                          {friendName}
-                        </Text>
-                        <Text style={[styles.cleanDirectText, { 
+                    {/* Left: Friend Avatar */}
+                    <View style={[styles.friendIconContainer, { 
+                      backgroundColor: isReceivedRequest ? theme.colors.success : theme.colors.warning 
+                    }]}>
+                      {(friend.friendData?.avatar || friend.friendData?.profilePicture || friend.friendData?.profileImage) ? (
+                        <Image 
+                          source={{ uri: friend.friendData.avatar || friend.friendData.profilePicture || friend.friendData.profileImage }} 
+                          style={styles.friendIconImage}
+                          onError={() => {
+                            console.log('Friend avatar failed to load, showing initials');
+                          }}
+                        />
+                      ) : (
+                        <Text style={styles.friendIconText}>{friendInitial}</Text>
+                      )}
+                    </View>
+
+                    {/* Center: Friend Details */}
+                    <View style={styles.friendCardRowDetails}>
+                      <Text style={[styles.friendCardRowName, { color: theme.colors.text }]} numberOfLines={1}>
+                        {friendName}
+                      </Text>
+                      <View style={styles.friendCardRowMeta}>
+                        <Text style={[styles.friendCardRowSource, { 
                           color: isReceivedRequest ? theme.colors.success : theme.colors.warning 
                         }]}>
                           {isReceivedRequest 
@@ -3128,8 +3307,8 @@ export default function RealSplittingScreen() {
                       </View>
                     </View>
 
-                    {/* Right section: Action Button */}
-                    <View style={styles.cleanFriendRight}>
+                    {/* Right: Action Button */}
+                    <View style={styles.friendCardRowBalance}>
                       {isReceivedRequest ? (
                         <TouchableOpacity
                           style={[styles.cleanActionButton, { backgroundColor: theme.colors.success }]}
@@ -3165,7 +3344,7 @@ export default function RealSplittingScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
           )
         )}
       </ScrollView>
@@ -3185,7 +3364,13 @@ export default function RealSplittingScreen() {
         <View style={styles.headerButtons}>
           <TouchableOpacity
             style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
-            onPress={() => setShowCreateGroup(true)}
+            onPress={async () => {
+              if (!user?.id) return;
+              const canCreate = await subscriptionHelper.checkGroupCreationLimit(user.id);
+              if (canCreate) {
+                setShowCreateGroup(true);
+              }
+            }}
           >
             <Icon name="add" size={18} color="white"  />
             <Text style={styles.headerButtonText}>Create</Text>
@@ -3202,7 +3387,13 @@ export default function RealSplittingScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.addFirstGroupButton, { backgroundColor: theme.colors.primary }]}
-            onPress={() => setShowCreateGroup(true)}
+            onPress={async () => {
+              if (!user?.id) return;
+              const canCreate = await subscriptionHelper.checkGroupCreationLimit(user.id);
+              if (canCreate) {
+                setShowCreateGroup(true);
+              }
+            }}
           >
             <Text style={styles.addFirstGroupText}>Create Your First Group</Text>
           </TouchableOpacity>
@@ -3367,6 +3558,7 @@ export default function RealSplittingScreen() {
     const balanceDetail = sharedBalances.allBalances.find(b => b.userId === friend.friendId);
     const balance = balanceDetail?.balance || 0;
     const hasBalance = Math.abs(balance) > 0.01;
+    const isSettled = !hasBalance;
 
     const actions: Array<{
       text: string;
@@ -3388,19 +3580,22 @@ export default function RealSplittingScreen() {
 
     // Always show Remove Friend option
     actions.push({
-      text: 'Remove Friend',
+      text: isSettled ? 'Remove Friend' : 'Remove Friend (Settle first)',
       style: 'destructive',
       onPress: () => handleRemoveFriend(friend)
     });
 
     actions.push({ text: 'Cancel', style: 'cancel' });
 
-    // Show status in the alert title
-    const statusDisplay = hasBalance 
-      ? balance > 0 
+    // Show status in the alert title - make it clearer for settled friends
+    let statusDisplay = '';
+    if (hasBalance) {
+      statusDisplay = balance > 0 
         ? `Owes you ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`
-        : `You owe ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`
-      : 'All settled up';
+        : `You owe ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`;
+    } else {
+      statusDisplay = '✅ All settled up - Safe to remove';
+    }
 
     CrossPlatformAlert.alert(
       friend.friendData.fullName,
@@ -3411,9 +3606,47 @@ export default function RealSplittingScreen() {
 
   // Helper functions (keep existing but add balance notifications where needed)
   const handleRemoveFriend = (friend: Friend) => {
+    // Check if there's an outstanding balance
+    const balanceEntry = sharedBalances.allBalances.find(b => b.userId === friend.friendId);
+    const balance = balanceEntry?.balance || 0;
+    const hasBalance = Math.abs(balance) > 0.01;
+
+    if (hasBalance) {
+      const balanceText = balance > 0 
+        ? `${friend.friendData.fullName} owes you ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`
+        : `You owe ${friend.friendData.fullName} ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`;
+
+      Alert.alert(
+        'Cannot Remove Friend',
+        `You cannot remove ${friend.friendData.fullName} because there's an outstanding balance.\n\n${balanceText}\n\nPlease settle all balances before removing this friend.`,
+        [
+          { text: 'OK' },
+          {
+            text: 'Settle Now',
+            onPress: () => {
+              // Open settlement screen for this friend
+              if (balanceEntry?.groupId) {
+                openSettlementScreen({ 
+                  filter: 'groups', 
+                  groupId: balanceEntry.groupId,
+                  friendId: friend.friendId 
+                });
+              } else {
+                openSettlementScreen({ 
+                  filter: 'friends', 
+                  friendId: friend.friendId 
+                });
+              }
+            }
+          }
+        ]
+      );
+      return;
+    }
+
     Alert.alert(
       'Remove Friend',
-      `Are you sure you want to remove ${friend.friendData.fullName} from your friends list?`,
+      `Are you sure you want to remove ${friend.friendData.fullName} from your friends list?\n\nThis action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -3422,8 +3655,15 @@ export default function RealSplittingScreen() {
           onPress: async () => {
             try {
               await apiService.removeFriend(user!.id, friend.friendId);
-              Alert.alert('Friend Removed', `${friend.friendData.fullName} has been removed.`);
+              Alert.alert('Friend Removed', `${friend.friendData.fullName} has been removed from your friends list.`);
+              // Refresh data to update UI and counts
+              await Promise.all([
+                debouncedLoadFriends(),
+                sharedBalances.refresh()
+              ]);
               notifyBalanceChange(); // FIXED: Notify balance system
+              // Force immediate UI update by calling loadFriendsAndRequests directly
+              setTimeout(() => loadFriendsAndRequests(), 100);
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to remove friend');
             }
@@ -3506,6 +3746,18 @@ export default function RealSplittingScreen() {
             await loadFriendsAndRequests();
             await loadNotifications(); // Also refresh notifications
             notifyBalanceChange(); // FIXED: Notify balance system
+            
+            // Find and open the specific friend request modal
+            setTimeout(() => {
+              const friendRequest = friendRequests.incoming?.find(req => req.id === intent.friendRequestId);
+              if (friendRequest) {
+                console.log('🎯 Opening FriendRequestModal for request:', friendRequest);
+                setSelectedFriendRequest(friendRequest);
+                setShowFriendRequest(true);
+              } else {
+                console.log('⚠️ Friend request not found in incoming requests:', intent.friendRequestId);
+              }
+            }, 500); // Small delay to ensure state has updated
           }
           break;
 
@@ -3584,6 +3836,47 @@ export default function RealSplittingScreen() {
           }
           break;
 
+        case 'friend_request_reminder':
+          console.log('🔔 Processing friend request reminder notification:', data);
+          setActiveTab('friends');
+          
+          // Refresh friends list to show the received friend request
+          try {
+            await loadFriendsAndRequests();
+            console.log('✅ Friends list refreshed for friend request reminder');
+          } catch (error) {
+            console.error('❌ Failed to refresh friends list:', error);
+          }
+          
+          if (data.friendRequestId && data.friendName) {
+            console.log('📋 Friend request reminder data:', {
+              friendRequestId: data.friendRequestId,
+              friendName: data.friendName,
+              friendEmail: data.friendEmail,
+              friendId: data.friendId
+            });
+            
+            const friendRequestData = {
+              id: data.friendRequestId,
+              fromUserId: data.friendId || '',
+              fromUserData: {
+                fullName: data.friendName,
+                email: data.friendEmail || '',
+                avatar: data.friendAvatar
+              },
+              message: `${data.friendName} is still waiting for you to respond to their friend request`,
+              status: 'pending' as const,
+              createdAt: new Date() // Add the required createdAt field
+            };
+            
+            console.log('🎯 Opening friend request modal with reminder data:', friendRequestData);
+            setSelectedFriendRequest(friendRequestData);
+            setShowFriendRequest(true);
+          } else {
+            console.warn('⚠️ Missing required friend request reminder data:', data);
+          }
+          break;
+
         case 'expense_added':
           if (data.groupId) {
             const group = groups.find(g => g.id === data.groupId);
@@ -3594,7 +3887,7 @@ export default function RealSplittingScreen() {
                 setTimeout(() => {
                   Alert.alert(
                     'New Expense Added',
-                    `${data.senderName} added "${data.description}" for ${getCurrencySymbol(data.currency || 'USD')}${data.amount} in ${data.groupName}`,
+                    `${data.senderName} added "${data.description}" for ${getCurrencySymbol(user?.currency || 'USD')}${data.amount} in ${data.groupName}`,
                     [{ text: 'OK' }]
                   );
                 }, 500);
@@ -3778,9 +4071,8 @@ export default function RealSplittingScreen() {
             ]
           }}
         >
-          <Text style={styles.brandText}>Spendy</Text>
+          <Text style={styles.brandText}>Let'Split</Text>
         </Animated.View>
-
         {/* Profile Circle - moves to right center when scrolled */}
         <Animated.View
           style={[
@@ -3803,9 +4095,20 @@ export default function RealSplittingScreen() {
             style={styles.profileCircleButton}
             onPress={() => navigation.navigate('Profile' as never)}
           >
-            <Text style={styles.profileText}>
-              {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
-            </Text>
+            {user?.profilePicture || user?.profileImage ? (
+              <Image 
+                source={{ uri: user.profilePicture || user.profileImage }} 
+                style={styles.profileImage}
+                onError={() => {
+                  // If image fails to load, will show fallback initials
+                  console.log('Profile image failed to load, showing initials');
+                }}
+              />
+            ) : (
+              <Text style={styles.profileText}>
+                {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
+            )}
           </TouchableOpacity>
         </Animated.View>
       </Animated.View>
@@ -3881,10 +4184,14 @@ export default function RealSplittingScreen() {
         onClose={() => setShowGroupDetails(false)}
         group={selectedGroup}
         currentUser={user}
-        onAddExpense={() => {
-          setSelectedGroupForExpense(selectedGroup);
-          setShowGroupDetails(false);
-          setShowAddExpense(true);
+        onAddExpense={async () => {
+          if (!user?.id) return;
+          const canCreate = await subscriptionHelper.canCreateTransaction(user.id);
+          if (canCreate) {
+            setSelectedGroupForExpense(selectedGroup);
+            setShowGroupDetails(false);
+            setShowAddExpense(true);
+          }
         }}
         onOpenChat={() => {
           setShowGroupDetails(false);
@@ -3918,10 +4225,14 @@ export default function RealSplittingScreen() {
         onClose={() => setShowGroupChat(false)}
         group={selectedGroup}
         currentUser={user}
-        onAddExpense={() => {
-          setShowGroupChat(false);
-          setSelectedGroupForExpense(selectedGroup);
-          setShowAddExpense(true);
+        onAddExpense={async () => {
+          if (!user?.id) return;
+          const canCreate = await subscriptionHelper.canCreateTransaction(user.id);
+          if (canCreate) {
+            setShowGroupChat(false);
+            setSelectedGroupForExpense(selectedGroup);
+            setShowAddExpense(true);
+          }
         }}
       />
 
@@ -4025,6 +4336,7 @@ export default function RealSplittingScreen() {
         }}
         isUserAdmin={groups.find(g => g.id === selectedExpenseForAction?.groupId)
           ?.members.find(m => m.userId === user?.id)?.role === 'admin'}
+        selectedGroup={groups.find(g => g.id === selectedExpenseForAction?.groupId)}
       />
 
       <SplittingAnalyticsModal
@@ -4058,7 +4370,7 @@ export default function RealSplittingScreen() {
         title={expenseListTitle}
         onExpensePress={(expense) => {
           setShowSimpleExpenseList(false);
-          handleEditExpenseFromDetails(expense);
+          handleExpenseDetailFromOverview(expense);
         }}
       /> 
 
@@ -4224,6 +4536,20 @@ export default function RealSplittingScreen() {
         errorCode={fullScreenErrorProps.errorCode}
         onRestart={fullScreenErrorProps.onRestart}
       />
+
+
+      {/* Expense Detail Modal */}
+      <ExpenseDetailModal
+        visible={showExpenseDetail}
+        onClose={() => setShowExpenseDetail(false)}
+        expense={selectedExpenseForDetail}
+        onEdit={handleEditFromDetail}
+        groups={groups}
+        friends={friends}
+        isEditable={selectedExpenseForDetail ? isExpenseEditable(selectedExpenseForDetail) : false}
+      />
+
+      {/* Subscription Modal handled globally by App.tsx */}
     </SafeAreaView>
   );
 }
@@ -4486,6 +4812,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 20,
     fontWeight: '700',
+  },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   profileCircleButton: {
     width: 50,
@@ -5265,7 +5596,8 @@ editedTextInline: {
 
 // Friend Card Rows (New Layout)
 friendCardsList: {
-  maxHeight: 300,
+  paddingBottom: 20,
+  paddingTop: 8,
 },
 friendCardRow: {
   flexDirection: 'row',
@@ -5289,6 +5621,11 @@ friendIconText: {
   fontSize: 16,
   fontWeight: 'bold',
   color: 'white',
+},
+friendIconImage: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
 },
 friendCardRowDetails: {
   flex: 1,
@@ -5423,7 +5760,7 @@ modernTabContainer: {
   marginHorizontal: 20,
   marginBottom: 20,
   padding: 4,
-  borderRadius: 12,
+  borderRadius: 16,
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 1 },
   shadowOpacity: 0.05,
@@ -5437,23 +5774,24 @@ modernTab: {
   justifyContent: 'center',
   paddingVertical: 12,
   paddingHorizontal: 16,
-  borderRadius: 8,
+  borderRadius: 12,
   gap: 8,
+  minHeight: 44,
 },
 modernTabText: {
-  fontSize: 14,
+  fontSize: 15,
   fontWeight: '600',
 },
 modernTabBadge: {
-  paddingHorizontal: 6,
-  paddingVertical: 2,
-  borderRadius: 10,
-  minWidth: 20,
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 12,
+  minWidth: 24,
   alignItems: 'center',
 },
 modernTabBadgeText: {
-  fontSize: 12,
-  fontWeight: '600',
+  fontSize: 13,
+  fontWeight: '700',
 },
 
 // Clean empty state
@@ -5487,49 +5825,109 @@ cleanEmptySubtitle: {
 
 // Clean friends list
 cleanFriendsList: {
-  paddingHorizontal: 20,
-  gap: 12,
+  paddingHorizontal: 8,
+  gap: 8,
 },
 
 // Clean friend card
 cleanFriendCard: {
   flexDirection: 'row',
   alignItems: 'center',
-  paddingHorizontal: 16,
+  paddingHorizontal: 20,
+  paddingVertical: 8,
+  borderRadius: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 6,
+  elevation: 3,
+  marginBottom: 8,
+  minHeight: 48,
+  marginHorizontal: 4,
+},
+
+// Active friend card (for accepted friends - wider but shorter)
+cleanActiveFriendCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 20,
   paddingVertical: 16,
   borderRadius: 16,
   shadowColor: '#000',
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.05,
-  shadowRadius: 3,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
   elevation: 2,
-  marginBottom: 4,
+  marginBottom: 12,
+  minHeight: 72,
+  marginHorizontal: 16,
 },
 cleanFriendLeft: {
   flexDirection: 'row',
   alignItems: 'center',
   flex: 1,
-  marginRight: 12,
+  marginRight: 16,
+},
+
+// Active friend left section (wider spacing)
+cleanActiveFriendLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+  marginRight: 16,
 },
 cleanAvatar: {
-  width: 48,
-  height: 48,
-  borderRadius: 24,
+  width: 40,
+  height: 40,
+  borderRadius: 20,
   justifyContent: 'center',
   alignItems: 'center',
   marginRight: 12,
 },
 cleanAvatarText: {
   color: 'white',
+  fontSize: 14,
+  fontWeight: '700',
+},
+
+// Active friend avatar (moderate size)
+cleanActiveAvatar: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 14,
+},
+cleanActiveAvatarText: {
+  color: 'white',
   fontSize: 18,
   fontWeight: '700',
+},
+cleanActiveAvatarImage: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
 },
 cleanFriendInfo: {
   flex: 1,
   minWidth: 0,
 },
 cleanFriendName: {
-  fontSize: 16,
+  fontSize: 14,
+  fontWeight: '600',
+  marginBottom: 1,
+  lineHeight: 16,
+},
+
+// Active friend info (compact text)
+cleanActiveFriendInfo: {
+  flex: 1,
+  minWidth: 0,
+  justifyContent: 'center',
+},
+cleanActiveFriendName: {
+  fontSize: 17,
   fontWeight: '600',
   marginBottom: 4,
   lineHeight: 20,
@@ -5540,10 +5938,25 @@ cleanGroupIndicator: {
   gap: 4,
 },
 cleanGroupText: {
-  fontSize: 13,
+  fontSize: 11,
   fontWeight: '500',
 },
 cleanDirectText: {
+  fontSize: 11,
+  fontWeight: '400',
+},
+
+// Active friend group indicator (compact)
+cleanActiveGroupIndicator: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+},
+cleanActiveGroupText: {
+  fontSize: 13,
+  fontWeight: '500',
+},
+cleanActiveDirectText: {
   fontSize: 13,
   fontWeight: '400',
 },
@@ -5551,49 +5964,79 @@ cleanDirectText: {
 // Clean friend right section
 cleanFriendRight: {
   alignItems: 'flex-end',
-  gap: 8,
-  minWidth: 100,
+  gap: 6,
+  minWidth: 90,
+},
+
+// Active friend right section (wider)
+cleanActiveFriendRight: {
+  alignItems: 'flex-end',
+  gap: 6,
+  minWidth: 120,
 },
 cleanSettledBadge: {
   flexDirection: 'row',
   alignItems: 'center',
   gap: 6,
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 8,
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 12,
 },
 cleanSettledText: {
   fontSize: 13,
   fontWeight: '600',
 },
 cleanBalanceBadge: {
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  borderRadius: 12,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 10,
   alignItems: 'center',
-  minWidth: 80,
+  minWidth: 65,
 },
 cleanBalanceAmount: {
+  fontSize: 12,
+  fontWeight: '700',
+  textAlign: 'center',
+  lineHeight: 14,
+},
+cleanBalanceLabel: {
+  fontSize: 9,
+  fontWeight: '500',
+  textAlign: 'center',
+  marginTop: 0,
+},
+
+// Active friend balance badge (wider but shorter)
+cleanActiveBalanceBadge: {
+  paddingHorizontal: 16,
+  paddingVertical: 6,
+  borderRadius: 12,
+  alignItems: 'center',
+  minWidth: 95,
+},
+cleanActiveBalanceAmount: {
   fontSize: 14,
   fontWeight: '700',
   textAlign: 'center',
+  lineHeight: 16,
 },
-cleanBalanceLabel: {
+cleanActiveBalanceLabel: {
   fontSize: 11,
   fontWeight: '500',
   textAlign: 'center',
-  marginTop: 2,
+  marginTop: 1,
 },
 cleanRemindButton: {
-  width: 32,
-  height: 32,
-  borderRadius: 16,
+  width: 40,
+  height: 40,
+  borderRadius: 20,
   justifyContent: 'center',
   alignItems: 'center',
   shadowColor: '#000',
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.2,
-  shadowRadius: 2,
-  elevation: 2,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.15,
+  shadowRadius: 3,
+  elevation: 3,
+  marginTop: 4,
 },
 });

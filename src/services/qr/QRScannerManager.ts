@@ -1,6 +1,7 @@
 // src/services/qr/QRScannerManager.ts
 import { CrossPlatformAlert } from '@/utils/alertUtils';
 import { QRCodeService } from './QRCodeService';
+import { SecureQRService } from './SecureQRService';
 
 export interface QRScannerState {
   isScanning: boolean;
@@ -26,6 +27,8 @@ export class QRScannerManager {
   };
   
   private stateListeners: Set<(state: QRScannerState) => void> = new Set();
+  private lastScanTime: number | null = null;
+  private lastProcessedQRData: string | null = null;
 
   static getInstance(): QRScannerManager {
     if (!QRScannerManager.instance) {
@@ -53,6 +56,20 @@ export class QRScannerManager {
 
   // Start scanning session
   startScanning(): void {
+    this.lastScanTime = null; // Reset timestamp for new session
+    this.lastProcessedQRData = null; // Reset QR data for new session
+    this.updateState({
+      isScanning: true,
+      isProcessing: false,
+      hasScanned: false,
+      error: null,
+    });
+  }
+
+  // Reset scanner for new scan (called when modal opens)
+  resetScanner(): void {
+    this.lastScanTime = null;
+    this.lastProcessedQRData = null;
     this.updateState({
       isScanning: true,
       isProcessing: false,
@@ -82,16 +99,34 @@ export class QRScannerManager {
   ): Promise<QRScanResult> {
     // Prevent multiple rapid scans but allow retry after a short delay
     if (this.state.isProcessing) {
+      console.log('🚫 QR scan blocked - already processing');
       return {
         success: false,
-        error: 'Please wait, processing your previous QR code...',
+        error: 'Please wait, processing QR code...',
       };
     }
 
-    // Reset hasScanned if it's been more than 3 seconds
-    if (this.state.hasScanned) {
-      this.resetForNewScan();
+    // Add timestamp-based debouncing to prevent rapid successive scans (reduced to 1.5 seconds)
+    const now = Date.now();
+    if (this.lastScanTime && (now - this.lastScanTime) < 1500) {
+      console.log('🚫 QR scan blocked - too soon after last scan');
+      return {
+        success: false,
+        error: 'Please wait before scanning another QR code...',
+      };
     }
+    
+    // Additional check: if we just processed the same QR data, block it
+    if (this.lastProcessedQRData === qrData) {
+      console.log('🚫 QR scan blocked - same QR data already processed');
+      return {
+        success: false,
+        error: 'This QR code was already processed',
+      };
+    }
+    
+    this.lastScanTime = now;
+    this.lastProcessedQRData = qrData;
 
     this.updateState({
       isProcessing: true,
@@ -104,15 +139,31 @@ export class QRScannerManager {
         throw new Error('Invalid Spendy QR code format');
       }
 
-      // Process the QR code
-      if (options?.navigation) {
-        await QRCodeService.handleScannedQRWithNavigation(
-          qrData, 
-          currentUserId, 
-          options.navigation
-        );
+      // Detect QR version and use appropriate service
+      const isV2QR = await this.detectQRVersion(qrData);
+      
+      if (isV2QR) {
+        console.log('🔄 Using SecureQRService for v2.0 QR code');
+        if (options?.navigation) {
+          await SecureQRService.handleScannedQRWithNavigation(
+            qrData, 
+            currentUserId, 
+            options.navigation
+          );
+        } else {
+          await SecureQRService.handleScannedQR(qrData, currentUserId);
+        }
       } else {
-        await QRCodeService.handleScannedQR(qrData, currentUserId);
+        console.log('🔄 Using QRCodeService for v1.0 QR code');
+        if (options?.navigation) {
+          await QRCodeService.handleScannedQRWithNavigation(
+            qrData, 
+            currentUserId, 
+            options.navigation
+          );
+        } else {
+          await QRCodeService.handleScannedQR(qrData, currentUserId);
+        }
       }
 
       this.updateState({
@@ -129,13 +180,18 @@ export class QRScannerManager {
 
     } catch (error: any) {
       const errorMessage = error.message || 'Failed to process QR code';
+      console.error('🚫 QR processing error:', error);
       
       this.updateState({
         isProcessing: false,
         isScanning: false, // Stop scanning on error
         error: errorMessage,
+        hasScanned: true, // Mark as scanned to prevent retry
       });
 
+      // Clear the processed QR data on error so user can retry if needed
+      this.lastProcessedQRData = null;
+      
       return {
         success: false,
         error: errorMessage,
@@ -213,6 +269,37 @@ export class QRScannerManager {
   // Check if scanner is busy
   isBusy(): boolean {
     return this.state.isProcessing || this.state.hasScanned;
+  }
+
+  // Detect QR version to use appropriate service
+  private async detectQRVersion(qrData: string): Promise<boolean> {
+    try {
+      // Extract the encoded data part
+      let encodedData = '';
+      if (qrData.includes('spendy://qr?data=')) {
+        encodedData = qrData.replace('spendy://qr?data=', '');
+      } else if (qrData.includes('spendy.app/qr?data=')) {
+        encodedData = qrData.split('data=')[1];
+      } else {
+        return false; // Default to v1.0 for unknown formats
+      }
+
+      // Try to decode and check version
+      try {
+        const base64Decoded = atob(encodedData);
+        const jsonString = decodeURIComponent(base64Decoded);
+        const qrDataObj = JSON.parse(jsonString);
+        console.log('🔍 Detected QR version:', qrDataObj.version);
+        return qrDataObj.version === '2.0';
+      } catch {
+        // If decode fails, default to v1.0
+        console.log('🔍 QR version detection failed, defaulting to v1.0');
+        return false;
+      }
+    } catch (error) {
+      console.error('QR version detection error:', error);
+      return false; // Default to v1.0
+    }
   }
 }
 

@@ -25,6 +25,7 @@ interface ExpenseDeletionModalProps {
   currentUser: User | null;
   onDeletionComplete: () => void;
   isUserAdmin?: boolean;
+  selectedGroup?: any;
 }
 
 interface BalanceImpact {
@@ -41,7 +42,8 @@ export default function ExpenseDeletionModal({
   expense,
   currentUser,
   onDeletionComplete,
-  isUserAdmin = false
+  isUserAdmin = false,
+  selectedGroup
 }: ExpenseDeletionModalProps) {
   const { theme } = useTheme();
   const apiService = ApiService.getInstance();
@@ -73,10 +75,10 @@ export default function ExpenseDeletionModal({
           let impactAmount = 0;
           
           if (split.userId === expense.paidBy) {
-            // Person who paid will lose the positive balance (money they're owed)
-            impactAmount = -expense.amount + split.amount;
+            // Person who paid will get back the amount they're owed (negative impact on their positive balance)
+            impactAmount = -(expense.amount - split.amount);
           } else {
-            // Person who owes will lose the negative balance (debt relief)
+            // Person who owed will no longer owe this amount (positive impact, reducing their debt)
             impactAmount = split.amount;
           }
 
@@ -85,7 +87,7 @@ export default function ExpenseDeletionModal({
             userName: split.userId === currentUser.id ? 'You' : (member.userData?.fullName || 'Unknown'),
             currentBalance: member.balance,
             impactAmount,
-            newBalance: member.balance - impactAmount
+            newBalance: member.balance + impactAmount
           });
         }
       }
@@ -101,11 +103,12 @@ export default function ExpenseDeletionModal({
       return { canDelete: false, reason: 'Expense not found' };
     }
 
-    // Only the person who paid or group admin can delete
-    if (expense.paidBy !== currentUser.id && !isUserAdmin) {
+    // Only group admins can delete expenses (unless it's their own expense)
+    const isPaidByUser = expense.paidBy === currentUser.id;
+    if (!isUserAdmin && !isPaidByUser) {
       return { 
         canDelete: false, 
-        reason: 'Only the person who paid for this expense or group admins can delete it' 
+        reason: 'Only group admins or the person who paid for this expense can delete it' 
       };
     }
 
@@ -113,20 +116,48 @@ export default function ExpenseDeletionModal({
     const splitData = expense.splitData || expense.splitDetails || expense.splits || [];
     const hasPartialPayments = splitData.some(split => split.isPaid || split.isSettled);
     if (hasPartialPayments) {
+      // For new groups with no settlement history, allow all deletes by admins and expense creators
+      if (!selectedGroup?.lastSettlementDate) {
+        console.log('✅ No settlement date - allowing delete for new group');
+        // Allow admins and expense creators to delete
+        if (!isUserAdmin && expense.paidBy !== currentUser.id) {
+          return { 
+            canDelete: false, 
+            reason: 'Only group admins or the person who paid for this expense can delete it' 
+          };
+        }
+      } else {
+        return { 
+          canDelete: false, 
+          reason: 'Cannot delete expense with recorded payments. Please contact group members to resolve.' 
+        };
+      }
+    }
+
+    // Check if expense is from a completed settlement
+    // Once settlement is completed, user won't be able to delete or edit expense
+    // Any expense added after settlement can be editable and deletable
+    if (expense.isSettled || expense.isSettlementTransaction) {
       return { 
         canDelete: false, 
-        reason: 'Cannot delete expense with recorded payments. Please contact group members to resolve.' 
+        reason: 'Cannot delete expenses from completed settlements.' 
       };
     }
 
-    // Check if expense is older than 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    if (expense.createdAt < thirtyDaysAgo && !isUserAdmin) {
-      return { 
-        canDelete: false, 
-        reason: 'Cannot delete expenses older than 30 days. Contact a group admin.' 
-      };
+    // TODO: Add check for expenses created before last group settlement
+    // This would require access to selectedGroup with lastSettlementDate
+
+    // Check if expense is older than 30 days (for non-admins only)
+    if (!isUserAdmin) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const expenseDate = new Date(expense.createdAt || expense.date);
+      if (expenseDate < thirtyDaysAgo) {
+        return { 
+          canDelete: false, 
+          reason: 'Cannot delete expenses older than 30 days. Contact a group admin.' 
+        };
+      }
     }
 
     return { canDelete: true };

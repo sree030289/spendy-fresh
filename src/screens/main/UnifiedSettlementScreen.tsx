@@ -386,7 +386,7 @@ export default function UnifiedSettlementScreen({
     try {
       CrossPlatformAlert.alert(
         'Mark Payment as Complete',
-        `Confirm that ${suggestion.fromUserName} has paid ${getCurrencySymbol('USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}?`,
+        `Confirm that ${suggestion.fromUserName} has paid ${getCurrencySymbol(user?.currency || 'USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -419,7 +419,7 @@ export default function UnifiedSettlementScreen({
                 
                 CrossPlatformAlert.alert(
                   'Payment Recorded',
-                  `Successfully recorded ${suggestion.fromUserName}'s payment of ${getCurrencySymbol('USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}.`,
+                  `Successfully recorded ${suggestion.fromUserName}'s payment of ${getCurrencySymbol(user?.currency || 'USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}.`,
                   [{ text: 'OK' }]
                 );
                 
@@ -493,7 +493,7 @@ export default function UnifiedSettlementScreen({
                   {group.name}
                 </Text>
                 <Text style={[styles.groupSubtitle, { color: theme.colors.textSecondary }]}>
-                  {group.members?.length || 0} members • {getCurrencySymbol('USD')}
+                  {group.members?.length || 0} members • {getCurrencySymbol(user?.currency || 'USD')}
                 </Text>
               </View>
             </View>
@@ -562,7 +562,7 @@ export default function UnifiedSettlementScreen({
                 
                 <View style={styles.amountContainer}>
                   <Text style={[styles.amount, { color: theme.colors.success }]}>
-                    {getCurrencySymbol('USD')}{suggestion.amount.toFixed(0)}
+                    {getCurrencySymbol(user?.currency || 'USD')}{suggestion.amount.toFixed(2)}
                   </Text>
                 </View>
                 

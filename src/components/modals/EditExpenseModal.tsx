@@ -18,7 +18,6 @@ import { Button } from '@/components/common/Button';
 import { Friend, Group, Expense } from '@/services/firebase/splitting-disabled';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
-import ExpenseDeletionModal from './ExpenseDeletionModal';
 import FullscreenModal from '@/components/common/FullscreenModal';
 
 interface EditExpenseModalProps {
@@ -77,7 +76,6 @@ export default function EditExpenseModal({
   const [notes, setNotes] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   // Errors
   const [errors, setErrors] = useState<any>({});
@@ -195,41 +193,100 @@ export default function EditExpenseModal({
       return { canEdit: false, reason: 'Expense not found' };
     }
 
-    // Only the person who paid or group admin can edit
-    if (expense.paidBy !== user.id && !isUserAdmin) {
+    // Only group admins can edit expenses (unless it's their own expense)
+    const isPaidByUser = expense.paidBy === user.id;
+    if (!isUserAdmin && !isPaidByUser) {
       return { 
         canEdit: false, 
-        reason: 'Only the person who paid for this expense or group admins can edit it' 
+        reason: 'Only group admins or the person who paid for this expense can edit it' 
       };
     }
 
     // Check if expense has been partially settled/paid
+    // But allow editing if expense was added after the last settlement
     const splitData = expense.splitData || expense.splitDetails || expense.splits || [];
     const hasPartialPayments = splitData.some((split: any) => split.isPaid || split.isSettled);
+    
+    console.log('🔍 Edit expense debug:', {
+      expenseId: expense.id,
+      hasPartialPayments,
+      splitData: splitData.map(s => ({ userId: s.userId, isPaid: s.isPaid, isSettled: s.isSettled })),
+      lastSettlementDate: selectedGroup?.lastSettlementDate,
+      expenseCreatedAt: expense.createdAt,
+      isUserAdmin,
+      expensePaidBy: expense.paidBy,
+      currentUserId: user?.id
+    });
+    
     if (hasPartialPayments) {
+      // For new groups with no settlement history, allow all edits by admins and expense creators
+      if (!selectedGroup?.lastSettlementDate) {
+        console.log('✅ No settlement date - allowing edit for new group');
+        // Allow admins and expense creators to edit
+        if (!isUserAdmin && expense.paidBy !== user.id) {
+          return { 
+            canEdit: false, 
+            reason: 'Only group admins or the person who paid for this expense can edit it' 
+          };
+        }
+        // Allowed to edit
+      } else {
+        // For groups with settlement history, check if expense was added after settlement
+        const wasAddedAfterSettlement = new Date(expense.createdAt) > new Date(selectedGroup.lastSettlementDate);
+        
+        // If expense was NOT added after settlement, block editing
+        if (!wasAddedAfterSettlement) {
+          return { 
+            canEdit: false, 
+            reason: 'Cannot edit expense with recorded payments from before the last settlement.' 
+          };
+        }
+        
+        // If expense WAS added after settlement, allow admins and expense creators to edit
+        if (!isUserAdmin && expense.paidBy !== user.id) {
+          return { 
+            canEdit: false, 
+            reason: 'Only group admins or the person who paid for this expense can edit it' 
+          };
+        }
+      }
+    }
+
+    // Check if expense is from a completed settlement
+    // Once settlement is completed, user won't be able to delete or edit expense
+    // Any expense added after settlement can be editable and deletable
+    if (expense.isSettled || expense.isSettlementTransaction) {
       return { 
         canEdit: false, 
-        reason: 'Cannot edit expense with recorded payments. Please contact group members to resolve.' 
+        reason: 'Cannot edit expenses from completed settlements.' 
       };
     }
 
-    // Check if expense is settled
-    if (expense.isSettled) {
-      return { 
-        canEdit: false, 
-        reason: 'Cannot edit a settled expense.' 
-      };
+    // Check if this expense was created before the last group settlement
+    // If the group has settled balances, check if this expense predates the settlement
+    if (selectedGroup?.lastSettlementDate && expense.createdAt) {
+      const expenseDate = new Date(expense.createdAt);
+      const lastSettlement = new Date(selectedGroup.lastSettlementDate);
+      
+      if (expenseDate <= lastSettlement) {
+        return { 
+          canEdit: false, 
+          reason: 'Cannot edit expenses from before the last settlement. Only new expenses can be edited.' 
+        };
+      }
     }
 
-    // Check if expense is older than 30 days (for non-admins)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const expenseDate = new Date(expense.createdAt || expense.date);
-    if (expenseDate < thirtyDaysAgo && !isUserAdmin) {
-      return { 
-        canEdit: false, 
-        reason: 'Cannot edit expenses older than 30 days. Contact a group admin.' 
-      };
+    // Check if expense is older than 30 days (for non-admins only)
+    if (!isUserAdmin) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const expenseDate = new Date(expense.createdAt || expense.date);
+      if (expenseDate < thirtyDaysAgo) {
+        return { 
+          canEdit: false, 
+          reason: 'Cannot edit expenses older than 30 days. Contact a group admin.' 
+        };
+      }
     }
 
     return { canEdit: true };
@@ -1115,14 +1172,6 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
       visible={visible}
       onClose={onClose}
       title="Edit Expense"
-      rightActions={
-        <TouchableOpacity 
-          onPress={() => setShowDeleteModal(true)}
-          style={styles.deleteButton}
-        >
-          <Icon name="trash" size={20} color={theme.colors.error}  />
-        </TouchableOpacity>
-      }
     >
       {/* Show success message overlay when expense is updated */}
       {showSuccessMessage ? renderSuccessMessage() : (
@@ -1171,19 +1220,6 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
           </View>
         </>
       )}
-
-      {/* Delete Modal */}
-      <ExpenseDeletionModal
-        visible={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        expense={expense}
-        currentUser={user}
-        onDeletionComplete={() => {
-          onClose();
-          onExpenseDeleted?.();
-        }}
-        isUserAdmin={isUserAdmin}
-      />
     </FullscreenModal>
   );
 }
@@ -1191,9 +1227,6 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  deleteButton: {
-    padding: 8,
   },
   stepIndicator: {
     flexDirection: 'row',

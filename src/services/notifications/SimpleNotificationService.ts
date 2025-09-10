@@ -44,16 +44,8 @@ export class SimpleNotificationService {
         console.log('✅ Push token obtained');
         this.pushToken = token;
         
-        // Save push token to server
-        try {
-          const { ApiService } = await import('@/services/api/ApiService');
-          const apiService = ApiService.getInstance();
-          await apiService.savePushToken(token);
-          console.log('✅ Push token saved to server');
-        } catch (saveError) {
-          console.error('❌ Failed to save push token to server:', saveError);
-          // Don't fail initialization if token save fails
-        }
+        // Save push token to server with retry mechanism
+        await this.savePushTokenWithRetry(token);
       }
 
       // Set up listeners
@@ -64,6 +56,53 @@ export class SimpleNotificationService {
 
     } catch (error) {
       console.error('❌ Failed to initialize simple notification service:', error);
+      return false;
+    }
+  }
+
+  // **NEW** - Save push token with retry mechanism to handle auth timing issues
+  private static async savePushTokenWithRetry(pushToken: string, maxRetries: number = 3): Promise<void> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`💾 Saving push token to server (attempt ${attempt}/${maxRetries})`);
+        const { ApiService } = await import('@/services/api/ApiService');
+        const apiService = ApiService.getInstance();
+        
+        // Check if ApiService has auth token before making request
+        const hasToken = await this.checkApiServiceAuth(apiService);
+        if (!hasToken && attempt < maxRetries) {
+          console.log(`⏳ Auth token not ready yet, waiting before retry (${attempt}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Progressive delay
+          continue;
+        }
+        
+        await apiService.savePushToken(pushToken);
+        console.log('✅ Push token saved to server');
+        return; // Success - exit retry loop
+        
+      } catch (serverError) {
+        console.error(`❌ Failed to save push token to server (attempt ${attempt}/${maxRetries}):`, serverError);
+        
+        if (attempt === maxRetries) {
+          console.log('⚠️ Push token save failed after all retries, but continuing app initialization');
+          // Don't throw error - push token save is non-critical
+          return;
+        }
+        
+        // Wait before retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+  }
+
+  // **NEW** - Check if ApiService has auth token set
+  private static async checkApiServiceAuth(apiService: any): Promise<boolean> {
+    try {
+      // Try to check if the service has an auth token by calling a lightweight endpoint
+      // This is better than checking private properties
+      const authToken = await AsyncStorage.getItem('@spendy_auth_token');
+      return !!authToken;
+    } catch (error) {
       return false;
     }
   }

@@ -6,7 +6,6 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FirebaseNotificationService } from './src/services/smartMoney/firebaseNotificationService';
 import { CrossPlatformAlert } from './src/utils/alertUtils';
 import { hideDevIndicators } from './src/utils/devUtils';
 
@@ -36,8 +35,8 @@ import { RealNotificationService } from './src/services/notifications/RealNotifi
 // import { NotificationService } from './src/services/notifications/NotificationService';
 import { ApiService } from '@/services/api/ApiService';
 import { notificationManager } from '@/services/NotificationManager';
-import SmartMoneyApp from '@/screens/main/SmartMoneyApp';
 import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
  import { SubscriptionService } from '@/services/SubscriptionService';
 import SubscriptionModal from '@/components/modals/SubscriptionModal';
@@ -81,12 +80,18 @@ const AppNavigator = () => {
     }
   }, [user, hasVisitedLanding]);
 
-  // Subscription states
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [subscriptionReason, setSubscriptionReason] = useState<'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature'>('firstTime');
-  const [featureName, setFeatureName] = useState<string>('');
-  const [subscriptionCanClose, setSubscriptionCanClose] = useState(true);
-  const [subscriptionCountdown, setSubscriptionCountdown] = useState(0);
+  // Subscription states - using single state to prevent race conditions
+  const [subscriptionModal, setSubscriptionModal] = useState<{
+    visible: boolean;
+    reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature';
+    featureName: string;
+    canClose: boolean;
+  }>({
+    visible: false,
+    reason: 'firstTime',
+    featureName: '',
+    canClose: true
+  });
 
   // Add app ready state and modal sequencing
   const [appReady, setAppReady] = useState(false);
@@ -252,64 +257,36 @@ const AppNavigator = () => {
     if (pendingSubscriptionModal && appReady && subscriptionCheckComplete) {
       setTimeout(() => {
         console.log('🎯 DEBUG: Showing pending subscription modal:', pendingSubscriptionModal.reason);
-        setSubscriptionReason(pendingSubscriptionModal.reason);
-        setFeatureName(pendingSubscriptionModal.feature || '');
-        setSubscriptionCanClose(pendingSubscriptionModal.canClose);
-        setSubscriptionCountdown(pendingSubscriptionModal.canClose ? 0 : 5);
-        setShowSubscriptionModal(true);
+        console.log('🔧 DEBUG: Setting subscription modal state:', {
+          reason: pendingSubscriptionModal.reason,
+          canClose: pendingSubscriptionModal.canClose,
+          willShowTimer: !pendingSubscriptionModal.canClose
+        });
+        
+        // Set all subscription modal state at once to prevent race conditions
+        const modalConfig = {
+          visible: true,
+          reason: pendingSubscriptionModal.reason,
+          featureName: pendingSubscriptionModal.feature || '',
+          canClose: pendingSubscriptionModal.canClose
+        };
+        
+        console.log('🎨 DEBUG: Setting SubscriptionModal state:', {
+          ...modalConfig,
+          autoCloseAfter: modalConfig.canClose ? undefined : 5,
+        });
+        
+        setSubscriptionModal(modalConfig);
         setPendingSubscriptionModal(null);
       }, 1500);
     }
   }, [pendingSubscriptionModal, appReady, subscriptionCheckComplete]);
 
-  // Handle subscription countdown
-  useEffect(() => {
-    if (subscriptionCountdown > 0) {
-      const timer = setInterval(() => {
-        setSubscriptionCountdown((prev) => {
-          if (prev <= 1) {
-            setSubscriptionCanClose(true);
-            clearInterval(timer);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [subscriptionCountdown]);
-
-  useEffect(() => {
-    // Initialize Smart Money notifications
-    const initializeSmartMoney = async () => {
-      if (user?.id) {
-        try {
-          console.log('🚀 Initializing Smart Money notifications for user:', user.id);
-          const notificationService = FirebaseNotificationService.getInstance();
-          const initialized = await notificationService.initialize();
-          
-          if (initialized) {
-            console.log('✅ Smart Money notifications initialized');
-            
-            // Schedule all Smart Money notifications
-            await notificationService.scheduleDailyExpenseReminder();
-            await notificationService.scheduleWeeklyAnalytics();
-            
-            // Save token for user
-            await notificationService.saveTokenToServer(user.id);
-          } else {
-            console.log('⚠️ Smart Money notifications not initialized (may be on web platform or permissions denied)');
-          }
-        } catch (error) {
-          console.error('❌ Failed to initialize notifications:', error);
-          // Don't block app initialization if notifications fail
-        }
-      }
-    };
-
-    initializeSmartMoney();
-  }, [user?.id]);
+  // Handle subscription countdown completion (called by SubscriptionModal)
+  const handleSubscriptionCountdownComplete = () => {
+    console.log('✅ Subscription countdown completed, enabling close button');
+    setSubscriptionModal(prev => ({ ...prev, canClose: true }));
+  };
 
   useEffect(() => {
     // Initialize main notification service for friend requests and other app notifications
@@ -357,7 +334,7 @@ const AppNavigator = () => {
       tourCheckCompleted,
       appReady,
       subscriptionCheckComplete,
-      showSubscriptionModal,
+      subscriptionModalVisible: subscriptionModal.visible,
       pendingSubscriptionModal: !!pendingSubscriptionModal,
       shouldShowTourAfterSubscription
     });
@@ -369,7 +346,7 @@ const AppNavigator = () => {
         tourCheckCompleted && 
         appReady && 
         subscriptionCheckComplete && 
-        !showSubscriptionModal && 
+        !subscriptionModal.visible && 
         !pendingSubscriptionModal &&
         !shouldShowTourAfterSubscription) {
       
@@ -381,7 +358,7 @@ const AppNavigator = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [user, isLoading, initializing, hasShownTour, tourCheckCompleted, startTour, appReady, subscriptionCheckComplete, showSubscriptionModal, pendingSubscriptionModal, shouldShowTourAfterSubscription]);
+  }, [user, isLoading, initializing, hasShownTour, tourCheckCompleted, startTour, appReady, subscriptionCheckComplete, subscriptionModal.visible, pendingSubscriptionModal, shouldShowTourAfterSubscription]);
 
   useEffect(() => {
     // Initialize notifications
@@ -475,11 +452,7 @@ const AppNavigator = () => {
     try {
       console.log('🔄 DEBUG: Mock subscription purchase:', { plan, promoCode });
       
-      setShowSubscriptionModal(false);
-      
-      // Reset subscription state
-      setSubscriptionCountdown(0);
-      setSubscriptionCanClose(true);
+      setSubscriptionModal(prev => ({ ...prev, visible: false, canClose: true }));
       
       CrossPlatformAlert.alert('Success! 🎉', 'Mock subscription completed', [
         {
@@ -587,22 +560,37 @@ const AppNavigator = () => {
   ) => {
     console.log('🎯 Showing subscription modal for reason:', reason, 'feature:', feature, 'canClose:', canClose, 'autoCloseAfter:', autoCloseAfter);
     
-    setSubscriptionReason(reason);
-    setFeatureName(feature || '');
-    setSubscriptionCanClose(canClose);
-    setSubscriptionCountdown(canClose ? 0 : (autoCloseAfter || 5));
-    setShowSubscriptionModal(true);
+    setSubscriptionModal({
+      visible: true,
+      reason,
+      featureName: feature || '',
+      canClose
+    });
   };
 
   // Handle modal close with tour trigger
   const handleSubscriptionModalClose = () => {
-    console.log('🔄 DEBUG: Closing subscription modal');
-    setShowSubscriptionModal(false);
-    setSubscriptionCountdown(0);
-    setSubscriptionCanClose(true);
+    console.log('🔄 DEBUG: Closing subscription modal, reason:', subscriptionModal.reason);
+    
+    const wasTransactionLimit = subscriptionModal.reason === 'transactionLimit';
+    setSubscriptionModal(prev => ({ ...prev, visible: false, canClose: true }));
+    
+    // If this was a transaction limit modal that auto-closed, open Add Expense modal
+    if (wasTransactionLimit) {
+      console.log('💰 Opening Add Expense modal after transaction limit countdown');
+      setTimeout(() => {
+        // Open the Add Expense modal
+        if ((global as any).openAddExpenseModal) {
+          console.log('🎯 Calling global openAddExpenseModal function');
+          (global as any).openAddExpenseModal();
+        } else {
+          console.log('❌ Global openAddExpenseModal function not available');
+        }
+      }, 600); // Small delay after modal close animation
+    }
     
     // Check if there's pending expense data to process after the countdown
-    if ((window as any).pendingExpenseData && subscriptionReason === 'transactionLimit') {
+    if ((window as any).pendingExpenseData && wasTransactionLimit) {
       const { expenseData, fromGroupDetails } = (window as any).pendingExpenseData;
       console.log('📋 Processing pending expense after countdown:', expenseData);
       
@@ -640,10 +628,23 @@ const AppNavigator = () => {
       console.log('🔔 Global showSubscriptionModal called:', { reason, feature, canClose, autoCloseAfter });
       showSubscriptionModalForReason(reason, feature, canClose, autoCloseAfter);
     };
+
+
+
+    // Set up SubscriptionHelper to use our global handler
+    const { SubscriptionHelper } = require('./src/utils/SubscriptionHelper');
+    SubscriptionHelper.getInstance().setShowSubscriptionModal(
+      (reason: string, feature?: string, canClose?: boolean, autoCloseAfter?: number) => {
+        console.log('🔔 SubscriptionHelper -> App.tsx showSubscriptionModal:', { reason, feature, canClose, autoCloseAfter });
+        showSubscriptionModalForReason(reason as any, feature, canClose ?? true, autoCloseAfter);
+      }
+    );
     
     return () => {
       console.log('🧹 Cleaning up global subscription modal function');
       (global as any).showSubscriptionModal = undefined;
+      (global as any).testTimer = undefined;
+      (global as any).testFirstTime = undefined;
     };
   }, []);
 
@@ -717,15 +718,17 @@ const AppNavigator = () => {
       </Stack.Navigator>
 
       {/* Simple subscription modal for testing */}
-      {user && (
+      {user && subscriptionModal.visible && (
         <SubscriptionModal
-          visible={showSubscriptionModal}
+          visible={subscriptionModal.visible}
           onClose={handleSubscriptionModalClose}
           onSubscribe={handleSubscriptionPurchase}
-          reason={subscriptionReason}
-          featureName={featureName}
-          canClose={subscriptionCanClose}
-          autoCloseAfter={subscriptionCountdown > 0 ? subscriptionCountdown : undefined}
+          reason={subscriptionModal.reason}
+          featureName={subscriptionModal.featureName}
+          canClose={subscriptionModal.canClose}
+          autoCloseAfter={subscriptionModal.canClose ? undefined : (subscriptionModal.reason === 'transactionLimit' ? 10 : 5)}
+          onCountdownComplete={handleSubscriptionCountdownComplete}
+          autoCloseOnComplete={subscriptionModal.reason === 'transactionLimit'}
         />
       )}
     </NavigationContainer>
@@ -734,13 +737,15 @@ const AppNavigator = () => {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <TourProvider>
-          <AppNavigator />
-        </TourProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <TourProvider>
+            <AppNavigator />
+          </TourProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

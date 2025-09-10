@@ -7,14 +7,14 @@ import {
   TouchableOpacity,
   Alert,
   Share,
+  Linking,
 } from 'react-native';
 import { Icon } from '../common/Icon';
 import QRCode from 'react-native-qrcode-svg';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
-import { QRCodeService } from '@/services/qr/QRCodeService';
-import { InviteService } from '@/services/payments/PaymentService';
+import { SecureQRService } from '@/services/qr/SecureQRService';
 import { User } from '@/types';
 
 // Temporary Group interface for QR code functionality
@@ -26,7 +26,7 @@ interface Group {
   members: any[];
 }
 import QRCodeScanner from '@/components/QRCodeScanner';
-import QRScannerManager, { QRScannerState } from '@/services/qr/QRScannerManager';
+import ImprovedQRScannerManager, { ScannerState } from '@/services/qr/ImprovedQRScannerManager';
 
 interface QRCodeModalProps {
   visible: boolean;
@@ -40,19 +40,18 @@ type QRMode = 'friend' | 'group' | 'scanner';
 export default function QRCodeModal({ visible, onClose, user, selectedGroup }: QRCodeModalProps) {
   const { theme } = useTheme();
   const [mode, setMode] = useState<QRMode>('friend');
-  const [qrData, setQrData] = useState<any>(null);
   const [qrString, setQrString] = useState('');
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [scannerState, setScannerState] = useState<QRScannerState>({
-    isScanning: false,
+  const [scannerState, setScannerState] = useState<ScannerState>({
+    status: 'idle',
     isProcessing: false,
     hasScanned: false,
     error: null,
+    lastScanTime: null,
   });
-  const [isHandlingScan, setIsHandlingScan] = useState(false); // Add this state
 
-  const scannerManager = QRScannerManager.getInstance();
+  const scannerManager = ImprovedQRScannerManager.getInstance();
 
   useEffect(() => {
     // Subscribe to scanner state changes
@@ -67,34 +66,34 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
     
     // Reset scanner state when modal opens or closes
     if (visible) {
-      scannerManager.stopScanning();
+      scannerManager.resetScanner();
       setShowScanner(false);
-      setIsHandlingScan(false);
     } else {
       // When modal closes, ensure all states are reset
       setShowScanner(false);
-      setIsHandlingScan(false);
-      scannerManager.stopScanning();
+      scannerManager.resetScanner();
     }
   }, [visible, mode, user, selectedGroup]);
 
-  const generateQRCode = () => {
+  const generateQRCode = async () => {
     if (!user) return;
 
+    setLoading(true);
     try {
-      let generatedQRData;
+      const qrService = SecureQRService.getInstance();
+      let qrUrl = '';
       
       if (mode === 'friend') {
-        generatedQRData = QRCodeService.generateFriendInviteQR(
+        qrUrl = await qrService.generateFriendInviteQR(
           user.id,
           {
             fullName: user.fullName,
             email: user.email,
-            profilePicture: user.profilePicture
+            avatar: user.profilePicture
           }
         );
       } else if (mode === 'group' && selectedGroup) {
-        generatedQRData = QRCodeService.generateGroupInviteQR(
+        qrUrl = await qrService.generateGroupInviteQR(
           selectedGroup.id,
           selectedGroup.inviteCode,
           {
@@ -106,23 +105,26 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
         );
       }
 
-      if (generatedQRData) {
-        setQrData(generatedQRData);
-        const encodedString = QRCodeService.encodeQRData(generatedQRData);
-        setQrString(encodedString);
+      if (qrUrl) {
+        setQrString(qrUrl);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Generate QR code error:', error);
-      Alert.alert('Error', 'Failed to generate QR code');
+      Alert.alert('Error', error.message || 'Failed to generate QR code');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleShare = async () => {
-    if (!qrData || !user || loading) return;
+    if (!qrString || !user || loading) return;
 
     setLoading(true);
     try {
-      await QRCodeService.shareQRCode(qrData);
+      const qrService = SecureQRService.getInstance();
+      const targetName = mode === 'friend' ? user.fullName : selectedGroup?.name || 'Group';
+      const shareMode = mode === 'scanner' ? 'friend' : mode; // Default scanner mode to friend
+      await qrService.shareQRCode(qrString, shareMode, targetName);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to share QR code');
     } finally {
@@ -131,7 +133,7 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
   };
 
   const handleSendSMS = async () => {
-    if (!qrData || !user || loading) return;
+    if (!qrString || !user || loading) return;
 
     Alert.prompt(
       'Send SMS',
@@ -144,8 +146,13 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
             if (phoneNumber && !loading) {
               setLoading(true);
               try {
-                await QRCodeService.shareViaSMS(qrData, phoneNumber);
-                Alert.alert('Success', 'SMS invitation sent!');
+                const message = mode === 'friend' 
+                  ? `Add me as a friend on Spendy! ${qrString}`
+                  : `Join "${selectedGroup?.name}" group on Spendy! ${qrString}`;
+                
+                // Use native SMS sharing
+                await Share.share({ message });
+                Alert.alert('Success', 'SMS invitation shared!');
               } catch (error: any) {
                 Alert.alert('Error', error.message || 'Failed to send SMS');
               } finally {
@@ -162,7 +169,7 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
   };
 
   const handleSendWhatsApp = async () => {
-    if (!qrData || !user || loading) return;
+    if (!qrString || !user || loading) return;
 
     Alert.prompt(
       'Send WhatsApp',
@@ -175,10 +182,17 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
             if (phoneNumber && !loading) {
               setLoading(true);
               try {
-                await QRCodeService.shareViaWhatsApp(qrData, phoneNumber);
-                Alert.alert('Success', 'WhatsApp invitation sent!');
+                const message = mode === 'friend' 
+                  ? `Add me as a friend on Spendy! ${qrString}`
+                  : `Join "${selectedGroup?.name}" group on Spendy! ${qrString}`;
+                
+                // Use WhatsApp URL scheme
+                const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
+                await Linking.openURL(whatsappUrl);
               } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to send WhatsApp message');
+                // Fallback to regular share
+                const fallbackMessage = `WhatsApp: ${message}`;
+                await Share.share({ message: fallbackMessage });
               } finally {
                 setLoading(false);
               }
@@ -194,165 +208,99 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
 
 const handleScanQR = useCallback(() => {
   // Prevent multiple rapid button presses
-  if (!scannerManager.canProcessAction()) {
+  if (scannerManager.isBusy()) {
     return;
   }
   
-  // Reset scanner state before opening
-  scannerManager.resetForNewScan();
+  // Start scanning session
   setShowScanner(true);
   scannerManager.startScanning();
 }, [scannerManager]);
 
 const handleQRCodeScanned = useCallback(async (qrData: string) => {
-  if (!user || isHandlingScan) {
-    console.log('Scan handling already in progress, user is null, or modal not visible.');
+  if (!user) {
+    console.log('No user available for QR processing');
     return;
   }
 
   // Handle special error cases from QRCodeScanner
   if (qrData === 'INVALID_QR_FORMAT') {
-    Alert.alert(
-      'Invalid QR Code',
+    scannerManager.showErrorMessage(
       'This is not a valid Spendy QR code. Please scan a QR code generated by Spendy.',
-      [
-        {
-          text: 'Try Again',
-          onPress: () => {
-            // Reset scanner state and keep it open for retry
-            scannerManager.resetForNewScan();
-          }
-        },
-        {
-          text: 'Cancel',
-          onPress: () => {
-            setShowScanner(false);
-            onClose();
-          }
-        }
-      ]
+      () => scannerManager.resetForNewScan(),
+      () => {
+        setShowScanner(false);
+        onClose();
+      }
     );
     return;
   }
 
   if (qrData === 'SCAN_ERROR') {
-    Alert.alert(
-      'Scan Error',
+    scannerManager.showErrorMessage(
       'An error occurred while scanning. Please try again.',
-      [
-        {
-          text: 'Try Again',
-          onPress: () => {
-            // Reset scanner state and keep it open for retry
-            scannerManager.resetForNewScan();
-          }
-        },
-        {
-          text: 'Cancel',
-          onPress: () => {
-            setShowScanner(false);
-            onClose();
-          }
-        }
-      ]
+      () => scannerManager.resetForNewScan(),
+      () => {
+        setShowScanner(false);
+        onClose();
+      }
     );
     return;
   }
 
-  setIsHandlingScan(true);
-
   try {
-    // Reset scanner state before processing
-    scannerManager.resetForNewScan();
-    
-    const result = await scannerManager.processQRCode(qrData, user.id, {
-      closeOnSuccess: true,
-    });
+    const result = await scannerManager.processQRCode(qrData, user.id);
 
     if (result.success) {
-      // Immediately close scanner and modal
+      // Close scanner and modal
       setShowScanner(false);
-      onClose(); 
+      onClose();
       
-      // Show success message with a slight delay to ensure UI updates
+      // Show success message
       setTimeout(() => {
         Alert.alert(
           'Success! 🎉',
-          'QR code processed successfully!',
-          [{ text: 'OK' }]
+          result.message,
+          [{ 
+            text: 'OK',
+            onPress: () => {
+              // Handle navigation if needed
+              if (result.navigationAction?.type === 'group_details' && result.navigationAction.groupId) {
+                // Navigate to group details - this would be handled by parent component
+                console.log('Navigate to group:', result.navigationAction.groupId);
+              }
+            }
+          }]
         );
-      }, 100);
+      }, 300);
     } else {
-      // Handle error without using QRScannerManager's alert
-      const errorMessage = result.error || 'Failed to process QR code';
-      
-      // Don't show "Already processing" errors to user, just retry
-      if (errorMessage.includes('processing') || errorMessage.includes('wait')) {
-        console.log('Processing retry needed:', errorMessage);
-        // Auto retry after short delay
-        setTimeout(() => {
-          setIsHandlingScan(false);
-          handleQRCodeScanned(qrData);
-        }, 1000);
-        return;
-      }
-      
-      Alert.alert(
-        'QR Code Error',
-        errorMessage,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => {
-              setShowScanner(false);
-              onClose();
-            }
-          },
-          {
-            text: 'Try Again',
-            onPress: () => {
-              // Reset and keep scanner open for retry
-              scannerManager.resetForNewScan();
-              setIsHandlingScan(false);
-            }
-          }
-        ]
+      // Show error with retry option
+      scannerManager.showErrorMessage(
+        result.message,
+        () => scannerManager.resetForNewScan(),
+        () => {
+          setShowScanner(false);
+          onClose();
+        }
       );
     }
   } catch (error) {
     console.error('Unexpected error in handleQRCodeScanned:', error);
-    Alert.alert(
-      'Error',
+    scannerManager.showErrorMessage(
       'An unexpected error occurred. Please try again.',
-      [
-        {
-          text: 'Cancel',
-          onPress: () => {
-            setShowScanner(false);
-            onClose();
-          }
-        },
-        {
-          text: 'Try Again',
-          onPress: () => {
-            // Reset and keep scanner open for retry
-            scannerManager.resetForNewScan();
-            setIsHandlingScan(false);
-          }
-        }
-      ]
+      () => scannerManager.resetForNewScan(),
+      () => {
+        setShowScanner(false);
+        onClose();
+      }
     );
-  } finally {
-    setIsHandlingScan(false);
   }
-}, [user, scannerManager, onClose, setShowScanner, isHandlingScan]);
+}, [user, scannerManager, onClose, setShowScanner]);
 
 const handleScannerClose = useCallback(() => {
   setShowScanner(false);
   scannerManager.stopScanning();
   setMode('friend');
-  setIsHandlingScan(false); // Reset the handling flag
 }, [scannerManager]);
 
   const renderModeSelector = () => (
@@ -423,7 +371,7 @@ const handleScannerClose = useCallback(() => {
           styles.modeTabText,
           { color: scannerState.isProcessing ? theme.colors.textSecondary : theme.colors.primary }
         ]}>
-          {scannerState.isProcessing ? 'Processing...' : 'Scan QR'}
+          {scannerManager.getStatusMessage()}
         </Text>
       </TouchableOpacity>
     </View>

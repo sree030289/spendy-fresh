@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@/types';
-import { SplittingService } from './splitting-disabled';
 import { RealNotificationService } from '../notifications/RealNotificationService';
 
 
@@ -169,8 +168,8 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
     
     // Process any pending email invitations
     try {
-      await SplittingService.processEmailInvitations(userData.email, userCredential.user.uid);
-      console.log('✅ Email invitations processed for new user');
+      // await SplittingService.processEmailInvitations(userData.email, userCredential.user.uid);
+      console.log('✅ Email invitations processing disabled');
     } catch (invitationError) {
       console.log('⚠️ Email invitation processing failed (non-critical):', invitationError);
       // Don't throw - this is not critical for registration
@@ -196,8 +195,8 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
     
     // Even for mock users, try to process email invitations
     try {
-      await SplittingService.processEmailInvitations(userData.email, mockUser.id);
-      console.log('✅ Email invitations processed for mock user');
+      // await SplittingService.processEmailInvitations(userData.email, mockUser.id);
+      console.log('✅ Email invitations processing disabled for mock user');
     } catch (invitationError) {
       console.log('⚠️ Mock email invitation processing failed (non-critical):', invitationError);
     }
@@ -213,8 +212,8 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
     // Try Firebase first
     try {
       if (!firebaseAuth) {
-        const initialized = await initializeFirebase();
-        if (!initialized) throw new Error('Firebase not available');
+      const initialized = await initializeFirebase();
+      if (!initialized) throw new Error('Firebase not available');
       }
 
       const { signInWithEmailAndPassword } = await import('firebase/auth');
@@ -228,55 +227,26 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
       
       let user: User;
       if (userDoc.exists()) {
-        const userData = userDoc.data();
-        console.log('✅ Firebase login successful with user data!');
-        user = {
-          id: userCredential.user.uid,
-          fullName: userData.fullName || 'Firebase User',
-          email: userData.email,
-          mobile: userData.mobile,
-          country: userData.country,
-          currency: userData.currency,
-          profilePicture: userData.profilePicture,
-          biometricEnabled: userData.biometricEnabled || false,
-          createdAt: userData.createdAt?.toDate() || new Date(),
-          updatedAt: userData.updatedAt?.toDate() || new Date(),
-        };
+      const userData = userDoc.data();
+      console.log('✅ Firebase login successful with user data!');
+      user = {
+        id: userCredential.user.uid,
+        fullName: userData.fullName || 'Firebase User',
+        email: userData.email,
+        mobile: userData.mobile,
+        country: userData.country,
+        currency: userData.currency,
+        profilePicture: userData.profilePicture,
+        biometricEnabled: userData.biometricEnabled || false,
+        createdAt: userData.createdAt?.toDate() || new Date(),
+        updatedAt: userData.updatedAt?.toDate() || new Date(),
+      };
       } else {
-        console.log('✅ Firebase login successful but no user data, using defaults');
-        user = {
-          id: userCredential.user.uid,
-          email,
-          fullName: 'Firebase User',
-          country: 'US',
-          mobile: '+1234567890',
-          currency: 'USD',
-          biometricEnabled: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-      }
-      
-      // Store session info for logged in user
-      await this.storeUserSession(user);
-
-       try {
-    await RealNotificationService.registerTokenWithBackend(user.id);
-  } catch (error) {
-    console.log('Failed to register push token:', error);
-  }
-      
-      return user;
-      
-    } catch (error: any) {
-      console.log('❌ Firebase login failed, using mock:', error.message);
-      
-      // Fallback to mock (your app still works!)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const mockUser: User = {
-        id: 'mock-123',
+      console.log('✅ Firebase login successful but no user data, using defaults');
+      user = {
+        id: userCredential.user.uid,
         email,
-        fullName: 'Mock User (Firebase failed)',
+        fullName: 'Firebase User',
         country: 'US',
         mobile: '+1234567890',
         currency: 'USD',
@@ -284,11 +254,38 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      }
       
-      // Store session info for mock user
-      await this.storeUserSession(mockUser);
+      // Store session info for logged in user
+      await this.storeUserSession(user);
+
+       try {
+    await RealNotificationService.registerTokenWithBackend(user.id);
+    } catch (error) {
+    console.log('Failed to register push token:', error);
+    }
       
-      return mockUser;
+      return user;
+      
+    } catch (error: any) {
+      console.log('❌ Firebase login failed:', error.message);
+      
+      // Handle specific authentication errors
+      if (error.code === 'auth/user-not-found') {
+      throw new Error('No account found with this email address');
+      } else if (error.code === 'auth/wrong-password') {
+      throw new Error('Invalid password. Please try again');
+      } else if (error.code === 'auth/invalid-email') {
+      throw new Error('Invalid email address format');
+      } else if (error.code === 'auth/user-disabled') {
+      throw new Error('This account has been disabled');
+      } else if (error.code === 'auth/too-many-requests') {
+      throw new Error('Too many failed attempts. Please try again later');
+      } else if (error.code === 'auth/network-request-failed') {
+      throw new Error('Network error. Please check your connection');
+      } else {
+      throw new Error('Login failed. Please check your credentials and try again');
+      }
     }
   }
 
@@ -299,17 +296,6 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
     try {
       // Clear all stored session data first
       await this.clearUserSession();
-      
-      // Clear Smart Money data for the current user
-      try {
-        const { DataService } = await import('../smartMoney/dataService');
-        const dataService = DataService.getInstance();
-        // Note: We don't pass userId here because we want to clear the current user's cached data
-        await dataService.clearAllData();
-        console.log('✅ Smart Money data cleared');
-      } catch (smartMoneyError) {
-        console.log('⚠️ Failed to clear Smart Money data:', smartMoneyError);
-      }
       
       // Then logout from Firebase
       if (firebaseAuth) {
@@ -460,6 +446,43 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
       if (error.code !== 'storage/object-not-found') {
         throw error;
       }
+    }
+  }
+
+  // OTP-based password update
+  static async updatePasswordWithOTP(email: string, newPassword: string): Promise<void> {
+    console.log('AuthService: Update password with OTP for', email);
+    
+    try {
+      if (!firebaseAuth) {
+        throw new Error('Firebase not initialized');
+      }
+
+      // Get current user
+      const currentUser = firebaseAuth.currentUser;
+      
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
+
+      if (currentUser.email?.toLowerCase() !== email.toLowerCase()) {
+        throw new Error('Email does not match current user');
+      }
+
+      const { updatePassword } = await import('firebase/auth');
+      
+      // Update password directly (OTP verification ensures user authorization)
+      await updatePassword(currentUser, newPassword);
+      
+      // Update user document with updated timestamp
+      await this.updateUser(currentUser.uid, { 
+        updatedAt: new Date()
+      });
+      
+      console.log('✅ Password updated successfully with OTP verification');
+    } catch (error: any) {
+      console.log('❌ OTP-based password update failed:', error.message);
+      throw error;
     }
   }
 

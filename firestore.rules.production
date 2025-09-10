@@ -1,0 +1,96 @@
+// Firestore Security Rules - Production
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions for authentication and authorization
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isValidUser() {
+      return isAuthenticated() && request.auth.uid != null;
+    }
+    
+    // User documents - users can only access their own data
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Friend relationships
+    match /friends/{friendshipId} {
+      allow read, write: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || 
+         resource.data.friendId == request.auth.uid);
+    }
+    
+    // Friend requests
+    match /friendRequests/{requestId} {
+      allow read, write: if isAuthenticated() && 
+        (resource.data.senderId == request.auth.uid || 
+         resource.data.recipientId == request.auth.uid);
+    }
+    
+    // Groups - users can read/write groups they're members of
+    match /groups/{groupId} {
+      allow read, write: if isAuthenticated() && 
+        (resource.data.createdBy == request.auth.uid ||
+         request.auth.uid in resource.data.memberIds);
+    }
+    
+    // Group members
+    match /groups/{groupId}/members/{memberId} {
+      allow read, write: if isAuthenticated() && 
+        (memberId == request.auth.uid || 
+         exists(/databases/$(database)/documents/groups/$(groupId)) &&
+         get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy == request.auth.uid);
+    }
+    
+    // Expenses - users can read/write expenses they're involved in
+    match /expenses/{expenseId} {
+      allow read, write: if isAuthenticated() && 
+        (resource.data.createdBy == request.auth.uid ||
+         resource.data.paidBy == request.auth.uid ||
+         request.auth.uid in resource.data.splitUserIds);
+    }
+    
+    // Settlements
+    match /settlements/{settlementId} {
+      allow read, write: if isAuthenticated() && 
+        (resource.data.payerId == request.auth.uid ||
+         resource.data.payeeId == request.auth.uid);
+    }
+    
+    // Notifications - users can only read their own notifications
+    match /notifications/{notificationId} {
+      allow read, write: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Subscription data
+    match /subscriptions/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Usage tracking
+    match /usageStats/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // App metadata (read-only for authenticated users)
+    match /appConfig/{document} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only server can write
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

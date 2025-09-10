@@ -15,7 +15,12 @@ router.use(generalLimiter);
 
 // Friend request routes
 router.post('/requests/send', 
-  validateRequest(['userId']),
+  (req, res, next) => {
+    console.log('🔍 Route /requests/send hit with body:', req.body);
+    console.log('🔍 Route headers:', req.headers['content-type']);
+    next();
+  },
+  validateRequest(['recipientEmail']),
   FriendsController.sendFriendRequest
 );
 

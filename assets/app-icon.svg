@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient for background -->
+    <linearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D6001C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B30019;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Text shadow filter -->
+    <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="2" dy="4" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+    </filter>
+    
+    <!-- Subtle inner glow -->
+    <filter id="innerGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background with rounded corners for modern look -->
+  <rect width="1024" height="1024" rx="180" ry="180" fill="url(#backgroundGradient)"/>
+  
+  <!-- Subtle overlay for depth -->
+  <rect width="1024" height="1024" rx="180" ry="180" fill="rgba(255,255,255,0.05)"/>
+  
+  <!-- Main text "Let'Split" -->
+  <text x="512" y="450" 
+        font-family="SF Pro Display, -apple-system, BlinkMacSystemFont, Helvetica Neue, Arial, sans-serif" 
+        font-size="110" 
+        font-weight="800" 
+        text-anchor="middle" 
+        fill="white" 
+        filter="url(#textShadow)">Let'Split</text>
+  
+  <!-- Subtitle for context -->
+  <text x="512" y="580" 
+        font-family="SF Pro Display, -apple-system, BlinkMacSystemFont, Helvetica Neue, Arial, sans-serif" 
+        font-size="42" 
+        font-weight="500" 
+        text-anchor="middle" 
+        fill="rgba(255,255,255,0.9)" 
+        filter="url(#textShadow)">Bill Splitting Made Easy</text>
+  
+  <!-- Decorative elements for design -->
+  <!-- Top accent line -->
+  <line x1="200" y1="320" x2="824" y2="320" 
+        stroke="rgba(255,255,255,0.3)" 
+        stroke-width="2" 
+        stroke-linecap="round"/>
+  
+  <!-- Bottom accent line -->
+  <line x1="200" y1="650" x2="824" y2="650" 
+        stroke="rgba(255,255,255,0.3)" 
+        stroke-width="2" 
+        stroke-linecap="round"/>
+  
+  <!-- Corner accent dots for modern touch -->
+  <circle cx="180" cy="180" r="8" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="844" cy="180" r="8" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="180" cy="844" r="8" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="844" cy="844" r="8" fill="rgba(255,255,255,0.4)"/>
+</svg>

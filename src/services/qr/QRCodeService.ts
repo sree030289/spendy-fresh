@@ -162,13 +162,27 @@ static decodeQRData(qrString: string): QRData {
       throw new Error('No data found in QR code');
     }
     
-    // Decode from base64 first, then convert UTF-8 bytes back to string
-    const base64Decoded = atob(decodeURIComponent(encodedData));
-    const jsonString = decodeURIComponent(base64Decoded.split('').map(c => {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-    
-    const qrData: QRData = JSON.parse(jsonString);
+    // Decode the QR data: first base64 decode, then URL decode
+    let qrData: QRData;
+    try {
+      const base64Decoded = atob(encodedData);
+      const jsonString = decodeURIComponent(base64Decoded);
+      console.log('🔍 QRCodeService decoded JSON:', jsonString);
+      qrData = JSON.parse(jsonString);
+    } catch (decodeError) {
+      console.error('QR decode error:', decodeError);
+      // Try alternate decoding method
+      try {
+        console.log('🔄 Trying alternate decode method...');
+        const urlDecoded = decodeURIComponent(encodedData);
+        const jsonString = atob(urlDecoded);
+        console.log('🔍 Alternate decoded JSON:', jsonString);
+        qrData = JSON.parse(jsonString);
+      } catch (altError) {
+        console.error('Alternate decode also failed:', altError);
+        throw new Error('Invalid or corrupted QR code');
+      }
+    }
     
     if (!qrData.version || qrData.version !== '1.0') {
       throw new Error('Unsupported QR code version');

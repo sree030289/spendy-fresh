@@ -21,6 +21,7 @@ export class FriendsController {
    */
   static async sendFriendRequest(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      console.log('🔍 sendFriendRequest body:', req.body);
       const { recipientEmail, recipientPhoneNumber, message } = req.body;
       const senderId = req.user!.id;
 

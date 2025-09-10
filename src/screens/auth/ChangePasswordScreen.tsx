@@ -17,6 +17,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
+import { EmailService } from '@/services/EmailService';
+import { AuthService } from '@/services/firebase/auth';
 
 export default function ChangePasswordScreen() {
   const navigation = useNavigation();
@@ -41,8 +43,8 @@ export default function ChangePasswordScreen() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Mock OTP for demo (in production, this would be generated server-side)
-  const [generatedOTP, setGeneratedOTP] = useState('');
+  // Email service instance
+  const emailService = EmailService.getInstance();
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -80,12 +82,8 @@ export default function ChangePasswordScreen() {
       setErrors(prev => ({ ...prev, newPassword: 'Password is required' }));
       return false;
     }
-    if (password.length < 8) {
-      setErrors(prev => ({ ...prev, newPassword: 'Password must be at least 8 characters' }));
-      return false;
-    }
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      setErrors(prev => ({ ...prev, newPassword: 'Password must contain uppercase, lowercase, and number' }));
+    if (password.length < 6) {
+      setErrors(prev => ({ ...prev, newPassword: 'Password must be at least 6 characters' }));
       return false;
     }
     setErrors(prev => ({ ...prev, newPassword: '' }));
@@ -105,24 +103,30 @@ export default function ChangePasswordScreen() {
     return true;
   };
 
-  const generateOTP = (): string => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
+  const sendOTPEmail = async (email: string) => {
+    console.log(`Sending OTP to ${email} via EmailService`);
+    
+    try {
+      const result = await emailService.sendOTP(email);
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
 
-  const sendOTPEmail = async (email: string, otp: string) => {
-    // In production, this would call your backend API to send email
-    // For demo, we'll simulate the email sending
-    console.log(`Sending OTP ${otp} to ${email}`);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // For demo purposes, show OTP in alert (remove in production)
-    Alert.alert(
-      'OTP Sent!',
-      `Demo Mode: Your OTP is ${otp}\n\nIn production, this would be sent to your email: ${email}`,
-      [{ text: 'OK' }]
-    );
+      // For demo purposes, show the OTP in alert (remove in production)
+      if (result.otp) {
+        Alert.alert(
+          'Demo Mode - OTP Sent!',
+          `Your OTP is: ${result.otp}\n\nIn production, this would be sent to your email: ${email}`,
+          [{ text: 'OK' }]
+        );
+      }
+
+      return result.message;
+    } catch (error: any) {
+      console.error('Send OTP error:', error);
+      throw new Error(`Failed to send OTP: ${error.message}`);
+    }
   };
 
   const handleSendOTP = async () => {
@@ -130,15 +134,12 @@ export default function ChangePasswordScreen() {
 
     setLoading(true);
     try {
-      const otp = generateOTP();
-      setGeneratedOTP(otp);
-      
-      await sendOTPEmail(formData.email, otp);
+      await sendOTPEmail(formData.email);
       
       setOtpSent(true);
       setStep('otp');
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to send OTP. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -149,9 +150,10 @@ export default function ChangePasswordScreen() {
 
     setLoading(true);
     try {
-      // Verify OTP
-      if (formData.otp !== generatedOTP) {
-        setErrors(prev => ({ ...prev, otp: 'Invalid OTP' }));
+      const result = await emailService.verifyOTP(formData.email, formData.otp);
+      
+      if (!result.success) {
+        setErrors(prev => ({ ...prev, otp: result.message }));
         setLoading(false);
         return;
       }
@@ -159,6 +161,7 @@ export default function ChangePasswordScreen() {
       setOtpVerified(true);
       setStep('password');
     } catch (error: any) {
+      console.error('Verify OTP error:', error);
       Alert.alert('Error', 'OTP verification failed. Please try again.');
     } finally {
       setLoading(false);
@@ -173,13 +176,23 @@ export default function ChangePasswordScreen() {
 
     setLoading(true);
     try {
-      // In a real app, you'd use the OTP verification as authorization
-      // For now, we'll use a placeholder current password
-      await updatePassword('placeholder', formData.newPassword);
+      // Verify that OTP is still valid
+      if (!emailService.isOTPVerified(formData.email)) {
+        Alert.alert('Error', 'OTP session has expired. Please verify your email again.');
+        setStep('email');
+        setLoading(false);
+        return;
+      }
+
+      // Use the new updatePasswordWithOTP method
+      await AuthService.updatePasswordWithOTP(formData.email, formData.newPassword);
       
+      // Clear the OTP session
+      emailService.clearOTP();
+
       Alert.alert(
         'Success!',
-        'Your password has been changed successfully.',
+        'Your password has been changed successfully. You can now log in with your new password.',
         [
           {
             text: 'OK',
@@ -189,22 +202,20 @@ export default function ChangePasswordScreen() {
       );
     } catch (error: any) {
       console.error('Change password error:', error);
-      Alert.alert('Error', 'Failed to change password. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to change password. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleResendOTP = async () => {
-    const otp = generateOTP();
-    setGeneratedOTP(otp);
     setFormData(prev => ({ ...prev, otp: '' }));
     
     try {
-      await sendOTPEmail(formData.email, otp);
-      Alert.alert('OTP Resent', `New OTP sent to ${formData.email}`);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+      await sendOTPEmail(formData.email);
+      Alert.alert('OTP Resent', `A new verification code has been sent to ${formData.email}`);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to resend OTP. Please try again.');
     }
   };
 
@@ -267,7 +278,7 @@ export default function ChangePasswordScreen() {
   const renderOTPStep = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <Icon name="shield-checkmark-outline" size={48} color={theme.colors.primary} />
+        <Icon name="checkmark" size={48} color={theme.colors.primary} />
         <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
           Enter OTP
         </Text>
@@ -302,7 +313,7 @@ export default function ChangePasswordScreen() {
           maxLength={6}
         />
         <Icon
-          name="keypad-outline"
+          name="calculator"
           size={20}
           color={errors.otp ? theme.colors.error : theme.colors.textSecondary}
           style={styles.inputIcon}
@@ -337,7 +348,7 @@ export default function ChangePasswordScreen() {
           Set New Password
         </Text>
         <Text style={[styles.stepSubtitle, { color: theme.colors.textSecondary }]}>
-          Choose a strong password for your account
+          Create a password with at least 6 characters
         </Text>
       </View>
 
@@ -353,7 +364,7 @@ export default function ChangePasswordScreen() {
                 color: theme.colors.text
               }
             ]}
-            placeholder="New Password (min. 8 characters)"
+            placeholder="New Password (min. 6 characters)"
             placeholderTextColor={theme.colors.textSecondary}
             value={formData.newPassword}
             onChangeText={(text) => {
@@ -373,7 +384,7 @@ export default function ChangePasswordScreen() {
             style={styles.passwordToggle}
           >
             <Icon
-              name={showNewPassword ? "eye-off-outline" : "eye-outline"}
+              name={showNewPassword ? "eyeOff" : "eye"}
               size={20}
               color={theme.colors.textSecondary}
             />
@@ -417,7 +428,7 @@ export default function ChangePasswordScreen() {
             style={styles.passwordToggle}
           >
             <Icon
-              name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+              name={showConfirmPassword ? "eyeOff" : "eye"}
               size={20}
               color={theme.colors.textSecondary}
             />

@@ -204,7 +204,9 @@ export class ExpensesController {
         throw new ValidationError('Expense ID is required');
       }
 
+      console.log('🔍 Looking for expense:', expenseId);
       const expense = await DatabaseService.getDocument(COLLECTIONS.EXPENSES, expenseId) as Expense;
+      console.log('🔍 Found expense:', expense ? 'YES' : 'NO');
       if (!expense) {
         throw new NotFoundError('Expense not found');
       }
@@ -255,24 +257,31 @@ export class ExpensesController {
         throw new ValidationError('Expense ID is required');
       }
 
+      console.log('🔍 Looking for expense:', expenseId);
       const expense = await DatabaseService.getDocument(COLLECTIONS.EXPENSES, expenseId) as Expense;
+      console.log('🔍 Found expense:', expense ? 'YES' : 'NO');
       if (!expense) {
         throw new NotFoundError('Expense not found');
-      }
-
-      // Only the person who paid can edit the expense
-      if (expense.paidBy !== userId) {
-        throw new ValidationError('Only the person who paid can edit this expense');
-      }
-
-      if (expense.isSettled) {
-        throw new ValidationError('Cannot edit a settled expense');
       }
 
       // Get group for validation
       const group = await DatabaseService.getDocument(COLLECTIONS.GROUPS, expense.groupId) as Group;
       if (!group) {
         throw new NotFoundError('Group not found');
+      }
+
+      // Check if user can edit: must be expense payer, group creator, or group admin
+      const isExpensePayer = expense.paidBy === userId;
+      const isGroupCreator = group.createdBy === userId;
+      const userMember = group.members.find(member => member.userId === userId);
+      const isGroupAdmin = userMember?.role === 'admin';
+
+      if (!isExpensePayer && !isGroupCreator && !isGroupAdmin) {
+        throw new ValidationError('Only the person who paid, group admins, or group creator can edit this expense');
+      }
+
+      if (expense.isSettled) {
+        throw new ValidationError('Cannot edit a settled expense');
       }
 
       const updateData: Partial<Expense> = {
@@ -371,14 +380,27 @@ export class ExpensesController {
         throw new ValidationError('Expense ID is required');
       }
 
+      console.log('🔍 Looking for expense:', expenseId);
       const expense = await DatabaseService.getDocument(COLLECTIONS.EXPENSES, expenseId) as Expense;
+      console.log('🔍 Found expense:', expense ? 'YES' : 'NO');
       if (!expense) {
         throw new NotFoundError('Expense not found');
       }
 
-      // Only the person who paid can delete the expense
-      if (expense.paidBy !== userId) {
-        throw new ValidationError('Only the person who paid can delete this expense');
+      // Get group for validation  
+      const group = await DatabaseService.getDocument(COLLECTIONS.GROUPS, expense.groupId) as Group;
+      if (!group) {
+        throw new NotFoundError('Group not found');
+      }
+
+      // Check if user can delete: must be expense payer, group creator, or group admin
+      const isExpensePayer = expense.paidBy === userId;
+      const isGroupCreator = group.createdBy === userId;
+      const userMember = group.members.find(member => member.userId === userId);
+      const isGroupAdmin = userMember?.role === 'admin';
+
+      if (!isExpensePayer && !isGroupCreator && !isGroupAdmin) {
+        throw new ValidationError('Only the person who paid, group admins, or group creator can delete this expense');
       }
 
       if (expense.isSettled) {
@@ -386,7 +408,6 @@ export class ExpensesController {
       }
 
       // Update group total expenses
-      const group = await DatabaseService.getDocument(COLLECTIONS.GROUPS, expense.groupId) as Group;
       if (group) {
         await DatabaseService.updateDocument(COLLECTIONS.GROUPS, expense.groupId, {
           totalExpenses: Math.max(0, group.totalExpenses - expense.amount),
@@ -419,7 +440,9 @@ export class ExpensesController {
         throw new ValidationError('Expense ID is required');
       }
 
+      console.log('🔍 Looking for expense:', expenseId);
       const expense = await DatabaseService.getDocument(COLLECTIONS.EXPENSES, expenseId) as Expense;
+      console.log('🔍 Found expense:', expense ? 'YES' : 'NO');
       if (!expense) {
         throw new NotFoundError('Expense not found');
       }

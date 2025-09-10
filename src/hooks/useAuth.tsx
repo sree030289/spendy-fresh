@@ -83,8 +83,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             email: profileData.email,
             fullName: profileData.fullName,
             currency: profileData.currency,
-            profilePicture: profileData.profileImage,
-            profileImage: profileData.profileImage,
+            profilePicture: profileData.profileImage || profileData.profilePicture,
+            profileImage: profileData.profileImage || profileData.profilePicture,
             isPremium: profileData.isPremium,
             biometricEnabled: finalBiometricSetting,
             country: parsedUser.country || 'US',
@@ -131,8 +131,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email: response.user.email,
         fullName: response.user.fullName,
         currency: response.user.currency,
-        profilePicture: response.user.profileImage,
-        profileImage: response.user.profileImage,
+        profilePicture: response.user.profileImage || response.user.profilePicture,
+        profileImage: response.user.profileImage || response.user.profilePicture,
         isPremium: response.user.isPremium,
         biometricEnabled: false, // Will be updated from stored preferences
         country: 'US', // Default, will be updated from profile
@@ -261,12 +261,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     try {
       setIsLoading(true);
-      // For now, just update locally since we don't have update endpoint yet
-      // TODO: Implement update user API endpoint
-      const updatedUser = { ...user, ...updates, updatedAt: new Date() };
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(updatedUser));
+      console.log('📤 Updating user profile:', updates);
       
-      // If biometric setting is being updated, save it in both formats
+      // Try to update via API first, but fallback to local storage on error
+      try {
+        const updatedUserData = await apiService.updateUserProfile({
+          fullName: updates.fullName,
+          mobile: updates.mobile,
+          country: updates.country,
+          currency: updates.currency,
+          biometricEnabled: updates.biometricEnabled,
+          profilePicture: updates.profilePicture
+        });
+        
+        console.log('📥 API updated user profile successfully');
+        
+        // Update local user state with API response
+        const updatedUser = { 
+          ...user, 
+          ...updatedUserData,
+          profilePicture: updatedUserData.profilePicture || updatedUserData.profileImage,
+          profileImage: updatedUserData.profilePicture || updatedUserData.profileImage,
+          updatedAt: new Date() 
+        };
+        
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        
+      } catch (apiError) {
+        console.log('⚠️ API update failed, updating locally:', apiError);
+        
+        // Fallback to local update
+        const updatedUser = { ...user, ...updates, updatedAt: new Date() };
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(updatedUser));
+        setUser(updatedUser);
+      }
+      
+      // Handle biometric setting updates
       if ('biometricEnabled' in updates && user.id) {
         console.log('💾 Updating biometric preference for user:', user.id, 'enabled:', updates.biometricEnabled);
         
@@ -281,15 +312,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         
         // Update the session data with new biometric preference
-        await apiService.storeUserSession(updatedUser);
+        await apiService.storeUserSession(user);
         
         console.log('✅ Biometric preference updated successfully');
       }
       
-      setUser(updatedUser);
-      console.log('User updated successfully');
+      console.log('✅ User updated successfully');
     } catch (error) {
-      console.error('Update user error:', error);
+      console.error('❌ Update user error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -428,8 +458,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email: profileData.email,
         fullName: profileData.fullName,
         currency: profileData.currency,
-        profilePicture: profileData.profileImage,
-        profileImage: profileData.profileImage,
+        profilePicture: profileData.profileImage || profileData.profilePicture,
+        profileImage: profileData.profileImage || profileData.profilePicture,
         isPremium: profileData.isPremium,
         biometricEnabled: finalBiometricSetting,
         country: parsedUser.country || 'US',

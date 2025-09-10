@@ -8,16 +8,16 @@ const getApiBaseUrl = () => {
   const buildType = process.env.EXPO_PUBLIC_BUILD_TYPE || 'dev';
   
   console.log('🔧 API Environment:', environment, 'Build:', buildType);
-  
-  // Use dev API for development builds (but respect prod override)
+
+  // Use Firebase Functions for both dev and prod builds from spendy-develop project
   if (buildType === 'dev' || (environment === 'development' && buildType !== 'prod')) {
-    console.log('🔧 Using DEVELOPMENT CLOUD RUN API endpoint');
-    // Use Cloud Run API for development
-    return 'https://spendyapi-2fy22mkg6q-uc.a.run.app';
+    console.log('🔧 Using DEVELOPMENT Firebase Functions API endpoint');
+    // Use Firebase Functions from spendy-develop project for development
+    return 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi';
   }
   
-  // Use production API for production builds
-  console.log('🔧 Using PRODUCTION API endpoint');
+  // Use production API for production builds (same endpoint for now)
+  console.log('🔧 Using PRODUCTION Firebase Functions API endpoint');
   return 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi';
 };
 
@@ -333,6 +333,26 @@ class ApiService {
     throw new Error(response.message || 'Failed to get profile');
   }
 
+  async updateUserProfile(updates: {
+    fullName?: string;
+    mobile?: string;
+    country?: string;
+    currency?: string;
+    biometricEnabled?: boolean;
+    profilePicture?: string;
+  }): Promise<any> {
+    const response = await this.makeRequest('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    
+    if (response.success && response.data) {
+      return response.data.user;
+    } else {
+      throw new Error(response.message || 'Failed to update profile');
+    }
+  }
+
   async logout(): Promise<void> {
     await this.clearAuthToken();
   }
@@ -344,6 +364,81 @@ class ApiService {
     } catch (error) {
       console.error('Health check failed:', error);
       return false;
+    }
+  }
+
+  // ========================
+  // FRIENDS MANAGEMENT
+  // ========================
+  async sendFriendRequestByEmail(recipientEmail: string, message?: string): Promise<any> {
+    const response = await this.makeRequest('/friends/requests/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        recipientEmail,
+        message: message || 'Sent via Spendy'
+      })
+    });
+    
+    if (response.success) {
+      return response.data;
+    } else {
+      throw new Error(response.message || 'Failed to send friend request');
+    }
+  }
+
+  async acceptFriendRequest(requestId: string): Promise<any> {
+    const response = await this.makeRequest(`/friends/requests/${requestId}/accept`, {
+      method: 'POST'
+    });
+    
+    if (response.success) {
+      return response.data;
+    } else {
+      throw new Error(response.message || 'Failed to accept friend request');
+    }
+  }
+
+  async declineFriendRequest(requestId: string): Promise<any> {
+    const response = await this.makeRequest(`/friends/requests/${requestId}/reject`, {
+      method: 'POST'
+    });
+    
+    if (response.success) {
+      return response.data;
+    } else {
+      throw new Error(response.message || 'Failed to decline friend request');
+    }
+  }
+
+  async getFriends(): Promise<any> {
+    const response = await this.makeRequest('/friends');
+    
+    if (response.success) {
+      return response.data;
+    } else {
+      throw new Error(response.message || 'Failed to get friends');
+    }
+  }
+
+  async getFriendRequests(): Promise<any> {
+    const response = await this.makeRequest('/friends/requests');
+    
+    if (response.success) {
+      return response.data;
+    } else {
+      throw new Error(response.message || 'Failed to get friend requests');
+    }
+  }
+
+  async removeFriend(userId: string, friendId: string): Promise<any> {
+    const response = await this.makeRequest(`/friends/${friendId}`, {
+      method: 'DELETE'
+    });
+    
+    if (response.success) {
+      return response.data;
+    } else {
+      throw new Error(response.message || 'Failed to remove friend');
     }
   }
 
@@ -559,6 +654,7 @@ class ApiService {
   }
 
   async updateExpense(expenseId: string, expenseData: any): Promise<void> {
+    console.log('🔍 Updating expense:', expenseId, 'with data:', expenseData);
     await this.request('PUT', `/expenses/${expenseId}`, expenseData);
   }
 
@@ -635,9 +731,65 @@ class ApiService {
   // FRIENDS
   // ========================
   async sendFriendRequest(fromUserId: string, toEmail: string, message?: string): Promise<{ success: boolean; isNewUser?: boolean; message?: string }> {
-    const response = await this.request('POST', '/friends/requests/send', { toEmail, message });
+    const response = await this.request('POST', '/friends/requests/send', { recipientEmail: toEmail, message });
     return response;
   }
+
+  // Send friend request with QR tracking
+  async sendFriendRequestWithQR(
+    fromUserId: string, 
+    toUserId: string, 
+    toEmail: string, 
+    inviteId: string, 
+    message?: string
+  ): Promise<{ success: boolean; isNewUser?: boolean; message?: string }> {
+    console.log('🔍 sendFriendRequestWithQR params:', { fromUserId, toUserId, toEmail, inviteId, message });
+    
+    if (!toEmail) {
+      throw new Error('Recipient email is required for friend request');
+    }
+    
+    const response = await this.request('POST', '/friends/requests/send', {
+      recipientEmail: toEmail,
+      message: message || 'Added via QR code scan',
+      metadata: {
+        fromUserId,
+        toUserId,
+        inviteId,
+        source: 'qr_scan'
+      }
+    });
+    return response;
+  }
+
+  // Respond to friend request (accept/decline)
+  async respondToFriendRequest(requestId: string, userId: string, response: 'accepted' | 'declined'): Promise<any> {
+    const result = await this.request('POST', '/friends/requests/respond', {
+      requestId,
+      userId,
+      response
+    });
+    return result.data || result;
+  }
+
+  // Get user profile by ID
+  async getUserProfile(userId: string): Promise<any> {
+    const response = await this.request('GET', `/users/${userId}`);
+    return response.data || response;
+  }
+
+  // Send push notification
+  async sendPushNotification(userId: string, notification: {
+    title: string;
+    body: string;
+    data?: any;
+  }): Promise<void> {
+    await this.request('POST', '/notifications/send', {
+      userId,
+      notification
+    });
+  }
+
 
   async savePushToken(pushToken: string): Promise<void> {
     try {
@@ -646,7 +798,8 @@ class ApiService {
       console.log('✅ Push token saved successfully');
     } catch (error) {
       console.error('❌ Failed to save push token:', error);
-      throw error;
+      // Don't throw error for push token save failures - they're non-critical
+      console.log('⚠️ Push token save failed but continuing app initialization');
     }
   }
 
@@ -754,9 +907,26 @@ class ApiService {
     }
   }
 
-  async sendFriendRequestReminder(fromUserId: string, toUserId: string, notificationData: any): Promise<void> {
-    // This might need to be implemented in the API
-    await this.request('POST', `/friends/requests/reminder`, { fromUserId, toUserId, ...notificationData });
+  async sendFriendRequestReminder(friendRequestId: string, reminderMethod: 'auto' | 'push' | 'email' | 'sms' = 'auto'): Promise<{
+    success: boolean;
+    isUnregistered?: boolean;
+    availableMethods?: string[];
+    userInfo?: {
+      email: string | null;
+      mobile: string | null;
+      fullName: string;
+    };
+    data?: {
+      method: string;
+      isUserRegistered: boolean;
+      originalInviteMethod: string | null;
+      availableMethods: string[];
+      recipient: string;
+    };
+    message: string;
+  }> {
+    const response = await this.request('POST', `/friends/requests/${friendRequestId}/remind`, { reminderMethod });
+    return response;
   }
 
   async removePendingFriendInvitation(userId: string, friendRequestId: string): Promise<void> {

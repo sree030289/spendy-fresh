@@ -385,16 +385,90 @@ export class SubscriptionService {
         return { allowed: true, currentCount: 0, limit: -1 };
       }
       
-      const usage = await this.getDailyUsage(userId);
+      // Check transactions in the last 24 hours instead of calendar day
+      const transactionsLast24h = await this.getTransactionCountLast24Hours(userId);
       
       return {
-        allowed: usage.transactionsUsed < plan.limits.dailyTransactions,
-        currentCount: usage.transactionsUsed,
+        allowed: transactionsLast24h < plan.limits.dailyTransactions,
+        currentCount: transactionsLast24h,
         limit: plan.limits.dailyTransactions
       };
     } catch (error) {
       console.error('Check transaction limit error:', error);
       return { allowed: false, currentCount: 0, limit: 0 };
+    }
+  }
+
+  // Get count of transactions created by user in the last 24 hours
+  private async getTransactionCountLast24Hours(userId: string): Promise<number> {
+    try {
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      
+      // We need to query the actual expenses collection to count transactions
+      // This requires importing the proper Firestore query functions
+      const { collection, query, where, getDocs, Timestamp } = await import('firebase/firestore');
+      
+      const expensesRef = collection(db, 'expenses');
+      
+      try {
+        // Try the composite index query first (requires Firebase index)
+        const recentExpensesQuery = query(
+          expensesRef,
+          where('createdBy', '==', userId),
+          where('createdAt', '>=', Timestamp.fromDate(twentyFourHoursAgo)),
+          where('createdAt', '<=', Timestamp.fromDate(now))
+        );
+        
+        const snapshot = await getDocs(recentExpensesQuery);
+        const count = snapshot.size;
+        
+        console.log(`📊 Transactions in last 24h for user ${userId} (indexed query):`, {
+          count,
+          since: twentyFourHoursAgo.toISOString(),
+          until: now.toISOString()
+        });
+        
+        return count;
+      } catch (indexError) {
+        console.log('📋 Index not available, trying simple query with client-side filtering...');
+        
+        // Fallback: Query by createdBy only and filter client-side
+        const userExpensesQuery = query(
+          expensesRef,
+          where('createdBy', '==', userId)
+        );
+        
+        const snapshot = await getDocs(userExpensesQuery);
+        let count = 0;
+        
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.createdAt) {
+            const createdAt = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+            if (createdAt >= twentyFourHoursAgo && createdAt <= now) {
+              count++;
+            }
+          }
+        });
+        
+        console.log(`📊 Transactions in last 24h for user ${userId} (client-filtered):`, {
+          count,
+          totalUserExpenses: snapshot.size,
+          since: twentyFourHoursAgo.toISOString(),
+          until: now.toISOString()
+        });
+        
+        return count;
+      }
+    } catch (error) {
+      console.error('Error getting 24h transaction count:', error);
+      console.log('📋 Falling back to daily usage count (requires Firebase index for 24h rolling limit)');
+      
+      // Final fallback to daily usage if all queries fail
+      const usage = await this.getDailyUsage(userId);
+      console.log(`📊 Using daily limit fallback: ${usage.transactionsUsed} transactions today`);
+      return usage.transactionsUsed;
     }
   }
 

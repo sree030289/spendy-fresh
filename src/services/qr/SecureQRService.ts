@@ -56,7 +56,20 @@ export interface QRProcessResult {
 export class SecureQRService {
   private static instance: SecureQRService;
   private static readonly STORAGE_KEY = 'qr_generation_history';
-  private static readonly APP_SECRET = 'spendy_qr_v2_secret'; // In production, use env var
+  private static readonly APP_SECRET = (() => {
+    // Import the environment config
+    try {
+      const { ENV } = require('../../config/environment');
+      return ENV.qrService.secret;
+    } catch (error) {
+      console.error('Failed to load QR service secret from environment:', error);
+      // Fallback for development only
+      if (__DEV__) {
+        return 'dev-qr-secret-not-for-production';
+      }
+      throw new Error('QR_SERVICE_SECRET must be configured in production');
+    }
+  })();
 
   static getInstance(): SecureQRService {
     if (!SecureQRService.instance) {
@@ -159,8 +172,27 @@ export class SecureQRService {
         throw new Error('Invalid QR code format');
       }
 
-      const jsonString = decodeURIComponent(atob(encodedData));
-      const qrData: QRData = JSON.parse(jsonString);
+      // First base64 decode, then URL decode
+      let qrData: QRData;
+      try {
+        const base64Decoded = atob(encodedData);
+        const jsonString = decodeURIComponent(base64Decoded);
+        console.log('🔍 Decoded QR JSON:', jsonString);
+        qrData = JSON.parse(jsonString);
+      } catch (decodeError) {
+        console.error('QR decode error:', decodeError);
+        // Try alternate decoding method in case of different encoding
+        try {
+          console.log('🔄 Trying alternate decode method...');
+          const urlDecoded = decodeURIComponent(encodedData);
+          const jsonString = atob(urlDecoded);
+          console.log('🔍 Alternate decoded JSON:', jsonString);
+          qrData = JSON.parse(jsonString);
+        } catch (altError) {
+          console.error('Alternate decode also failed:', altError);
+          throw new Error('Invalid or corrupted QR code');
+        }
+      }
 
       // Validate version
       if (qrData.version !== '2.0') {
@@ -220,23 +252,23 @@ export class SecureQRService {
 
     try {
       // Check existing friendship status
-      const existingStatus = await apiService.checkExistingFriendship(currentUserId, qrData.inviterData.email);
+      const friendshipCheck = await apiService.checkExistingFriendship(currentUserId, qrData.inviterData.email);
       
-      if (existingStatus === 'accepted') {
+      if (friendshipCheck.isFriend) {
         return {
           success: false,
           message: `You're already friends with ${qrData.inviterData.fullName}!`
         };
       }
 
-      if (existingStatus === 'request_sent') {
+      if (friendshipCheck.status === 'request_sent') {
         return {
           success: false,
           message: `You already sent a friend request to ${qrData.inviterData.fullName}. Please wait for their response.`
         };
       }
 
-      if (existingStatus === 'request_received') {
+      if (friendshipCheck.status === 'request_received') {
         return {
           success: false,
           message: `${qrData.inviterData.fullName} already sent you a friend request. Check your notifications to accept it.`
@@ -257,7 +289,7 @@ export class SecureQRService {
 
       return {
         success: true,
-        message: result.isNewUser 
+        message: result?.isNewUser === true
           ? `Invitation saved! ${qrData.inviterData.fullName} will get your friend request when they join Spendy.`
           : `Friend request sent to ${qrData.inviterData.fullName}! They'll receive a notification.`,
         shouldShowModal: false
@@ -401,9 +433,40 @@ export class SecureQRService {
 
   // Verify security signature
   private verifySignature(qrData: QRData): boolean {
-    const { signature, ...dataWithoutSignature } = qrData;
-    const expectedSignature = this.generateSignature(dataWithoutSignature);
-    return signature === expectedSignature;
+    // Use only the fields that were used during signature generation
+    let signatureData: any;
+    
+    if (qrData.type === 'friend_invite') {
+      const friendQR = qrData as FriendInviteQR;
+      signatureData = { 
+        inviterId: friendQR.inviterId, 
+        inviteId: friendQR.inviteId, 
+        timestamp: friendQR.timestamp, 
+        expiresAt: friendQR.expiresAt 
+      };
+    } else if (qrData.type === 'group_invite') {
+      const groupQR = qrData as GroupInviteQR;
+      signatureData = { 
+        groupId: groupQR.groupId, 
+        inviteCode: groupQR.inviteCode, 
+        inviterId: groupQR.inviterId, 
+        inviteId: groupQR.inviteId, 
+        timestamp: groupQR.timestamp, 
+        expiresAt: groupQR.expiresAt 
+      };
+    } else {
+      return false; // Unknown QR type
+    }
+    
+    const expectedSignature = this.generateSignature(signatureData);
+    console.log('🔍 Signature verification:', {
+      receivedSignature: qrData.signature,
+      expectedSignature,
+      signatureData,
+      match: qrData.signature === expectedSignature
+    });
+    
+    return qrData.signature === expectedSignature;
   }
 
   // Log QR generation for analytics
@@ -453,6 +516,63 @@ export class SecureQRService {
           }
         ]
       );
+    }
+  }
+
+  // Static methods for compatibility with QRCodeService interface
+  static async handleScannedQR(qrString: string, currentUserId: string): Promise<void> {
+    try {
+      const instance = SecureQRService.getInstance();
+      const result = await instance.processScannedQR(qrString, currentUserId);
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+      
+      if (result.shouldShowModal) {
+        CrossPlatformAlert.alert('Success', result.message);
+      }
+    } catch (error: any) {
+      console.error('SecureQR handleScannedQR error:', error);
+      CrossPlatformAlert.alert('QR Code Error', error.message || 'Failed to process QR code');
+      throw error;
+    }
+  }
+
+  static async handleScannedQRWithNavigation(
+    qrString: string, 
+    currentUserId: string,
+    navigation: any
+  ): Promise<void> {
+    try {
+      const instance = SecureQRService.getInstance();
+      const result = await instance.processScannedQR(qrString, currentUserId);
+      
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+      
+      if (result.navigationAction) {
+        // Handle navigation actions
+        switch (result.navigationAction.type) {
+          case 'navigate':
+            navigation.navigate(result.navigationAction.route, result.navigationAction.params);
+            break;
+          case 'replace':
+            navigation.replace(result.navigationAction.route, result.navigationAction.params);
+            break;
+          default:
+            console.log('Unknown navigation action:', result.navigationAction);
+        }
+      }
+      
+      if (result.shouldShowModal) {
+        CrossPlatformAlert.alert('Success', result.message);
+      }
+    } catch (error: any) {
+      console.error('SecureQR handleScannedQRWithNavigation error:', error);
+      CrossPlatformAlert.alert('QR Code Error', error.message || 'Failed to process QR code');
+      throw error;
     }
   }
 }

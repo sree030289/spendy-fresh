@@ -10,6 +10,7 @@ import friendsRoutes from './routes/friends.routes';
 import groupsRoutes from './routes/groups.routes';
 import expensesRoutes from './routes/expenses.routes';
 import moneyRoutes from './routes/money.routes';
+import settlementsRoutes from './routes/settlements.routes';
 
 const app = express();
 
@@ -26,7 +27,7 @@ app.use((req, res, next) => {
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:8081', // Expo dev server
-    'exp://localhost:19000', // Expo dev
+        'exp://localhost:19000', // Expo dev
     'exp://192.168.1.100:19000' // Expo on local network
   ];
 
@@ -67,6 +68,7 @@ app.use('/api/friends', friendsRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/money', moneyRoutes);
+app.use('/api/settlements', settlementsRoutes);
 
 // 404 handler for unknown routes
 app.use('*', (req, res) => {

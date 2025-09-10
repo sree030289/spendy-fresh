@@ -81,14 +81,29 @@ export class SubscriptionHelper {
     }
   }
 
-  // Check if user can create a transaction
-  async checkTransactionLimit(userId: string): Promise<boolean> {
+  // Check if user can create a transaction (without incrementing count)
+  async canCreateTransaction(userId: string): Promise<boolean> {
     try {
+      console.log('🔍 CHECKING TRANSACTION LIMIT (without increment) for user:', userId);
       const subscriptionService = SubscriptionService.getInstance();
       const result = await subscriptionService.canCreateTransaction(userId);
       
+      console.log('📊 Transaction limit check result:', {
+        allowed: result.allowed,
+        currentCount: result.currentCount,
+        limit: result.limit,
+        userId
+      });
+      
       if (!result.allowed) {
-        console.log('🚫 Daily transaction limit reached:', result);
+        console.log('🚫 DAILY TRANSACTION LIMIT REACHED - SHOWING MODAL:', {
+          currentCount: result.currentCount,
+          limit: result.limit,
+          reason: 'transactionLimit',
+          feature: 'Unlimited Daily Transactions',
+          canClose: false,
+          autoCloseAfter: 10
+        });
         
         // For transactions, allow closing after 10 seconds
         this.showSubscriptionModal?.(
@@ -101,12 +116,68 @@ export class SubscriptionHelper {
         return false;
       }
       
+      console.log('✅ Transaction allowed (count will be incremented on actual submit)');
+      return true;
+    } catch (error) {
+      console.error('❌ Error checking transaction limit:', error);
+      return false;
+    }
+  }
+
+  // Check if user can create a transaction AND increment count (for actual expense submission)
+  async checkTransactionLimit(userId: string): Promise<boolean> {
+    try {
+      console.log('🔍 CHECKING TRANSACTION LIMIT AND INCREMENTING for user:', userId);
+      const subscriptionService = SubscriptionService.getInstance();
+      const result = await subscriptionService.canCreateTransaction(userId);
+      
+      console.log('📊 Transaction limit check result:', {
+        allowed: result.allowed,
+        currentCount: result.currentCount,
+        limit: result.limit,
+        userId
+      });
+      
+      if (!result.allowed) {
+        console.log('🚫 DAILY TRANSACTION LIMIT REACHED - SHOWING MODAL:', {
+          currentCount: result.currentCount,
+          limit: result.limit,
+          reason: 'transactionLimit',
+          feature: 'Unlimited Daily Transactions',
+          canClose: false,
+          autoCloseAfter: 10
+        });
+        
+        // For transactions, allow closing after 10 seconds
+        this.showSubscriptionModal?.(
+          'transactionLimit',
+          'Unlimited Daily Transactions',
+          false,
+          10
+        );
+        
+        return false;
+      }
+      
+      console.log('✅ Transaction allowed, incrementing usage...');
       // Increment transaction count if allowed
       await subscriptionService.incrementTransactionUsage(userId);
       return true;
     } catch (error) {
-      console.error('Error checking transaction limit:', error);
+      console.error('❌ Error checking transaction limit:', error);
       return false;
+    }
+  }
+
+  // Just increment transaction usage without checking limit (for when limit was already checked)
+  async incrementTransactionUsage(userId: string): Promise<void> {
+    try {
+      console.log('📈 INCREMENTING TRANSACTION USAGE for user:', userId);
+      const subscriptionService = SubscriptionService.getInstance();
+      await subscriptionService.incrementTransactionUsage(userId);
+      console.log('✅ Transaction usage incremented successfully');
+    } catch (error) {
+      console.error('❌ Error incrementing transaction usage:', error);
     }
   }
 

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Spendy - Expense Splitting Made Easy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #D6001C, #FF4081);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 32px;
+            color: white;
+            font-weight: bold;
+        }
+        
+        h1 {
+            font-size: 24px;
+            color: #2D3748;
+            margin-bottom: 16px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            color: #718096;
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+        
+        .invitation-details {
+            background: #F7FAFC;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .invitation-type {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .invitation-content {
+            font-size: 18px;
+            color: #2D3748;
+            font-weight: 600;
+        }
+        
+        .download-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .download-btn {
+            flex: 1;
+            background: #2D3748;
+            color: white;
+            text-decoration: none;
+            padding: 16px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform 0.2s;
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .download-btn.ios {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+        
+        .download-btn.android {
+            background: linear-gradient(135deg, #34A853, #4285F4);
+        }
+        
+        .features {
+            text-align: left;
+            margin-bottom: 24px;
+        }
+        
+        .features h3 {
+            font-size: 16px;
+            color: #2D3748;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #4A5568;
+        }
+        
+        .feature-icon {
+            width: 20px;
+            height: 20px;
+            background: #E6FFFA;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #38B2AC;
+            font-size: 12px;
+        }
+        
+        .footer {
+            font-size: 12px;
+            color: #A0AEC0;
+            border-top: 1px solid #E2E8F0;
+            padding-top: 16px;
+        }
+        
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">S</div>
+        
+        <h1 id="pageTitle">Join Spendy</h1>
+        <p class="subtitle">Split expenses effortlessly with friends and groups</p>
+        
+        <div class="invitation-details" id="invitationDetails" style="display: none;">
+            <div class="invitation-type" id="invitationType"></div>
+            <div class="invitation-content" id="invitationContent"></div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Preparing your invitation...</p>
+        </div>
+        
+        <div class="download-buttons">
+            <a href="#" class="download-btn ios" id="iosBtn">
+                📱 App Store
+            </a>
+            <a href="#" class="download-btn android" id="androidBtn">
+                🤖 Play Store
+            </a>
+        </div>
+        
+        <div class="features">
+            <h3>Why Spendy?</h3>
+            <div class="feature-item">
+                <div class="feature-icon">✓</div>
+                <span>Split bills instantly with friends</span>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">✓</div>
+                <span>Track group expenses effortlessly</span>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">✓</div>
+                <span>Smart settlement suggestions</span>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">✓</div>
+                <span>Secure & private</span>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Your invitation will be automatically processed when you install and open the app.</p>
+        </div>
+    </div>
+
+    <script>
+        // App store URLs
+        const APP_STORE_URL = 'https://apps.apple.com/app/spendy/id123456789';
+        const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.svaag.spendy';
+        
+        // Get QR data from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const qrData = urlParams.get('data');
+        
+        // Set up download buttons
+        document.getElementById('iosBtn').href = APP_STORE_URL;
+        document.getElementById('androidBtn').href = PLAY_STORE_URL;
+        
+        // Process QR invitation data
+        if (qrData) {
+            try {
+                const decodedData = JSON.parse(decodeURIComponent(atob(qrData)));
+                processInvitation(decodedData);
+                
+                // Store invitation for when app opens
+                localStorage.setItem('pendingInvitation', JSON.stringify({
+                    qrData: decodedData,
+                    timestamp: Date.now(),
+                    processed: false
+                }));
+                
+            } catch (error) {
+                console.error('Failed to process invitation:', error);
+                showError();
+            }
+        }
+        
+        function processInvitation(invitation) {
+            const titleEl = document.getElementById('pageTitle');
+            const typeEl = document.getElementById('invitationType');
+            const contentEl = document.getElementById('invitationContent');
+            const detailsEl = document.getElementById('invitationDetails');
+            
+            if (invitation.type === 'friend_invite') {
+                titleEl.textContent = 'Friend Invitation';
+                typeEl.textContent = '👋 FRIEND REQUEST';
+                contentEl.textContent = `${invitation.inviterData.fullName} wants to add you as a friend on Spendy!`;
+                
+            } else if (invitation.type === 'group_invite') {
+                titleEl.textContent = 'Group Invitation';
+                typeEl.textContent = '👥 GROUP INVITE';
+                contentEl.textContent = `Join "${invitation.groupData.name}" with ${invitation.groupData.memberCount} members`;
+            }
+            
+            detailsEl.style.display = 'block';
+        }
+        
+        function showError() {
+            document.getElementById('pageTitle').textContent = 'Invalid Invitation';
+            document.querySelector('.subtitle').textContent = 'This invitation link is invalid or has expired.';
+        }
+        
+        // Detect mobile platform and highlight appropriate button
+        const userAgent = navigator.userAgent.toLowerCase();
+        if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
+            document.getElementById('iosBtn').style.transform = 'scale(1.05)';
+            document.getElementById('iosBtn').style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.3)';
+        } else if (userAgent.includes('android')) {
+            document.getElementById('androidBtn').style.transform = 'scale(1.05)';
+            document.getElementById('androidBtn').style.boxShadow = '0 8px 20px rgba(52, 168, 83, 0.3)';
+        }
+        
+        // Try to open app first, then fallback to store
+        function tryAppFirst(storeUrl) {
+            const appScheme = 'spendy://qr?data=' + qrData;
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            
+            // Try to open app
+            window.location.href = appScheme;
+            
+            // If app doesn't open in 2 seconds, redirect to store
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                window.location.href = storeUrl;
+            }, 2000);
+        }
+        
+        // Update button click handlers
+        document.getElementById('iosBtn').onclick = (e) => {
+            e.preventDefault();
+            tryAppFirst(APP_STORE_URL);
+        };
+        
+        document.getElementById('androidBtn').onclick = (e) => {
+            e.preventDefault();
+            tryAppFirst(PLAY_STORE_URL);
+        };
+        
+        // Handle app returning to foreground (if app was installed)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                const pending = localStorage.getItem('pendingInvitation');
+                if (pending) {
+                    const invitation = JSON.parse(pending);
+                    if (!invitation.processed) {
+                        // Mark as processed and close this tab
+                        invitation.processed = true;
+                        localStorage.setItem('pendingInvitation', JSON.stringify(invitation));
+                        window.close();
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

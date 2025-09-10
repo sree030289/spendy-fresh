@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
 import useBalances from '@/hooks/useBalances';
 import { Button } from '@/components/common/Button';
 import { Group, Expense, Friend } from '@/services/firebase/splitting-disabled';
@@ -35,6 +36,7 @@ import SimpleExpenseListModal from './SimpleExpenseListModal';
 import { SubscriptionHelper } from '@/utils/SubscriptionHelper';
 import { ExportService } from '@/services/ExportService';
 import ExportModal from './ExportModal';
+import ExpenseDetailModal from './ExpenseDetailModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -82,6 +84,7 @@ export default function GroupDetailsModal({
   onOpenSettlement
 }: GroupDetailsModalProps) {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const { calculateGroupBalance } = useBalances();
   
   // Initialize API service
@@ -108,6 +111,8 @@ export default function GroupDetailsModal({
   const [expenseListGroupId, setExpenseListGroupId] = useState<string | undefined>(undefined);
   const [expenseListTitle, setExpenseListTitle] = useState('All Expenses');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showExpenseDetail, setShowExpenseDetail] = useState(false);
+  const [selectedExpenseForDetail, setSelectedExpenseForDetail] = useState<Expense | null>(null);
   
   // Member balances state
   const [memberBalances, setMemberBalances] = useState<Map<string, number>>(new Map());
@@ -714,18 +719,39 @@ export default function GroupDetailsModal({
     );
   };
 
-  const handleEditExpense = (expense: Expense) => {
+  const handleExpenseDetail = (expense: Expense) => {
+    setSelectedExpenseForDetail(expense);
+    setShowExpenseDetail(true);
+  };
+
+  const handleEditFromDetail = (expense: Expense) => {
     setSelectedExpense(expense);
     setShowEditExpense(true);
+    setShowExpenseDetail(false);
+  };
+
+  // Check if expense is editable based on settlement status
+  const isExpenseEditable = (expense: Expense) => {
+    // For now, we'll consider all expenses editable since settlement logic isn't fully implemented
+    // In the future, this should check if the expense was created after the last settlement
+    return true;
   };
 
   const handleExpenseUpdated = async (expenseData: any) => {
     try {
+      console.log('🔄 Updating expense from GroupDetailsModal:', expenseData);
+      
+      // Actually call the API to update the expense
+      await ApiService.getInstance().updateExpense(expenseData.id, expenseData);
+      console.log('✅ Expense updated successfully from GroupDetailsModal');
+      
+      // Close modal and refresh data
       setShowEditExpense(false);
       setSelectedExpense(null);
       await loadGroupExpenses();
     } catch (error) {
-      console.error('Error after expense update:', error);
+      console.error('❌ Error updating expense from GroupDetailsModal:', error);
+      throw error; // Re-throw so the modal can show error
     }
   };
 
@@ -740,7 +766,7 @@ export default function GroupDetailsModal({
       <TouchableOpacity
         key={expense.id}
         style={[styles.card, { backgroundColor: theme.colors.surface }]}
-        onPress={() => handleEditExpense(expense)}
+        onPress={() => handleExpenseDetail(expense)}
         activeOpacity={0.7}
       >
         <View style={styles.expenseRow}>
@@ -835,7 +861,7 @@ export default function GroupDetailsModal({
               // Current user always shows settled since we calculate from their perspective
               <>
                 <Text style={[styles.balanceAmount, { color: theme.colors.textSecondary }]}>
-                  {getCurrencySymbol(localGroupData?.currency || 'USD')}0.00
+                  {getCurrencySymbol(user?.currency || 'USD')}0.00
                 </Text>
                 <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
                   Settled
@@ -845,7 +871,7 @@ export default function GroupDetailsModal({
               // Other members with no balance
               <>
                 <Text style={[styles.balanceAmount, { color: theme.colors.textSecondary }]}>
-                  {getCurrencySymbol(localGroupData?.currency || 'USD')}0.00
+                  {getCurrencySymbol(user?.currency || 'USD')}0.00
                 </Text>
                 <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
                   Settled
@@ -855,7 +881,7 @@ export default function GroupDetailsModal({
               // Positive balance: this member owes the current user
               <>
                 <Text style={[styles.balanceAmount, styles.balancePositive]}>
-                  +{getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
+                  +{getCurrencySymbol(user?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
                 </Text>
                 <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
                   Owes you
@@ -865,7 +891,7 @@ export default function GroupDetailsModal({
               // Negative balance: current user owes this member
               <>
                 <Text style={[styles.balanceAmount, styles.balanceNegative]}>
-                  {getCurrencySymbol(localGroupData?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
+                  {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
                 </Text>
                 <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
                   You owe
@@ -1098,14 +1124,13 @@ export default function GroupDetailsModal({
                   <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
                     Group Members
                   </Text>
-                  {isUserAdmin && (
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
-                      onPress={() => setShowAddMember(true)}
-                    >
-                      <Text style={styles.actionBtnText}>+ Add Member</Text>
-                    </TouchableOpacity>
-                  )}
+                  {/* Allow any member to add new members */}
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
+                    onPress={() => setShowAddMember(true)}
+                  >
+                    <Text style={styles.actionBtnText}>+ Add Member</Text>
+                  </TouchableOpacity>
                 </View>
                 
                 {(() => {
@@ -1475,6 +1500,7 @@ export default function GroupDetailsModal({
           expense={selectedExpense}
           onSubmit={handleExpenseUpdated}
           groups={[localGroupData]}
+          isUserAdmin={isUserAdmin}
         />
       )}
 
@@ -1495,7 +1521,7 @@ export default function GroupDetailsModal({
         title={expenseListTitle}
         onExpensePress={(expense) => {
           setShowSimpleExpenseList(false);
-          handleEditExpense(expense);
+          handleExpenseDetail(expense);
         }}
       />
 
@@ -1520,6 +1546,17 @@ export default function GroupDetailsModal({
         group={localGroupData}
         currentUserId={currentUser?.id || ''}
         onExportComplete={handleExportComplete}
+      />
+
+      {/* Expense Detail Modal */}
+      <ExpenseDetailModal
+        visible={showExpenseDetail}
+        onClose={() => setShowExpenseDetail(false)}
+        expense={selectedExpenseForDetail}
+        onEdit={handleEditFromDetail}
+        groups={localGroupData ? [localGroupData] : []}
+        friends={friends}
+        isEditable={selectedExpenseForDetail ? isExpenseEditable(selectedExpenseForDetail) : false}
       />
     </View>
   );
