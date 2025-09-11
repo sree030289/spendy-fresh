@@ -942,10 +942,11 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
     const targetUserId = targetUserDoc.id;
     const fromUserId = req.user.id;
 
-    // Check if already friends
+    // Check if already friends (only active friendships)
     const existingFriendship = await db.collection(COLLECTIONS.FRIENDS)
       .where('user1Id', 'in', [fromUserId, targetUserId])
       .where('user2Id', 'in', [fromUserId, targetUserId])
+      .where('status', '==', 'active')
       .limit(1)
       .get();
 
@@ -1030,11 +1031,13 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
               senderName: senderData.fullName,
               senderEmail: senderData.email,
               action: "view_friend_request",
+              requestId: docRef.id,
               deepLink: {
                 screen: "FriendRequestModal",
-                params: { autoOpen: true }
+                params: { friendRequestId: docRef.id, fromDeepLink: true }
               }
             },
+            url: `letssplit://friend-request/${docRef.id}`
           };
 
           console.log("📱 Sending push notification with Expo API");
@@ -1467,7 +1470,8 @@ spendyApp.post('/groups', authenticateJWT, async (req, res) => {
                         autoOpen: true
                       }
                     }
-                  }
+                  },
+                  url: `letssplit://group/${groupRef.id}`
                 };
 
                 await sendExpoPushNotification(memberData.pushToken, expoPushNotification);
@@ -2304,10 +2308,11 @@ spendyApp.put('/groups/:groupId/members/:userId/role', authenticateJWT, async (r
               newRole: role,
               action: 'view_group',
               deepLink: {
-                screen: 'GroupDetails',
+                screen: 'GroupDetailsModal',
                 params: { groupId }
               }
-            }
+            },
+            url: `letssplit://group/${groupId}`
           };
 
           await sendExpoPushNotification(targetUserData.pushToken, expoPushNotification);
@@ -6208,7 +6213,8 @@ spendyApp.post('/friends/requests/:requestId/accept', authenticateJWT, async (re
                 openFriendsTab: true 
               }
             }
-          }
+          },
+          url: "letssplit://split/friends"
         };
 
         const pushResult = await sendExpoPushNotification(
@@ -6703,7 +6709,7 @@ spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (re
                 toUserEmail: recipientEmail,
                 inviteMethod: 'email',
                 message: `${senderData.fullName} is still waiting for you to join Spendy and accept their friend request!`,
-                deepLink: `spendy://friend-request/${requestId}`,
+                deepLink: `letssplit://friend-request/${requestId}`,
                 appStoreLink: 'https://spendy.app/download',
                 friendRequestId: requestId
               })
@@ -6736,7 +6742,7 @@ spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (re
                 toUserPhone: recipientPhone,
                 inviteMethod: 'phone',
                 message: `${senderData.fullName} is still waiting for you to join Spendy! Download: https://spendy.app/download`,
-                deepLink: `spendy://friend-request/${requestId}`,
+                deepLink: `letssplit://friend-request/${requestId}`,
                 friendRequestId: requestId
               })
             });

@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Deep linking configuration
 const DEEP_LINK_CONFIG = {
-  scheme: 'spendy',
+  scheme: 'letssplit',
   host: 'app.spendy.com.au',
   appStore: {
     ios: 'https://apps.apple.com/au/app/spendy/id123456789', // Replace with actual App Store ID
