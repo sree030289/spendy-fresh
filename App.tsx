@@ -229,18 +229,19 @@ const AppNavigator = () => {
         const isPremium = await subscriptionService.isPremiumUser(user.id);
         console.log('🔍 User premium status:', isPremium);
         
+        // DISABLED: Subscription modal on app launch
         // Only show subscription modal for FREE users who haven't seen the tour
-        if (!isPremium && !hasShownTour) {
-          console.log('🎯 Free user detected, will show subscription modal first');
-          
-          setPendingSubscriptionModal({
-            reason: 'firstTime',
-            canClose: false
-          });
-          setShouldShowTourAfterSubscription(true);
-        } else {
-          console.log('🔍 Premium user or tour already shown - skipping subscription modal');
-        }
+        // if (!isPremium && !hasShownTour) {
+        //   console.log('🎯 Free user detected, will show subscription modal first');
+        //   
+        //   setPendingSubscriptionModal({
+        //     reason: 'firstTime',
+        //     canClose: false
+        //   });
+        //   setShouldShowTourAfterSubscription(true);
+        // } else {
+          console.log('🔍 Skipping subscription modal on app launch (disabled)');
+        // }
         
         setSubscriptionCheckComplete(true);
       } catch (error) {

@@ -399,10 +399,30 @@ export default function RealSplittingScreen() {
   useEffect(() => {
     // Removed local subscription modal handler - using global App.tsx handler now
     
-    // Set up global function to open Add Expense modal
-    (global as any).openAddExpenseModal = () => {
-      console.log('🚀 Opening Add Expense modal via global function');
-      setShowAddExpense(true);
+    // Set up global function to open Add Expense modal with subscription check
+    (global as any).openAddExpenseModal = async () => {
+      console.log('🚀 Global openAddExpenseModal called - checking subscription limits');
+      if (!user?.id) {
+        console.log('❌ No user ID found');
+        return;
+      }
+      
+      try {
+        console.log('🔍 Checking transaction limit for global expense modal...');
+        const canCreate = await subscriptionHelper.canCreateTransaction(user.id);
+        console.log('📊 Global expense modal - Can create transaction?', canCreate);
+        
+        if (canCreate) {
+          console.log('✅ Opening AddExpenseModal via global function');
+          setShowAddExpense(true);
+        } else {
+          console.log('🚫 Transaction limit reached - subscription modal should be showing');
+        }
+      } catch (error) {
+        console.error('❌ Error checking subscription for global expense modal:', error);
+        // Still allow opening the modal if subscription check fails
+        setShowAddExpense(true);
+      }
     };
     
     // Set up global function to process pending expenses after countdown
@@ -1733,8 +1753,25 @@ export default function RealSplittingScreen() {
       await proceedWithExpenseCreation();
       
       async function proceedWithExpenseCreation() {
+        // Process receipt upload if present
+        let processedData = { ...expenseData };
+        if (expenseData.receipt && expenseData.receipt.imageUri) {
+          console.log('🔍 Processing receipt upload for expense...');
+          try {
+            const { SmartMoneyService } = await import('@/services/smartMoney/SmartMoneyService');
+            const receiptUrl = await SmartMoneyService.uploadReceiptImage(expenseData.receipt.imageUri, user.id);
+            processedData.receiptUrl = receiptUrl;
+            console.log('✅ Receipt uploaded successfully:', receiptUrl);
+          } catch (receiptError) {
+            console.error('❌ Receipt upload failed:', receiptError);
+            // Continue without receipt URL
+          }
+          // Remove the receipt object as it's processed
+          delete processedData.receipt;
+        }
+        
         const response = await apiService.addExpense({
-          ...expenseData,
+          ...processedData,
           isSettled: false,
           date: new Date()
         });

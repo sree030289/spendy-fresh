@@ -925,8 +925,21 @@ class ApiService {
     };
     message: string;
   }> {
-    const response = await this.request('POST', `/friends/requests/${friendRequestId}/remind`, { reminderMethod });
-    return response;
+    try {
+      const response = await this.request('POST', `/friends/requests/${friendRequestId}/remind`, { reminderMethod });
+      // The request method returns only the data when successful, so we need to wrap it
+      return {
+        success: true,
+        data: response,
+        message: 'Reminder sent successfully'
+      };
+    } catch (error: any) {
+      // Handle error responses that might have additional data
+      return {
+        success: false,
+        message: error.message || 'Failed to send reminder'
+      };
+    }
   }
 
   async removePendingFriendInvitation(userId: string, friendRequestId: string): Promise<void> {

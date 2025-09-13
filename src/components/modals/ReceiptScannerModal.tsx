@@ -20,6 +20,7 @@ import * as FileSystem from 'expo-file-system';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
+import { useRobustReceiptScanner } from '@/services/useRobustReceiptScanner';
 
 // Import OCR libraries
 // import TextRecognition from '@react-native-ml-kit/text-recognition';
@@ -59,13 +60,21 @@ export default function ReceiptScannerModal({ visible, onClose, onReceiptProcess
   const { theme } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [type, setType] = useState<CameraType>('back');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([]);
   const [extractedData, setExtractedData] = useState<ReceiptData | null>(null);
   const cameraRef = useRef<CameraView>(null);
+  
+  // Use the robust receipt scanner
+  const { 
+    scanReceipt, 
+    retryWithDifferentSettings, 
+    isProcessing, 
+    error: scanError, 
+    progress 
+  } = useRobustReceiptScanner();
 
   const initialSteps: ProcessingStep[] = [
     { name: 'Image Enhancement', status: 'pending' },
@@ -98,7 +107,6 @@ export default function ReceiptScannerModal({ visible, onClose, onReceiptProcess
     setCapturedImage(null);
     setShowCamera(false);
     setCameraReady(false);
-    setIsProcessing(false);
     setProcessingSteps([]);
     setExtractedData(null);
   };
@@ -134,7 +142,6 @@ export default function ReceiptScannerModal({ visible, onClose, onReceiptProcess
 
     try {
       console.log('Setting processing state...');
-      setIsProcessing(true);
       setProcessingSteps(initialSteps);
       
       console.log('About to call takePictureAsync...');
@@ -158,6 +165,7 @@ export default function ReceiptScannerModal({ visible, onClose, onReceiptProcess
         setCapturedImage(photo.uri);
         setShowCamera(false);
         console.log('Starting OCR processing...');
+        setProcessingSteps(initialSteps);
         await processReceiptImage(photo.uri);
       } else {
         throw new Error('Failed to capture image - no URI returned');
@@ -199,7 +207,6 @@ export default function ReceiptScannerModal({ visible, onClose, onReceiptProcess
       });
 
       if (!result.canceled && result.assets[0]) {
-        setIsProcessing(true);
         setProcessingSteps(initialSteps);
         const imageUri = result.assets[0].uri;
         setCapturedImage(imageUri);
@@ -208,46 +215,40 @@ export default function ReceiptScannerModal({ visible, onClose, onReceiptProcess
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert('Error', 'Failed to pick image');
-      setIsProcessing(false);
     }
   };
 
   const processReceiptImage = async (imageUri: string) => {
     try {
-      // Step 1: Image Enhancement
+      // Use the robust OCR service
       updateProcessingStep('Image Enhancement', 'processing');
-      const enhancedUri = await enhanceImageForOCR(imageUri);
-      updateProcessingStep('Image Enhancement', 'completed');
-
-      // Step 2: Text Recognition
       updateProcessingStep('Text Recognition', 'processing');
-      let ocrResult;
-      try {
-        ocrResult = await performAdvancedOCR(enhancedUri);
-        updateProcessingStep('Text Recognition', 'completed', `Confidence: ${(ocrResult.confidence * 100).toFixed(1)}%`);
-      } catch (ocrError) {
-        console.error('OCR failed:', ocrError);
-        updateProcessingStep('Text Recognition', 'error', 'OCR failed');
-        // Use fallback result
-        ocrResult = await performFallbackOCR(enhancedUri);
-        updateProcessingStep('Text Recognition', 'completed', 'Using fallback method');
-      }
-
-      // Step 3: Data Extraction
       updateProcessingStep('Data Extraction', 'processing');
-      const receiptData = await extractReceiptData(ocrResult);
-      updateProcessingStep('Data Extraction', 'completed');
-
-      // Step 4: Validation
       updateProcessingStep('Validation', 'processing');
-      const validatedData = await validateExtractedData(receiptData);
-      updateProcessingStep('Validation', 'completed');
-
-      setExtractedData(validatedData);
-      setIsProcessing(false);
-
-      // Show confirmation dialog
-      showDataConfirmation(validatedData);
+      
+      const result = await scanReceipt(imageUri);
+      
+      if (result.success && result.data) {
+        // Update all steps as completed
+        updateProcessingStep('Image Enhancement', 'completed');
+        updateProcessingStep('Text Recognition', 'completed', 
+          `Method: ${result.ocrMethod || 'Unknown'}, Time: ${result.processingTime}ms`);
+        updateProcessingStep('Data Extraction', 'completed');
+        updateProcessingStep('Validation', 'completed', 
+          `Confidence: ${((result.data.confidence || 0) * 100).toFixed(1)}%`);
+        
+        setExtractedData(result.data);
+        showDataConfirmation(result.data);
+      } else {
+        // Handle partial failure
+        updateProcessingStep('Image Enhancement', 'completed');
+        updateProcessingStep('Text Recognition', 'error', result.error || 'OCR failed');
+        updateProcessingStep('Data Extraction', 'error', 'Could not extract data');
+        updateProcessingStep('Validation', 'error', 'Validation failed');
+        
+        // Show retry options
+        showRetryOptions(result.error || 'Processing failed', imageUri);
+      }
 
     } catch (error) {
       console.error('Error processing receipt:', error);
@@ -258,22 +259,73 @@ export default function ReceiptScannerModal({ visible, onClose, onReceiptProcess
             : step
         )
       );
-      setIsProcessing(false);
       
-      // Show more helpful error message
-      Alert.alert(
-        'Processing Error', 
-        'Failed to process the receipt image. This could be due to:\n\n• Poor image quality\n• Unclear text\n• Network connectivity issues\n\nPlease try taking a clearer photo or enter the details manually.',
-        [
-          { text: 'Try Again', onPress: () => setCapturedImage(null) },
-          { text: 'Manual Entry', onPress: () => {
+      showRetryOptions(error instanceof Error ? error.message : 'Unknown error', imageUri);
+    }
+  };
+
+  const showRetryOptions = (error: string, imageUri: string) => {
+    Alert.alert(
+      'Processing Failed',
+      `Receipt scanning failed: ${error}\n\nWould you like to try again with different settings or enter the details manually?`,
+      [
+        {
+          text: 'Enhanced Retry',
+          onPress: async () => {
+            console.log('🔄 Trying enhanced retry...');
+            updateProcessingStep('Text Recognition', 'processing');
+            updateProcessingStep('Data Extraction', 'processing');
+            updateProcessingStep('Validation', 'processing');
+            
+            try {
+              const retryResult = await retryWithDifferentSettings(imageUri);
+              
+              if (retryResult.success && retryResult.data) {
+                updateProcessingStep('Text Recognition', 'completed', 
+                  `Retry: ${retryResult.ocrMethod || 'Enhanced'}`);
+                updateProcessingStep('Data Extraction', 'completed');
+                updateProcessingStep('Validation', 'completed');
+                
+                setExtractedData(retryResult.data);
+                showDataConfirmation(retryResult.data);
+              } else {
+                updateProcessingStep('Text Recognition', 'error', 'Retry failed');
+                updateProcessingStep('Data Extraction', 'error', 'No data');
+                updateProcessingStep('Validation', 'error', 'Failed');
+                
+                // Final fallback
+                Alert.alert(
+                  'Retry Failed',
+                  'We could not automatically process this receipt. Please enter the details manually.',
+                  [
+                    { text: 'Manual Entry', onPress: () => {
+                      onReceiptProcessed({ confidence: 0, category: 'other' });
+                      onClose();
+                    }},
+                    { text: 'Try Different Photo', onPress: () => setCapturedImage(null) }
+                  ]
+                );
+              }
+            } catch (retryError) {
+              console.error('Enhanced retry failed:', retryError);
+              updateProcessingStep('Text Recognition', 'error', 'Enhanced retry failed');
+            }
+          }
+        },
+        {
+          text: 'Manual Entry',
+          onPress: () => {
             onReceiptProcessed({ confidence: 0, category: 'other' });
             onClose();
-          }},
-          { text: 'Cancel', style: 'cancel' }
-        ]
-      );
-    }
+          }
+        },
+        {
+          text: 'Try Different Photo',
+          onPress: () => setCapturedImage(null)
+        },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
   };
 
   const enhanceImageForOCR = async (imageUri: string): Promise<string> => {

@@ -1,5 +1,5 @@
 // src/components/modals/ExpenseDetailModal.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Image,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import { useTheme } from '@/hooks/useTheme';
@@ -90,8 +93,19 @@ export default function ExpenseDetailModal({
 }: ExpenseDetailModalProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
   if (!expense) return null;
+
+  // Debug: Check expense data
+  console.log('🔍 ExpenseDetailModal - Expense data:', {
+    id: expense.id,
+    description: expense.description,
+    receiptUrl: expense.receiptUrl,
+    hasReceiptUrl: !!expense.receiptUrl,
+    allFields: Object.keys(expense)
+  });
 
   const handleEdit = () => {
     if (!isEditable) {
@@ -248,6 +262,37 @@ export default function ExpenseDetailModal({
           )}
         </View>
 
+        {/* Receipt Image */}
+        {expense.receiptUrl && (
+          <View style={[styles.section, { borderBottomColor: theme.colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Receipt
+            </Text>
+            
+            <TouchableOpacity
+              style={[styles.receiptThumbnail, { borderColor: theme.colors.border }]}
+              onPress={() => setImageViewerVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Image
+                source={{ uri: expense.receiptUrl }}
+                style={styles.thumbnailImage}
+                resizeMode="cover"
+              />
+              <View style={[styles.thumbnailOverlay, { backgroundColor: `${theme.colors.primary}15` }]}>
+                <Icon name="zoom-in" size={20} color={theme.colors.primary} />
+                <Text style={[styles.zoomText, { color: theme.colors.primary }]}>
+                  View
+                </Text>
+              </View>
+            </TouchableOpacity>
+            
+            <Text style={[styles.receiptHint, { color: theme.colors.textSecondary }]}>
+              Tap to view full image
+            </Text>
+          </View>
+        )}
+
         {/* Split Details */}
         <View style={[styles.section, { borderBottomColor: theme.colors.border }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
@@ -300,6 +345,40 @@ export default function ExpenseDetailModal({
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Full-size Image Viewer Modal */}
+      <Modal
+        visible={imageViewerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setImageViewerVisible(false)}
+      >
+        <View style={styles.imageViewerContainer}>
+          <TouchableOpacity
+            style={styles.imageViewerBackdrop}
+            activeOpacity={1}
+            onPress={() => setImageViewerVisible(false)}
+          >
+            <View style={styles.imageViewerContent}>
+              <Image
+                source={{ uri: expense.receiptUrl! }}
+                style={[styles.fullImage, { 
+                  maxWidth: screenWidth - 40, 
+                  maxHeight: screenHeight - 120 
+                }]}
+                resizeMode="contain"
+              />
+              
+              <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => setImageViewerVisible(false)}
+              >
+                <Icon name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </FullscreenModal>
   );
 }
@@ -422,5 +501,75 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  // Receipt image styles
+  receiptThumbnail: {
+    width: 120,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'relative',
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 1,
+  },
+  zoomText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  receiptHint: {
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  // Full-size image viewer styles
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerBackdrop: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerContent: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullImage: {
+    borderRadius: 8,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: -50,
+    right: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
 });

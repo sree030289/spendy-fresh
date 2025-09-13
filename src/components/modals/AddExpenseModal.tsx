@@ -23,7 +23,7 @@ import DatePickerCalendarModal from './DatePickerCalendarModal';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
 import * as ImagePicker from 'expo-image-picker';
-import { AdvancedOCRService, OCRResult } from '@/services/ocrService';
+import { useRobustReceiptScanner } from '@/services/useRobustReceiptScanner';
 import { SubscriptionHelper } from '@/utils/SubscriptionHelper';
 
 interface AddExpenseModalProps {
@@ -81,8 +81,10 @@ export default function AddExpenseModal({
 
   // Receipt scanning
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
-  const [isProcessingReceipt, setIsProcessingReceipt] = useState(false);
   const [receiptScanComplete, setReceiptScanComplete] = useState(false);
+  
+  // Use robust receipt scanner
+  const { scanReceipt, isProcessing: isProcessingReceipt } = useRobustReceiptScanner();
 
   // Errors
   const [errors, setErrors] = useState<any>({});
@@ -123,7 +125,6 @@ export default function AddExpenseModal({
     
     // Reset receipt scanning
     setReceiptImage(null);
-    setIsProcessingReceipt(false);
     setReceiptScanComplete(false);
   };
 
@@ -254,16 +255,43 @@ const initializeSplitData = () => {
   const handleSubmit = async () => {
      if (!validateStep('split')) return;
 
-  console.log('🔍 SUBMITTING EXPENSE');
-  console.log('🔍 Paid by:', paidBy);
-  console.log('🔍 Split data being submitted:', splitData.filter(split => split.isIncluded).map(split => ({
-    userId: split.userId,
-    name: split.userData?.fullName || 'Unknown',
-    amount: split.amount,
-    isIncluded: split.isIncluded
-  })));
+    // 🚨 CRITICAL FIX: Check subscription limits BEFORE submitting expense
+    if (!user?.id) {
+      Alert.alert('Error', 'Please log in to add expenses');
+      return;
+    }
 
+    console.log('🔍 SUBMITTING EXPENSE - Checking subscription limits first...');
+    const subscriptionHelper = SubscriptionHelper.getInstance();
+    
     setLoading(true);
+    
+    try {
+      // Check if user can create this transaction (this will show subscription modal if needed)
+      const canCreate = await subscriptionHelper.checkTransactionLimit(user.id);
+      
+      if (!canCreate) {
+        console.log('🚫 Subscription limit reached - expense submission blocked');
+        setLoading(false);
+        return; // Don't continue with submission
+      }
+      
+      console.log('✅ Subscription check passed, proceeding with expense submission...');
+    } catch (error) {
+      console.error('❌ Error checking subscription limits:', error);
+      setLoading(false);
+      Alert.alert('Error', 'Failed to check subscription limits. Please try again.');
+      return;
+    }
+
+    console.log('🔍 SUBMITTING EXPENSE');
+    console.log('🔍 Paid by:', paidBy);
+    console.log('🔍 Split data being submitted:', splitData.filter(split => split.isIncluded).map(split => ({
+      userId: split.userId,
+      name: split.userData?.fullName || 'Unknown',
+      amount: split.amount,
+      isIncluded: split.isIncluded
+    })));
     try {
       const expenseData = {
         description: description.trim(),
@@ -295,6 +323,12 @@ const initializeSplitData = () => {
           scannedAt: receiptScanComplete ? new Date().toISOString() : null,
         } : null,
       };
+      
+      console.log('📤 AddExpenseModal - Submitting expense with receipt data:', {
+        hasReceipt: !!expenseData.receipt,
+        receiptImageUri: expenseData.receipt?.imageUri,
+        receiptScanComplete: receiptScanComplete
+      });
 
       await onSubmit(expenseData);
       resetForm();
@@ -485,7 +519,7 @@ const initializeSplitData = () => {
   const openCamera = async () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -504,7 +538,7 @@ const initializeSplitData = () => {
   const openGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -521,35 +555,64 @@ const initializeSplitData = () => {
   };
 
   const processReceiptImage = async (imageUri: string) => {
-    setIsProcessingReceipt(true);
-    
     try {
-      const ocrService = new AdvancedOCRService({
-        useCloudVision: true,
-        useMLKit: false,
-        useTesseract: false,
-        language: 'en',
-        confidenceThreshold: 0.7
-      });
-
-      const ocrResult = await ocrService.processImage(imageUri);
-      await parseReceiptData(ocrResult);
+      // Validate imageUri parameter
+      if (!imageUri || typeof imageUri !== 'string') {
+        console.error('❌ Invalid imageUri provided to processReceiptImage:', imageUri);
+        throw new Error('Invalid image URI provided for processing');
+      }
       
-      setReceiptScanComplete(true);
-      Alert.alert(
-        'Receipt Scanned!', 
-        'We\'ve extracted the information from your receipt. Please review the details below.',
-        [{ text: 'OK' }]
-      );
+      console.log('🔍 Processing receipt with robust OCR...', imageUri);
+      const result = await scanReceipt(imageUri);
+      
+      if (result.success && result.data) {
+        console.log('✅ Receipt processed successfully');
+        
+        // Auto-fill form fields from receipt data
+        if (result.data.merchant) {
+          setDescription(result.data.merchant);
+        }
+        if (result.data.total) {
+          setAmount(result.data.total.toString());
+        }
+        if (result.data.category) {
+          const categoryMatch = EXPENSE_CATEGORIES.find(cat => 
+            cat.id === result.data.category || cat.name.toLowerCase().includes(result.data.category)
+          );
+          if (categoryMatch) {
+            setSelectedCategory(categoryMatch);
+          }
+        }
+        if (result.data.date) {
+          setExpenseDate(new Date(result.data.date));
+        }
+        if (result.data.notes) {
+          setNotes(result.data.notes);
+        }
+        
+        setReceiptScanComplete(true);
+        Alert.alert(
+          'Receipt Processed!', 
+          'Information extracted from receipt. Please review and adjust details as needed.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        console.log('⚠️ Receipt processing failed, manual entry required');
+        setReceiptScanComplete(false);
+        Alert.alert(
+          'Receipt Processing',
+          'Could not extract all data from the receipt. Please review and enter any missing details manually.',
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
-      console.error('OCR processing failed:', error);
+      console.error('❌ Receipt processing error:', error);
+      setReceiptScanComplete(false);
       Alert.alert(
-        'Processing Failed',
-        'We couldn\'t read your receipt. Please enter the details manually or try a clearer image.',
+        'Receipt Processing Failed',
+        'Could not process the receipt. You can still attach the image and enter details manually.',
         [{ text: 'OK' }]
       );
-    } finally {
-      setIsProcessingReceipt(false);
     }
   };
 
@@ -660,6 +723,73 @@ const initializeSplitData = () => {
   const removeReceiptImage = () => {
     setReceiptImage(null);
     setReceiptScanComplete(false);
+  };
+
+  // Simple image attachment without OCR processing (for step 3)
+  const handleSimpleImageAttachment = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Please log in to attach images');
+      return;
+    }
+
+    try {
+      Alert.alert(
+        'Add Receipt Image',
+        'Choose how to add your receipt image',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Camera', onPress: () => openCameraForAttachment() },
+          { text: 'Gallery', onPress: () => openGalleryForAttachment() }
+        ]
+      );
+    } catch (error) {
+      console.error('Error in simple image attachment:', error);
+      Alert.alert('Error', 'Failed to attach image');
+    }
+  };
+
+  const openCameraForAttachment = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0] && result.assets[0].uri) {
+        setReceiptImage(result.assets[0].uri);
+        // No OCR processing, just attach the image
+        console.log('📎 Image attached without OCR processing:', result.assets[0].uri);
+      } else {
+        console.log('📎 Image selection cancelled or invalid');
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      Alert.alert('Error', 'Failed to open camera');
+    }
+  };
+
+  const openGalleryForAttachment = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0] && result.assets[0].uri) {
+        setReceiptImage(result.assets[0].uri);
+        // No OCR processing, just attach the image
+        console.log('📎 Image attached without OCR processing:', result.assets[0].uri);
+      } else {
+        console.log('📎 Image selection cancelled or invalid');
+      }
+    } catch (error) {
+      console.error('Gallery error:', error);
+      Alert.alert('Error', 'Failed to open gallery');
+    }
   };
 
   const renderStepIndicator = () => (
@@ -1340,11 +1470,11 @@ const initializeSplitData = () => {
             ) : (
               <TouchableOpacity 
                 style={[styles.reviewUploadButton, { borderColor: theme.colors.border }]}
-                onPress={handleReceiptScan}
+                onPress={handleSimpleImageAttachment}
               >
                 <Icon name="camera" size={16} color={theme.colors.textSecondary} />
                 <Text style={[styles.reviewUploadText, { color: theme.colors.textSecondary }]}>
-                  Add receipt (Premium)
+                  Add receipt image
                 </Text>
               </TouchableOpacity>
             )}

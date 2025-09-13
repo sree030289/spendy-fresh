@@ -1,4 +1,5 @@
 // functions/index.js - Fixed without region syntax and Node 18+ compatible
+require('dotenv').config();
 const functions = require('firebase-functions');
 const cors = require('cors')({ origin: true });
 const admin = require('firebase-admin');
@@ -929,12 +930,144 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
         createdAt: new Date()
       };
 
-      await db.collection(COLLECTIONS.FRIEND_REQUESTS).add(newUserInvite);
+      const friendRequestRef = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+          .add(newUserInvite);
+
+      // Send actual email invitation to new user
+      try {
+        // Get sender information
+        const senderDoc = await db.collection(COLLECTIONS.USERS)
+            .doc(req.user.id).get();
+        
+        if (senderDoc.exists) {
+          const senderData = senderDoc.data();
+          
+          console.log("📧 Sending email invitation to new user:",
+              recipientEmail.toLowerCase());
+          
+          // Send email using nodemailer
+          const nodemailer = require("nodemailer");
+          
+          const emailUser = process.env.EMAIL_USER || "noreply@spendy.com";
+          const emailPass = process.env.EMAIL_PASSWORD || "your-app-password";
+          
+          console.log("📧 Email configuration:", {
+            emailUser: emailUser,
+            hasPassword: !!emailPass && emailPass !== "your-app-password",
+            passwordLength: emailPass ? emailPass.length : 0,
+          });
+          
+          const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+              user: emailUser,
+              pass: emailPass,
+            },
+          });
+
+          // Create deep link for friend request
+          const deepLink = `letssplit://friend-request/${friendRequestRef.id}`;
+          const appStoreLink = "https://apps.apple.com/app/spendy/id123456789";
+
+          console.log("📧 Email details:", {
+            from: emailUser,
+            to: recipientEmail.toLowerCase(),
+            deepLink: deepLink,
+            appStoreLink: appStoreLink,
+          });
+
+          const subject = `${senderData.fullName} invited you to join Spendy!`;
+          const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; ` +
+              `margin: 0 auto; padding: 20px; border: 1px solid #ddd; ` +
+              `border-radius: 10px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #667eea; margin: 0;">💰 Spendy</h1>
+                <h2 style="color: #333; margin: 10px 0;">You're Invited!</h2>
+              </div>
+              
+              <div style="background-color: #f8f9ff; padding: 20px; ` +
+                `border-radius: 8px; margin-bottom: 30px;">
+                <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
+                  Hi! 👋
+                </p>
+                <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
+                  <strong>${senderData.fullName}</strong> invited you to join ` +
+                  `Spendy - the smart way to split expenses and manage ` +
+                  `shared costs with friends!
+                </p>
+                <p style="font-size: 14px; color: #666; margin: 0;">
+                  ${message || "Start tracking shared expenses, split bills " +
+                    "fairly, and never worry about who owes what again!"}
+                </p>
+              </div>
+              
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h3 style="color: #333; margin: 0 0 15px 0;">✨ What you can ` +
+                  `do with Spendy:</h3>
+                <ul style="text-align: left; color: #666; font-size: 14px; ` +
+                  `margin: 0; padding-left: 20px;">
+                  <li>Split bills and expenses with friends</li>
+                  <li>Track who owes what in real-time</li>
+                  <li>Send payment reminders</li>
+                  <li>Manage group expenses for trips and events</li>
+                  <li>Connect your email for automatic bill detection</li>
+                </ul>
+              </div>
+              
+              <div style="text-align: center; margin-bottom: 30px;">
+                <a href="${deepLink}" style="display: inline-block; ` +
+                  `background-color: #667eea; color: white; padding: 12px 24px; ` +
+                  `text-decoration: none; border-radius: 6px; font-weight: bold; ` +
+                  `margin-right: 10px;">Accept Invitation</a>
+                <a href="${appStoreLink}" style="display: inline-block; ` +
+                  `background-color: #28a745; color: white; padding: 12px 24px; ` +
+                  `text-decoration: none; border-radius: 6px; font-weight: bold;">`+
+                  `Download Spendy</a>
+              </div>
+              
+              <div style="border-top: 1px solid #eee; padding-top: 20px;">
+                <p style="color: #888; font-size: 12px; margin: 0;">
+                  This invitation was sent by ${senderData.fullName} ` +
+                  `(${senderData.email}). If you don't want to receive ` +
+                  `invitations from this person, you can ignore this email.
+                </p>
+                <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
+                  Spendy - Smart Money Management | This is an automated message.
+                </p>
+              </div>
+            </div>
+          `;
+
+          const mailOptions = {
+            from: `"Spendy" <${emailUser}>`,
+            to: recipientEmail.toLowerCase(),
+            subject: subject,
+            html: htmlContent,
+          };
+
+          console.log("📧 About to send email with options:", {
+            from: mailOptions.from,
+            to: mailOptions.to,
+            subject: mailOptions.subject,
+            htmlLength: htmlContent.length,
+          });
+
+          const result = await transporter.sendMail(mailOptions);
+          console.log(`✅ Email invitation sent successfully to: ` +
+              `${recipientEmail.toLowerCase()}`);
+          console.log("📧 Email send result:", result);
+        }
+      } catch (emailError) {
+        console.error("❌ Failed to send email invitation:", emailError);
+        // Don't fail the request if email fails -
+        // the invitation record is still created
+      }
 
       return res.status(201).json({
         success: true,
-        message: 'Invitation sent to new user',
-        isNewUser: true
+        message: "Invitation sent to new user",
+        isNewUser: true,
       });
     }
 
@@ -2002,9 +2135,13 @@ spendyApp.post('/groups/:groupId/leave', authenticateJWT, async (req, res) => {
         });
       }
     } catch (settlementCheckError) {
-      console.warn("Error checking settlements before leaving group:",
+      console.error("Error checking settlements before leaving group:",
           settlementCheckError);
-      // Continue with leaving if settlement check fails (non-blocking)
+      return res.status(500).json({
+        success: false,
+        message: "Failed to verify settlement status",
+        error: "SETTLEMENT_CHECK_ERROR",
+      });
     }
 
     // Remove user from group members
@@ -2014,19 +2151,19 @@ spendyApp.post('/groups/:groupId/leave', authenticateJWT, async (req, res) => {
 
     await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
       members: updatedMembers,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     res.json({
       success: true,
-      message: 'Successfully left the group'
+      message: "Successfully left the group",
     });
   } catch (error) {
-    console.error('Leave group error:', error);
+    console.error("Leave group error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to leave group',
-      error: 'LEAVE_GROUP_ERROR'
+      message: "Failed to leave group",
+      error: "LEAVE_GROUP_ERROR",
     });
   }
 });
@@ -2078,25 +2215,118 @@ spendyApp.delete('/groups/:groupId', authenticateJWT, async (req, res) => {
       });
     }
 
+    // Check if all settlements are done before allowing group deletion
+    try {
+      // Check for pending settlements
+      const settlementsSnapshot = await db.collection(COLLECTIONS.SETTLEMENTS)
+          .where("groupId", "==", groupId)
+          .where("status", "in", ["pending", "requested"])
+          .get();
+
+      if (settlementsSnapshot.docs.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot delete group with pending settlements. " +
+                   "Please settle all outstanding balances first.",
+          error: "PENDING_SETTLEMENTS",
+          details: {
+            requiresSettlement: true,
+            pendingSettlements: settlementsSnapshot.docs.length,
+            message: "All group members must settle their balances " +
+                     "before the group can be deleted.",
+          },
+        });
+      }
+
+      // Check if any group member has outstanding balances
+      const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+          .where("groupId", "==", groupId)
+          .where("isSettled", "==", false)
+          .get();
+
+      let hasOutstandingBalances = false;
+      const memberBalances = new Map();
+      
+      // Initialize balances for all active members
+      groupData.members.filter((m) => m.isActive).forEach((member) => {
+        memberBalances.set(member.userId, 0);
+      });
+
+      expensesSnapshot.forEach((doc) => {
+        const expense = doc.data();
+        if (expense.splits && expense.splits.length > 0) {
+          expense.splits.forEach((split) => {
+            if (memberBalances.has(split.userId)) {
+              if (expense.paidBy === split.userId) {
+                // User paid for this expense - add what others owe them
+                const currentBalance = memberBalances.get(split.userId);
+                const newBalance = currentBalance +
+                    (expense.amount - split.amount);
+                memberBalances.set(split.userId, newBalance);
+              } else {
+                // User owes money for this expense
+                const currentBalance = memberBalances.get(split.userId);
+                memberBalances.set(split.userId,
+                    currentBalance - split.amount);
+              }
+            }
+          });
+        }
+      });
+
+      // Check if any member has non-zero balance
+      // (considering floating point precision)
+      for (const [, balance] of memberBalances) {
+        if (Math.abs(balance) > 0.01) {
+          hasOutstandingBalances = true;
+          break;
+        }
+      }
+
+      if (hasOutstandingBalances) {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot delete group with unsettled balances. " +
+                   "All members must settle their expenses before " +
+                   "the group can be deleted.",
+          error: "OUTSTANDING_BALANCES",
+          details: {
+            requiresSettlement: true,
+            message: "Group has members with outstanding balances. " +
+                     "Please ensure all expenses are settled before " +
+                     "deleting the group.",
+          },
+        });
+      }
+    } catch (settlementCheckError) {
+      console.error("Error checking settlements before deleting group:",
+          settlementCheckError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to verify settlement status",
+        error: "SETTLEMENT_CHECK_ERROR",
+      });
+    }
+
     // Mark group as inactive instead of deleting (for data integrity)
     await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
       isActive: false,
       deletedAt: new Date(),
       deletedBy: userId,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     // Optionally: Mark all group expenses as inactive too
     const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
-      .where('groupId', '==', groupId)
-      .get();
+        .where("groupId", "==", groupId)
+        .get();
 
     const batch = db.batch();
-    expensesSnapshot.docs.forEach(expenseDoc => {
+    expensesSnapshot.docs.forEach((expenseDoc) => {
       batch.update(expenseDoc.ref, {
         isActive: false,
         deletedAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
     });
 
@@ -2104,108 +2334,194 @@ spendyApp.delete('/groups/:groupId', authenticateJWT, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Group successfully deleted',
+      message: "Group successfully deleted",
       data: {
         deletedGroupId: groupId,
-        deletedExpenses: expensesSnapshot.docs.length
-      }
+        deletedExpenses: expensesSnapshot.docs.length,
+      },
     });
   } catch (error) {
-    console.error('Delete group error:', error);
+    console.error("Delete group error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete group',
-      error: 'DELETE_GROUP_ERROR'
+      message: "Failed to delete group",
+      error: "DELETE_GROUP_ERROR",
     });
   }
 });
 
 // Remove Group Member
-spendyApp.delete('/groups/:groupId/members/:userId', authenticateJWT, async (req, res) => {
-  try {
-    const { groupId, userId: targetUserId } = req.params;
-    const requesterId = req.user.id;
+spendyApp.delete("/groups/:groupId/members/:userId", authenticateJWT,
+    async (req, res) => {
+      try {
+        const {groupId, userId: targetUserId} = req.params;
+        const requesterId = req.user.id;
 
-    // Get the group
-    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
-    
-    if (!groupDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        message: 'Group not found',
-        error: 'GROUP_NOT_FOUND'
-      });
-    }
+        // Get the group
+        const groupDoc = await db.collection(COLLECTIONS.GROUPS)
+            .doc(groupId).get();
+        
+        if (!groupDoc.exists) {
+          return res.status(404).json({
+            success: false,
+            message: "Group not found",
+            error: "GROUP_NOT_FOUND",
+          });
+        }
 
-    const groupData = groupDoc.data();
-    
-    // Check if requester is admin or the user being removed
-    const requesterMember = groupData.members.find(member => 
-      member.userId === requesterId && member.isActive
-    );
-    
-    if (!requesterMember) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied - not a group member',
-        error: 'ACCESS_DENIED'
-      });
-    }
+        const groupData = groupDoc.data();
+        
+        // Check if requester is admin or the user being removed
+        const requesterMember = groupData.members.find((member) =>
+          member.userId === requesterId && member.isActive,
+        );
+        
+        if (!requesterMember) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied - not a group member",
+            error: "ACCESS_DENIED",
+          });
+        }
 
-    // Only admins can remove other users, users can remove themselves
-    if (requesterId !== targetUserId && requesterMember.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Only group admins can remove other members',
-        error: 'INSUFFICIENT_PERMISSIONS'
-      });
-    }
+        // Only admins can remove other users, users can remove themselves
+        if (requesterId !== targetUserId &&
+            requesterMember.role !== "admin") {
+          return res.status(403).json({
+            success: false,
+            message: "Only group admins can remove other members",
+            error: "INSUFFICIENT_PERMISSIONS",
+          });
+        }
 
-    // Find the target member
-    const targetMemberIndex = groupData.members.findIndex(member => 
-      member.userId === targetUserId && member.isActive
-    );
-    
-    if (targetMemberIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Member not found in group',
-        error: 'MEMBER_NOT_FOUND'
-      });
-    }
+        // Find the target member
+        const targetMemberIndex = groupData.members.findIndex((member) =>
+          member.userId === targetUserId && member.isActive,
+        );
+        
+        if (targetMemberIndex === -1) {
+          return res.status(404).json({
+            success: false,
+            message: "Member not found in group",
+            error: "MEMBER_NOT_FOUND",
+          });
+        }
 
-    // Prevent removing the group creator
-    if (groupData.createdBy === targetUserId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot remove group creator',
-        error: 'CREATOR_CANNOT_BE_REMOVED'
-      });
-    }
+        // Prevent removing the group creator
+        if (groupData.createdBy === targetUserId) {
+          return res.status(400).json({
+            success: false,
+            message: "Cannot remove group creator",
+            error: "CREATOR_CANNOT_BE_REMOVED",
+          });
+        }
 
-    // Remove member from group
-    const updatedMembers = [...groupData.members];
-    updatedMembers[targetMemberIndex].isActive = false;
-    updatedMembers[targetMemberIndex].leftAt = new Date();
+        // Check if target user has pending settlements before removal
+        try {
+          const settlementsSnapshot = await db
+              .collection(COLLECTIONS.SETTLEMENTS)
+              .where("groupId", "==", groupId)
+              .where("status", "in", ["pending", "requested"])
+              .get();
 
-    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
-      members: updatedMembers,
-      updatedAt: new Date()
+          const userHasPendingSettlements = settlementsSnapshot.docs
+              .some((doc) => {
+                const settlement = doc.data();
+                return settlement.fromUserId === targetUserId ||
+                       settlement.toUserId === targetUserId;
+              });
+
+          if (userHasPendingSettlements) {
+            return res.status(400).json({
+              success: false,
+              message: "Cannot remove member with pending settlements. " +
+                       "Please settle all outstanding balances first.",
+              error: "PENDING_SETTLEMENTS",
+              details: {
+                requiresSettlement: true,
+                message: "The member has pending settlements in this group. " +
+                         "Please settle their balances before removing them.",
+              },
+            });
+          }
+
+          // Check if target user has any outstanding balance in the group
+          const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+              .where("groupId", "==", groupId)
+              .where("isSettled", "==", false)
+              .get();
+
+          let userBalance = 0;
+          let hasUnsolvedExpenses = false;
+
+          expensesSnapshot.forEach((doc) => {
+            const expense = doc.data();
+            if (expense.splits) {
+              const userSplit = expense.splits
+                  .find((split) => split.userId === targetUserId);
+              if (userSplit) {
+                hasUnsolvedExpenses = true;
+                if (expense.paidBy === targetUserId) {
+                  userBalance += (expense.amount - userSplit.amount);
+                } else {
+                  userBalance -= userSplit.amount;
+                }
+              }
+            }
+          });
+
+          if (hasUnsolvedExpenses && Math.abs(userBalance) > 0.01) {
+            const balanceMessage = userBalance > 0 ?
+              `Member is owed $${Math.abs(userBalance).toFixed(2)}` :
+              `Member owes $${Math.abs(userBalance).toFixed(2)}`;
+
+            return res.status(400).json({
+              success: false,
+              message: `Cannot remove member with outstanding balance. ` +
+                       `${balanceMessage}. Please settle all balances first.`,
+              error: "OUTSTANDING_BALANCE",
+              details: {
+                requiresSettlement: true,
+                balance: userBalance,
+                balanceFormatted: balanceMessage,
+                message: "The member has an outstanding balance in this " +
+                         "group. Please settle before removing them.",
+              },
+            });
+          }
+        } catch (settlementCheckError) {
+          console.error("Error checking settlements before removing member:",
+              settlementCheckError);
+          return res.status(500).json({
+            success: false,
+            message: "Failed to verify settlement status",
+            error: "SETTLEMENT_CHECK_ERROR",
+          });
+        }
+
+        // Remove member from group
+        const updatedMembers = [...groupData.members];
+        updatedMembers[targetMemberIndex].isActive = false;
+        updatedMembers[targetMemberIndex].leftAt = new Date();
+
+        await db.collection(COLLECTIONS.GROUPS).doc(groupId).update({
+          members: updatedMembers,
+          updatedAt: new Date(),
+        });
+
+        res.json({
+          success: true,
+          message: "Member removed from group successfully",
+        });
+      } catch (error) {
+        console.error("Remove group member error:", error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to remove group member",
+          error: "REMOVE_MEMBER_ERROR",
+        });
+      }
     });
-
-    res.json({
-      success: true,
-      message: 'Member removed from group successfully'
-    });
-  } catch (error) {
-    console.error('Remove group member error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to remove group member',
-      error: 'REMOVE_MEMBER_ERROR'
-    });
-  }
-});
 
 // Update Member Role
 spendyApp.put('/groups/:groupId/members/:userId/role', authenticateJWT, async (req, res) => {

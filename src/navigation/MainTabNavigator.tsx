@@ -9,12 +9,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { GRADIENTS } from '@/constants/theme';
 import { ApiService } from '@/services/api/ApiService';
+import { SubscriptionHelper } from '@/utils/SubscriptionHelper';
 
 // Import modals
 import UnifiedActionModal from '@/components/modals/UnifiedActionModal';
 import AddExpenseModal from '@/components/modals/AddExpenseModal';
 import ProfileScreen from '@/screens/profile/ProfileScreen';
 import RealSplittingScreen from '@/screens/main/RealSplittingScreen';
+import { Group, Friend } from '@/services/firebase/splitting-disabled';
 
 const Tab = createBottomTabNavigator();
 
@@ -106,11 +108,33 @@ function MainTabNavigatorComponent() {
   }, [navigation, tabSlideAnimation]);
   
   const handleAddExpense = async (expenseData: any) => {
+    console.log('📨 MainTabNavigator - Received expense data:', {
+      hasReceipt: !!expenseData.receipt,
+      receiptData: expenseData.receipt
+    });
+    
     try {
       if (!user?.id) return;
       
+      // Process receipt upload if present
+      let processedData = { ...expenseData };
+      if (expenseData.receipt && expenseData.receipt.imageUri) {
+        console.log('🔍 Processing receipt upload for expense...');
+        try {
+          const { SmartMoneyService } = await import('@/services/smartMoney/SmartMoneyService');
+          const receiptUrl = await SmartMoneyService.uploadReceiptImage(expenseData.receipt.imageUri, user.id);
+          processedData.receiptUrl = receiptUrl;
+          console.log('✅ Receipt uploaded successfully:', receiptUrl);
+        } catch (receiptError) {
+          console.error('❌ Receipt upload failed:', receiptError);
+          // Continue without receipt URL
+        }
+        // Remove the receipt object as it's processed
+        delete processedData.receipt;
+      }
+      
       const response = await apiService.addExpense({
-        ...expenseData,
+        ...processedData,
         isSettled: false,
         date: new Date()
       });
@@ -147,17 +171,39 @@ function MainTabNavigatorComponent() {
     }
   };
   
-  const handleActionSelect = (actionId: string) => {
+  const handleActionSelect = async (actionId: string) => {
     console.log('🎯 Handling action in MainTabNavigator:', actionId);
     
     switch (actionId) {
       case 'split-expense':
-        // Refresh data before opening modal
-        if (user?.id) {
+        // 🚨 CRITICAL FIX: Check subscription limits BEFORE opening expense modal
+        if (!user?.id) {
+          console.log('❌ No user ID found for expense modal');
+          return;
+        }
+        
+        try {
+          console.log('🔍 Checking subscription limits for tab navigator expense modal...');
+          const subscriptionHelper = SubscriptionHelper.getInstance();
+          const canCreate = await subscriptionHelper.canCreateTransaction(user.id);
+          
+          if (!canCreate) {
+            console.log('🚫 Subscription limit reached - expense modal blocked in tab navigator');
+            return;
+          }
+          
+          console.log('✅ Subscription check passed - opening expense modal in tab navigator');
+          // Refresh data before opening modal
           apiService.getUserGroups().then(setGroups).catch(console.error);
           apiService.getFriends().then(setFriends).catch(console.error);
+          setShowAddExpense(true);
+        } catch (error) {
+          console.error('❌ Error checking subscription in tab navigator:', error);
+          // Still allow opening the modal if subscription check fails
+          apiService.getUserGroups().then(setGroups).catch(console.error);
+          apiService.getFriends().then(setFriends).catch(console.error);
+          setShowAddExpense(true);
         }
-        setShowAddExpense(true);
         break;
       case 'smart-expense':
         // Navigate to Money Management tab
