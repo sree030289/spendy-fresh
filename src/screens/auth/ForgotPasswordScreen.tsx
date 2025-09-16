@@ -17,6 +17,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
+import { MeetNSplitLogo } from '@/components/common/MeetNSplitLogo';
+import { BrandHeader } from '@/components/common/BrandHeader';
 
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation();
@@ -150,10 +152,6 @@ export default function ForgotPasswordScreen() {
       borderBottomLeftRadius: 25,
       borderBottomRightRadius: 25,
       width: '100%',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
       ...(Platform.OS === 'web' && {
         background: `linear-gradient(135deg, ${colors.brand} 0%, ${colors.brandDark} 100%)`,
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
@@ -171,7 +169,7 @@ export default function ForgotPasswordScreen() {
     },
     backButton: {
       position: 'absolute',
-      top: 50,
+      top: 10,
       left: 24,
       padding: 8,
       zIndex: 10,
@@ -179,7 +177,6 @@ export default function ForgotPasswordScreen() {
     whiteContent: {
       flex: 1,
       backgroundColor: '#ffffff',
-      marginTop: 120,
       borderTopLeftRadius: 25,
       borderTopRightRadius: 25,
       paddingTop: 30,
@@ -345,17 +342,13 @@ export default function ForgotPasswordScreen() {
   const styles = getStyles(theme.colors);
 
   return (
-    <View style={styles.container}>
-      {/* Red Header */}
-      <View style={styles.redHeader}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Icon name="back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.brandText}>Spendy</Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Brand Header */}
+      <BrandHeader 
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+        height={100}
+      />
 
       {/* White Content Area */}
       <View style={styles.whiteContent}>
@@ -460,189 +453,7 @@ export default function ForgotPasswordScreen() {
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#DC143C',
-  },
-  redHeader: {
-    backgroundColor: '#DC143C',
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
-    width: '100%',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  brandText: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '700',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: {width: 1, height: 1},
-    textShadowRadius: 2,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 24,
-    padding: 8,
-    zIndex: 10,
-  },
-  whiteContent: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    marginTop: 100,
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    paddingTop: 50,
-    paddingHorizontal: 32,
-    width: '100%',
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: 80,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '600',
-    marginBottom: 12,
-    textAlign: 'center',
-    color: '#1F2937',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 24,
-    color: '#6B7280',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-  },
-  form: {
-    gap: 24,
-    marginBottom: 40,
-  },
-  inputContainer: {
-    position: 'relative',
-    marginBottom: 4,
-  },
-  input: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#D1D5DB',
-    fontSize: 16,
-    backgroundColor: '#FFFFFF',
-    color: '#374151',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-    fontWeight: '400',
-    minHeight: 56,
-  },
-  errorText: {
-    fontSize: 13,
-    marginTop: 6,
-    marginLeft: 20,
-    color: '#EF4444',
-  },
-  resetButton: {
-    backgroundColor: '#DC143C',
-    borderRadius: 25,
-    paddingVertical: 18,
-    marginTop: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  backToLoginButton: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 25,
-    paddingVertical: 18,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  successContainer: {
-    alignItems: 'center',
-  },
-  successInfo: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: '#333333',
-  },
-  successText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 12,
-    color: '#6B7280',
-  },
-  emailContainer: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  emailText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#DC143C',
-  },
-  instructionText: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    color: '#6B7280',
-  },
-  actionButtons: {
-    width: '100%',
-    gap: 12,
-    marginBottom: 24,
-  },
-  resendButton: {
-    marginBottom: 8,
-  },
-  redirectText: {
-    fontSize: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
-    color: '#6B7280',
-  },
-});

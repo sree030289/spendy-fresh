@@ -1,0 +1,24 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow all users to upload/read profile pictures and receipts
+    // Note: This is more permissive but necessary since app uses custom JWT auth
+    match /profiles/{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    match /receipts/{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    // Allow public assets
+    match /public/{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

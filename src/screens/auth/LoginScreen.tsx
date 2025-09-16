@@ -21,6 +21,8 @@ import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
 import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
 import { ApiService } from '@/services/api/ApiService';
+import { MeetNSplitLogo } from '@/components/common/MeetNSplitLogo';
+import { BrandHeader } from '@/components/common/BrandHeader';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
@@ -305,16 +307,13 @@ export default function LoginScreen() {
     },
     redHeader: {
       backgroundColor: colors.brand,
-      height: 120,
+      height: 100,
       justifyContent: 'center',
       alignItems: 'center',
       borderBottomLeftRadius: 25,
       borderBottomRightRadius: 25,
       width: '100%',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
+      paddingTop: 10,
       // Enhanced gradient effect for modern look
       shadowColor: '#000',
       shadowOffset: {
@@ -348,7 +347,6 @@ export default function LoginScreen() {
     whiteContent: {
       flex: 1,
       backgroundColor: '#ffffff',
-      marginTop: 120,
       borderTopLeftRadius: 25,
       borderTopRightRadius: 25,
       paddingTop: 30,
@@ -506,11 +504,9 @@ export default function LoginScreen() {
   const styles = getStyles(theme.colors);
 
   return (
-    <View style={styles.container}>
-      {/* Red Header */}
-      <View style={styles.redHeader}>
-        <Text style={styles.brandText}>Spendy</Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Brand Header */}
+      <BrandHeader height={100} />
 
       {/* White Content Area */}
       <View style={styles.whiteContent}>
@@ -642,13 +638,13 @@ export default function LoginScreen() {
               style={styles.registerButton}
             >
               <Text style={styles.registerButtonText}>
-                Not yet joined Spendy?
+                Not yet joined MeetnSplit ?
               </Text>
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
     </View>
-    </View>
+    </SafeAreaView>
   );
 }

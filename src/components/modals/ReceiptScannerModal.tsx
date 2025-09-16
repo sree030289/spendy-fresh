@@ -200,10 +200,12 @@ export default function ReceiptScannerModal({ visible, onClose, onReceiptProcess
   const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [3, 4],
         quality: 0.9,
+        exif: false, // Disable EXIF data for better iOS performance
+        base64: false, // Disable base64 encoding for better performance
       });
 
       if (!result.canceled && result.assets[0]) {

@@ -28,6 +28,12 @@ interface Group {
 import QRCodeScanner from '@/components/QRCodeScanner';
 import ImprovedQRScannerManager, { ScannerState } from '@/services/qr/ImprovedQRScannerManager';
 
+// Helper function to get active member count
+const getActiveMemberCount = (members: any[]): number => {
+  if (!members || !Array.isArray(members)) return 0;
+  return members.filter(member => member.isActive !== false).length;
+};
+
 interface QRCodeModalProps {
   visible: boolean;
   onClose: () => void;
@@ -99,7 +105,7 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
           {
             name: selectedGroup.name,
             avatar: selectedGroup.avatar || '',
-            memberCount: selectedGroup.members.length
+            memberCount: getActiveMemberCount(selectedGroup.members)
           },
           user.id
         );

@@ -475,6 +475,57 @@ spendyApp.get('/auth/profile', authenticateJWT, async (req, res) => {
   }
 });
 
+// Update Profile
+spendyApp.put('/auth/profile', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { fullName, mobile, country, currency, biometricEnabled, profilePicture } = req.body;
+
+    const updateData = {
+      updatedAt: new Date()
+    };
+
+    if (fullName) {
+      updateData.fullName = fullName.trim();
+      updateData.name = fullName.trim(); // Alias
+    }
+    if (mobile !== undefined) {
+      updateData.mobile = mobile;
+      updateData.phoneNumber = mobile; // Alias
+    }
+    if (country) updateData.country = country.toUpperCase();
+    if (currency) updateData.currency = currency.toUpperCase();
+    if (biometricEnabled !== undefined) updateData.biometricEnabled = biometricEnabled;
+    if (profilePicture !== undefined) {
+      updateData.profilePicture = profilePicture;
+      updateData.profileImage = profilePicture; // Alias
+    }
+
+    // Update user document
+    await db.collection(COLLECTIONS.USERS).doc(userId).update(updateData);
+
+    // Get updated user data
+    const updatedUserDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    const updatedUser = updatedUserDoc.data();
+    
+    // Remove sensitive information
+    const { password, resetToken, resetTokenExpiry, verificationCode, ...userProfile } = updatedUser;
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: { user: userProfile }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile',
+      error: 'PROFILE_UPDATE_ERROR'
+    });
+  }
+});
+
 // ===== PASSWORD RESET OTP ROUTES =====
 
 // Send OTP for password reset
@@ -2501,6 +2552,7 @@ spendyApp.delete("/groups/:groupId/members/:userId", authenticateJWT,
 
         // Remove member from group
         const updatedMembers = [...groupData.members];
+        const removedMemberData = updatedMembers[targetMemberIndex];
         updatedMembers[targetMemberIndex].isActive = false;
         updatedMembers[targetMemberIndex].leftAt = new Date();
 
@@ -2508,6 +2560,123 @@ spendyApp.delete("/groups/:groupId/members/:userId", authenticateJWT,
           members: updatedMembers,
           updatedAt: new Date(),
         });
+
+        // Send notification to the removed user
+        try {
+          const requesterUserDoc = await db.collection(COLLECTIONS.USERS).doc(requesterId).get();
+          const removedUserDoc = await db.collection(COLLECTIONS.USERS).doc(targetUserId).get();
+          
+          if (requesterUserDoc.exists && removedUserDoc.exists) {
+            const requesterUserData = requesterUserDoc.data();
+            const removedUserData = removedUserDoc.data();
+            
+            // Create in-app notification for removed user
+            await db.collection('appNotifications').add({
+              userId: targetUserId,
+              type: 'group_member_removed',
+              title: '🚫 Removed from Group',
+              message: `${requesterUserData.fullName || 'Someone'} removed you from "${groupData.name}"`,
+              data: {
+                groupId: groupId,
+                groupName: groupData.name,
+                removedBy: requesterId,
+                removedByName: requesterUserData.fullName || 'Someone',
+                navigationType: 'friends'
+              },
+              isRead: false,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            });
+
+            // Send push notification to removed user
+            if (removedUserData.pushToken) {
+              const expoPushNotification = {
+                title: '🚫 Removed from Group',
+                body: `${requesterUserData.fullName || 'Someone'} removed you from "${groupData.name}"`,
+                data: {
+                  type: 'group_member_removed',
+                  groupId: groupId,
+                  groupName: groupData.name,
+                  removedBy: requesterId,
+                  removedByName: requesterUserData.fullName || 'Someone',
+                  deepLink: {
+                    screen: 'MainTabs',
+                    params: { initialTab: 'Split' }
+                  }
+                },
+                url: `letssplit://friends`
+              };
+
+              await sendExpoPushNotification(removedUserData.pushToken, expoPushNotification);
+              console.log('📱 Member removal notification sent to removed user');
+            }
+
+            // Notify other group members about the removal
+            const otherMembers = groupData.members.filter(member => 
+              member.userId !== requesterId && 
+              member.userId !== targetUserId && 
+              member.isActive
+            );
+
+            const otherMemberNotifications = otherMembers.map(async (member) => {
+              try {
+                // Create in-app notification for other members
+                await db.collection('appNotifications').add({
+                  userId: member.userId,
+                  type: 'group_member_removed',
+                  title: '🚫 Member Removed',
+                  message: `${requesterUserData.fullName || 'Someone'} removed ${removedMemberData.userData.fullName || 'Someone'} from "${groupData.name}"`,
+                  data: {
+                    groupId: groupId,
+                    groupName: groupData.name,
+                    removedBy: requesterId,
+                    removedByName: requesterUserData.fullName || 'Someone',
+                    removedUserId: targetUserId,
+                    removedUserName: removedMemberData.userData.fullName || 'Someone',
+                    navigationType: 'groupMembers'
+                  },
+                  isRead: false,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                });
+
+                // Send push notification to other members
+                const memberDoc = await db.collection(COLLECTIONS.USERS).doc(member.userId).get();
+                if (memberDoc.exists) {
+                  const memberData = memberDoc.data();
+                  if (memberData.pushToken) {
+                    const expoPushNotification = {
+                      title: '🚫 Member Removed',
+                      body: `${requesterUserData.fullName || 'Someone'} removed ${removedMemberData.userData.fullName || 'Someone'} from "${groupData.name}"`,
+                      data: {
+                        type: 'group_member_removed',
+                        groupId: groupId,
+                        groupName: groupData.name,
+                        removedBy: requesterId,
+                        removedUserId: targetUserId,
+                        deepLink: {
+                          screen: 'GroupDetailsModal',
+                          params: { groupId }
+                        }
+                      },
+                      url: `letssplit://group/${groupId}`
+                    };
+
+                    await sendExpoPushNotification(memberData.pushToken, expoPushNotification);
+                  }
+                }
+              } catch (memberNotificationError) {
+                console.error('❌ Failed to send notification to member:', member.userId, memberNotificationError);
+              }
+            });
+
+            await Promise.all(otherMemberNotifications);
+            console.log(`✅ Member removal notifications sent to removed user and ${otherMemberNotifications.length} other members`);
+          }
+        } catch (notificationError) {
+          console.error('❌ Failed to send member removal notifications:', notificationError);
+          // Don't fail the member removal if notifications fail
+        }
 
         res.json({
           success: true,

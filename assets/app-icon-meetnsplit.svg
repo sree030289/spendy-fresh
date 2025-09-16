@@ -1,0 +1,22 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#B8CDD9" rx="120"/>
+  
+  <!-- "Meet" text -->
+  <text x="512" y="380" font-family="Arial, sans-serif" font-size="120" font-weight="700" text-anchor="middle" fill="#1E3A5F">Meet</text>
+  
+  <!-- Decorative line before "n" -->
+  <rect x="380" y="445" width="60" height="4" fill="#FFA500" rx="2"/>
+  
+  <!-- "n" text -->
+  <text x="512" y="480" font-family="Arial, sans-serif" font-size="120" font-weight="700" text-anchor="middle" fill="#FFA500">n</text>
+  
+  <!-- Decorative line after "n" -->
+  <rect x="584" y="445" width="60" height="4" fill="#FFA500" rx="2"/>
+  
+  <!-- "Split" text -->
+  <text x="512" y="620" font-family="Arial, sans-serif" font-size="120" font-weight="700" text-anchor="middle" fill="#1E3A5F">Split</text>
+  
+  <!-- Orange dot on the "i" in "Split" -->
+  <circle cx="565" cy="540" r="8" fill="#FFA500"/>
+</svg>

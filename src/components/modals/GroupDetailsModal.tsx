@@ -40,6 +40,12 @@ import ExpenseDetailModal from './ExpenseDetailModal';
 
 const { width, height } = Dimensions.get('window');
 
+// Helper function to get active member count
+const getActiveMemberCount = (members: any[]): number => {
+  if (!members || !Array.isArray(members)) return 0;
+  return members.filter(member => member.isActive !== false).length;
+};
+
 // Expense categories for icon lookup
 const EXPENSE_CATEGORIES = [
   { id: 'all', name: 'All Categories', icon: '📋', color: '#B0004F' },
@@ -1010,7 +1016,7 @@ export default function GroupDetailsModal({
                 <Text style={styles.badgeText}>💰 {localGroupData.currency}</Text>
               </View>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>👥 {(localGroupData.members || []).length} members</Text>
+                <Text style={styles.badgeText}>👥 {getActiveMemberCount(localGroupData.members || [])} members</Text>
               </View>
             </View>
             

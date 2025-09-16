@@ -26,6 +26,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRobustReceiptScanner } from '@/services/useRobustReceiptScanner';
 import { SubscriptionHelper } from '@/utils/SubscriptionHelper';
 
+// Helper function to get active member count
+const getActiveMemberCount = (members: any[]): number => {
+  if (!members || !Array.isArray(members)) return 0;
+  return members.filter(member => member.isActive !== false).length;
+};
+
 interface AddExpenseModalProps {
   visible: boolean;
   onClose: () => void;
@@ -519,7 +525,7 @@ const initializeSplitData = () => {
   const openCamera = async () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -538,10 +544,12 @@ const initializeSplitData = () => {
   const openGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        exif: false, // Disable EXIF data for better iOS performance
+        base64: false, // Disable base64 encoding for better performance
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -751,7 +759,7 @@ const initializeSplitData = () => {
   const openCameraForAttachment = async () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -773,10 +781,12 @@ const initializeSplitData = () => {
   const openGalleryForAttachment = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        exif: false, // Disable EXIF data for better iOS performance
+        base64: false, // Disable base64 encoding for better performance
       });
 
       if (!result.canceled && result.assets[0] && result.assets[0].uri) {
@@ -1085,7 +1095,7 @@ const initializeSplitData = () => {
                     {group.name}
                   </Text>
                   <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
-                    {group.members.length} members
+                    {getActiveMemberCount(group.members)} members
                   </Text>
                 </TouchableOpacity>
               ))}

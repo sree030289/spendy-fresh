@@ -20,6 +20,12 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getCurrencySymbol } from '@/utils/currency';
 import FullscreenModal from '@/components/common/FullscreenModal';
 
+// Helper function to get active member count
+const getActiveMemberCount = (members: any[]): number => {
+  if (!members || !Array.isArray(members)) return 0;
+  return members.filter(member => member.isActive !== false).length;
+};
+
 interface EditExpenseModalProps {
   visible: boolean;
   onClose: () => void;
@@ -781,7 +787,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
                 {selectedGroup?.name || 'Unknown Group'}
               </Text>
               <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
-                {selectedGroup?.members.length || 0} members
+                {getActiveMemberCount(selectedGroup?.members || [])} members
               </Text>
             </View>
           </View>

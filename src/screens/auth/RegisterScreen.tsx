@@ -18,6 +18,8 @@ import { Icon } from '../../components/common/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
+import { MeetNSplitLogo } from '@/components/common/MeetNSplitLogo';
+import { BrandHeader } from '@/components/common/BrandHeader';
 import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
 import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
@@ -374,17 +376,13 @@ export default function RegisterScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      {/* Red Header */}
-      <View style={styles.redHeader}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Icon name="back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.brandText}>Spendy</Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Brand Header */}
+      <BrandHeader 
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+        height={100}
+      />
 
       {/* White Content Area */}
       <View style={styles.whiteContent}>
@@ -631,7 +629,7 @@ export default function RegisterScreen() {
       <CountryPicker />
       <CurrencyPicker />
       <BiometricPrompt />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -642,16 +640,13 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   redHeader: {
     backgroundColor: colors.brand,
-    height: 120,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
     borderBottomLeftRadius: 25,
     borderBottomRightRadius: 25,
     width: '100%',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    paddingTop: 10,
   },
   brandText: {
     color: '#ffffff',
@@ -661,7 +656,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 50,
+    top: 20,
     left: 24,
     padding: 8,
     zIndex: 10,
@@ -669,7 +664,6 @@ const getStyles = (colors: any) => StyleSheet.create({
   whiteContent: {
     flex: 1,
     backgroundColor: '#ffffff',
-    marginTop: 120,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     paddingTop: 30,

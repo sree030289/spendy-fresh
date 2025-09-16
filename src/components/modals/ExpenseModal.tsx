@@ -284,6 +284,38 @@ export default function ExpenseModal({
                 {isSettlement ? 'Settlement' : category}
               </Text>
             </View>
+            
+            {/* Receipt Indicator */}
+            {expense.receiptUrl && (
+              <View style={styles.receiptIndicator}>
+                <Icon name="document" size={12} color={theme.colors.primary} />
+              </View>
+            )}
+            
+            <View style={styles.expenseActions}>
+              <View style={styles.statusRow}>
+                <View style={[
+                  styles.statusIndicator,
+                  { backgroundColor: expense.isSettled ? '#10b981' : '#f59e0b' }
+                ]} />
+                {canSplit && !expense.isSettled && !isSettlement && (
+                  <TouchableOpacity 
+                    style={[styles.splitButton, { backgroundColor: theme.colors.primary + '20' }]}
+                    onPress={() => handleExpensePress(expense)}
+                  >
+                    <Text style={[styles.splitButtonText, { color: theme.colors.primary }]}>
+                      Split
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {isSettlement && (
+                  <View style={[styles.settlementBadge, { backgroundColor: '#10b981' }]}>
+                    <Icon name="checkmark" size={14} color="white"  />
+                    <Text style={styles.settlementBadgeText}>Settled</Text>
+                  </View>
+                )}
+              </View>
+            </View>
             <View style={styles.expenseActions}>
               <View style={styles.statusRow}>
                 <View style={[
@@ -654,6 +686,14 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  receiptIndicator: {
+    marginTop: 4,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: 'flex-end',
   },
   expenseActions: {
     alignItems: 'flex-end',

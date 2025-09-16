@@ -40,6 +40,7 @@ interface Expense {
   currency: string;
   date: Date;
   createdAt: Date;
+  receiptUrl?: string;
 }
 
 interface Group {
@@ -395,11 +396,18 @@ export default function SimpleExpenseListModal({
           </View>
         </View>
 
-        {/* Amount */}
+        {/* Amount and Receipt Indicator */}
         <View style={styles.rightSection}>
           <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
             {formatCurrency(expense.amount)}
           </Text>
+          
+          {/* Receipt Indicator */}
+          {expense.receiptUrl && (
+            <View style={styles.receiptIndicator}>
+              <Icon name="document" size={12} color={theme.colors.primary} />
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -766,6 +774,14 @@ const styles = StyleSheet.create({
   expenseAmount: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  receiptIndicator: {
+    marginTop: 4,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: 'flex-end',
   },
   emptyContainer: {
     alignItems: 'center',

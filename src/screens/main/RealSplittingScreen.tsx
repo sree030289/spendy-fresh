@@ -24,9 +24,17 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { User } from '@/types';
+import { MeetNSplitLogo } from '@/components/common/MeetNSplitLogo';
+import { BrandHeader } from '@/components/common/BrandHeader';
 
 // Import subscription helper
 import { SubscriptionHelper } from '@/utils/SubscriptionHelper';
+
+// Helper function to get active member count
+const getActiveMemberCount = (members: any[]): number => {
+  if (!members || !Array.isArray(members)) return 0;
+  return members.filter(member => member.isActive !== false).length;
+};
 
 // FIXED: Import only the unified balance system
 import { useSharedBalances } from '@/hooks/useSharedBalances';
@@ -2162,7 +2170,7 @@ export default function RealSplittingScreen() {
       return {
         groupName: group.name,
         totalSpent: groupExpenseTotal,
-        memberCount: group.members?.length || 0,
+        memberCount: getActiveMemberCount(group.members),
         userBalance: userBalance
       };
     });
@@ -2336,28 +2344,21 @@ export default function RealSplittingScreen() {
   const showPendingFriendActionsMenu = (friend: Friend) => {
     // Check if this is a received friend request (user can accept/decline)
     if (friend.requestType === 'received' && friend.status === 'pending_incoming') {
-      const actions: Array<{
-        text: string;
-        style?: 'cancel' | 'destructive' | 'default';
-        onPress?: () => void;
-      }> = [
-        {
-          text: 'Accept Friend Request',
-          onPress: () => friend.requestId && handleAcceptFriendRequest(friend.requestId)
+      // Open FriendRequestModal for received invites
+      const friendRequestData = {
+        id: friend.requestId || '',
+        fromUserId: friend.friendId,
+        fromUserData: {
+          fullName: friend.friendData.fullName,
+          email: friend.friendData.email || '',
+          avatar: friend.friendData.avatar || ''
         },
-        {
-          text: 'Decline Request',
-          style: 'destructive',
-          onPress: () => friend.requestId && handleDeclineFriendRequest(friend.requestId)
-        },
-        { text: 'Cancel', style: 'cancel' }
-      ];
-
-      Alert.alert(
-        `Friend Request from ${friend.friendData.fullName}`,
-        'Would you like to accept or decline this friend request?',
-        actions
-      );
+        message: `${friend.friendData.fullName} wants to be your friend`,
+        status: 'pending' as const,
+        createdAt: new Date()
+      };
+      setSelectedFriendRequest(friendRequestData);
+      setShowFriendRequest(true);
     } else {
       // This is a sent invitation (user can resend/cancel)
       const actions: Array<{
@@ -2854,11 +2855,18 @@ export default function RealSplittingScreen() {
                     </View>
                   </View>
 
-                  {/* Right: Amount */}
+                  {/* Right: Amount and Receipt Indicator */}
                   <View style={styles.expenseCardAmount}>
                     <Text style={[styles.expenseCardAmountText, { color: theme.colors.text }]}>
                       <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{expense.amount.toFixed(2)}</Text>
                     </Text>
+                    
+                    {/* Receipt Indicator */}
+                    {expense.receiptUrl && (
+                      <View style={styles.receiptIndicator}>
+                        <Icon name="document" size={12} color={theme.colors.primary} />
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -3156,127 +3164,186 @@ export default function RealSplittingScreen() {
               showsVerticalScrollIndicator={false}
               style={styles.friendCardsList}
             >
-              {/* Show accepted friends regardless of balance status */}
-              {acceptedFriends.map((friend, index) => {
-                // Get balance from sharedBalances if available, otherwise default to 0
-                const balanceEntry = sharedBalances.allBalances.find(b => b.userId === friend.friendId);
-                const balance = balanceEntry?.balance || 0;
-                const friendName = friend.friendData?.fullName || 'Unknown User';
-                const friendEmail = friend.friendData?.email || '';
-                const friendInitial = friendName.charAt(0).toUpperCase() || '?';
-                
-                // Create a unique key
-                const entryKey = `friend-${friend.friendId}-${index}`;
-                
-                // Determine balance status for clean display
-                const isSettled = Math.abs(balance) < 0.01;
-                const owesYou = balance > 0;
-                const youOwe = balance < 0;
-                const amount = Math.abs(balance);
-                
-                return (
+              {/* Show accepted friends with sorting: green amounts first, then red amounts, settled at end */}
+              {acceptedFriends
+                .map((friend, index) => {
+                  // Get balance from sharedBalances if available, otherwise default to 0
+                  const balanceEntry = sharedBalances.allBalances.find(b => b.userId === friend.friendId);
+                  const balance = balanceEntry?.balance || 0;
+                  const friendName = friend.friendData?.fullName || 'Unknown User';
+                  const friendEmail = friend.friendData?.email || '';
+                  const friendInitial = friendName.charAt(0).toUpperCase() || '?';
+                  
+                  // Create a unique key
+                  const entryKey = `friend-${friend.friendId}-${index}`;
+                  
+                  // Determine balance status for clean display
+                  const isSettled = Math.abs(balance) < 0.01;
+                  const owesYou = balance > 0;
+                  const youOwe = balance < 0;
+                  const amount = Math.abs(balance);
+                  
+                  return {
+                    friend,
+                    balance,
+                    friendName,
+                    friendInitial,
+                    entryKey,
+                    isSettled,
+                    owesYou,
+                    youOwe,
+                    amount,
+                    balanceEntry
+                  };
+                })
+                .sort((a, b) => {
+                  // Sort priority: 1) Green amounts (owes you) - highest first, 2) Red amounts (you owe) - lowest first, 3) Settled
+                  if (a.isSettled && !b.isSettled) return 1; // Settled goes to end
+                  if (!a.isSettled && b.isSettled) return -1;
+                  if (a.isSettled && b.isSettled) return 0; // Both settled, maintain order
+                  
+                  if (a.owesYou && !b.owesYou) return -1; // Green amounts first
+                  if (!a.owesYou && b.owesYou) return 1;
+                  
+                  if (a.owesYou && b.owesYou) {
+                    return b.amount - a.amount; // Higher green amounts first
+                  }
+                  
+                  if (a.youOwe && b.youOwe) {
+                    return a.amount - b.amount; // Lower red amounts first
+                  }
+                  
+                  return 0;
+                })
+                .map(({ friend, balance, friendName, friendInitial, entryKey, isSettled, owesYou, youOwe, amount, balanceEntry }) => (
                   <TouchableOpacity
                     key={entryKey}
-                    style={[styles.cleanActiveFriendCard, { backgroundColor: theme.colors.surface }]}
-                    onPress={() => {
-                      // If this has a group-specific balance, open settlement screen with group filter
-                      if (balanceEntry?.groupId) {
-                        openSettlementScreen({ 
-                          filter: 'groups', 
-                          groupId: balanceEntry.groupId,
-                          friendId: friend.friendId 
-                        });
-                      } else {
-                        // For direct friend balances, use friend filter
-                        openSettlementScreen({ 
-                          filter: 'friends', 
-                          friendId: friend.friendId 
-                        });
-                      }
-                    }}
-                    onLongPress={() => {
-                      // Show friend actions menu on long press, especially useful for settled friends
-                      showFriendActionsMenu(friend);
-                    }}
+                    style={styles.simpleFriendItem}
+                    onLongPress={() => showFriendActionsMenu(friend)}
+                    delayLongPress={500}
+                    activeOpacity={0.7}
                   >
-                    {/* Left section: Avatar + Info */}
-                    <View style={styles.cleanActiveFriendLeft}>
-                      <View style={[styles.cleanActiveAvatar, { 
-                        backgroundColor: isSettled ? theme.colors.success : (owesYou ? theme.colors.success : theme.colors.error)
-                      }]}>
-                        {(friend.friendData?.avatar || friend.friendData?.profilePicture || friend.friendData?.profileImage) ? (
-                          <Image 
-                            source={{ uri: friend.friendData.avatar || friend.friendData.profilePicture || friend.friendData.profileImage }} 
-                            style={styles.cleanActiveAvatarImage}
-                            onError={() => {
-                              console.log('Friend avatar failed to load, showing initials');
-                            }}
-                          />
-                        ) : (
-                          <Text style={styles.cleanActiveAvatarText}>{friendInitial}</Text>
-                        )}
-                      </View>
-                      <View style={styles.cleanActiveFriendInfo}>
-                        <Text style={[styles.cleanActiveFriendName, { color: theme.colors.text }]} numberOfLines={1}>
+                    {/* Main row: Avatar, Name, and Status */}
+                    <View style={styles.simpleFriendMainRow}>
+                      {/* Left side: Avatar and Name */}
+                      <View style={styles.simpleFriendLeft}>
+                        <View style={[styles.simpleFriendAvatar, { 
+                          backgroundColor: isSettled ? '#E5E7EB' : (owesYou ? theme.colors.success : theme.colors.error)
+                        }]}>
+                          {(() => {
+                            const avatarUri = friend.friendData?.avatar || friend.friendData?.profilePicture || friend.friendData?.profileImage;
+                            console.log('🖼️ Friend avatar debug:', { 
+                              friendName, 
+                              avatarUri, 
+                              hasAvatar: !!avatarUri,
+                              isLocalFile: avatarUri?.startsWith('file://'),
+                              isHttpUrl: avatarUri?.startsWith('http'),
+                              friendData: friend.friendData 
+                            });
+                            
+                            // Check if we have a valid avatar URI that's not a local file
+                            const hasValidAvatar = avatarUri && 
+                              avatarUri.trim() !== '' && 
+                              !avatarUri.startsWith('file://') && 
+                              (avatarUri.startsWith('http') || 
+                               avatarUri.startsWith('https://') ||
+                               avatarUri.includes('firebasestorage.googleapis.com'));
+                            
+                            if (hasValidAvatar) {
+                              return (
+                                <>
+                                  <Image 
+                                    source={{ uri: avatarUri }} 
+                                    style={styles.simpleFriendAvatarImage}
+                                    onError={(error) => {
+                                      console.log('❌ Friend avatar failed to load:', error.nativeEvent?.error, 'for friend:', friendName, 'URI:', avatarUri);
+                                    }}
+                                    onLoad={() => {
+                                      console.log('✅ Friend avatar loaded successfully for:', friendName);
+                                    }}
+                                    resizeMode="cover"
+                                  />
+                                  <Text style={[styles.simpleFriendAvatarText, { opacity: 0 }]}>{friendInitial}</Text>
+                                </>
+                              );
+                            } else {
+                              // Show initials - either no avatar or local file that can't be displayed
+                              if (avatarUri?.startsWith('file://')) {
+                                console.log('⚠️ Skipping local file avatar for:', friendName, 'URI:', avatarUri);
+                              }
+                              return (
+                                <Text style={styles.simpleFriendAvatarText}>{friendInitial}</Text>
+                              );
+                            }
+                          })()}
+                        </View>
+                        <Text style={[styles.simpleFriendName, { color: theme.colors.text }]}>
                           {friendName}
                         </Text>
-                        {balanceEntry?.groupName ? (
-                          <View style={styles.cleanActiveGroupIndicator}>
-                            <Icon name="people" size={14} color={theme.colors.primary}  />
-                            <Text style={[styles.cleanActiveGroupText, { color: theme.colors.primary }]} numberOfLines={1}>
-                              {balanceEntry.groupName}
+                      </View>
+
+                      {/* Right side: Status indicator */}
+                      <View style={styles.simpleFriendRight}>
+                        {isSettled ? (
+                          <View style={styles.simpleFriendSettledContainer}>
+                            <Icon name="check" size={16} color={theme.colors.success} />
+                            <Text style={[styles.simpleFriendSettledText, { color: theme.colors.textSecondary }]}>
+                              All settled
                             </Text>
                           </View>
                         ) : (
-                          <Text style={[styles.cleanActiveDirectText, { color: theme.colors.textSecondary }]}>
-                            Direct friendship
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Right section: Balance + Actions */}
-                    <View style={styles.cleanActiveFriendRight}>
-                      {isSettled ? (
-                        <View style={styles.cleanSettledBadge}>
-                          <Icon name="success" size={16} color={theme.colors.success}  />
-                          <Text style={[styles.cleanSettledText, { color: theme.colors.success }]}>
-                            Settled
-                          </Text>
-                        </View>
-                      ) : (
-                        <>
-                          <View style={[styles.cleanActiveBalanceBadge, { 
-                            backgroundColor: owesYou ? `${theme.colors.success}15` : `${theme.colors.error}15`
-                          }]}>
-                            <Text style={[styles.cleanActiveBalanceAmount, { 
-                              color: owesYou ? theme.colors.success : theme.colors.error 
-                            }]}>
-                              <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{(amount || 0).toFixed(2)}</Text>
-                            </Text>
-                            <Text style={[styles.cleanActiveBalanceLabel, { 
+                          <View style={styles.simpleFriendAmountContainer}>
+                            <Text style={[styles.simpleFriendAmountLabel, { 
                               color: owesYou ? theme.colors.success : theme.colors.error 
                             }]}>
                               {owesYou ? 'owes you' : 'you owe'}
                             </Text>
+                            <Text style={[styles.simpleFriendAmount, { 
+                              color: owesYou ? theme.colors.success : theme.colors.error 
+                            }]}>
+                              {getCurrencySymbol(user?.currency || 'USD')}{amount.toFixed(2)}
+                            </Text>
                           </View>
-                          <TouchableOpacity
-                            style={[styles.cleanRemindButton, { backgroundColor: theme.colors.warning }]}
-                            onPress={() => {
-                              if (!user?.id) return;
-                              // Use the actual friend object for the reminder function
-                              showFriendActionsMenu(friend);
-                            }}
-                          >
-                            <Icon name="notifications" size={12} color="white"  />
-                          </TouchableOpacity>
-                        </>
-                      )}
+                        )}
+                      </View>
                     </View>
+
+                    {/* Action buttons - only show for unsettled friends */}
+                    {!isSettled && (
+                      <View style={styles.simpleFriendActions}>
+                        <TouchableOpacity
+                          style={[styles.simpleFriendButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+                          onPress={() => showFriendActionsMenu(friend)}
+                        >
+                          <Text style={[styles.simpleFriendButtonText, { color: theme.colors.text }]}>
+                            Remind...
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.simpleFriendButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+                          onPress={() => {
+                            if (balanceEntry?.groupId) {
+                              openSettlementScreen({ 
+                                filter: 'groups', 
+                                groupId: balanceEntry.groupId,
+                                friendId: friend.friendId 
+                              });
+                            } else {
+                              openSettlementScreen({ 
+                                filter: 'friends', 
+                                friendId: friend.friendId 
+                              });
+                            }
+                          }}
+                        >
+                          <Text style={[styles.simpleFriendButtonText, { color: theme.colors.text }]}>
+                            Settle up
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </TouchableOpacity>
-                );
-              })
-              .filter(Boolean)}
+                ))}
             </ScrollView>
           )
         ) : (
@@ -3482,7 +3549,7 @@ export default function RealSplittingScreen() {
                     </Text>
                     <View style={styles.groupMetaRow}>
                       <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
-                        {(group.members?.length || 0)} members
+                        {getActiveMemberCount(group.members)} members
                       </Text>
                       <Text style={[styles.groupDivider, { color: theme.colors.textSecondary }]}>•</Text>
                       <Text style={[styles.groupActivity, { color: theme.colors.textSecondary }]}>
@@ -4065,69 +4132,13 @@ export default function RealSplittingScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Login-style Red Banner */}
-      <Animated.View 
-        style={[
-          styles.redBanner, 
-          { 
-            backgroundColor: theme.colors.brand,
-            borderBottomLeftRadius: scrollY.interpolate({
-              inputRange: [0, 100],
-              outputRange: [25, 0],
-              extrapolate: 'clamp'
-            }),
-            borderBottomRightRadius: scrollY.interpolate({
-              inputRange: [0, 100],
-              outputRange: [25, 0],
-              extrapolate: 'clamp'
-            }),
-            height: scrollY.interpolate({
-              inputRange: [0, 100],
-              outputRange: [120, 72],
-              extrapolate: 'clamp'
-            })
-          }
-        ]}
-      >
-        {/* Spendy Text - centers when not scrolled, moves to left when scrolled */}
-        <Animated.View
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            transform: [
-              { translateY: -14 },
-              { 
-                translateX: scrollY.interpolate({
-                  inputRange: [0, 100],
-                  outputRange: [-30, -150],
-                  extrapolate: 'clamp'
-                })
-              }
-            ]
-          }}
-        >
-          <Text style={styles.brandText}>Let'Split</Text>
-        </Animated.View>
-        {/* Profile Circle - moves to right center when scrolled */}
-        <Animated.View
-          style={[
-            styles.profileCircle,
-            {
-              right: scrollY.interpolate({
-                inputRange: [0, 100],
-                outputRange: [20, 20],
-                extrapolate: 'clamp'
-              }),
-              top: scrollY.interpolate({
-                inputRange: [0, 100],
-                outputRange: [35, 11],
-                extrapolate: 'clamp'
-              })
-            }
-          ]}
-        >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+      {/* Brand Header with Profile */}
+      <BrandHeader 
+        height={120}
+        showProfileButton={true}
+        onProfilePress={() => navigation.navigate('Profile' as never)}
+        profileContent={
           <TouchableOpacity 
             style={styles.profileCircleButton}
             onPress={() => navigation.navigate('Profile' as never)}
@@ -4147,8 +4158,8 @@ export default function RealSplittingScreen() {
               </Text>
             )}
           </TouchableOpacity>
-        </Animated.View>
-      </Animated.View>
+        }
+      />
       
       {/* Tab Navigation */}
       <View style={[styles.tabNavigation, { backgroundColor: theme.colors.background }]}>
@@ -4802,36 +4813,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: 'center',
   },
-  // Login-style red banner styles
-  redBanner: {
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  brandText: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '700',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 2, height: 3 },
-    textShadowRadius: 8,
-  },
-  memberText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 4,
-    opacity: 0.9,
-  },
+
+
   profileCircle: {
     position: 'absolute',
     top: 35,
@@ -5411,6 +5394,14 @@ expenseCardAmount: {
 expenseCardAmountText: {
   fontSize: 16,
   fontWeight: 'bold',
+},
+receiptIndicator: {
+  marginTop: 4,
+  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  borderRadius: 8,
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  alignSelf: 'flex-end',
 },
 expenseCardContent: {
   flex: 1,
@@ -6075,5 +6066,105 @@ cleanRemindButton: {
   shadowRadius: 3,
   elevation: 3,
   marginTop: 4,
+},
+
+// Simple Friend Item Styles (horizontal layout with status at right)
+simpleFriendItem: {
+  flexDirection: 'column',
+  paddingHorizontal: 24,
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: 'rgba(0,0,0,0.06)',
+  minHeight: 80,
+},
+simpleFriendMainRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  width: '100%',
+  marginBottom: 8,
+},
+simpleFriendLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+},
+simpleFriendAvatar: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 12,
+  overflow: 'hidden',
+},
+simpleFriendAvatarImage: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+},
+simpleFriendAvatarText: {
+  color: 'white',
+  fontSize: 16,
+  fontWeight: 'bold',
+},
+simpleFriendText: {
+  flex: 1,
+},
+simpleFriendName: {
+  fontSize: 17,
+  fontWeight: '600',
+  lineHeight: 22,
+  marginBottom: 2,
+},
+simpleFriendStatus: {
+  fontSize: 15,
+  fontWeight: '400',
+  lineHeight: 20,
+},
+simpleFriendRight: {
+  alignItems: 'flex-end',
+  justifyContent: 'center',
+},
+simpleFriendSettledContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+},
+simpleFriendSettledText: {
+  fontSize: 14,
+  fontWeight: '500',
+},
+simpleFriendAmountContainer: {
+  alignItems: 'flex-end',
+},
+simpleFriendAmountLabel: {
+  fontSize: 12,
+  fontWeight: '400',
+  marginBottom: 2,
+},
+simpleFriendAmount: {
+  fontSize: 16,
+  fontWeight: '700',
+},
+simpleFriendActions: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  alignSelf: 'flex-end',
+},
+simpleFriendButton: {
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  borderRadius: 8,
+  borderWidth: 1,
+},
+simpleFriendButtonText: {
+  fontSize: 14,
+  fontWeight: '500',
 },
 });

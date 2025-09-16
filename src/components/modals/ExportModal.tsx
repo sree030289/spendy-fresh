@@ -16,6 +16,12 @@ import FullscreenModal from '@/components/common/FullscreenModal';
 import { Group } from '@/services/firebase/splitting-disabled';
 import { SubscriptionService } from '@/services/SubscriptionService';
 
+// Helper function to get active member count
+const getActiveMemberCount = (members: any[]): number => {
+  if (!members || !Array.isArray(members)) return 0;
+  return members.filter(member => member.isActive !== false).length;
+};
+
 interface ExportModalProps {
   visible: boolean;
   onClose: () => void;
@@ -125,7 +131,7 @@ export default function ExportModal({
                 {group.name}
               </Text>
               <Text style={[styles.groupMeta, { color: theme.colors.textSecondary }]}>
-                {group.members.length} members • {group.currency}
+                {getActiveMemberCount(group.members)} members • {group.currency}
               </Text>
             </View>
             <View style={[styles.premiumBadge, { backgroundColor: '#FFD700' }]}>

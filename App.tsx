@@ -23,7 +23,7 @@ import { useTour } from './src/components/tour/TourProvider';
 // Import screens
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
-import SplashScreen from './src/screens/auth/SplashScreen';
+import MeetnSplitSplashScreen from './src/components/screens/MeetnSplitSplashScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import BiometricAuthScreen from './src/screens/auth/BiometricAuthScreen';
 import ChangePasswordScreen from '@/screens/auth/ChangePasswordScreen';
@@ -691,8 +691,8 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="Splash" 
             children={() => (
-              <SplashScreen 
-                onSplashComplete={() => {
+              <MeetnSplitSplashScreen 
+                onAnimationComplete={() => {
                   console.log('🎬 Splash completed, hiding splash screen');
                   setShowSplash(false);
                 }}

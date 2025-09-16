@@ -19,6 +19,12 @@ import { useSharedBalances } from '@/hooks/useSharedBalances';
 import { getCurrencySymbol } from '@/utils/currency';
 import { ApiService } from '@/services/api/ApiService';
 
+// Helper function to get active member count
+const getActiveMemberCount = (members: any[]): number => {
+  if (!members || !Array.isArray(members)) return 0;
+  return members.filter(member => member.isActive !== false).length;
+};
+
 // Define local interfaces to avoid external dependencies
 interface Group {
   id: string;
@@ -493,7 +499,7 @@ export default function UnifiedSettlementScreen({
                   {group.name}
                 </Text>
                 <Text style={[styles.groupSubtitle, { color: theme.colors.textSecondary }]}>
-                  {group.members?.length || 0} members • {getCurrencySymbol(user?.currency || 'USD')}
+                  {getActiveMemberCount(group.members)} members • {getCurrencySymbol(user?.currency || 'USD')}
                 </Text>
               </View>
             </View>
@@ -542,52 +548,19 @@ export default function UnifiedSettlementScreen({
       ) : (
         <>
           {settlementSuggestions.map((suggestion, index) => (
-            <View key={index} style={[styles.settlementCard, { backgroundColor: theme.colors.surface }]}>
-              <View style={styles.settlementFlow}>
-                <View style={styles.payerContainer}>
-                  <View style={[styles.userAvatar, { backgroundColor: theme.colors.primary }]}>
-                    <Text style={styles.userAvatarText}>
-                      {suggestion.fromUserName.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.userInfo}>
-                    <Text style={[styles.userName, { color: theme.colors.text }]}>
-                      {suggestion.fromUserName}
-                    </Text>
-                    <Text style={[styles.userAction, { color: theme.colors.textSecondary }]}>
-                      pays
-                    </Text>
-                  </View>
-                </View>
-                
-                <View style={styles.amountContainer}>
-                  <Text style={[styles.amount, { color: theme.colors.success }]}>
-                    {getCurrencySymbol(user?.currency || 'USD')}{suggestion.amount.toFixed(2)}
-                  </Text>
-                </View>
-                
-                <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
-                
-                <View style={styles.payeeContainer}>
-                  <View style={styles.userInfo}>
-                    <Text style={[styles.userName, { color: theme.colors.text }]}>
-                      {suggestion.toUserName}
-                    </Text>
-                    <Text style={[styles.userAction, { color: theme.colors.textSecondary }]}>
-                      receives
-                    </Text>
-                  </View>
-                  <View style={[styles.userAvatar, { backgroundColor: theme.colors.secondary }]}>
-                    <Text style={styles.userAvatarText}>
-                      {suggestion.toUserName.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
+            <View key={index} style={styles.settlementItem}>
+              <View style={styles.settlementTextContainer}>
+                <Text style={[styles.settlementText, { color: theme.colors.text }]}>
+                  {suggestion.fromUserName === (user?.fullName || 'You') 
+                    ? `You owe ${suggestion.toUserName} ${getCurrencySymbol(user?.currency || 'USD')}${suggestion.amount.toFixed(2)}`
+                    : `${suggestion.fromUserName} owes you ${getCurrencySymbol(user?.currency || 'USD')}${suggestion.amount.toFixed(2)}`
+                  }
+                </Text>
               </View>
               
               <TouchableOpacity
                 style={[
-                  styles.markPaidButton, 
+                  styles.settleButton, 
                   { backgroundColor: theme.colors.primary },
                   recordingPayment && { opacity: 0.6 }
                 ]}
@@ -597,11 +570,10 @@ export default function UnifiedSettlementScreen({
                 {recordingPayment ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Icon name="success" size={16} color="white"  />
+                  <Text style={styles.settleButtonText}>
+                    Mark as Paid
+                  </Text>
                 )}
-                <Text style={styles.markPaidText}>
-                  {recordingPayment ? 'Recording...' : 'Mark as Paid'}
-                </Text>
               </TouchableOpacity>
             </View>
           ))}
@@ -696,61 +668,13 @@ export default function UnifiedSettlementScreen({
       ) : (
         <>
           {settlementHistory.map((transaction, index) => (
-            <View key={transaction.id || index} style={[styles.historyCard, { backgroundColor: theme.colors.surface }]}>
-              <View style={styles.historyHeader}>
-                <View style={styles.historyFlow}>
-                  <View style={styles.historyUser}>
-                    <View style={[styles.userAvatar, { backgroundColor: theme.colors.primary }]}>
-                      <Text style={styles.userAvatarText}>
-                        {transaction.fromUserData.fullName.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <Text style={[styles.historyUserName, { color: theme.colors.text }]}>
-                      {transaction.fromUserData.fullName}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.historyAmount}>
-                    <Text style={[styles.historyAmountText, { color: theme.colors.success }]}>
-                      {getCurrencySymbol(transaction.currency)}{transaction.amount.toFixed(0)}
-                    </Text>
-                    <Icon name="forward" size={16} color={theme.colors.textSecondary} />
-                  </View>
-                  
-                  <View style={styles.historyUser}>
-                    <View style={[styles.userAvatar, { backgroundColor: theme.colors.secondary }]}>
-                      <Text style={styles.userAvatarText}>
-                        {transaction.toUserData.fullName.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <Text style={[styles.historyUserName, { color: theme.colors.text }]}>
-                      {transaction.toUserData.fullName}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              
-              <View style={styles.historyDetails}>
-                <View style={styles.historyMeta}>
-                  <View style={styles.historyMetaItem}>
-                    <Icon name="calendar" size={16} color={theme.colors.textSecondary} />
-                    <Text style={[styles.historyMetaText, { color: theme.colors.textSecondary }]}>
-                      {transaction.date.toLocaleDateString()}
-                    </Text>
-                  </View>
-                  <View style={styles.historyMetaItem}>
-                    <Icon name="success" size={16} color={theme.colors.success} />
-                    <Text style={[styles.historyMetaText, { color: theme.colors.success }]}>
-                      Settled
-                    </Text>
-                  </View>
-                </View>
-                {transaction.description && (
-                  <Text style={[styles.historyDescription, { color: theme.colors.textSecondary }]}>
-                    {transaction.description}
-                  </Text>
-                )}
-              </View>
+            <View key={transaction.id || index} style={styles.historyItem}>
+              <Text style={[styles.historyText, { color: theme.colors.text }]}>
+                {transaction.fromUserData.fullName} paid {transaction.toUserData.fullName} {getCurrencySymbol(transaction.currency)}{transaction.amount.toFixed(0)}
+              </Text>
+              <Text style={[styles.historyDate, { color: theme.colors.textSecondary }]}>
+                {transaction.date.toLocaleDateString()} • Settled
+              </Text>
             </View>
           ))}
         </>
@@ -1067,69 +991,122 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   
-  // Settlement History Styles
-  historyCard: {
-    padding: 16,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+  // Simplified Settlement Item Styles
+  settlementItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
+  },
+  settlementTextContainer: {
+    flex: 1,
+    marginRight: 16,
+  },
+  settlementText: {
+    fontSize: 17,
+    fontWeight: '500',
+    lineHeight: 22,
+  },
+  settleButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  settleButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // Simplified History Item Styles
+  historyItem: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
+  },
+  historyText: {
+    fontSize: 17,
+    fontWeight: '500',
+    lineHeight: 22,
+    marginBottom: 6,
+  },
+  historyDate: {
+    fontSize: 14,
+    fontWeight: '400',
   },
   historyHeader: {
-    marginBottom: 12,
+    marginBottom: 18, // Increased from 12
   },
   historyFlow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 50, // Added minimum height for consistency
   },
   historyUser: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    paddingVertical: 4, // Added vertical padding
   },
   historyUserName: {
-    fontSize: 16,
+    fontSize: 17, // Increased from 16
     fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: 12, // Increased from 8
     flex: 1,
+    lineHeight: 22, // Added line height for better readability
   },
   historyAmount: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 8,
+    paddingHorizontal: 20, // Increased from 16
+    paddingVertical: 8, // Added vertical padding
+    backgroundColor: 'rgba(34, 197, 94, 0.08)', // Added subtle background
+    borderRadius: 12, // Added border radius
+    gap: 10, // Increased from 8
   },
   historyAmountText: {
-    fontSize: 18,
+    fontSize: 20, // Increased from 18
     fontWeight: '700',
+    lineHeight: 24, // Added line height
   },
   historyDetails: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-    paddingTop: 12,
+    borderTopColor: 'rgba(0,0,0,0.08)', // Slightly more visible
+    paddingTop: 18, // Increased from 12
+    marginTop: 6, // Added margin for more space
   },
   historyMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 4, // Added vertical padding
   },
   historyMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8, // Increased from 6
+    paddingHorizontal: 8, // Added horizontal padding
+    paddingVertical: 6, // Added vertical padding
+    borderRadius: 8, // Added border radius for visual separation
+    backgroundColor: 'rgba(0,0,0,0.02)', // Subtle background
   },
   historyMetaText: {
-    fontSize: 14,
+    fontSize: 15, // Increased from 14
     fontWeight: '500',
+    lineHeight: 18, // Added line height
   },
   historyDescription: {
-    fontSize: 14,
-    marginTop: 8,
+    fontSize: 15, // Increased from 14
+    marginTop: 12, // Increased from 8
     fontStyle: 'italic',
+    lineHeight: 20, // Added line height
+    paddingTop: 8, // Added padding top
+    borderTopWidth: 0.5, // Added subtle separator
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
 });

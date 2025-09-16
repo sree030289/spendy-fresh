@@ -20,6 +20,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase/config';
 import { AIService } from '../ai/AIService';
 import { BankingService } from '../banking/BankingService';
+import { ApiService } from '../api/ApiService';
 
 // Smart Money Types
 export interface SmartTransaction {
@@ -597,6 +598,26 @@ export class SmartMoneyService {
     }
   }
 
+  static async uploadProfilePicture(imageUri: string, userId: string): Promise<string> {
+    try {
+      console.log('📤 Uploading profile picture to Firebase Storage...');
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      
+      const filename = `profiles/${userId}/profile_picture.jpg`;
+      const storageRef = ref(storage, filename);
+      
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      console.log('✅ Profile picture uploaded successfully:', downloadURL);
+      return downloadURL;
+    } catch (error) {
+      console.error('❌ Upload profile picture error:', error);
+      throw error;
+    }
+  }
+
   // BANK INTEGRATION HELPERS
   static async syncBankTransactions(userId: string, accountId: string): Promise<void> {
     try {
@@ -657,7 +678,6 @@ export class SmartMoneyService {
       const transaction = transactionDoc.data() as SmartTransaction;
       
       // Use ApiService instead of disabled SplittingService
-      const { ApiService } = await import('../api/ApiService');
       const apiService = ApiService.getInstance();
       
       // Find user's groups to determine where to split

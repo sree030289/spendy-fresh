@@ -12,13 +12,13 @@ const getApiBaseUrl = () => {
   // Use Firebase Functions for both dev and prod builds from spendy-develop project
   if (buildType === 'dev' || (environment === 'development' && buildType !== 'prod')) {
     console.log('🔧 Using DEVELOPMENT Firebase Functions API endpoint');
-    // Use Firebase Functions from spendy-develop project for development
-    return 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi';
+    // Use the new Cloud Run deployed function URL
+    return 'https://spendyapi-2fy22mkg6q-uc.a.run.app';
   }
   
   // Use production API for production builds (same endpoint for now)
   console.log('🔧 Using PRODUCTION Firebase Functions API endpoint');
-  return 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi';
+  return 'https://spendyapi-2fy22mkg6q-uc.a.run.app';
 };
 
 const API_BASE_URL = getApiBaseUrl();
