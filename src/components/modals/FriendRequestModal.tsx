@@ -186,7 +186,7 @@ export default function FriendRequestModal({
                 Message:
               </Text>
               <Text style={[styles.messageText, { color: theme.colors.text }]}>
-                {friendRequest.message || `Hi! I'd like to add you as a friend on Spendy so we can split expenses together.`}
+                {friendRequest.message || `Hi! I'd like to add you as a friend on Meet-n-Split so we can split expenses together.`}
               </Text>
             </View>
 

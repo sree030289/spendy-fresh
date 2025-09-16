@@ -62,7 +62,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       >
         <View style={styles.heroContent}>
           <Text style={[styles.heroTitle, { color: theme.colors.surface }]}>
-            Spendy
+            Meet-n-Split
           </Text>
           <Text style={[styles.heroSubtitle, { color: theme.colors.surface }]}>
             Split expenses, track balances, stay organized
@@ -91,7 +91,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* Features Section */}
       <View style={styles.featuresSection}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Why Choose Spendy?
+          Why Choose Meet-n-Split?
         </Text>
         
         <View style={styles.featuresGrid}>
@@ -173,7 +173,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
           Ready to Get Started?
         </Text>
         <Text style={[styles.finalCtaSubtitle, { color: theme.colors.textSecondary }]}>
-          Join thousands of users who trust Spendy with their shared expenses
+          Join thousands of users who trust Meet-n-Split with their shared expenses
         </Text>
         
         <TouchableOpacity

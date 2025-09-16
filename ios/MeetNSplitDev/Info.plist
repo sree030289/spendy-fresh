@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>Spendy Dev</string>
+    <string>MeetNSplit Dev</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -52,23 +52,25 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow Spendy to access your camera for QR code scanning and profile pictures.</string>
+    <string>Allow MeetNSplit to access your camera for QR code scanning and profile pictures.</string>
     <key>NSContactsUsageDescription</key>
-    <string>Allow Spendy to access your contacts to add friends.</string>
+    <string>Allow MeetNSplit to access your contacts to add friends.</string>
     <key>NSFaceIDUsageDescription</key>
-    <string>Allow Spendy to use Face ID for secure authentication.</string>
+    <string>Allow MeetNSplit to use Face ID for secure authentication.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Allow Spendy to use your location for expense tracking.</string>
+    <string>Allow MeetNSplit to use your location for expense tracking.</string>
     <key>NSLocationAlwaysUsageDescription</key>
-    <string>Allow Spendy to use your location for automatic expense categorization.</string>
+    <string>Allow MeetNSplit to use your location for automatic expense categorization.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Allow Spendy to use your location when you're using the app.</string>
+    <string>Allow MeetNSplit to use your location when you're using the app.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>This app needs access to save photos to your photo library.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>This app needs access to your photo library to update your profile picture and save expense receipts.</string>
+    <key>NSUserNotificationsUsageDescription</key>
+    <string>This app sends push notifications for expense updates, payment reminders, and group activity.</string>
     <key>UIBackgroundModes</key>
     <array>
       <string>fetch</string>

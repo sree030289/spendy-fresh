@@ -289,7 +289,7 @@ const EnhancedSplashScreen: React.FC<EnhancedSplashScreenProps> = ({ onAnimation
               },
             ]}
           >
-            <Text style={styles.appName}>Spendy</Text>
+            <Text style={styles.appName}>Meet-n-Split</Text>
             <Text style={styles.tagline}>Smart Bill Splitting</Text>
           </Animated.View>
         )}

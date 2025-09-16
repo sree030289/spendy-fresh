@@ -178,7 +178,7 @@ const AnimatedSplashScreen: React.FC<AnimatedSplashScreenProps> = ({ onAnimation
           },
         ]}
       >
-        Spendy
+        Meet-n-Split
       </Animated.Text>
       
       <Animated.Text

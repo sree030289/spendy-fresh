@@ -55,7 +55,7 @@ const sampleAIData = [
 const tourSteps: TourStep[] = [
   {
     id: 'welcome',
-    title: 'Welcome to Spendy! 💰',
+    title: 'Welcome to Meet-n-Split! 💰',
     quote: 'Split. Track. Share. Make Money.',
     description: 'Australia\'s smartest expense sharing app with real-time balances, receipt scanning, and exclusive deals from your favorite brands.',
     icon: 'sparkles-outline',
@@ -330,11 +330,11 @@ export default function AppTour({ visible, onComplete, onSkip }: AppTourProps) {
 
   const getScreenTitle = (stepId: string) => {
     switch (stepId) {
-      case 'welcome': return 'Spendy';
+      case 'welcome': return 'MeetNSplit';
       case 'expenses-groups': return 'Expenses & Groups';
       case 'personal-tracker': return 'Personal Tracker';
       case 'ai-deals': return 'AI Analytics & Deals';
-      default: return 'Spendy';
+      default: return 'MeetNSplit';
     }
   };
 

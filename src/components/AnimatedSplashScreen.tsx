@@ -178,7 +178,7 @@ const AnimatedSplashScreen: React.FC<AnimatedSplashScreenProps> = ({ onAnimation
           },
         ]}
       >
-        Spendy
+        Meet-n-Split
       </Animated.Text>
       
       <Animated.Text
@@ -201,36 +201,6 @@ const AnimatedSplashScreen: React.FC<AnimatedSplashScreenProps> = ({ onAnimation
       </Animated.Text>
     </View>
   );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 40,
-  },
-  appName: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: '#D6001C',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  tagline: {
-    fontSize: 18,
-    color: '#666666',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-});
-
-export default AnimatedSplashScreen;
 };
 
 const styles = StyleSheet.create({

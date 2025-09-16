@@ -276,7 +276,7 @@ export default function FriendRequestActionModal({
 
               {/* Message */}
               <Text style={[styles.message, { color: theme.colors.textSecondary }]}>
-                {requestData.message || 'wants to add you as a friend on Spendy'}
+                {requestData.message || 'wants to add you as a friend on Meet-n-Split'}
               </Text>
 
               {/* Action Buttons */}

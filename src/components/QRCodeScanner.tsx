@@ -90,7 +90,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
     try {
       console.log('📱 QR Code scanned:', data);
       
-      // Simple validation - check if it's a valid JSON or Spendy URL
+      // Simple validation - check if it's a valid JSON or MeetNSplit URL
       let isValidQR = false;
       
       if (data.startsWith('spendy://')) {
@@ -265,7 +265,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
             <View style={styles.infoCard}>
               <Icon name="information" size={16} color="rgba(255,255,255,0.8)"  />
               <Text style={styles.infoText}>
-                Only scan QR codes from trusted Spendy users
+                Only scan QR codes from trusted Meet-n-Split users
               </Text>
             </View>
           </View>
