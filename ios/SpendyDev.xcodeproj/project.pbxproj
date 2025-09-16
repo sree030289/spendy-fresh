@@ -9,27 +9,27 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		73E3028E9A7054457D64B70F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F8F919EBADC663DCACE458C0 /* PrivacyInfo.xcprivacy */; };
-		A7B5E122C705567426A90A07 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67A2B49EC50D02697CB31215 /* ExpoModulesProvider.swift */; };
+		62359E43B375FC3B0FDF1AEC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D6C48FD49CCA09D1D3FF3877 /* PrivacyInfo.xcprivacy */; };
+		7956DA6B5751643516BF9A81 /* libPods-SpendyDev.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0D419BD88CE4841694469300 /* libPods-SpendyDev.a */; };
+		A2293EE5913F94D7460A361D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A854A14ED857AC7A63CC5429 /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		BDEC412F8018AD2E9B5E00F2 /* libPods-SpendyDev.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F45FC383A9A138FBD1205D4B /* libPods-SpendyDev.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0D419BD88CE4841694469300 /* libPods-SpendyDev.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SpendyDev.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07F961A680F5B00A75B9A /* SpendyDev.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SpendyDev.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = SpendyDev/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SpendyDev/Info.plist; sourceTree = "<group>"; };
-		3079D185AF54F5701C86245A /* Pods-SpendyDev.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SpendyDev.debug.xcconfig"; path = "Target Support Files/Pods-SpendyDev/Pods-SpendyDev.debug.xcconfig"; sourceTree = "<group>"; };
-		67A2B49EC50D02697CB31215 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SpendyDev/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		2F33F07FD1F5768E7C527857 /* Pods-SpendyDev.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SpendyDev.release.xcconfig"; path = "Target Support Files/Pods-SpendyDev/Pods-SpendyDev.release.xcconfig"; sourceTree = "<group>"; };
+		597CE0B354CB86E476D920EE /* Pods-SpendyDev.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SpendyDev.debug.xcconfig"; path = "Target Support Files/Pods-SpendyDev/Pods-SpendyDev.debug.xcconfig"; sourceTree = "<group>"; };
+		A854A14ED857AC7A63CC5429 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SpendyDev/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SpendyDev/SplashScreen.storyboard; sourceTree = "<group>"; };
-		B00909DFD3F6D99ABD959251 /* Pods-SpendyDev.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SpendyDev.release.xcconfig"; path = "Target Support Files/Pods-SpendyDev/Pods-SpendyDev.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		D6C48FD49CCA09D1D3FF3877 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = SpendyDev/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = SpendyDev/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* SpendyDev-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "SpendyDev-Bridging-Header.h"; path = "SpendyDev/SpendyDev-Bridging-Header.h"; sourceTree = "<group>"; };
-		F45FC383A9A138FBD1205D4B /* libPods-SpendyDev.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SpendyDev.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F8F919EBADC663DCACE458C0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = SpendyDev/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BDEC412F8018AD2E9B5E00F2 /* libPods-SpendyDev.a in Frameworks */,
+				7956DA6B5751643516BF9A81 /* libPods-SpendyDev.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,7 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				F8F919EBADC663DCACE458C0 /* PrivacyInfo.xcprivacy */,
+				D6C48FD49CCA09D1D3FF3877 /* PrivacyInfo.xcprivacy */,
 			);
 			name = SpendyDev;
 			sourceTree = "<group>";
@@ -62,9 +62,27 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				F45FC383A9A138FBD1205D4B /* libPods-SpendyDev.a */,
+				0D419BD88CE4841694469300 /* libPods-SpendyDev.a */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		612DEBB965A7761A1AE5A412 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				BD2C2B72C20779C734CC1B54 /* SpendyDev */,
+			);
+			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
+		6ADC928E5C9F53482D5A9EF4 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				597CE0B354CB86E476D920EE /* Pods-SpendyDev.debug.xcconfig */,
+				2F33F07FD1F5768E7C527857 /* Pods-SpendyDev.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -81,8 +99,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				B078C486AF0714EDE1542DA6 /* Pods */,
-				E938521145AC440200C14788 /* ExpoModulesProviders */,
+				6ADC928E5C9F53482D5A9EF4 /* Pods */,
+				612DEBB965A7761A1AE5A412 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -97,24 +115,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		AE03A0731C00295486AEA4A4 /* SpendyDev */ = {
-			isa = PBXGroup;
-			children = (
-				67A2B49EC50D02697CB31215 /* ExpoModulesProvider.swift */,
-			);
-			name = SpendyDev;
-			sourceTree = "<group>";
-		};
-		B078C486AF0714EDE1542DA6 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				3079D185AF54F5701C86245A /* Pods-SpendyDev.debug.xcconfig */,
-				B00909DFD3F6D99ABD959251 /* Pods-SpendyDev.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
-			sourceTree = "<group>";
-		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
@@ -124,12 +124,12 @@
 			path = SpendyDev/Supporting;
 			sourceTree = "<group>";
 		};
-		E938521145AC440200C14788 /* ExpoModulesProviders */ = {
+		BD2C2B72C20779C734CC1B54 /* SpendyDev */ = {
 			isa = PBXGroup;
 			children = (
-				AE03A0731C00295486AEA4A4 /* SpendyDev */,
+				A854A14ED857AC7A63CC5429 /* ExpoModulesProvider.swift */,
 			);
-			name = ExpoModulesProviders;
+			name = SpendyDev;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "SpendyDev" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				3D497159DF6CE9ACB0047FA4 /* [Expo] Configure project */,
+				DC1AA5881AAB42D221491730 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				532EA743E7E44D42158AEC77 /* [CP] Embed Pods Frameworks */,
+				ACB8451F9FFE73DED7C009FB /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				73E3028E9A7054457D64B70F /* PrivacyInfo.xcprivacy in Resources */,
+				62359E43B375FC3B0FDF1AEC /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,43 +238,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		3D497159DF6CE9ACB0047FA4 /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-SpendyDev/expo-configure-project.sh\"\n";
-		};
-		532EA743E7E44D42158AEC77 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-SpendyDev/Pods-SpendyDev-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SpendyDev/Pods-SpendyDev-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
@@ -331,6 +294,43 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SpendyDev/Pods-SpendyDev-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		ACB8451F9FFE73DED7C009FB /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SpendyDev/Pods-SpendyDev-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SpendyDev/Pods-SpendyDev-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		DC1AA5881AAB42D221491730 /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-SpendyDev/expo-configure-project.sh\"\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -339,7 +339,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				A7B5E122C705567426A90A07 /* ExpoModulesProvider.swift in Sources */,
+				A2293EE5913F94D7460A361D /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -348,7 +348,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3079D185AF54F5701C86245A /* Pods-SpendyDev.debug.xcconfig */;
+			baseConfigurationReference = 597CE0B354CB86E476D920EE /* Pods-SpendyDev.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -384,7 +384,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B00909DFD3F6D99ABD959251 /* Pods-SpendyDev.release.xcconfig */;
+			baseConfigurationReference = 2F33F07FD1F5768E7C527857 /* Pods-SpendyDev.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;

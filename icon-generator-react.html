@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meet n Split - Icon Generator</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useCallback } = React;
+
+        const IconGenerator = () => {
+          const [isGenerating, setIsGenerating] = useState(false);
+          const [progress, setProgress] = useState('');
+          const canvasRef = useRef(null);
+
+          const iconSpecs = {
+            ios: [
+              { size: 180, name: 'ios-icon-180x180.png', desc: 'App Store' },
+              { size: 120, name: 'ios-icon-120x120.png', desc: 'iPhone @2x' },
+              { size: 87, name: 'ios-icon-87x87.png', desc: 'iPhone @3x' },
+              { size: 80, name: 'ios-icon-80x80.png', desc: 'iPad Spotlight @2x' },
+              { size: 60, name: 'ios-icon-60x60.png', desc: 'iPhone Spotlight @2x' },
+              { size: 58, name: 'ios-icon-58x58.png', desc: 'Settings @2x' },
+              { size: 40, name: 'ios-icon-40x40.png', desc: 'iPad Spotlight' },
+              { size: 29, name: 'ios-icon-29x29.png', desc: 'Settings' }
+            ],
+            androidStandard: [
+              { size: 512, name: 'android-icon-512x512.png', desc: 'Play Store' },
+              { size: 192, name: 'android-icon-192x192-xxxhdpi.png', desc: 'XXXHDPI' },
+              { size: 144, name: 'android-icon-144x144-xxhdpi.png', desc: 'XXHDPI' },
+              { size: 96, name: 'android-icon-96x96-xhdpi.png', desc: 'XHDPI' },
+              { size: 72, name: 'android-icon-72x72-hdpi.png', desc: 'HDPI' },
+              { size: 48, name: 'android-icon-48x48-mdpi.png', desc: 'MDPI' }
+            ],
+            androidAdaptive: [
+              { size: 432, name: 'android-adaptive-432x432-xxxhdpi.png', desc: 'Adaptive XXXHDPI' },
+              { size: 324, name: 'android-adaptive-324x324-xxhdpi.png', desc: 'Adaptive XXHDPI' },
+              { size: 216, name: 'android-adaptive-216x216-xhdpi.png', desc: 'Adaptive XHDPI' },
+              { size: 162, name: 'android-adaptive-162x162-hdpi.png', desc: 'Adaptive HDPI' },
+              { size: 108, name: 'android-adaptive-108x108-mdpi.png', desc: 'Adaptive MDPI' }
+            ]
+          };
+
+          const IconComponent = ({ size, isIOS = false, isAdaptive = false, className = '' }) => {
+            const baseFontSize = Math.max(size / 8, 8);
+            const nFontSize = baseFontSize * 0.8;
+            const lineWidth = baseFontSize * 0.6;
+            const lineOffset = baseFontSize * 0.8;
+
+            const getBorderRadius = () => {
+              if (isIOS) return '22%';
+              if (isAdaptive) return '50%';
+              return '8px';
+            };
+
+            const containerStyle = {
+              width: `${size}px`,
+              height: `${size}px`,
+              backgroundColor: '#B0004F',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: getBorderRadius(),
+              position: 'relative',
+              overflow: 'hidden'
+            };
+
+            const logoContentStyle = {
+              textAlign: 'center',
+              color: 'white',
+              fontFamily: 'Arial, sans-serif'
+            };
+
+            const meetTextStyle = {
+              fontSize: `${baseFontSize}px`,
+              fontWeight: 'bold',
+              color: '#1e3a5f',
+              margin: 0,
+              lineHeight: 1
+            };
+
+            const nTextStyle = {
+              fontSize: `${nFontSize}px`,
+              fontWeight: 'bold',
+              color: '#ffa500',
+              margin: 0,
+              position: 'relative',
+              display: 'inline-block'
+            };
+
+            const splitTextStyle = {
+              fontSize: `${baseFontSize}px`,
+              fontWeight: 'bold',
+              color: '#1e3a5f',
+              margin: 0,
+              lineHeight: 1
+            };
+
+            const iLetterStyle = {
+              position: 'relative',
+              color: '#1e3a5f'
+            };
+
+            const dotStyle = {
+              position: 'absolute',
+              top: '-0.1em',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              color: '#ffa500',
+              fontSize: '0.4em'
+            };
+
+            const lineBeforeStyle = {
+              content: '""',
+              position: 'absolute',
+              top: '50%',
+              left: `-${lineOffset}px`,
+              width: `${lineWidth}px`,
+              height: '3px',
+              backgroundColor: '#ffa500',
+              transform: 'translateY(-50%)'
+            };
+
+            const lineAfterStyle = {
+              content: '""',
+              position: 'absolute',
+              top: '50%',
+              right: `-${lineOffset}px`,
+              width: `${lineWidth}px`,
+              height: '3px',
+              backgroundColor: '#ffa500',
+              transform: 'translateY(-50%)'
+            };
+
+            return React.createElement('div', { style: containerStyle, className: className },
+              React.createElement('div', { style: logoContentStyle },
+                React.createElement('div', { style: meetTextStyle }, 'Meet'),
+                React.createElement('div', { style: nTextStyle },
+                  'n',
+                  React.createElement('span', { style: lineBeforeStyle }),
+                  React.createElement('span', { style: lineAfterStyle })
+                ),
+                React.createElement('div', { style: splitTextStyle },
+                  'Spl',
+                  React.createElement('span', { style: iLetterStyle },
+                    'ı',
+                    React.createElement('span', { style: dotStyle }, '•')
+                  ),
+                  't'
+                )
+              )
+            );
+          };
+
+          const generateIcon = useCallback(async (spec, type) => {
+            // Create temporary icon element
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-9999px';
+            tempContainer.style.top = '-9999px';
+            document.body.appendChild(tempContainer);
+
+            // Create React element and render it
+            const iconElement = document.createElement('div');
+            tempContainer.appendChild(iconElement);
+
+            // Create the icon HTML
+            const isIOS = type === 'ios';
+            const isAdaptive = type === 'android-adaptive';
+            
+            const baseFontSize = Math.max(spec.size / 8, 8);
+            const nFontSize = baseFontSize * 0.8;
+            const lineWidth = baseFontSize * 0.6;
+            const lineOffset = baseFontSize * 0.8;
+
+            const getBorderRadius = () => {
+              if (isIOS) return '22%';
+              if (isAdaptive) return '50%';
+              return '8px';
+            };
+
+            iconElement.innerHTML = `
+              <div style="
+                width: ${spec.size}px;
+                height: ${spec.size}px;
+                background-color: #B0004F;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border-radius: ${getBorderRadius()};
+                position: relative;
+                overflow: hidden;
+                font-family: Arial, sans-serif;
+              ">
+                <div style="text-align: center; color: white;">
+                  <div style="
+                    font-size: ${baseFontSize}px;
+                    font-weight: bold;
+                    color: #1e3a5f;
+                    margin: 0;
+                    line-height: 1;
+                  ">Meet</div>
+                  <div style="
+                    font-size: ${nFontSize}px;
+                    font-weight: bold;
+                    color: #ffa500;
+                    margin: 0;
+                    position: relative;
+                    display: inline-block;
+                  ">
+                    n
+                    <span style="
+                      position: absolute;
+                      top: 50%;
+                      left: -${lineOffset}px;
+                      width: ${lineWidth}px;
+                      height: 3px;
+                      background-color: #ffa500;
+                      transform: translateY(-50%);
+                      display: block;
+                    "></span>
+                    <span style="
+                      position: absolute;
+                      top: 50%;
+                      right: -${lineOffset}px;
+                      width: ${lineWidth}px;
+                      height: 3px;
+                      background-color: #ffa500;
+                      transform: translateY(-50%);
+                      display: block;
+                    "></span>
+                  </div>
+                  <div style="
+                    font-size: ${baseFontSize}px;
+                    font-weight: bold;
+                    color: #1e3a5f;
+                    margin: 0;
+                    line-height: 1;
+                  ">
+                    Spl<span style="position: relative; color: #1e3a5f;">ı<span style="
+                      position: absolute;
+                      top: -0.1em;
+                      left: 50%;
+                      transform: translateX(-50%);
+                      color: #ffa500;
+                      font-size: 0.4em;
+                    ">•</span></span>t
+                  </div>
+                </div>
+              </div>
+            `;
+
+            try {
+              // Use html2canvas to capture the element
+              const canvas = await html2canvas(iconElement.firstElementChild, {
+                backgroundColor: '#B0004F',
+                scale: 1,
+                width: spec.size,
+                height: spec.size,
+                useCORS: true
+              });
+
+              // Clean up
+              document.body.removeChild(tempContainer);
+
+              // Convert canvas to blob
+              return new Promise((resolve) => {
+                canvas.toBlob((blob) => {
+                  if (blob) resolve(blob);
+                }, 'image/png');
+              });
+            } catch (error) {
+              document.body.removeChild(tempContainer);
+              throw error;
+            }
+          }, []);
+
+          const generateAllIcons = useCallback(async () => {
+            setIsGenerating(true);
+            setProgress('Starting generation...');
+
+            try {
+              const zip = new JSZip();
+              
+              // Create folders
+              const iosFolder = zip.folder('iOS');
+              const androidFolder = zip.folder('Android');
+              const androidStandardFolder = androidFolder?.folder('Standard');
+              const androidAdaptiveFolder = androidFolder?.folder('Adaptive');
+
+              const allSpecs = [
+                ...iconSpecs.ios.map(spec => ({ ...spec, type: 'ios' })),
+                ...iconSpecs.androidStandard.map(spec => ({ ...spec, type: 'android-standard' })),
+                ...iconSpecs.androidAdaptive.map(spec => ({ ...spec, type: 'android-adaptive' }))
+              ];
+
+              let completed = 0;
+
+              // Generate all icons
+              for (const specWithType of allSpecs) {
+                setProgress(`Generating ${specWithType.name}... (${completed + 1}/${allSpecs.length})`);
+                
+                try {
+                  const blob = await generateIcon(specWithType, specWithType.type);
+                  
+                  // Add to appropriate folder
+                  if (specWithType.type === 'ios') {
+                    iosFolder?.file(specWithType.name, blob);
+                  } else if (specWithType.type === 'android-standard') {
+                    androidStandardFolder?.file(specWithType.name, blob);
+                  } else if (specWithType.type === 'android-adaptive') {
+                    androidAdaptiveFolder?.file(specWithType.name, blob);
+                  }
+                  
+                  completed++;
+                } catch (error) {
+                  console.error(`Failed to generate ${specWithType.name}:`, error);
+                }
+
+                // Small delay to prevent browser freezing
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+
+              // Add README
+              const readmeContent = `# Meet n Split App Icons
+
+Generated on ${new Date().toLocaleDateString()}
+
+## iOS Icons (${iconSpecs.ios.length} files)
+${iconSpecs.ios.map(spec => `- ${spec.name} (${spec.size}x${spec.size}) - ${spec.desc}`).join('\n')}
+
+## Android Standard Icons (${iconSpecs.androidStandard.length} files)
+${iconSpecs.androidStandard.map(spec => `- ${spec.name} (${spec.size}x${spec.size}) - ${spec.desc}`).join('\n')}
+
+## Android Adaptive Icons (${iconSpecs.androidAdaptive.length} files)
+${iconSpecs.androidAdaptive.map(spec => `- ${spec.name} (${spec.size}x${spec.size}) - ${spec.desc}`).join('\n')}
+
+## Usage Instructions
+
+### iOS
+1. Add icons to your Xcode project's Assets.xcassets
+2. Create an App Icon image set
+3. Drag the appropriate sized icons to their slots
+
+### Android
+1. Place standard icons in res/drawable-* folders based on density
+2. For adaptive icons, place in res/mipmap-* folders
+3. Use the 512x512 icon for Play Store listing
+
+## File Structure
+- iOS/ - Contains all iOS app icons
+- Android/Standard/ - Contains standard Android launcher icons  
+- Android/Adaptive/ - Contains adaptive Android launcher icons
+
+Total icons generated: ${allSpecs.length}
+`;
+
+              zip.file('README.md', readmeContent);
+
+              setProgress('Creating zip file...');
+
+              // Generate zip file
+              const zipBlob = await zip.generateAsync({ type: 'blob' });
+              
+              // Download zip file
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(zipBlob);
+              link.download = 'meet-split-app-icons.zip';
+              link.click();
+
+              setProgress('✅ Download complete!');
+              setTimeout(() => setProgress(''), 3000);
+
+            } catch (error) {
+              console.error('Error generating icons:', error);
+              setProgress('❌ Error generating icons. Check console for details.');
+            } finally {
+              setIsGenerating(false);
+            }
+          }, [generateIcon, iconSpecs]);
+
+          return React.createElement('div', { 
+            style: { 
+              maxWidth: '1200px', 
+              margin: '0 auto', 
+              padding: '20px',
+              fontFamily: 'Arial, sans-serif'
+            }
+          },
+            React.createElement('div', { style: { textAlign: 'center', marginBottom: '30px' }},
+              React.createElement('h1', { style: { color: '#B0004F', marginBottom: '10px' }}, 
+                'Meet n Split App Icons Generator'
+              ),
+              React.createElement('p', null, 'Generate professional app icons for iOS and Android')
+            ),
+
+            React.createElement('div', {
+              style: {
+                backgroundColor: '#e8f4f8',
+                padding: '20px',
+                borderRadius: '8px',
+                marginBottom: '30px'
+              }
+            },
+              React.createElement('h3', { style: { marginTop: 0, color: '#1e3a5f' }}, 
+                '📦 Complete Icon Package'
+              ),
+              React.createElement('p', null, 'This will generate:'),
+              React.createElement('ul', null,
+                React.createElement('li', null, React.createElement('strong', null, `${iconSpecs.ios.length} iOS icons`), ' - All required sizes for App Store submission'),
+                React.createElement('li', null, React.createElement('strong', null, `${iconSpecs.androidStandard.length} Android standard icons`), ' - All density sizes'),
+                React.createElement('li', null, React.createElement('strong', null, `${iconSpecs.androidAdaptive.length} Android adaptive icons`), ' - For modern Android themes')
+              ),
+              
+              React.createElement('button', {
+                onClick: generateAllIcons,
+                disabled: isGenerating,
+                style: {
+                  backgroundColor: isGenerating ? '#ccc' : '#B0004F',
+                  color: 'white',
+                  border: 'none',
+                  padding: '15px 30px',
+                  borderRadius: '8px',
+                  cursor: isGenerating ? 'not-allowed' : 'pointer',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  display: 'block',
+                  margin: '20px auto 0'
+                }
+              }, isGenerating ? 'Generating...' : 'Generate & Download All Icons'),
+
+              progress && React.createElement('div', {
+                style: {
+                  textAlign: 'center',
+                  marginTop: '15px',
+                  fontWeight: 'bold',
+                  color: '#B0004F'
+                }
+              }, progress)
+            ),
+
+            // Preview Section
+            React.createElement('div', {
+              style: {
+                backgroundColor: 'white',
+                padding: '20px',
+                borderRadius: '10px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                marginBottom: '20px'
+              }
+            },
+              React.createElement('h2', { style: { marginTop: 0, color: '#333' }}, 'Icon Previews'),
+              
+              React.createElement('div', {
+                style: {
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '20px',
+                  marginTop: '20px'
+                }
+              },
+                React.createElement('div', { style: { textAlign: 'center' }},
+                  React.createElement(IconComponent, { size: 120, isIOS: true }),
+                  React.createElement('div', { style: { marginTop: '10px', fontWeight: 'bold' }}, 'iOS Icons'),
+                  React.createElement('div', { style: { fontSize: '12px', color: '#666' }}, 
+                    `${iconSpecs.ios.length} sizes (29px - 180px)`
+                  )
+                ),
+
+                React.createElement('div', { style: { textAlign: 'center' }},
+                  React.createElement(IconComponent, { size: 120, isIOS: false, isAdaptive: false }),
+                  React.createElement('div', { style: { marginTop: '10px', fontWeight: 'bold' }}, 'Android Standard'),
+                  React.createElement('div', { style: { fontSize: '12px', color: '#666' }}, 
+                    `${iconSpecs.androidStandard.length} sizes (48px - 512px)`
+                  )
+                ),
+
+                React.createElement('div', { style: { textAlign: 'center' }},
+                  React.createElement(IconComponent, { size: 120, isIOS: false, isAdaptive: true }),
+                  React.createElement('div', { style: { marginTop: '10px', fontWeight: 'bold' }}, 'Android Adaptive'),
+                  React.createElement('div', { style: { fontSize: '12px', color: '#666' }}, 
+                    `${iconSpecs.androidAdaptive.length} sizes (108px - 432px)`
+                  )
+                )
+              )
+            ),
+
+            // Hidden canvas container
+            React.createElement('div', { 
+              ref: canvasRef, 
+              style: { position: 'absolute', left: '-9999px', top: '-9999px' } 
+            })
+          );
+        };
+
+        ReactDOM.render(React.createElement(IconGenerator), document.getElementById('root'));
+    </script>
+</body>
+</html>

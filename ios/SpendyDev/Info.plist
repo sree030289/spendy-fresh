@@ -52,7 +52,7 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow Spendy to access your camera for QR code scanning.</string>
+    <string>Allow Spendy to access your camera for QR code scanning and profile pictures.</string>
     <key>NSContactsUsageDescription</key>
     <string>Allow Spendy to access your contacts to add friends.</string>
     <key>NSFaceIDUsageDescription</key>
@@ -66,9 +66,9 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>This app needs access to save receipts and expense images to your photo library.</string>
+    <string>This app needs access to save photos to your photo library.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>This app needs access to your photo library to save and share expense receipts and QR codes.</string>
+    <string>This app needs access to your photo library to update your profile picture and save expense receipts.</string>
     <key>UIBackgroundModes</key>
     <array>
       <string>fetch</string>

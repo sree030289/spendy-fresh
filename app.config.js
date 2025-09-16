@@ -66,11 +66,11 @@ export default {
     scheme: "spendy",
     userInterfaceStyle: "automatic",
     projectId: envConfig.firebase.projectId,
-    icon: "./assets/icon-receipt.png",
+    icon: "./assets/icon.png",
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#D6001C"
+      backgroundColor: "#B0004F"
     },
     ios: {
       supportsTablet: true,
@@ -84,6 +84,7 @@ export default {
         NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses location to provide location-based expense tracking and merchant suggestions.",
         NSPhotoLibraryUsageDescription: "This app needs access to your photo library to update your profile picture and save expense receipts.",
         NSPhotoLibraryAddUsageDescription: "This app needs access to save photos to your photo library.",
+        NSUserNotificationsUsageDescription: "This app sends push notifications for expense updates, payment reminders, and group activity.",
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: envConfig.allowArbitraryLoads,
           NSAllowsLocalNetworking: !IS_PRODUCTION
@@ -92,11 +93,15 @@ export default {
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon-receipt.png",
-        backgroundColor: "#D6001C"
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#B0004F"
       },
       package: envConfig.package,
       googleServicesFile: envConfig.androidGoogleServicesFile,
+      notification: {
+        icon: "./assets/notification-icon-meetnsplit.png",
+        color: "#B0004F"
+      },
       intentFilters: [
         {
           action: "VIEW",
@@ -120,7 +125,15 @@ export default {
     },
     plugins: [
       "expo-font",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/notification-icon-meetnsplit.png",
+          color: "#B0004F",
+          sounds: ["./assets/notification_sound.wav"],
+          mode: "production"
+        }
+      ],
       [
         "expo-camera",
         {
