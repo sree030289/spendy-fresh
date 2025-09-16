@@ -77,13 +77,13 @@ export default {
       bundleIdentifier: envConfig.bundleIdentifier,
       googleServicesFile: envConfig.googleServicesFile,
       infoPlist: {
-        NSCameraUsageDescription: "This app needs access to camera for QR code scanning to quickly add expenses and split bills.",
+        NSCameraUsageDescription: "This app needs access to camera for QR code scanning and taking profile pictures.",
         NSFaceIDUsageDescription: "Allow Spendy to use Face ID for secure authentication.",
         NSContactsUsageDescription: "This app needs access to contacts to help you add friends and split expenses with people in your contact list.",
         NSLocationWhenInUseUsageDescription: "This app uses location to provide location-based expense tracking and merchant suggestions.",
         NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses location to provide location-based expense tracking and merchant suggestions.",
-        NSPhotoLibraryUsageDescription: "This app needs access to your photo library to save and share expense receipts and QR codes.",
-        NSPhotoLibraryAddUsageDescription: "This app needs access to save receipts and expense images to your photo library.",
+        NSPhotoLibraryUsageDescription: "This app needs access to your photo library to update your profile picture and save expense receipts.",
+        NSPhotoLibraryAddUsageDescription: "This app needs access to save photos to your photo library.",
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: envConfig.allowArbitraryLoads,
           NSAllowsLocalNetworking: !IS_PRODUCTION
@@ -124,7 +124,14 @@ export default {
       [
         "expo-camera",
         {
-          cameraPermission: "Allow Spendy to access your camera for QR code scanning."
+          cameraPermission: "Allow Spendy to access your camera for QR code scanning and profile pictures."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          photosPermission: "This app needs access to your photo library to update your profile picture and save expense receipts.",
+          cameraPermission: "This app needs access to your camera to take profile pictures."
         }
       ],
       [
