@@ -56,7 +56,7 @@ export class FriendNotificationService {
         userId: friendRequest.toUserId,
         type: 'friend_request',
         title: '🤝 New Friend Request',
-        message: `${friendRequest.fromUserName} wants to be your friend on Spendy`,
+        message: `${friendRequest.fromUserName} wants to be your friend on Meet-n-Split`,
         data: {
           friendRequestId: friendRequest.id,
           friendId: friendRequest.fromUserId,
@@ -95,7 +95,7 @@ export class FriendNotificationService {
         userId: friendRequest.fromUserId,
         type: 'friend_accepted',
         title: '🎉 Friend Request Accepted',
-        message: `${acceptedByUserName} accepted your friend request! You're now friends on Spendy.`,
+        message: `${acceptedByUserName} accepted your friend request! You're now friends on Meet-n-Split.`,
         data: {
           friendId: friendRequest.toUserId,
           friendName: acceptedByUserName,
@@ -172,8 +172,8 @@ export class FriendNotificationService {
       const action = isBlocked ? 'blocked' : 'removed';
       const title = isBlocked ? '🚫 You were blocked' : '💔 Friendship ended';
       const message = isBlocked 
-        ? `${removedByUserName} has blocked you on Spendy.`
-        : `${removedByUserName} is no longer your friend on Spendy.`;
+        ? `${removedByUserName} has blocked you on Meet-n-Split.`
+        : `${removedByUserName} is no longer your friend on Meet-n-Split.`;
 
       const notification: Omit<AppNotification, 'id' | 'createdAt'> = {
         userId: removedUserId,
@@ -235,13 +235,13 @@ export class FriendNotificationService {
 
   // Generate deep link for friend request
   private generateDeepLink(friendRequest: FriendRequest): string {
-    const baseUrl = 'https://spendy.app'; // Your app's universal link domain
+    const baseUrl = 'https://meetnsplit.app'; // Your app's universal link domain
     return `${baseUrl}/friend-request/${friendRequest.id}`;
   }
 
   // Get app store link
   private getAppStoreLink(): string {
-    return 'https://apps.apple.com/app/spendy'; // Replace with your actual App Store link
+    return 'https://apps.apple.com/app/meetnsplit'; // Replace with your actual App Store link
   }
 
   // Handle friend request from deep link

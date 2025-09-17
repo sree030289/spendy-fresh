@@ -35,7 +35,7 @@ export class PushNotificationManager {
     const notificationData: PushNotificationData = {
       type: 'friend_request',
       title: '🤝 New Friend Request',
-      message: `${fromUserName} wants to be your friend on Spendy!`,
+      message: `${fromUserName} wants to be your friend on Meet-n-Split!`,
       deepLink: {
         screen: 'FriendRequestModal',
         params: { autoOpen: true }

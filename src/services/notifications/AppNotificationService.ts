@@ -241,36 +241,36 @@ export class AppNotificationService {
   // Navigation methods (these will use your app's navigation system)
   private navigateToFriends(): void {
     // Navigate to Split tab -> Friends section
-    Linking.openURL('spendy://split/friends');
+    Linking.openURL('meetnsplit://split/friends');
   }
 
   private navigateToGroup(groupId?: string): void {
     if (groupId) {
-      Linking.openURL(`spendy://split/group/${groupId}`);
+      Linking.openURL(`meetnsplit://split/group/${groupId}`);
     }
   }
 
   private navigateToGroupChat(groupId?: string): void {
     if (groupId) {
-      Linking.openURL(`spendy://split/group/${groupId}/chat`);
+      Linking.openURL(`meetnsplit://split/group/${groupId}/chat`);
     }
   }
 
   private navigateToGroupMembers(groupId?: string): void {
     if (groupId) {
-      Linking.openURL(`spendy://split/group/${groupId}/members`);
+      Linking.openURL(`meetnsplit://split/group/${groupId}/members`);
     }
   }
 
   private navigateToExpense(expenseId?: string, groupId?: string): void {
     if (expenseId && groupId) {
-      Linking.openURL(`spendy://split/group/${groupId}/expense/${expenseId}`);
+      Linking.openURL(`meetnsplit://split/group/${groupId}/expense/${expenseId}`);
     }
   }
 
   private navigateToGroupExpenses(groupId?: string): void {
     if (groupId) {
-      Linking.openURL(`spendy://split/group/${groupId}/expenses`);
+      Linking.openURL(`meetnsplit://split/group/${groupId}/expenses`);
     }
   }
 

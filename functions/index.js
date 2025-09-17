@@ -14,20 +14,20 @@ const FieldValue = admin.firestore.FieldValue;
 
 
 
-// ===== SPENDY API ===== 
-// Complete REST API for Spendy expense splitting application
+// ===== MEET-N-SPLIT API ===== 
+// Complete REST API for Meet-n-Split expense splitting application
 
 const express = require('express');
 
-// Create Express app for Spendy API
-const spendyApp = express();
+// Create Express app for Meet-n-Split API
+const meetnsplitApp = express();
 
 // Middleware
-spendyApp.use(express.json({ limit: '10mb' }));
-spendyApp.use(express.urlencoded({ extended: true }));
+meetnsplitApp.use(express.json({ limit: '10mb' }));
+meetnsplitApp.use(express.urlencoded({ extended: true }));
 
-// CORS for Spendy API
-spendyApp.use((req, res, next) => {
+// CORS for Meet-n-Split API
+meetnsplitApp.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = [
     'http://localhost:3000',
@@ -138,7 +138,7 @@ const CryptoUtils = {
 };
 
 // JWT Secret
-const JWT_SECRET = 'spendy-firebase-jwt-secret-2024-production';
+const JWT_SECRET = "meet-n-split-firebase-jwt-secret-2024-production";
 
 // Helper function to convert Firestore timestamps to React Native compatible format
 const convertFirestoreTimestamps = (obj) => {
@@ -306,7 +306,7 @@ const COLLECTIONS = {
 // ===== AUTHENTICATION ROUTES =====
 
 // Register
-spendyApp.post('/auth/register', async (req, res) => {
+meetnsplitApp.post('/auth/register', async (req, res) => {
   try {
     const { email, password, fullName, mobile, country, currency } = req.body;
 
@@ -387,7 +387,7 @@ spendyApp.post('/auth/register', async (req, res) => {
 });
 
 // Login
-spendyApp.post('/auth/login', async (req, res) => {
+meetnsplitApp.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -456,7 +456,7 @@ spendyApp.post('/auth/login', async (req, res) => {
 });
 
 // Get Profile
-spendyApp.get('/auth/profile', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/auth/profile', authenticateJWT, async (req, res) => {
   try {
     const { password, resetToken, resetTokenExpiry, verificationCode, ...userProfile } = req.user;
 
@@ -476,7 +476,7 @@ spendyApp.get('/auth/profile', authenticateJWT, async (req, res) => {
 });
 
 // Update Profile
-spendyApp.put('/auth/profile', authenticateJWT, async (req, res) => {
+meetnsplitApp.put('/auth/profile', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { fullName, mobile, country, currency, biometricEnabled, profilePicture } = req.body;
@@ -529,7 +529,7 @@ spendyApp.put('/auth/profile', authenticateJWT, async (req, res) => {
 // ===== PASSWORD RESET OTP ROUTES =====
 
 // Send OTP for password reset
-spendyApp.post('/auth/send-password-reset-otp', async (req, res) => {
+meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -588,13 +588,13 @@ spendyApp.post('/auth/send-password-reset-otp', async (req, res) => {
       });
 
       const mailOptions = {
-        from: process.env.EMAIL_USER || 'noreply@spendy.com',
+        from: process.env.EMAIL_USER || 'noreply@meetnsplit.com',
         to: normalizedEmail,
         subject: 'Password Reset - Verification Code',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
             <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #667eea; margin: 0;">🔐 Spendy</h1>
+              <h1 style="color: #667eea; margin: 0;">🔐 Meet-n-Split</h1>
               <h2 style="color: #333; margin: 10px 0;">Password Reset Code</h2>
             </div>
             
@@ -606,7 +606,7 @@ spendyApp.post('/auth/send-password-reset-otp', async (req, res) => {
             
             <div style="margin-bottom: 30px;">
               <p style="color: #333; line-height: 1.6;">
-                You requested a password reset for your Spendy account. Enter the verification code above in the app to continue resetting your password.
+                You requested a password reset for your Meet-n-Split account. Enter the verification code above in the app to continue resetting your password.
               </p>
               <p style="color: #666; line-height: 1.6;">
                 If you didn't request this code, please ignore this email. Your account remains secure.
@@ -615,7 +615,7 @@ spendyApp.post('/auth/send-password-reset-otp', async (req, res) => {
             
             <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
               <p style="color: #888; font-size: 12px;">
-                This is an automated message from Spendy. Please do not reply to this email.
+                This is an automated message from Meet-n-Split. Please do not reply to this email.
               </p>
             </div>
           </div>
@@ -647,7 +647,7 @@ spendyApp.post('/auth/send-password-reset-otp', async (req, res) => {
 });
 
 // Verify OTP for password reset
-spendyApp.post('/auth/verify-password-reset-otp', async (req, res) => {
+meetnsplitApp.post('/auth/verify-password-reset-otp', async (req, res) => {
   try {
     const { email, otp, sessionId } = req.body;
 
@@ -723,7 +723,7 @@ spendyApp.post('/auth/verify-password-reset-otp', async (req, res) => {
 });
 
 // Reset password using verified OTP session
-spendyApp.post('/auth/reset-password', async (req, res) => {
+meetnsplitApp.post('/auth/reset-password', async (req, res) => {
   try {
     const { email, newPassword, sessionId } = req.body;
 
@@ -827,7 +827,7 @@ spendyApp.post('/auth/reset-password', async (req, res) => {
 // ===== FRIENDS ROUTES =====
 
 // Get Friends
-spendyApp.get('/friends', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/friends', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -901,7 +901,7 @@ spendyApp.get('/friends', authenticateJWT, async (req, res) => {
 });
 
 // Friends Search Endpoint
-spendyApp.get('/friends/search', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/friends/search', authenticateJWT, async (req, res) => {
   try {
     const { query } = req.query;
     
@@ -946,7 +946,7 @@ spendyApp.get('/friends/search', authenticateJWT, async (req, res) => {
 });
 
 // Send Friend Request Endpoint
-spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
   try {
     const { userId, recipientEmail, message } = req.body;
     
@@ -999,7 +999,7 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
           // Send email using nodemailer
           const nodemailer = require("nodemailer");
           
-          const emailUser = process.env.EMAIL_USER || "noreply@spendy.com";
+          const emailUser = process.env.EMAIL_USER || "noreply@meetnsplit.com";
           const emailPass = process.env.EMAIL_PASSWORD || "your-app-password";
           
           console.log("📧 Email configuration:", {
@@ -1018,7 +1018,7 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
 
           // Create deep link for friend request
           const deepLink = `letssplit://friend-request/${friendRequestRef.id}`;
-          const appStoreLink = "https://apps.apple.com/app/spendy/id123456789";
+          const appStoreLink = "https://apps.apple.com/app/meetnsplit/id123456789";
 
           console.log("📧 Email details:", {
             from: emailUser,
@@ -1027,13 +1027,13 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
             appStoreLink: appStoreLink,
           });
 
-          const subject = `${senderData.fullName} invited you to join Spendy!`;
+          const subject = `${senderData.fullName} invited you to join Meet-n-Split!`;
           const htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; ` +
               `margin: 0 auto; padding: 20px; border: 1px solid #ddd; ` +
               `border-radius: 10px;">
               <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #667eea; margin: 0;">💰 Spendy</h1>
+                <h1 style="color: #667eea; margin: 0;">💰 Meet-n-Split</h1>
                 <h2 style="color: #333; margin: 10px 0;">You're Invited!</h2>
               </div>
               
@@ -1044,7 +1044,7 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
                 </p>
                 <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
                   <strong>${senderData.fullName}</strong> invited you to join ` +
-                  `Spendy - the smart way to split expenses and manage ` +
+                  `Meet-n-Split - the smart way to split expenses and manage ` +
                   `shared costs with friends!
                 </p>
                 <p style="font-size: 14px; color: #666; margin: 0;">
@@ -1055,7 +1055,7 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
               
               <div style="text-align: center; margin-bottom: 30px;">
                 <h3 style="color: #333; margin: 0 0 15px 0;">✨ What you can ` +
-                  `do with Spendy:</h3>
+                  `do with Meet-n-Split:</h3>
                 <ul style="text-align: left; color: #666; font-size: 14px; ` +
                   `margin: 0; padding-left: 20px;">
                   <li>Split bills and expenses with friends</li>
@@ -1074,7 +1074,7 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
                 <a href="${appStoreLink}" style="display: inline-block; ` +
                   `background-color: #28a745; color: white; padding: 12px 24px; ` +
                   `text-decoration: none; border-radius: 6px; font-weight: bold;">`+
-                  `Download Spendy</a>
+                  `Download Meet-n-Split</a>
               </div>
               
               <div style="border-top: 1px solid #eee; padding-top: 20px;">
@@ -1084,14 +1084,14 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
                   `invitations from this person, you can ignore this email.
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
-                  Spendy - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Money Management | This is an automated message.
                 </p>
               </div>
             </div>
           `;
 
           const mailOptions = {
-            from: `"Spendy" <${emailUser}>`,
+            from: `"Meet-n-Split" <${emailUser}>`,
             to: recipientEmail.toLowerCase(),
             subject: subject,
             html: htmlContent,
@@ -1207,7 +1207,7 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
         if (recipientData.pushToken) {
           const expoPushNotification = {
             title: "🤝 New Friend Request",
-            body: `${senderData.fullName} wants to be your friend on Spendy!`,
+            body: `${senderData.fullName} wants to be your friend on Meet-n-Split!`,
             data: {
               type: "friend_request",
               friendRequestId: docRef.id,
@@ -1279,7 +1279,7 @@ spendyApp.post('/friends/requests/send', authenticateJWT, async (req, res) => {
 });
 
 // Accept Friend Request Endpoint
-spendyApp.post('/friends/requests/accept', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/friends/requests/accept', authenticateJWT, async (req, res) => {
   try {
     const { requestId } = req.body;
     const userId = req.user.id;
@@ -1354,7 +1354,7 @@ spendyApp.post('/friends/requests/accept', authenticateJWT, async (req, res) => 
 });
 
 // Decline Friend Request Endpoint
-spendyApp.post('/friends/requests/decline', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/friends/requests/decline', authenticateJWT, async (req, res) => {
   try {
     const { requestId } = req.body;
     const userId = req.user.id;
@@ -1408,7 +1408,7 @@ spendyApp.post('/friends/requests/decline', authenticateJWT, async (req, res) =>
 });
 
 // Get Friend Requests Endpoint
-spendyApp.get('/friends/requests', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/friends/requests', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     console.log('🔍 Getting friend requests for user:', userId);
@@ -1525,7 +1525,7 @@ spendyApp.get('/friends/requests', authenticateJWT, async (req, res) => {
 // ===== GROUPS ROUTES =====
 
 // Create Group
-spendyApp.post('/groups', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/groups', authenticateJWT, async (req, res) => {
   console.log('🎯 POST /groups route handler called!');
   try {
     console.log('🚀 Group creation request:', { 
@@ -1697,7 +1697,7 @@ spendyApp.post('/groups', authenticateJWT, async (req, res) => {
 });
 
 // Get Specific Group
-spendyApp.get('/groups/:groupId', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/groups/:groupId', authenticateJWT, async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
@@ -1776,7 +1776,7 @@ spendyApp.get('/groups/:groupId', authenticateJWT, async (req, res) => {
 });
 
 // Add Group Member
-spendyApp.post('/groups/:groupId/members', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/groups/:groupId/members', authenticateJWT, async (req, res) => {
   try {
     const { groupId } = req.params;
     const { userId: newMemberUserId, email, role = 'member' } = req.body;
@@ -2002,7 +2002,7 @@ spendyApp.post('/groups/:groupId/members', authenticateJWT, async (req, res) => 
 });
 
 // Get User Groups
-spendyApp.get('/groups', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/groups', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -2073,7 +2073,7 @@ spendyApp.get('/groups', authenticateJWT, async (req, res) => {
 });
 
 // Leave Group
-spendyApp.post('/groups/:groupId/leave', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/groups/:groupId/leave', authenticateJWT, async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
@@ -2220,7 +2220,7 @@ spendyApp.post('/groups/:groupId/leave', authenticateJWT, async (req, res) => {
 });
 
 // Delete Group (entire group)
-spendyApp.delete('/groups/:groupId', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/groups/:groupId', authenticateJWT, async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
@@ -2402,7 +2402,7 @@ spendyApp.delete('/groups/:groupId', authenticateJWT, async (req, res) => {
 });
 
 // Remove Group Member
-spendyApp.delete("/groups/:groupId/members/:userId", authenticateJWT,
+meetnsplitApp.delete("/groups/:groupId/members/:userId", authenticateJWT,
     async (req, res) => {
       try {
         const {groupId, userId: targetUserId} = req.params;
@@ -2693,7 +2693,7 @@ spendyApp.delete("/groups/:groupId/members/:userId", authenticateJWT,
     });
 
 // Update Member Role
-spendyApp.put('/groups/:groupId/members/:userId/role', authenticateJWT, async (req, res) => {
+meetnsplitApp.put('/groups/:groupId/members/:userId/role', authenticateJWT, async (req, res) => {
   try {
     const { groupId, userId: targetUserId } = req.params;
     const { role } = req.body;
@@ -2846,7 +2846,7 @@ spendyApp.put('/groups/:groupId/members/:userId/role', authenticateJWT, async (r
 // ===== EXPENSES ROUTES =====
 
 // Create Expense
-spendyApp.post('/expenses', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/expenses', authenticateJWT, async (req, res) => {
   try {
     const { 
       description, 
@@ -3060,7 +3060,7 @@ spendyApp.post('/expenses', authenticateJWT, async (req, res) => {
 });
 
 // Get User by ID
-spendyApp.get('/users/:userId', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/users/:userId', authenticateJWT, async (req, res) => {
   try {
     const { userId } = req.params;
     const requestingUserId = req.user.id;
@@ -3107,7 +3107,7 @@ spendyApp.get('/users/:userId', authenticateJWT, async (req, res) => {
   }
 });
 // Get User Expenses
-spendyApp.get('/expenses', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/expenses', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const limit = parseInt(req.query.limit) || 20;
@@ -3164,7 +3164,7 @@ spendyApp.get('/expenses', authenticateJWT, async (req, res) => {
 });
 
 // Get Group Expenses
-spendyApp.get('/expenses/group/:groupId', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/expenses/group/:groupId', authenticateJWT, async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
@@ -3232,7 +3232,7 @@ spendyApp.get('/expenses/group/:groupId', authenticateJWT, async (req, res) => {
 });
 
 // Get User Expenses by User ID
-spendyApp.get('/expenses/user/:userId', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/expenses/user/:userId', authenticateJWT, async (req, res) => {
   try {
     const { userId } = req.params;
     const requesterId = req.user.id;
@@ -3379,7 +3379,7 @@ spendyApp.get('/expenses/user/:userId', authenticateJWT, async (req, res) => {
 
 // ===== MONEY MANAGEMENT ROUTES =====
 // Update expense endpoint
-spendyApp.put('/expenses/:expenseId', authenticateJWT, async (req, res) => {
+meetnsplitApp.put('/expenses/:expenseId', authenticateJWT, async (req, res) => {
   try {
     const { expenseId } = req.params;
     const userId = req.user.id;
@@ -3436,7 +3436,7 @@ spendyApp.put('/expenses/:expenseId', authenticateJWT, async (req, res) => {
 });
 
 // Delete expense endpoint
-spendyApp.delete('/expenses/:expenseId', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/expenses/:expenseId', authenticateJWT, async (req, res) => {
   try {
     const { expenseId } = req.params;
     const userId = req.user.id;
@@ -3483,7 +3483,7 @@ spendyApp.delete('/expenses/:expenseId', authenticateJWT, async (req, res) => {
   }
 });
 // Add Personal Transaction
-spendyApp.post('/money/transactions', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/money/transactions', authenticateJWT, async (req, res) => {
   try {
     const {
       type,
@@ -3571,7 +3571,7 @@ spendyApp.post('/money/transactions', authenticateJWT, async (req, res) => {
 });
 
 // Get Personal Transactions
-spendyApp.get('/money/transactions', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/money/transactions', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { limit = 50, startAfter, type, category, startDate, endDate } = req.query;
@@ -3634,7 +3634,7 @@ spendyApp.get('/money/transactions', authenticateJWT, async (req, res) => {
 });
 
 // Update Personal Transaction
-spendyApp.put('/money/transactions/:id', authenticateJWT, async (req, res) => {
+meetnsplitApp.put('/money/transactions/:id', authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -3696,7 +3696,7 @@ spendyApp.put('/money/transactions/:id', authenticateJWT, async (req, res) => {
 });
 
 // Delete Personal Transaction
-spendyApp.delete('/money/transactions/:id', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/money/transactions/:id', authenticateJWT, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -3741,7 +3741,7 @@ spendyApp.delete('/money/transactions/:id', authenticateJWT, async (req, res) =>
 });
 
 // Get Analytics
-spendyApp.get('/money/analytics', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/money/analytics', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { period = 'month', startDate, endDate } = req.query;
@@ -3828,7 +3828,7 @@ spendyApp.get('/money/analytics', authenticateJWT, async (req, res) => {
 // ===== SETTLEMENT ROUTES =====
 
 // Get Settlement Recommendations for a Group
-spendyApp.get('/settlements/group/:groupId', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/settlements/group/:groupId', authenticateJWT, async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
@@ -4034,7 +4034,7 @@ spendyApp.get('/settlements/group/:groupId', authenticateJWT, async (req, res) =
 });
 
 // Record a Settlement Payment
-spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/settlements', authenticateJWT, async (req, res) => {
   try {
     const { fromUserId, toUserId, amount, groupId, note } = req.body;
     const userId = req.user.id;
@@ -4274,7 +4274,7 @@ spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
 });
 
 // Get Settlement History for a Group
-spendyApp.get("/settlements/history/:groupId", authenticateJWT,
+meetnsplitApp.get("/settlements/history/:groupId", authenticateJWT,
     async (req, res) => {
     try {
       const {groupId} = req.params;
@@ -4347,7 +4347,7 @@ spendyApp.get("/settlements/history/:groupId", authenticateJWT,
 // ===== NOTIFICATIONS ROUTES =====
 
 // Create Notification
-spendyApp.post('/notifications', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/notifications', authenticateJWT, async (req, res) => {
   try {
     const { userId, type, title, message, data, isRead = false } = req.body;
     const createdBy = req.user.id;
@@ -4408,7 +4408,7 @@ spendyApp.post('/notifications', authenticateJWT, async (req, res) => {
 });
 
 // Create Payment Reminder Notification
-spendyApp.post('/notifications/payment-reminder', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/notifications/payment-reminder', authenticateJWT, async (req, res) => {
   try {
     const { fromUserId, toUserId, amount, currency, expenseId, groupId, message } = req.body;
     const reminderId = req.user.id;
@@ -4497,7 +4497,7 @@ spendyApp.post('/notifications/payment-reminder', authenticateJWT, async (req, r
 });
 
 // Send notification endpoint
-spendyApp.post('/notifications/send', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/notifications/send', authenticateJWT, async (req, res) => {
   try {
     const { userId, title, body, data, type } = req.body;
     const senderId = req.user.id;
@@ -4538,7 +4538,7 @@ spendyApp.post('/notifications/send', authenticateJWT, async (req, res) => {
     const notificationData = {
       userId,
       senderId,
-      title: title || 'Spendy Notification',
+      title: title || 'Meet-n-Split Notification',
       body: body || '',
       data: data || {},
       type: type || 'general',
@@ -4599,7 +4599,7 @@ spendyApp.post('/notifications/send', authenticateJWT, async (req, res) => {
 });
 
 // Get User Notifications (no userId in path - uses authenticated user)
-spendyApp.get('/notifications', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/notifications', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { limit = 20, offset = 0, unreadOnly = false, type } = req.query;
@@ -4684,7 +4684,7 @@ spendyApp.get('/notifications', authenticateJWT, async (req, res) => {
 });
 
 // Get User Notifications
-spendyApp.get('/notifications/:userId', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/notifications/:userId', authenticateJWT, async (req, res) => {
   try {
     const { userId } = req.params;
     const requesterId = req.user.id;
@@ -4735,7 +4735,7 @@ spendyApp.get('/notifications/:userId', authenticateJWT, async (req, res) => {
 });
 
 // Mark Notification as Read
-spendyApp.post('/notifications/:notificationId/read', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/notifications/:notificationId/read', authenticateJWT, async (req, res) => {
   try {
     const { notificationId } = req.params;
     const userId = req.user.id;
@@ -4783,7 +4783,7 @@ spendyApp.post('/notifications/:notificationId/read', authenticateJWT, async (re
 });
 
 // Get Unread Notification Count
-spendyApp.get('/notifications/:userId/unread-count', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/notifications/:userId/unread-count', authenticateJWT, async (req, res) => {
   try {
     const { userId } = req.params;
     const requesterId = req.user.id;
@@ -4819,7 +4819,7 @@ spendyApp.get('/notifications/:userId/unread-count', authenticateJWT, async (req
 });
 
 // Clear All Notifications
-spendyApp.delete('/notifications/:userId/all', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/notifications/:userId/all', authenticateJWT, async (req, res) => {
   try {
     const { userId } = req.params;
     const requesterId = req.user.id;
@@ -4860,7 +4860,7 @@ spendyApp.delete('/notifications/:userId/all', authenticateJWT, async (req, res)
   }
 });
 // Send notification endpoint
-spendyApp.post('/notifications/send', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/notifications/send', authenticateJWT, async (req, res) => {
   try {
     const { userId, title, body, data, type } = req.body;
     const senderId = req.user.id;
@@ -4901,7 +4901,7 @@ spendyApp.post('/notifications/send', authenticateJWT, async (req, res) => {
     const message = {
       to: pushToken,
       sound: 'default',
-      title: title || 'Spendy Notification',
+      title: title || 'Meet-n-Split Notification',
       body: body || '',
       data: data || {}
     };
@@ -4937,8 +4937,8 @@ spendyApp.post('/notifications/send', authenticateJWT, async (req, res) => {
   }
 });
 
-// Health check for Spendy API
-spendyApp.get('/health', (req, res) => {
+// Health check for Meet-n-Split API
+meetnsplitApp.get('/health', (req, res) => {
   res.json({
     success: true,
     message: 'Spendy API is running on Firebase Functions',
@@ -4952,7 +4952,7 @@ spendyApp.get('/health', (req, res) => {
 // ===== GMAIL INTEGRATION ROUTES =====
 
 // Gmail OAuth auth URL
-spendyApp.get('/gmail/auth-url', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/gmail/auth-url', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -4982,7 +4982,7 @@ spendyApp.get('/gmail/auth-url', authenticateJWT, async (req, res) => {
 });
 
 // Gmail connection status
-spendyApp.get('/gmail/status', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/gmail/status', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -5021,7 +5021,7 @@ spendyApp.get('/gmail/status', authenticateJWT, async (req, res) => {
 });
 
 // Gmail connect (OAuth token exchange)
-spendyApp.post('/gmail/connect', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/gmail/connect', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { code } = req.body;
@@ -5109,7 +5109,7 @@ spendyApp.post('/gmail/connect', authenticateJWT, async (req, res) => {
 });
 
 // Gmail sync bills
-spendyApp.post('/gmail/sync', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/gmail/sync', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -5444,7 +5444,7 @@ spendyApp.post('/gmail/sync', authenticateJWT, async (req, res) => {
 });
 
 // Gmail disconnect
-spendyApp.delete('/gmail/disconnect', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/gmail/disconnect', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -5474,7 +5474,7 @@ spendyApp.delete('/gmail/disconnect', authenticateJWT, async (req, res) => {
 // ========================
 
 // Get settlement history for a group
-spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { groupId } = req.params;
@@ -5540,7 +5540,7 @@ spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res)
 });
 
 // Record settlement
-spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/settlements', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { fromUserId, toUserId, amount, groupId, note } = req.body;
@@ -5605,7 +5605,7 @@ spendyApp.post('/settlements', authenticateJWT, async (req, res) => {
 });
 
 // Get settlement history
-spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { groupId } = req.params;
@@ -5673,7 +5673,7 @@ spendyApp.get('/settlements/history/:groupId', authenticateJWT, async (req, res)
 // ========================
 
 // Get user transactions
-spendyApp.get('/money/transactions', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/money/transactions', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { page = 1, limit = 20, type, category } = req.query;
@@ -5739,7 +5739,7 @@ spendyApp.get('/money/transactions', authenticateJWT, async (req, res) => {
 });
 
 // Add transaction
-spendyApp.post('/money/transactions', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/money/transactions', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { type, amount, description, category, date } = req.body;
@@ -5778,7 +5778,7 @@ spendyApp.post('/money/transactions', authenticateJWT, async (req, res) => {
 });
 
 // Get analytics
-spendyApp.get('/money/analytics', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/money/analytics', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const { period = 'month' } = req.query;
@@ -5812,7 +5812,7 @@ spendyApp.get('/money/analytics', authenticateJWT, async (req, res) => {
 });
 
 // Get daily usage
-spendyApp.get('/money/usage/daily', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/money/usage/daily', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -5842,7 +5842,7 @@ spendyApp.get('/money/usage/daily', authenticateJWT, async (req, res) => {
 });
 
 // Post usage analytics
-spendyApp.post('/money/usage/analytics', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/money/usage/analytics', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -5866,7 +5866,7 @@ spendyApp.post('/money/usage/analytics', authenticateJWT, async (req, res) => {
 });
 
 // Delete transaction
-spendyApp.delete('/money/transactions/:id', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/money/transactions/:id', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const transactionId = req.params.id;
@@ -5913,7 +5913,7 @@ spendyApp.delete('/money/transactions/:id', authenticateJWT, async (req, res) =>
 });
 
 // Process recurring expenses  
-spendyApp.post('/recurring-expenses/process', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/recurring-expenses/process', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -5942,7 +5942,7 @@ spendyApp.post('/recurring-expenses/process', authenticateJWT, async (req, res) 
 });
 
 // Get user reminders
-spendyApp.get('/reminders', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/reminders', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -6042,7 +6042,7 @@ spendyApp.get('/reminders', authenticateJWT, async (req, res) => {
 });
 
 // Create reminder
-spendyApp.post('/reminders', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/reminders', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const {
@@ -6110,7 +6110,7 @@ spendyApp.post('/reminders', authenticateJWT, async (req, res) => {
 });
 
 // Update reminder
-spendyApp.put('/reminders/:id', authenticateJWT, async (req, res) => {
+meetnsplitApp.put('/reminders/:id', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const reminderId = req.params.id;
@@ -6176,7 +6176,7 @@ spendyApp.put('/reminders/:id', authenticateJWT, async (req, res) => {
 });
 
 // Mark reminder as paid
-spendyApp.post('/reminders/:id/mark-paid', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/reminders/:id/mark-paid', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const reminderId = req.params.id;
@@ -6230,7 +6230,7 @@ spendyApp.post('/reminders/:id/mark-paid', authenticateJWT, async (req, res) => 
 });
 
 // Delete reminder
-spendyApp.delete('/reminders/:id', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/reminders/:id', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const reminderId = req.params.id;
@@ -6280,7 +6280,7 @@ spendyApp.delete('/reminders/:id', authenticateJWT, async (req, res) => {
 });
 
 // Gmail OAuth callback route
-spendyApp.get('/gmail/callback', async (req, res) => {
+meetnsplitApp.get('/gmail/callback', async (req, res) => {
   try {
     const { code, state } = req.query;
     
@@ -6355,13 +6355,13 @@ spendyApp.get('/gmail/callback', async (req, res) => {
   }
 });
 
-// Export Spendy API as Firebase Function
-exports.spendyApi = functions.https.onRequest(spendyApp);
+// Export Meet-n-Split API as Firebase Function
+exports.meetnsplitApi = functions.https.onRequest(meetnsplitApp);
 
 // ===== COMPREHENSIVE NOTIFICATION API ENDPOINTS =====
 
 // Get User Notifications
-spendyApp.get('/notifications', authenticateJWT, async (req, res) => {
+meetnsplitApp.get('/notifications', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const limit = parseInt(req.query.limit) || 50;
@@ -6416,7 +6416,7 @@ spendyApp.get('/notifications', authenticateJWT, async (req, res) => {
 });
 
 // Mark Notification as Read
-spendyApp.put('/notifications/:notificationId/read', authenticateJWT, async (req, res) => {
+meetnsplitApp.put('/notifications/:notificationId/read', authenticateJWT, async (req, res) => {
   try {
     const { notificationId } = req.params;
     const userId = req.user.id;
@@ -6461,7 +6461,7 @@ spendyApp.put('/notifications/:notificationId/read', authenticateJWT, async (req
 });
 
 // Mark All Notifications as Read
-spendyApp.put('/notifications/read-all', authenticateJWT, async (req, res) => {
+meetnsplitApp.put('/notifications/read-all', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -6497,7 +6497,7 @@ spendyApp.put('/notifications/read-all', authenticateJWT, async (req, res) => {
 });
 
 // Delete Notification
-spendyApp.delete('/notifications/:notificationId', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/notifications/:notificationId', authenticateJWT, async (req, res) => {
   try {
     const { notificationId } = req.params;
     const userId = req.user.id;
@@ -6539,7 +6539,7 @@ spendyApp.delete('/notifications/:notificationId', authenticateJWT, async (req, 
 });
 
 // Register FCM Token
-spendyApp.post('/notifications/register-token', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/notifications/register-token', authenticateJWT, async (req, res) => {
   try {
     const { token, deviceInfo } = req.body;
     const userId = req.user.id;
@@ -6576,7 +6576,7 @@ spendyApp.post('/notifications/register-token', authenticateJWT, async (req, res
 });
 
 // Remove FCM Token
-spendyApp.delete('/notifications/remove-token', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/notifications/remove-token', authenticateJWT, async (req, res) => {
   try {
     const { token } = req.body;
     const userId = req.user.id;
@@ -6605,7 +6605,7 @@ spendyApp.delete('/notifications/remove-token', authenticateJWT, async (req, res
 });
 
 // Send Friend Request with Notification
-spendyApp.post('/friends/requests/:requestId/accept', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/friends/requests/:requestId/accept', authenticateJWT, async (req, res) => {
   try {
     const { requestId } = req.params;
     const userId = req.user.id;
@@ -6733,7 +6733,7 @@ spendyApp.post('/friends/requests/:requestId/accept', authenticateJWT, async (re
 });
 
 // Decline Friend Request with Notification (or Cancel Own Request)
-spendyApp.post('/friends/requests/:requestId/decline', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/friends/requests/:requestId/decline', authenticateJWT, async (req, res) => {
   try {
     const { requestId } = req.params;
     const userId = req.user.id;
@@ -6886,7 +6886,7 @@ spendyApp.post('/friends/requests/:requestId/decline', authenticateJWT, async (r
 });
 
 // Remove Friend with Notification
-spendyApp.delete('/friends/:friendId', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/friends/:friendId', authenticateJWT, async (req, res) => {
   try {
     const { friendId } = req.params;
     const userId = req.user.id;
@@ -6985,7 +6985,7 @@ spendyApp.delete('/friends/:friendId', authenticateJWT, async (req, res) => {
 });
 
 // Resend Friend Request Notification with enhanced reminder options
-spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (req, res) => {
   try {
     const { requestId } = req.params;
     const { reminderMethod = 'auto' } = req.body; // 'auto', 'push', 'email', 'sms'
@@ -7119,7 +7119,7 @@ spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (re
           const transporter = nodemailer.createTransporter({
             service: 'gmail',
             auth: {
-              user: process.env.EMAIL_USER || 'noreply@spendy.com',
+              user: process.env.EMAIL_USER || 'noreply@meetnsplit.com',
               pass: process.env.EMAIL_PASSWORD || 'your-app-password'
             }
           });
@@ -7140,7 +7140,7 @@ spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (re
                 <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
                   <strong>${senderData.fullName}</strong> ${isUserRegistered ? 
                     'is still waiting for you to respond to their friend request on Spendy.' :
-                    'has invited you to join Spendy and wants to be your friend!'}
+                    'has invited you to join Meet-n-Split and wants to be your friend!'}
                 </p>
                 ${isUserRegistered ? '' : `
                 <p style="font-size: 14px; color: #666; margin: 0;">
@@ -7150,8 +7150,8 @@ spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (re
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
-                <a href="https://spendy.app/download" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                  ${isUserRegistered ? 'Open Spendy App' : 'Download Spendy'}
+                <a href="https://meetnsplit.app/download" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                  ${isUserRegistered ? 'Open Meet-n-Split App' : 'Download Meet-n-Split'}
                 </a>
               </div>
               
@@ -7160,14 +7160,14 @@ spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (re
                   This reminder was sent by ${senderData.fullName} (${senderData.email}).
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
-                  Spendy - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Money Management | This is an automated message.
                 </p>
               </div>
             </div>
           `;
 
           const mailOptions = {
-            from: `"Spendy" <${process.env.EMAIL_USER || 'noreply@spendy.com'}>`,
+            from: `"Meet-n-Split" <${process.env.EMAIL_USER || 'noreply@meetnsplit.com'}>`,
             to: recipientEmail,
             subject: subject,
             html: htmlContent
@@ -7195,7 +7195,7 @@ spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (re
                 inviteMethod: 'email',
                 message: `${senderData.fullName} is still waiting for you to join Spendy and accept their friend request!`,
                 deepLink: `letssplit://friend-request/${requestId}`,
-                appStoreLink: 'https://spendy.app/download',
+                appStoreLink: 'https://meetnsplit.app/download',
                 friendRequestId: requestId
               })
             });
@@ -7226,7 +7226,7 @@ spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (re
                 fromUserName: senderData.fullName,
                 toUserPhone: recipientPhone,
                 inviteMethod: 'phone',
-                message: `${senderData.fullName} is still waiting for you to join Spendy! Download: https://spendy.app/download`,
+                message: `${senderData.fullName} is still waiting for you to join Meet-n-Split! Download: https://meetnsplit.app/download`,
                 deepLink: `letssplit://friend-request/${requestId}`,
                 friendRequestId: requestId
               })
@@ -7317,7 +7317,7 @@ spendyApp.post('/friends/requests/:requestId/remind', authenticateJWT, async (re
 });
 
 // Send Group Notification
-spendyApp.post('/groups/:groupId/notify', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/groups/:groupId/notify', authenticateJWT, async (req, res) => {
   try {
     const { groupId } = req.params;
     const { type, message, data = {} } = req.body;
@@ -7387,7 +7387,7 @@ spendyApp.post('/groups/:groupId/notify', authenticateJWT, async (req, res) => {
 });
 
 // Send Expense Notification
-spendyApp.post('/expenses/:expenseId/notify', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/expenses/:expenseId/notify', authenticateJWT, async (req, res) => {
   try {
     const { expenseId } = req.params;
     const { type, action } = req.body;
@@ -7488,7 +7488,7 @@ spendyApp.post('/expenses/:expenseId/notify', authenticateJWT, async (req, res) 
 });
 
 // Undo Expense Action
-spendyApp.post('/expenses/:expenseId/undo', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/expenses/:expenseId/undo', authenticateJWT, async (req, res) => {
   try {
     const { expenseId } = req.params;
     const { action } = req.body;
@@ -7543,7 +7543,7 @@ spendyApp.post('/expenses/:expenseId/undo', authenticateJWT, async (req, res) =>
 });
 
 // Clean up expired notifications
-spendyApp.delete('/notifications/cleanup', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/notifications/cleanup', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -7578,7 +7578,7 @@ spendyApp.delete('/notifications/cleanup', authenticateJWT, async (req, res) => 
 });
 
 // Send External Invite (Email/SMS)
-spendyApp.post('/invites/send', async (req, res) => {
+meetnsplitApp.post('/invites/send', async (req, res) => {
   try {
     const { 
       type, 
@@ -7642,7 +7642,7 @@ spendyApp.post('/invites/send', async (req, res) => {
               
               <div style="text-align: center; margin-bottom: 30px;">
                 ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Open in App</a>` : ''}
-                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Spendy</a>` : ''}
+                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Meet-n-Split</a>` : ''}
               </div>
               
               <div style="border-top: 1px solid #eee; padding-top: 20px;">
@@ -7650,14 +7650,14 @@ spendyApp.post('/invites/send', async (req, res) => {
                   This reminder was sent by ${fromUserName} (${fromUserEmail}). If you don't want to receive these reminders, you can ignore this email.
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
-                  Spendy - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Money Management | This is an automated message.
                 </p>
               </div>
             </div>
           `;
         } else {
           // Regular friend invite
-          subject = `${fromUserName} invited you to join Spendy!`;
+          subject = `${fromUserName} invited you to join Meet-n-Split!`;
           htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
               <div style="text-align: center; margin-bottom: 30px;">
@@ -7670,7 +7670,7 @@ spendyApp.post('/invites/send', async (req, res) => {
                   Hi! 👋
                 </p>
                 <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
-                  <strong>${fromUserName}</strong> invited you to join Spendy - the smart way to split expenses and manage shared costs with friends!
+                  <strong>${fromUserName}</strong> invited you to join Meet-n-Split - the smart way to split expenses and manage shared costs with friends!
                 </p>
                 <p style="font-size: 14px; color: #666; margin: 0;">
                   ${message || 'Start tracking shared expenses, split bills fairly, and never worry about who owes what again!'}
@@ -7690,7 +7690,7 @@ spendyApp.post('/invites/send', async (req, res) => {
               
               <div style="text-align: center; margin-bottom: 30px;">
                 ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Accept Invitation</a>` : ''}
-                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Spendy</a>` : ''}
+                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Meet-n-Split</a>` : ''}
               </div>
               
               <div style="border-top: 1px solid #eee; padding-top: 20px;">
@@ -7698,7 +7698,7 @@ spendyApp.post('/invites/send', async (req, res) => {
                   This invitation was sent by ${fromUserName} (${fromUserEmail}). If you don't want to receive invitations from this person, you can ignore this email.
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
-                  Spendy - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Money Management | This is an automated message.
                 </p>
               </div>
             </div>
@@ -7706,7 +7706,7 @@ spendyApp.post('/invites/send', async (req, res) => {
         }
 
         const mailOptions = {
-          from: `"Spendy" <${process.env.EMAIL_USER || 'noreply@spendy.com'}>`,
+          from: `"Meet-n-Split" <${process.env.EMAIL_USER || 'noreply@meetnsplit.com'}>`,
           to: toUserEmail,
           subject: subject,
           html: htmlContent
@@ -8183,7 +8183,7 @@ exports.cleanupOldNotifications = functions.scheduler.onSchedule('0 2 * * *', as
 // ==========================================
 
 // Save Push Token Endpoint
-spendyApp.post('/user/push-token', authenticateJWT, async (req, res) => {
+meetnsplitApp.post('/user/push-token', authenticateJWT, async (req, res) => {
   try {
     const { pushToken } = req.body;
     const userId = req.user.id;
@@ -8222,7 +8222,7 @@ spendyApp.post('/user/push-token', authenticateJWT, async (req, res) => {
 });
 
 // Remove Push Token Endpoint (for logout)
-spendyApp.delete('/user/push-token', authenticateJWT, async (req, res) => {
+meetnsplitApp.delete('/user/push-token', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
 

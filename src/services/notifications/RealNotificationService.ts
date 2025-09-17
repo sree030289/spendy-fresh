@@ -913,7 +913,7 @@ export class RealNotificationService {
       // For demo purposes, we'll schedule a local notification
       const notificationContent = {
         title: 'New Friend Request',
-        body: `${senderName} wants to be your friend on Spendy`,
+        body: `${senderName} wants to be your friend on Meet-n-Split`,
         data: {
           type: 'friend_request',
           friendRequestId,
@@ -922,7 +922,7 @@ export class RealNotificationService {
           senderName,
           senderEmail: senderEmail || '',
           senderAvatar: senderAvatar || '',
-          message: `${senderName} wants to be your friend on Spendy`
+          message: `${senderName} wants to be your friend on Meet-n-Split`
         },
         sound: 'default',
         categoryIdentifier: 'friend_request',
@@ -1214,7 +1214,7 @@ export class RealNotificationService {
 
       await this.sendImmediateNotification(
         'Test Notification',
-        'This is a test notification from Spendy. Your notifications are working perfectly!',
+        'This is a test notification from Meet-n-Split. Your notifications are working perfectly!',
         { type: 'test' }
       );
 

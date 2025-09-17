@@ -1048,7 +1048,7 @@ export default function ProfileScreen() {
           <ProfileItem
             icon="help-circle-outline"
             title="Help & Support"
-            onPress={() => Alert.alert('Contact', 'Email: support@spendy.com\nPhone: +1-800-SPENDY')}
+            onPress={() => Alert.alert('Contact', 'Email: support@meetnsplit.com\nPhone: +1-800-MEETNSPLIT')}
           />
           
           <ProfileItem

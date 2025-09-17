@@ -26,13 +26,13 @@ TERMS OF SERVICE
 
 Last updated: ${new Date().toLocaleDateString()}
 
-Welcome to Spendy! These terms of service ("Terms") apply to your access and use of the Spendy application and services (the "Service") provided by Spendy Inc.
+Welcome to Meet-n-Split! These terms of service ("Terms") apply to your access and use of the Meet-n-Split application and services (the "Service") provided by Meet-n-Split Inc.
 
 1. ACCEPTANCE OF TERMS
 By accessing or using our Service, you agree to be bound by these Terms. If you disagree with any part of these terms, then you may not access the Service.
 
 2. DESCRIPTION OF SERVICE
-Spendy is a personal finance and expense sharing application that allows users to:
+Meet-n-Split is a personal finance and expense sharing application that allows users to:
 - Track personal expenses and income
 - Split bills and expenses with friends and groups
 - Manage shared budgets and financial goals

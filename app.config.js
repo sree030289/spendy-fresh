@@ -8,7 +8,7 @@ const EXPO_ENVIRONMENT = process.env.EXPO_ENVIRONMENT || 'development';
 const getEnvironmentConfig = () => {
   if (EXPO_ENVIRONMENT === 'production') {
     return {
-      name: "MeetNSplit",
+      name: "Meet-n-Split",
       slug: "spendy",
       bundleIdentifier: "com.svaag.spendy",
       package: "com.svaag.spendy",
@@ -31,7 +31,7 @@ const getEnvironmentConfig = () => {
     };
   } else {
     return {
-      name: "MeetNSplit Dev",
+      name: "Meet-n-Split Dev",
       slug: "spendy-dev", 
       bundleIdentifier: "com.svaag.spendy.dev",
       package: "com.svaag.spendy.dev",
@@ -78,7 +78,7 @@ export default {
       googleServicesFile: envConfig.googleServicesFile,
       infoPlist: {
         NSCameraUsageDescription: "This app needs access to camera for QR code scanning and taking profile pictures.",
-        NSFaceIDUsageDescription: "Allow MeetNSplit to use Face ID for secure authentication.",
+        NSFaceIDUsageDescription: "Allow Meet-n-Split to use Face ID for secure authentication.",
         NSContactsUsageDescription: "This app needs access to contacts to help you add friends and split expenses with people in your contact list.",
         NSLocationWhenInUseUsageDescription: "This app uses location to provide location-based expense tracking and merchant suggestions.",
         NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses location to provide location-based expense tracking and merchant suggestions.",
@@ -137,7 +137,7 @@ export default {
       [
         "expo-camera",
         {
-          cameraPermission: "Allow MeetNSplit to access your camera for QR code scanning and profile pictures."
+          cameraPermission: "Allow Meet-n-Split to access your camera for QR code scanning and profile pictures."
         }
       ],
       [
@@ -150,15 +150,15 @@ export default {
       [
         "expo-contacts",
         {
-          contactsPermission: "Allow MeetNSplit to access your contacts to add friends."
+          contactsPermission: "Allow Meet-n-Split to access your contacts to add friends."
         }
       ],
       [
         "expo-location",
         {
-          locationAlwaysAndWhenInUsePermission: "Allow MeetNSplit to use your location for expense tracking.",
-          locationAlwaysPermission: "Allow MeetNSplit to use your location for automatic expense categorization.",
-          locationWhenInUsePermission: "Allow MeetNSplit to use your location when you're using the app.",
+          locationAlwaysAndWhenInUsePermission: "Allow Meet-n-Split to use your location for expense tracking.",
+          locationAlwaysPermission: "Allow Meet-n-Split to use your location for automatic expense categorization.",
+          locationWhenInUsePermission: "Allow Meet-n-Split to use your location when you're using the app.",
           isIosBackgroundLocationEnabled: false
         }
       ]

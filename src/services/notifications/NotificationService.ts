@@ -499,7 +499,7 @@ export class NotificationService {
 
       await this.sendImmediateNotification(
         'Test Notification',
-        'This is a test notification from Spendy. Your notifications are working perfectly!',
+        'This is a test notification from Meet-n-Split. Your notifications are working perfectly!',
         { type: 'test' }
       );
 
