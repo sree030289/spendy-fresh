@@ -15,10 +15,6 @@ hideDevIndicators();
 // Import providers
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
 import { ThemeProvider } from './src/hooks/useTheme';
-import { TourProvider } from './src/components/tour/TourProvider';
-
-// Import tour components
-import { useTour } from './src/components/tour/TourProvider';
 
 // Import screens
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -48,8 +44,6 @@ const Stack = createStackNavigator();
 const AppNavigator = () => {
   const { user, isLoading, restoreSessionFromBiometric } = useAuth();
   const [initializing, setInitializing] = useState(true);
-  const [hasShownTour, setHasShownTour] = useState(false);
-  const [tourCheckCompleted, setTourCheckCompleted] = useState(false);
   const [authFlowState, setAuthFlowState] = useState<'checking' | 'splash' | 'biometric' | 'login' | 'authenticated'>('checking');
   const [lastUserSession, setLastUserSession] = useState<any>(null);
   const [biometricFailed, setBiometricFailed] = useState(false); // Track biometric failures
@@ -63,8 +57,6 @@ const AppNavigator = () => {
       setShowSplash(true); // Show splash screen again after logout
     }
   }, [user, isLoading, authFlowState]);
-  const { startTour } = useTour();
-
   // Web-specific states
   const [showLandingPage, setShowLandingPage] = useState(Platform.OS === 'web' && !user);
   const [hasVisitedLanding, setHasVisitedLanding] = useState(false);
@@ -101,28 +93,12 @@ const AppNavigator = () => {
     feature?: string;
     canClose: boolean;
   } | null>(null);
-  const [shouldShowTourAfterSubscription, setShouldShowTourAfterSubscription] = useState(false);
 
   console.log('AppNavigator - User:', user ? 'Authenticated' : 'Not authenticated');
   console.log('AppNavigator - Loading:', isLoading);
   console.log('AppNavigator - Auth Flow State:', authFlowState);
 
-  useEffect(() => {
-    // Check if tour has been completed before
-    const checkTourStatus = async () => {
-      try {
-        const tourCompleted = await AsyncStorage.getItem('app_tour_completed');
-        console.log('🔍 Tour Status Check - Tour completed value:', tourCompleted);
-        setHasShownTour(tourCompleted === 'true');
-        setTourCheckCompleted(true);
-      } catch (error) {
-        console.log('Error checking tour status:', error);
-        setTourCheckCompleted(true);
-      }
-    };
 
-    checkTourStatus();
-  }, []);
 
   // Authentication flow logic - determines what screen to show
   useEffect(() => {
@@ -219,7 +195,7 @@ const AppNavigator = () => {
   // Subscription check with proper premium user verification
   useEffect(() => {
     const checkSubscriptionStatus = async () => {
-      if (!user?.id || !appReady || !tourCheckCompleted) return;
+      if (!user?.id || !appReady) return;
 
       try {
         console.log('🔍 Checking subscription status for user:', user.id);
@@ -230,18 +206,7 @@ const AppNavigator = () => {
         console.log('🔍 User premium status:', isPremium);
         
         // DISABLED: Subscription modal on app launch
-        // Only show subscription modal for FREE users who haven't seen the tour
-        // if (!isPremium && !hasShownTour) {
-        //   console.log('🎯 Free user detected, will show subscription modal first');
-        //   
-        //   setPendingSubscriptionModal({
-        //     reason: 'firstTime',
-        //     canClose: false
-        //   });
-        //   setShouldShowTourAfterSubscription(true);
-        // } else {
-          console.log('🔍 Skipping subscription modal on app launch (disabled)');
-        // }
+        console.log('🔍 Skipping subscription modal on app launch (disabled)');
         
         setSubscriptionCheckComplete(true);
       } catch (error) {
@@ -251,7 +216,7 @@ const AppNavigator = () => {
     };
 
     checkSubscriptionStatus();
-  }, [user?.id, appReady, tourCheckCompleted, hasShownTour]);
+  }, [user?.id, appReady]);
 
   // Show pending subscription modal when ready
   useEffect(() => {
@@ -325,41 +290,7 @@ const AppNavigator = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Tour trigger logic
-  useEffect(() => {
-    console.log('🔍 Tour trigger check:', {
-      user: !!user,
-      isLoading,
-      initializing,
-      hasShownTour,
-      tourCheckCompleted,
-      appReady,
-      subscriptionCheckComplete,
-      subscriptionModalVisible: subscriptionModal.visible,
-      pendingSubscriptionModal: !!pendingSubscriptionModal,
-      shouldShowTourAfterSubscription
-    });
-    
-    if (user && 
-        !isLoading && 
-        !initializing && 
-        !hasShownTour && 
-        tourCheckCompleted && 
-        appReady && 
-        subscriptionCheckComplete && 
-        !subscriptionModal.visible && 
-        !pendingSubscriptionModal &&
-        !shouldShowTourAfterSubscription) {
-      
-      const timer = setTimeout(() => {
-        console.log('🎯 Showing onboarding tour for user (no subscription conflicts)');
-        startTour();
-        setHasShownTour(true);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [user, isLoading, initializing, hasShownTour, tourCheckCompleted, startTour, appReady, subscriptionCheckComplete, subscriptionModal.visible, pendingSubscriptionModal, shouldShowTourAfterSubscription]);
+
 
   useEffect(() => {
     // Initialize notifications
@@ -383,7 +314,7 @@ const AppNavigator = () => {
   const navigationRef = React.useRef<any>(null);
   
   useEffect(() => {
-    const handleNotificationResponse = async (response) => {
+    const handleNotificationResponse = async (response: any) => {
       const data = response?.notification?.request?.content?.data;
       if (data && user && navigationRef.current) {
         console.log('🔗 Handling notification deep link:', data);
@@ -461,15 +392,7 @@ const AppNavigator = () => {
           onPress: () => {
             console.log('✅ Mock subscription purchase completed');
             
-            // If we should show tour after subscription, do it now
-            if (shouldShowTourAfterSubscription && !hasShownTour) {
-              setShouldShowTourAfterSubscription(false);
-              setTimeout(() => {
-                console.log('🎯 Showing onboarding tour after subscription completion');
-                startTour();
-                setHasShownTour(true);
-              }, 1000);
-            }
+
           }
         }
       ]);
@@ -605,15 +528,7 @@ const AppNavigator = () => {
       }
     }
     
-    // If we should show tour after subscription and user hasn't seen it yet
-    if (shouldShowTourAfterSubscription && !hasShownTour) {
-      setShouldShowTourAfterSubscription(false);
-      setTimeout(() => {
-        console.log('🎯 Showing onboarding tour after subscription modal close');
-        startTour();
-        setHasShownTour(true);
-      }, 500);
-    }
+
   };
 
   // Expose global subscription modal function
@@ -741,9 +656,7 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
-          <TourProvider>
-            <AppNavigator />
-          </TourProvider>
+          <AppNavigator />
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>

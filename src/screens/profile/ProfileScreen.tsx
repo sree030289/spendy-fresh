@@ -21,7 +21,7 @@ import { Button } from '@/components/common/Button';
 import CurrencyModal from '@/components/modals/CurrencyModal';
 import SubscriptionModal from '@/components/modals/SubscriptionModal';
 import { TermsPrivacyModal } from '@/components/modals/TermsPrivacyModal';
-import { useTour } from '@/components/tour/TourProvider';
+
 import { SubscriptionService, UserSubscription, SubscriptionPlan } from '@/services/SubscriptionService';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/services/firebase/config';
@@ -35,7 +35,7 @@ export default function ProfileScreen() {
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showTermsPrivacyModal, setShowTermsPrivacyModal] = useState(false);
-  const { startTour, resetTour } = useTour();
+
 
   // Subscription states
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
@@ -1022,29 +1022,7 @@ export default function ProfileScreen() {
             Support
           </Text>
           
-          <ProfileItem
-            icon="play-circle-outline"
-            title="App Tour"
-            onPress={() => {
-              Alert.alert(
-                'App Tour',
-                'Would you like to see the app tour again? This will show you all the key features of Spendy.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { 
-                    text: 'Start Tour', 
-                    onPress: () => {
-                      console.log('🎯 Profile: User tapped Start Tour button');
-                      resetTour();
-                      startTour();
-                      console.log('✅ Profile: Called resetTour() and startTour()');
-                    }
-                  }
-                ]
-              );
-            }}
-          />
-          
+
           <ProfileItem
             icon="help-circle-outline"
             title="Help & Support"

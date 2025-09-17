@@ -47,7 +47,7 @@ npm run dev                 # Start development server with auto-reload
 - **Database**: Firebase Firestore
 - **Authentication**: Custom JWT implementation via API Service
 - **Navigation**: React Navigation 7 with bottom tabs + swipe support
-- **State Management**: React Context (AuthProvider, ThemeProvider, TourProvider)
+- **State Management**: React Context (AuthProvider, ThemeProvider)
 - **Notifications**: Expo Notifications + Custom Smart Money system
 
 ### Core Architecture Patterns
@@ -136,8 +136,7 @@ import { useAuth } from '@/hooks/useAuth';
 #### State Management
 Follows React Context pattern with providers:
 - `AuthProvider`: User authentication state
-- `ThemeProvider`: Dark/light theme management  
-- `TourProvider`: Onboarding tour system
+- `ThemeProvider`: Dark/light theme management
 
 #### Error Handling
 - API calls use try/catch with graceful fallbacks
