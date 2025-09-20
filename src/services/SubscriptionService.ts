@@ -568,48 +568,130 @@ export class SubscriptionService {
     this.cacheExpiry.delete(key);
   }
 
-  // SUBSCRIPTION PURCHASE
+  // REAL SUBSCRIPTION PURCHASE
   async processSubscription(
     userId: string, 
     plan: 'monthly' | 'yearly', 
     promoCode?: string
   ): Promise<{ success: boolean; message: string }> {
     try {
-      // Here you would integrate with your payment provider (Stripe, Apple Pay, Google Pay, etc.)
-      console.log('Processing subscription:', { userId, plan, promoCode });
+      console.log('🛒 Processing real subscription:', { userId, plan, promoCode });
       
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Initialize payment service
+      const { default: RealPaymentService } = await import('./RealPaymentService');
+      const paymentService = RealPaymentService.getInstance();
       
-      // Calculate period based on plan
-      const now = new Date();
-      const periodEnd = new Date(now);
+      // Initialize with user ID
+      await paymentService.initialize(userId);
       
-      if (plan === 'yearly') {
-        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-      } else {
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
+      // Validate promo code if provided
+      if (promoCode) {
+        const { default: PromoCodeService } = await import('./PromoCodeService');
+        const promoService = PromoCodeService.getInstance();
+        
+        // Get current product pricing to validate promo code
+        const products = await paymentService.getAvailableProducts();
+        const targetProduct = products.find(p => 
+          p.identifier.includes(plan) || 
+          (plan === 'yearly' && p.identifier.includes('annual'))
+        );
+        
+        if (targetProduct) {
+          const originalPrice = parseFloat(targetProduct.price);
+          const validation = await promoService.validatePromoCode(
+            promoCode, 
+            plan, 
+            originalPrice, 
+            userId
+          );
+          
+          if (!validation.valid) {
+            return {
+              success: false,
+              message: validation.error || 'Invalid promo code'
+            };
+          }
+        }
       }
       
-      // Update subscription
-      await this.updateUserSubscription(userId, {
-        plan: 'premium',
-        status: 'active',
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-        cancelAtPeriodEnd: false,
-        updatedAt: new Date()
-      });
+      // Process payment through RevenueCat
+      const paymentResult = await paymentService.purchaseSubscription(plan, promoCode);
+      
+      if (!paymentResult.success) {
+        if (paymentResult.userCancelled) {
+          return {
+            success: false,
+            message: 'Purchase cancelled'
+          };
+        }
+        
+        return {
+          success: false,
+          message: paymentResult.error || 'Payment failed. Please try again.'
+        };
+      }
+      
+      // Clear usage cache for user since they now have premium
+      this.clearCache(`usage_${userId}_${this.formatDate(new Date())}`);
+      this.clearCache(`subscription_${userId}`);
+      
+      // Record promo code usage if applicable
+      if (promoCode && paymentResult.customerInfo) {
+        const { default: PromoCodeService } = await import('./PromoCodeService');
+        const promoService = PromoCodeService.getInstance();
+        
+        const products = await paymentService.getAvailableProducts();
+        const targetProduct = products.find(p => 
+          p.identifier.includes(plan) || 
+          (plan === 'yearly' && p.identifier.includes('annual'))
+        );
+        
+        if (targetProduct) {
+          const originalPrice = parseFloat(targetProduct.price);
+          const validation = await promoService.validatePromoCode(
+            promoCode, 
+            plan, 
+            originalPrice, 
+            userId
+          );
+          
+          if (validation.valid && validation.discountedPrice) {
+            await promoService.recordPromoCodeUsage(
+              userId,
+              promoCode,
+              plan,
+              originalPrice,
+              validation.discountedPrice,
+              paymentResult.customerInfo.originalPurchaseDate || undefined
+            );
+          }
+        }
+      }
       
       return {
         success: true,
-        message: 'Subscription activated successfully!'
+        message: '🎉 Welcome to Premium! Your subscription is now active.'
       };
+      
     } catch (error) {
-      console.error('Process subscription error:', error);
+      console.error('❌ Process subscription error:', error);
+      
+      // Provide specific error messages
+      let errorMessage = 'Failed to process subscription. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Payment service initialization failed')) {
+          errorMessage = 'Payment system is currently unavailable. Please try again later.';
+        } else if (error.message.includes('No subscription plans available')) {
+          errorMessage = 'Subscription plans are not available in your region.';
+        } else if (error.message.includes('network') || error.message.includes('internet')) {
+          errorMessage = 'Please check your internet connection and try again.';
+        }
+      }
+      
       return {
         success: false,
-        message: 'Failed to process subscription. Please try again.'
+        message: errorMessage
       };
     }
   }

@@ -86,7 +86,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = memo(({
       )}
     </TouchableOpacity>
   );
-};
+});
 
 // =====================================================
 // BALANCE ITEM - Individual person balance display

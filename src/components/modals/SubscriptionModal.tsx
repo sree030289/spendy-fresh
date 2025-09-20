@@ -46,6 +46,23 @@ export default function SubscriptionModal({
   const [canCloseModal, setCanCloseModal] = useState(canClose);
   const [countdown, setCountdown] = useState(autoCloseAfter || 0);
   const [loading, setLoading] = useState(false);
+  
+  // Real-time promo code validation
+  const [promoValidation, setPromoValidation] = useState<{
+    valid: boolean;
+    error?: string;
+    discountedPrice?: number;
+    originalPrice?: number;
+    discountAmount?: number;
+    isValidating?: boolean;
+  }>({ valid: false });
+  
+  // Real pricing from payment service
+  const [realPricing, setRealPricing] = useState<{
+    monthly: number;
+    yearly: number;
+    currency: string;
+  } | null>(null);
 
   // Subscription configuration state
   const [subscriptionConfig, setSubscriptionConfig] = useState<SubscriptionConfig | null>(null);
@@ -54,7 +71,7 @@ export default function SubscriptionModal({
   // Get user info for currency
   const { user } = useAuth();
 
-  // Initialize subscription configuration
+  // Initialize subscription configuration and real pricing
   useEffect(() => {
     const configService = SubscriptionConfigService.getInstance();
     
@@ -71,6 +88,10 @@ export default function SubscriptionModal({
         setSubscriptionConfig(config);
         setSelectedPlan(config.displayConfig.defaultPlan);
         setShowPromoInput(config.displayConfig.promoCodeEnabled);
+        
+        // Load real pricing from payment service
+        await loadRealPricing();
+        
       } catch (error) {
         console.error('Failed to initialize subscription config:', error);
         // Use fallback config
@@ -105,9 +126,118 @@ export default function SubscriptionModal({
     };
   }, [user]);
 
-  // Get current pricing from config
+  // Load real pricing from payment service
+  const loadRealPricing = async () => {
+    try {
+      if (!user?.id) return;
+      
+      console.log('💰 Loading real pricing from payment service...');
+      
+      const { default: RealPaymentService } = await import('@/services/RealPaymentService');
+      const paymentService = RealPaymentService.getInstance();
+      
+      await paymentService.initialize(user.id);
+      const products = await paymentService.getAvailableProducts();
+      
+      if (products.length > 0) {
+        const monthlyProduct = products.find(p => 
+          p.identifier.includes('monthly') && !p.identifier.includes('yearly')
+        );
+        const yearlyProduct = products.find(p => 
+          p.identifier.includes('yearly') || p.identifier.includes('annual')
+        );
+        
+        if (monthlyProduct && yearlyProduct) {
+          setRealPricing({
+            monthly: parseFloat(monthlyProduct.price),
+            yearly: parseFloat(yearlyProduct.price),
+            currency: monthlyProduct.currencyCode
+          });
+          console.log('✅ Loaded real pricing:', {
+            monthly: monthlyProduct.priceString,
+            yearly: yearlyProduct.priceString,
+            currency: monthlyProduct.currencyCode
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to load real pricing:', error);
+      // Continue with Firebase config pricing as fallback
+    }
+  };
+
+  // Real-time promo code validation
+  useEffect(() => {
+    const validatePromoCode = async () => {
+      if (!promoCode.trim() || !user?.id) {
+        setPromoValidation({ valid: false });
+        return;
+      }
+
+      setPromoValidation({ valid: false, isValidating: true });
+
+      try {
+        const { default: PromoCodeService } = await import('@/services/PromoCodeService');
+        const promoService = PromoCodeService.getInstance();
+        
+        // Get current pricing
+        const pricing = getCurrentPricing();
+        const currentPrice = selectedPlan === 'yearly' ? pricing.yearlyPrice : pricing.monthlyPrice;
+        
+        const validation = await promoService.validatePromoCode(
+          promoCode,
+          selectedPlan,
+          currentPrice,
+          user.id,
+          pricing.currency
+        );
+        
+        setPromoValidation({
+          valid: validation.valid,
+          error: validation.error,
+          discountedPrice: validation.discountedPrice,
+          originalPrice: validation.originalPrice,
+          discountAmount: validation.discountAmount,
+          isValidating: false
+        });
+        
+        console.log('🏷️ Promo validation result:', validation);
+      } catch (error) {
+        console.error('❌ Promo validation error:', error);
+        setPromoValidation({
+          valid: false,
+          error: 'Unable to validate promo code',
+          isValidating: false
+        });
+      }
+    };
+
+    // Debounce validation
+    const timeoutId = setTimeout(validatePromoCode, 500);
+    return () => clearTimeout(timeoutId);
+  }, [promoCode, selectedPlan, user?.id, subscriptionConfig]);
+
+  // Get current pricing from config - prioritize real pricing from payment service
   const getCurrentPricing = () => {
-    console.log('💰 getCurrentPricing called with subscriptionConfig:', subscriptionConfig);
+    console.log('💰 getCurrentPricing called');
+    
+    // Use real pricing if available (from App Store/Play Store)
+    if (realPricing) {
+      console.log('🛍️ Using real App Store/Play Store pricing:', realPricing);
+      const yearlyMonthlyPrice = realPricing.yearly / 12;
+      const yearlyTotal = realPricing.monthly * 12;
+      const savings = Math.round(((yearlyTotal - realPricing.yearly) / yearlyTotal) * 100);
+      
+      return {
+        monthlyPrice: realPricing.monthly,
+        yearlyPrice: realPricing.yearly,
+        yearlyMonthlyPrice,
+        savings,
+        currency: realPricing.currency
+      };
+    }
+    
+    // Fallback to Firebase config pricing
     if (!subscriptionConfig) {
       console.log('⚠️ No subscription config, using fallback pricing');
       const userCurrency = user?.currency || 'USD';
@@ -332,7 +462,21 @@ export default function SubscriptionModal({
                 <Text style={styles.planBadgeText}>SAVE {savings}%</Text>
               </View>
               <Text style={styles.planName}>Yearly</Text>
-              <Text style={styles.planPrice}>{formatCurrency(yearlyPrice, currency)}</Text>
+              
+              {/* Show discounted price if promo code is valid */}
+              {promoValidation.valid && selectedPlan === 'yearly' && promoValidation.discountedPrice ? (
+                <View style={styles.priceContainer}>
+                  <Text style={[styles.planPrice, styles.originalPrice]}>
+                    {formatCurrency(yearlyPrice, currency)}
+                  </Text>
+                  <Text style={styles.planPrice}>
+                    {formatCurrency(promoValidation.discountedPrice, currency)}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.planPrice}>{formatCurrency(yearlyPrice, currency)}</Text>
+              )}
+              
               <Text style={styles.planPriceSubtext}>{formatCurrency(yearlyMonthlyPrice, currency)}/month</Text>
               <Text style={styles.planBenefit}>2 months FREE</Text>
             </TouchableOpacity>
@@ -346,7 +490,21 @@ export default function SubscriptionModal({
               onPress={() => setSelectedPlan('monthly')}
             >
               <Text style={styles.planName}>Monthly</Text>
-              <Text style={styles.planPrice}>{formatCurrency(monthlyPrice, currency)}</Text>
+              
+              {/* Show discounted price if promo code is valid */}
+              {promoValidation.valid && selectedPlan === 'monthly' && promoValidation.discountedPrice ? (
+                <View style={styles.priceContainer}>
+                  <Text style={[styles.planPrice, styles.originalPrice]}>
+                    {formatCurrency(monthlyPrice, currency)}
+                  </Text>
+                  <Text style={styles.planPrice}>
+                    {formatCurrency(promoValidation.discountedPrice, currency)}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.planPrice}>{formatCurrency(monthlyPrice, currency)}</Text>
+              )}
+              
               <Text style={styles.planPriceSubtext}>per month</Text>
               <Text style={styles.planBenefit}>Cancel anytime</Text>
             </TouchableOpacity>
@@ -356,21 +514,56 @@ export default function SubscriptionModal({
         {/* Promo Code */}
         {subscriptionConfig?.displayConfig.promoCodeEnabled && (
           showPromoInput ? (
-            <View style={styles.promoInputContainer}>
-              <TextInput
-                style={styles.promoInput}
-                placeholder="Enter promo code"
-                placeholderTextColor="rgba(255,255,255,0.6)"
-                value={promoCode}
-                onChangeText={setPromoCode}
-                autoCapitalize="characters"
-              />
-              <TouchableOpacity
-                style={styles.promoCloseButton}
-                onPress={() => setShowPromoInput(false)}
-              >
-                <Text style={styles.promoCloseText}>✕</Text>
-              </TouchableOpacity>
+            <View style={styles.promoSection}>
+              <View style={[
+                styles.promoInputContainer,
+                promoValidation.isValidating && styles.promoInputValidating,
+                promoValidation.valid && styles.promoInputValid,
+                promoValidation.error && styles.promoInputError
+              ]}>
+                <TextInput
+                  style={styles.promoInput}
+                  placeholder="Enter promo code"
+                  placeholderTextColor="rgba(255,255,255,0.6)"
+                  value={promoCode}
+                  onChangeText={setPromoCode}
+                  autoCapitalize="characters"
+                />
+                {promoValidation.isValidating && (
+                  <Text style={styles.promoStatus}>⏳</Text>
+                )}
+                {promoValidation.valid && (
+                  <Text style={styles.promoStatus}>✅</Text>
+                )}
+                {promoValidation.error && !promoValidation.isValidating && (
+                  <Text style={styles.promoStatus}>❌</Text>
+                )}
+                <TouchableOpacity
+                  style={styles.promoCloseButton}
+                  onPress={() => {
+                    setShowPromoInput(false);
+                    setPromoCode('');
+                    setPromoValidation({ valid: false });
+                  }}
+                >
+                  <Text style={styles.promoCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {/* Promo validation feedback */}
+              {promoValidation.valid && promoValidation.discountAmount && (
+                <View style={styles.promoSuccess}>
+                  <Text style={styles.promoSuccessText}>
+                    🎉 {formatCurrency(promoValidation.discountAmount, currency)} discount applied!
+                  </Text>
+                </View>
+              )}
+              
+              {promoValidation.error && !promoValidation.isValidating && (
+                <View style={styles.promoError}>
+                  <Text style={styles.promoErrorText}>{promoValidation.error}</Text>
+                </View>
+              )}
             </View>
           ) : (
             <TouchableOpacity
@@ -392,7 +585,13 @@ export default function SubscriptionModal({
             <Text style={styles.subscribeButtonText}>
               {loading 
                 ? 'Processing...' 
-                : `Start Premium - ${formatCurrency(selectedPlan === 'yearly' ? yearlyPrice : monthlyPrice, currency)}`
+                : (() => {
+                    const currentPrice = selectedPlan === 'yearly' ? yearlyPrice : monthlyPrice;
+                    const finalPrice = promoValidation.valid && promoValidation.discountedPrice 
+                      ? promoValidation.discountedPrice 
+                      : currentPrice;
+                    return `Start Premium - ${formatCurrency(finalPrice, currency)}`;
+                  })()
               }
             </Text>
           </TouchableOpacity>
@@ -550,19 +749,38 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     fontWeight: '500',
   },
+  promoSection: {
+    marginBottom: 16,
+  },
   promoInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 12,
-    marginBottom: 16,
     paddingRight: 4,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  promoInputValidating: {
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  promoInputValid: {
+    borderColor: '#4CAF50',
+    backgroundColor: 'rgba(76,175,80,0.15)',
+  },
+  promoInputError: {
+    borderColor: '#F44336',
+    backgroundColor: 'rgba(244,67,54,0.15)',
   },
   promoInput: {
     flex: 1,
     padding: 12,
     color: 'white',
     fontSize: 14,
+  },
+  promoStatus: {
+    fontSize: 16,
+    marginRight: 8,
   },
   promoCloseButton: {
     padding: 8,
@@ -616,5 +834,42 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     lineHeight: 16,
+  },
+  priceContainer: {
+    alignItems: 'center',
+  },
+  originalPrice: {
+    textDecorationLine: 'line-through',
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 18,
+    marginBottom: 2,
+  },
+  promoSuccess: {
+    backgroundColor: 'rgba(76,175,80,0.2)',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  promoSuccessText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  promoError: {
+    backgroundColor: 'rgba(244,67,54,0.2)',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#F44336',
+  },
+  promoErrorText: {
+    color: '#F44336',
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });
