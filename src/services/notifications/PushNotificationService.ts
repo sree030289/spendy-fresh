@@ -137,7 +137,7 @@ export class PushNotificationService {
     return {
       type: 'friend_request',
       title: 'New Friend Request',
-      body: `${senderName} wants to be your friend on Meet-n-Split`,
+      body: `${senderName} wants to be your friend on meadium`,
       data: { 
         friendRequestId,
         senderName,

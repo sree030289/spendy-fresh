@@ -47,7 +47,7 @@ const getEnvironmentConfig = () => {
         appId: process.env.FIREBASE_APP_ID || '1:123456789:web:abcdef123456',
       },
       api: {
-        baseURL: process.env.API_BASE_URL || 'http://localhost:5000/spendy-dev-project/us-central1/spendyApi',
+        baseURL: process.env.API_BASE_URL || 'https://us-central1-spendy-develop.cloudfunctions.net/meetnsplitApi',
         jwtSecret: process.env.JWT_SECRET || 'dev-jwt-secret-not-for-production',
       },
       allowArbitraryLoads: true, // Allow HTTP in development
@@ -165,6 +165,9 @@ export default {
     ],
     // Pass environment config to the app
     extra: {
+      eas: {
+        projectId: "fdfe5c21-42b7-45a2-ad80-b39ab634bd55"
+      },
       environment: EXPO_ENVIRONMENT,
       firebase: envConfig.firebase,
       api: envConfig.api,

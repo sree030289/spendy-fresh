@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../../components/common/Icon';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
@@ -35,6 +37,7 @@ export default function ProfileScreen() {
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showTermsPrivacyModal, setShowTermsPrivacyModal] = useState(false);
+  const [cachedProfilePicture, setCachedProfilePicture] = useState<string | null>(null);
 
 
   // Subscription states
@@ -73,6 +76,26 @@ export default function ProfileScreen() {
 
     loadSubscriptionData();
   }, [user?.id]);
+
+  // Load cached profile picture
+  useEffect(() => {
+    const loadCachedProfilePicture = async () => {
+      if (!user?.id || !user.profilePicture) {
+        setCachedProfilePicture(null);
+        return;
+      }
+
+      try {
+        const cachedUri = await getCachedProfilePicture(user.profilePicture, user.id);
+        setCachedProfilePicture(cachedUri);
+      } catch (error) {
+        console.error('Error loading cached profile picture:', error);
+        setCachedProfilePicture(user.profilePicture); // Fallback to remote URL
+      }
+    };
+
+    loadCachedProfilePicture();
+  }, [user?.id, user?.profilePicture]);
 
   const ProfileItem = ({ 
     icon, 
@@ -148,6 +171,123 @@ export default function ProfileScreen() {
     );
   };
 
+  // Cache profile picture locally for offline viewing
+  const cacheProfilePicture = async (imageUri: string, userId: string): Promise<string> => {
+    try {
+      if (!imageUri || !userId) {
+        return imageUri;
+      }
+
+      const cacheDir = `${FileSystem.cacheDirectory}profile_pictures/`;
+      const cachedImagePath = `${cacheDir}${userId}_profile.jpg`;
+
+      // Ensure cache directory exists
+      await FileSystem.makeDirectoryAsync(cacheDir, { intermediates: true });
+
+      console.log('💾 Caching profile picture locally...', {
+        imageUri: imageUri.substring(0, 100) + '...',
+        userId,
+        isRemote: imageUri.startsWith('http://') || imageUri.startsWith('https://'),
+        cachedImagePath
+      });
+
+      // Check if the URI is already a local file or remote URL
+      if (imageUri.startsWith('http://') || imageUri.startsWith('https://')) {
+        // Remote URL - download it
+        console.log('� Downloading remote image...');
+        const downloadResult = await FileSystem.downloadAsync(imageUri, cachedImagePath);
+        
+        if (downloadResult && downloadResult.status === 200) {
+          console.log('✅ Profile picture downloaded and cached:', cachedImagePath);
+          
+          // Verify the cached file exists
+          const fileInfo = await FileSystem.getInfoAsync(cachedImagePath);
+          if (fileInfo.exists) {
+            console.log('📋 Cached file verified:', {
+              size: fileInfo.size,
+              uri: fileInfo.uri
+            });
+            
+            // Store the cached path in AsyncStorage for quick access
+            await AsyncStorage.setItem(`@cached_profile_${userId}`, cachedImagePath);
+            
+            return cachedImagePath;
+          } else {
+            console.warn('⚠️ Cached file does not exist after download');
+            return imageUri;
+          }
+        } else {
+          console.warn('⚠️ Failed to download profile picture, using original URL');
+          return imageUri;
+        }
+      } else {
+        // Local file - copy it to cache directory
+        console.log('📁 Copying local image to cache...');
+        await FileSystem.copyAsync({
+          from: imageUri,
+          to: cachedImagePath
+        });
+        
+        console.log('✅ Profile picture copied and cached:', cachedImagePath);
+        
+        // Verify the copied file exists
+        const fileInfo = await FileSystem.getInfoAsync(cachedImagePath);
+        if (fileInfo.exists) {
+          console.log('📋 Copied file verified:', {
+            size: fileInfo.size,
+            uri: fileInfo.uri
+          });
+          
+          // Store the cached path in AsyncStorage for quick access
+          await AsyncStorage.setItem(`@cached_profile_${userId}`, cachedImagePath);
+          
+          return cachedImagePath;
+        } else {
+          console.warn('⚠️ Copied file does not exist after copy operation');
+          return imageUri;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error caching profile picture:', error);
+      return imageUri; // Fallback to original URL
+    }
+  };
+
+  // Get cached profile picture or fallback to remote URL
+  const getCachedProfilePicture = async (remoteUri: string, userId: string): Promise<string> => {
+    try {
+      if (!userId) return remoteUri;
+
+      // Check if we have a cached version
+      const cachedPath = await AsyncStorage.getItem(`@cached_profile_${userId}`);
+      
+      if (cachedPath) {
+        // Verify the cached file still exists
+        const fileInfo = await FileSystem.getInfoAsync(cachedPath);
+        if (fileInfo.exists) {
+          console.log('💾 Using cached profile picture:', cachedPath);
+          return cachedPath;
+        } else {
+          // Clear invalid cache entry
+          await AsyncStorage.removeItem(`@cached_profile_${userId}`);
+        }
+      }
+
+      // No cache or invalid cache, use remote URL and cache it
+      if (remoteUri) {
+        // Cache in background without blocking UI
+        cacheProfilePicture(remoteUri, userId).catch(err => 
+          console.warn('Background caching failed:', err)
+        );
+      }
+
+      return remoteUri;
+    } catch (error) {
+      console.error('❌ Error getting cached profile picture:', error);
+      return remoteUri;
+    }
+  };
+
   const openCamera = async () => {
     try {
       console.log('📷 Opening camera...');
@@ -165,12 +305,12 @@ export default function ProfileScreen() {
 
       console.log('✅ Camera permission granted, launching camera...');
       
-      // Use more conservative settings for iOS
+      // Optimized camera settings for profile pictures
       const cameraOptions: ImagePicker.ImagePickerOptions = {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1] as [number, number],
-        quality: 0.7, // Higher quality for better compatibility
+        quality: 0.8, // Good quality for profile pictures
         exif: false, // Disable EXIF data to improve performance
         base64: false, // Disable base64 encoding for better performance
       };
@@ -236,11 +376,12 @@ export default function ProfileScreen() {
 
         console.log('✅ Permission granted, launching iOS image picker...');
         
-        // Ultra-minimal iOS configuration to prevent crashes
+        // Optimized gallery settings for profile pictures  
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false, // Disable editing on iOS to prevent crashes
-          quality: 0.5, // Lower quality for iOS stability
+          allowsEditing: true, // Enable editing for better user experience
+          aspect: [1, 1] as [number, number], // Square aspect ratio for profile pictures
+          quality: 0.8, // Good quality that will be auto-resized if needed
           exif: false,
           base64: false,
         });
@@ -467,8 +608,6 @@ export default function ProfileScreen() {
         throw new Error('Invalid or missing image URI');
       }
 
-      const imageUri = firstAsset.uri;
-      console.log('📤 Processing image URI (iOS):', imageUri);
       console.log('📤 Asset details:', {
         width: firstAsset.width,
         height: firstAsset.height,
@@ -476,37 +615,68 @@ export default function ProfileScreen() {
         fileSize: firstAsset.fileSize
       });
 
-      // iOS-specific size and format validation with more conservative limits
-      if (Platform.OS === 'ios') {
-        // More conservative file size limit for iOS to prevent memory issues
-        const maxFileSize = 5 * 1024 * 1024; // 5MB limit
-        if (firstAsset.fileSize && firstAsset.fileSize > maxFileSize) {
-          const fileSizeMB = Math.round(firstAsset.fileSize / (1024 * 1024));
-          throw new Error(`Image file is too large (${fileSizeMB}MB). Please select an image smaller than 5MB.`);
-        }
+      // Auto-resize image if it exceeds resolution limits
+      const maxResolution = 2048;
+      let processedUri = firstAsset.uri;
+      
+      if (firstAsset.width && firstAsset.height && (firstAsset.width > maxResolution || firstAsset.height > maxResolution)) {
+        console.log(`📏 Image resolution too high (${firstAsset.width}x${firstAsset.height}), resizing to max ${maxResolution}...`);
         
-        // More conservative resolution limits for iOS
-        const maxResolution = 2048; // 2048x2048 max
-        if (firstAsset.width && firstAsset.height && (firstAsset.width > maxResolution || firstAsset.height > maxResolution)) {
-          throw new Error(`Image resolution is too high (${firstAsset.width}x${firstAsset.height}). Please select an image with maximum 2048x2048 resolution.`);
-        }
-        
-        // Additional iOS memory check
-        if (firstAsset.width && firstAsset.height && firstAsset.fileSize) {
-          const estimatedMemoryUsage = firstAsset.width * firstAsset.height * 4; // 4 bytes per pixel (RGBA)
-          const maxMemoryUsage = 50 * 1024 * 1024; // 50MB memory limit
-          if (estimatedMemoryUsage > maxMemoryUsage) {
-            throw new Error('Image requires too much memory to process. Please select a smaller image.');
+        try {
+          // Calculate new dimensions maintaining aspect ratio
+          const aspectRatio = firstAsset.width / firstAsset.height;
+          let newWidth, newHeight;
+          
+          if (firstAsset.width > firstAsset.height) {
+            newWidth = maxResolution;
+            newHeight = Math.round(maxResolution / aspectRatio);
+          } else {
+            newHeight = maxResolution;
+            newWidth = Math.round(maxResolution * aspectRatio);
           }
+          
+          console.log(`🔄 Resizing from ${firstAsset.width}x${firstAsset.height} to ${newWidth}x${newHeight}`);
+          
+          const manipulatedImage = await ImageManipulator.manipulateAsync(
+            firstAsset.uri,
+            [
+              { 
+                resize: { 
+                  width: newWidth, 
+                  height: newHeight 
+                } 
+              }
+            ],
+            {
+              compress: 0.8, // Good compression for profile pictures
+              format: ImageManipulator.SaveFormat.JPEG,
+            }
+          );
+          
+          processedUri = manipulatedImage.uri;
+          console.log('✅ Image successfully resized:', {
+            originalSize: `${firstAsset.width}x${firstAsset.height}`,
+            newSize: `${newWidth}x${newHeight}`,
+            originalFileSize: firstAsset.fileSize,
+            newUri: manipulatedImage.uri
+          });
+          
+        } catch (manipulatorError) {
+          console.error('❌ Image resize failed:', manipulatorError);
+          throw new Error('Failed to resize image. Please try a different photo.');
         }
-        
-        console.log('✅ iOS image validation passed:', {
-          width: firstAsset.width,
-          height: firstAsset.height,
-          fileSize: firstAsset.fileSize,
-          fileSizeMB: firstAsset.fileSize ? Math.round(firstAsset.fileSize / (1024 * 1024)) : 'unknown'
-        });
       }
+      
+      console.log('✅ Image validation passed:', {
+        platform: Platform.OS,
+        originalSize: firstAsset.width && firstAsset.height ? `${firstAsset.width}x${firstAsset.height}` : 'unknown',
+        fileSize: firstAsset.fileSize,
+        finalUri: processedUri
+      });
+
+      // Use the processed URI (resized if needed) for upload
+      const imageUri = processedUri;
+      console.log('📤 Final image URI for upload:', imageUri);
 
       // Start upload process with iOS-safe approach
       console.log('☁️ Starting profile picture update...');
@@ -564,7 +734,7 @@ export default function ProfileScreen() {
         console.log('📥 API updated user profile successfully');
       }
       
-      // Update local AsyncStorage
+      // Update local AsyncStorage and auth context
       const updatedUser = { 
         ...user, 
         profilePicture: profilePictureUrl, // Ensure we use the Firebase URL
@@ -574,6 +744,25 @@ export default function ProfileScreen() {
       
       await AsyncStorage.setItem('@spendy_user_data', JSON.stringify(updatedUser));
       console.log('📱 Updated local user data with new profile picture');
+      
+      // Update auth context state immediately to show the image in UI
+      if (updateUser && typeof updateUser === 'function') {
+        await updateUser(updatedUser);
+        console.log('🔄 Updated auth context with new profile picture');
+      }
+
+      // Cache the profile picture locally and update UI immediately
+      try {
+        const cachedImagePath = await cacheProfilePicture(profilePictureUrl, user.id);
+        console.log('💾 Profile picture cached for offline viewing:', cachedImagePath);
+        
+        // Update cached profile picture state for immediate UI update
+        setCachedProfilePicture(cachedImagePath);
+      } catch (cacheError) {
+        console.warn('⚠️ Failed to cache profile picture:', cacheError);
+        // Still update UI with remote URL if caching fails
+        setCachedProfilePicture(profilePictureUrl);
+      }
       
       console.log('✅ Profile picture updated successfully!');
       Alert.alert('Success', 'Profile picture updated successfully!');
@@ -813,8 +1002,8 @@ export default function ProfileScreen() {
         {/* Profile Info */}
         <View style={styles.profileSection}>
           <TouchableOpacity onPress={handleImagePicker} style={styles.profileImageContainer}>
-            {user.profilePicture ? (
-              <Image source={{ uri: user.profilePicture }} style={styles.profileImage} />
+            {(cachedProfilePicture || user.profilePicture) ? (
+              <Image source={{ uri: cachedProfilePicture || user.profilePicture }} style={styles.profileImage} />
             ) : (
               <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.colors.primary }]}>
                 <Text style={styles.profileImageText}>

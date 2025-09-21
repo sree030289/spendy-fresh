@@ -396,21 +396,13 @@ Download Spendy to search thousands of deals from Australian retailers!`;
           break;
 
         case LinkType.CATEGORY:
-          if (linkData.id) {
-            navigate('DealsHub', { 
-              category: linkData.id,
-              source: linkData.params?.source,
-            });
-          }
+          // Deals functionality removed - navigate to main screen
+          navigate('Main');
           break;
 
         case LinkType.SOURCE:
-          if (linkData.id) {
-            navigate('DealsHub', { 
-              source: linkData.id,
-              category: 'All',
-            });
-          }
+          // Deals functionality removed - navigate to main screen
+          navigate('Main');
           break;
 
         case LinkType.SEARCH:
@@ -434,12 +426,12 @@ Download Spendy to search thousands of deals from Australian retailers!`;
           break;
 
         default:
-          navigate('DealsHub');
+          navigate('Main');
           break;
       }
     } catch (error) {
       console.error('Error handling navigation:', error);
-      navigate('DealsHub'); // Fallback to main screen
+      navigate('Main'); // Fallback to main screen
     }
   }
 

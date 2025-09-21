@@ -52,7 +52,7 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
       appId: extra.firebase?.appId || '',
     },
     api: {
-      baseURL: extra.api?.baseURL || 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi',
+      baseURL: extra.api?.baseURL || 'https://us-central1-spendy-develop.cloudfunctions.net/meetnsplitApi',
       jwtSecret: extra.api?.jwtSecret || 'dev-jwt-secret',
     },
     environment: environment as 'development' | 'staging' | 'production',

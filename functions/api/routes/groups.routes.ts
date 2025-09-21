@@ -36,6 +36,12 @@ router.get('/:groupId',
 );
 
 router.put('/:groupId',
+  (req, res, next) => {
+    console.log('🔍 Groups PUT route hit for groupId:', req.params.groupId);
+    console.log('🔍 Request body:', req.body);
+    console.log('🔍 Request headers:', req.headers);
+    next();
+  },
   GroupsController.updateGroup
 );
 

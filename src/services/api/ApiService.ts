@@ -3,22 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { convertApiTimestamps } from '../../utils/timestamp';
 
 // OPTIMIZATION: Environment-based API URL for cost management
-const getApiBaseUrl = () => {
-  const environment = process.env.NODE_ENV || 'development';
-  const buildType = process.env.EXPO_PUBLIC_BUILD_TYPE || 'dev';
-  
-  console.log('🔧 API Environment:', environment, 'Build:', buildType);
+import { ENV } from '@/config/environment';
 
-  // Use Firebase Functions for both dev and prod builds from spendy-develop project
-  if (buildType === 'dev' || (environment === 'development' && buildType !== 'prod')) {
-    console.log('🔧 Using DEVELOPMENT Firebase Functions API endpoint');
-    // Use the new Cloud Run deployed function URL
-    return 'https://spendyapi-2fy22mkg6q-uc.a.run.app';
-  }
-  
-  // Use production API for production builds (same endpoint for now)
-  console.log('🔧 Using PRODUCTION Firebase Functions API endpoint');
-  return 'https://spendyapi-2fy22mkg6q-uc.a.run.app';
+// Function to determine the correct API base URL
+const getApiBaseUrl = (): string => {
+  console.log('🔧 Using API URL from environment config:', ENV.api.baseURL);
+  return ENV.api.baseURL;
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -583,6 +573,17 @@ class ApiService {
       console.log('✅ API: Successfully deleted group');
     } catch (error: any) {
       console.error('❌ API: Delete group failed:', error);
+      throw error;
+    }
+  }
+
+  async updateGroup(groupId: string, updateData: { name?: string; description?: string; avatar?: string; settings?: any }): Promise<void> {
+    console.log('✏️ API: Updating group', { groupId, updateData });
+    try {
+      await this.request('PUT', `/groups/${groupId}`, updateData);
+      console.log('✅ API: Successfully updated group');
+    } catch (error: any) {
+      console.error('❌ API: Update group failed:', error);
       throw error;
     }
   }

@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Let'Split",
-    "slug": "letssplit",
+    "name": "Meet-n-Split",
+    "slug": "meetnsplit",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "letssplit",
+    "scheme": "meetnsplit",
     "userInterfaceStyle": "automatic",
-    "icon": "./assets/icon-letssplit.png",
+    "icon": "./assets/icon-meetnsplit.png",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -14,11 +14,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.svaag.letssplit",
+      "bundleIdentifier": "com.svaag.meetnsplit",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera for QR code scanning to quickly add expenses and split bills.",
-        "NSFaceIDUsageDescription": "Allow Let'Split to use Face ID for secure authentication.",
+        "NSFaceIDUsageDescription": "Allow Meet-n-Split to use Face ID for secure authentication.",
         "NSContactsUsageDescription": "This app needs access to contacts to help you add friends and split expenses with people in your contact list.",
         "NSLocationWhenInUseUsageDescription": "This app uses location to provide location-based expense tracking and merchant suggestions.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses location to provide location-based expense tracking and merchant suggestions.",
@@ -32,17 +32,17 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon-letssplit.png",
+        "foregroundImage": "./assets/adaptive-icon-meetnsplit.png",
         "backgroundColor": "#D6001C"
       },
-      "package": "com.svaag.letssplit",
+      "package": "com.svaag.meetnsplit",
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
           "data": [
             {
-              "scheme": "letssplit"
+              "scheme": "meetnsplit"
             }
           ],
           "category": [
@@ -54,7 +54,7 @@
           "action": "VIEW",
           "data": [
             {
-              "scheme": "com.svaag.letssplit"
+              "scheme": "com.svaag.meetnsplit"
             }
           ],
           "category": [
@@ -81,10 +81,10 @@
       ]
     },
     "notification": {
-      "icon": "./assets/notification-icon.png",
+      "icon": "./assets/notification-icon-meetnsplit.png",
       "color": "#10B981",
       "androidMode": "default",
-      "androidCollapsedTitle": "#{unread_notifications} new Smart Money notification(s)",
+      "androidCollapsedTitle": "#{unread_notifications} new Meet-n-Split notification(s)",
       "vapidPublicKey": "BCKn6-hFFrk_G2HzxtJ5u8_BfvwFjhSyBh2DQEG1Y0tPd8yJM1ZZCf7Cz9Hy5KVBEo1vVQb",
       "serviceWorkerPath": "./public/firebase-messaging-sw.js"
     },
@@ -98,7 +98,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
+          "icon": "./assets/notification-icon-meetnsplit.png",
           "color": "#10B981",
           "defaultChannel": "default",
           "sounds": [
@@ -109,7 +109,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Spendy to access your camera for QR code scanning and receipt capture.",
+          "cameraPermission": "Allow Meet-n-Split to access your camera for QR code scanning and receipt capture.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
@@ -117,28 +117,28 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow Spendy to use Face ID for secure authentication."
+          "faceIDPermission": "Allow Meet-n-Split to use Face ID for secure authentication."
         }
       ],
       [
         "expo-contacts",
         {
-          "contactsPermission": "Allow Spendy to access your contacts to help you add friends and split expenses."
+          "contactsPermission": "Allow Meet-n-Split to access your contacts to help you add friends and split expenses."
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Spendy to use your location for expense tracking and merchant suggestions.",
-          "locationAlwaysPermission": "Allow Spendy to use your location for expense tracking and merchant suggestions.",
-          "locationWhenInUsePermission": "Allow Spendy to use your location for expense tracking and merchant suggestions."
+          "locationAlwaysAndWhenInUsePermission": "Allow Meet-n-Split to use your location for expense tracking and merchant suggestions.",
+          "locationAlwaysPermission": "Allow Meet-n-Split to use your location for expense tracking and merchant suggestions.",
+          "locationWhenInUsePermission": "Allow Meet-n-Split to use your location for expense tracking and merchant suggestions."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Spendy to access your photo library to save and share expense receipts.",
-          "cameraPermission": "Allow Spendy to use the camera to take photos of receipts."
+          "photosPermission": "Allow Meet-n-Split to access your photo library to save and share expense receipts.",
+          "cameraPermission": "Allow Meet-n-Split to use the camera to take photos of receipts."
         }
       ],
       "expo-web-browser",

@@ -183,7 +183,7 @@ export class AuthController {
   static async updateProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.user!.id;
-      const { fullName, mobile, country, currency, biometricEnabled, profilePicture } = req.body;
+      const { fullName, mobile, country, currency, biometricEnabled, profilePicture, pushToken } = req.body;
 
       const updateData: any = {
         updatedAt: new Date()
@@ -203,6 +203,10 @@ export class AuthController {
       if (profilePicture !== undefined) {
         updateData.profilePicture = profilePicture;
         updateData.profileImage = profilePicture; // Alias
+      }
+      if (pushToken !== undefined) {
+        updateData.pushToken = pushToken;
+        console.log('📱 Updating push token for user:', userId, 'Token:', pushToken ? `${pushToken.substring(0, 20)}...` : 'null');
       }
 
       await DatabaseService.updateDocument(COLLECTIONS.USERS, userId, updateData);

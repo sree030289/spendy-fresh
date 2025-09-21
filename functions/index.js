@@ -1266,7 +1266,8 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
     res.status(201).json({
       success: true,
       message: 'Friend request sent successfully',
-      isNewUser: false
+      isNewUser: false,
+      recipientUserId: targetUserId
     });
   } catch (error) {
     console.error('Send friend request error:', error);
@@ -2215,6 +2216,81 @@ meetnsplitApp.post('/groups/:groupId/leave', authenticateJWT, async (req, res) =
       success: false,
       message: "Failed to leave group",
       error: "LEAVE_GROUP_ERROR",
+    });
+  }
+});
+
+// Update Group
+meetnsplitApp.put('/groups/:groupId', authenticateJWT, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { name, description, avatar, settings } = req.body;
+    const userId = req.user.id;
+
+    console.log('🔍 Groups PUT route hit for groupId:', groupId);
+    console.log('🔍 Request body:', req.body);
+    console.log('🔍 User ID:', userId);
+
+    if (!groupId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Group ID is required',
+        error: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Get the group
+    const groupDoc = await db.collection(COLLECTIONS.GROUPS).doc(groupId).get();
+    
+    if (!groupDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupData = groupDoc.data();
+    
+    // Check if user is admin of this group
+    const userMember = groupData.members.find(member => 
+      member.userId === userId && member.isActive
+    );
+    
+    if (!userMember || userMember.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only group admins can update group details',
+        error: 'ACCESS_DENIED'
+      });
+    }
+
+    // Prepare update data
+    const updateData = {
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (name) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (avatar !== undefined) updateData.avatar = avatar;
+    if (settings) updateData.settings = settings;
+
+    // Update the group
+    await db.collection(COLLECTIONS.GROUPS).doc(groupId).update(updateData);
+
+    console.log('✅ Group updated successfully:', groupId);
+
+    res.json({
+      success: true,
+      message: 'Group updated successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Update group error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update group',
+      error: 'SERVER_ERROR'
     });
   }
 });

@@ -2655,12 +2655,12 @@ export default function RealSplittingScreen() {
               <Text 
                 style={[
                   styles.balanceAmount, 
-                  { color: (netBalance || 0) >= 0 ? '#FFD700' : '#FFA500' }
+                  { color: (netBalance || 0) >= 0 ? '#10B981' : '#F97316' }
                 ]} 
                 numberOfLines={1} 
                 adjustsFontSizeToFit
               >
-                <Text>{(netBalance || 0) >= 0 ? '+' : ''}</Text><Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{Math.abs(netBalance || 0).toFixed(2)}</Text>
+                <Text>{(netBalance || 0) >= 0 ? '+' : '-'}</Text><Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{Math.abs(netBalance || 0).toFixed(2)}</Text>
               </Text>
               <Text style={styles.balanceLabel}>Net balance</Text>
             </View>
@@ -4174,6 +4174,7 @@ export default function RealSplittingScreen() {
                 index === tabs.length - 1 && styles.lastSegment,
               ]}
               onPress={() => handleTabSwitch(tab.id)}
+              activeOpacity={0.8}
             >
               <Icon
                 name={tab.icon as any}
@@ -4967,37 +4968,43 @@ const styles = StyleSheet.create({
   segmentedControl: {
     flexDirection: 'row',
     margin: 16,
-    borderRadius: 12,
-    padding: 4,
+    borderRadius: 20,
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   segment: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     gap: 6,
   },
   activeSegment: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   firstSegment: {
-    borderTopLeftRadius: 8,
-    borderBottomLeftRadius: 8,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
   },
   lastSegment: {
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
   },
   segmentText: {
     fontSize: 13,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   groupCard: {
     backgroundColor: 'white',

@@ -23,7 +23,7 @@ export const MeetNSplitLogo: React.FC<MeetNSplitLogoProps> = ({
         };
       case 'small':
         return {
-          fontSize: 22,
+          fontSize: 26,
           lineWidth: 15,
           lineHeight: 2,
           gap: 6,

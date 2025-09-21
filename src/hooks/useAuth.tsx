@@ -159,6 +159,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Store user session info
       await apiService.storeUserSession(user);
       
+      // Register push token with backend for notifications
+      try {
+        const { RealNotificationService } = await import('@/services/notifications/RealNotificationService');
+        await RealNotificationService.registerTokenWithBackend(user.id);
+        console.log('✅ Push token registered with backend');
+      } catch (error) {
+        console.error('⚠️ Failed to register push token:', error);
+        // Don't fail login if push token registration fails
+      }
+      
       setUser(user);
       setIsLoading(false);
       console.log('Login successful');
@@ -207,6 +217,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       // Store user session info
       await apiService.storeUserSession(user);
+      
+      // Register push token with backend for notifications
+      try {
+        const { RealNotificationService } = await import('@/services/notifications/RealNotificationService');
+        await RealNotificationService.registerTokenWithBackend(user.id);
+        console.log('✅ Push token registered with backend after registration');
+      } catch (error) {
+        console.error('⚠️ Failed to register push token:', error);
+        // Don't fail registration if push token registration fails
+      }
       
       setUser(user);
       setIsLoading(false); 
@@ -475,6 +495,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email: user.email,
         fullName: user.fullName
       });
+      
+      // Register push token with backend for notifications
+      try {
+        const { RealNotificationService } = await import('@/services/notifications/RealNotificationService');
+        await RealNotificationService.registerTokenWithBackend(user.id);
+        console.log('✅ Push token registered with backend after biometric restore');
+      } catch (error) {
+        console.error('⚠️ Failed to register push token after biometric restore:', error);
+        // Don't fail restore if push token registration fails
+      }
       
       setUser(user);
       console.log('✅ Session restored successfully after biometric auth with verified token');

@@ -37,7 +37,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
 
       {/* Centered Logo */}
       <View style={styles.logoContainer}>
-        <MeetNSplitLogo size="tiny" color="light" />
+        <MeetNSplitLogo size="small" color="light" />
       </View>
 
       {/* Profile Button */}

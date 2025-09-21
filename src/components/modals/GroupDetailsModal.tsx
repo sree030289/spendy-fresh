@@ -11,6 +11,7 @@ import {
   TextInput,
   Linking,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../common/Icon';
@@ -127,6 +128,10 @@ export default function GroupDetailsModal({
   // Local state for group data to enable real-time updates
   const [localGroupData, setLocalGroupData] = useState<Group | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  
+  // Edit group name modal state
+  const [showEditGroupModal, setShowEditGroupModal] = useState(false);
+  const [editGroupName, setEditGroupName] = useState('');
 
   // Calculate total expenses
   const totalExpenses = groupExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
@@ -614,13 +619,35 @@ export default function GroupDetailsModal({
       return;
     }
     
-    console.log('💰 Member balance:', member.balance);
-    if (member.balance !== 0) {
-      console.log('❌ Cannot remove member - has pending balance:', member.balance);
+    // Use the calculated balance from memberBalances instead of member.balance
+    const calculatedBalance = memberBalances.get(userId) || 0;
+    console.log('💰 Member balance from local data:', member.balance);
+    console.log('💰 Calculated balance from memberBalances:', calculatedBalance);
+    
+    if (calculatedBalance !== 0) {
+      console.log('❌ Cannot remove member - has pending balance:', calculatedBalance);
+      
+      const balanceText = calculatedBalance > 0 
+        ? `You owe ${member.userData?.fullName || 'this member'} ${getCurrencySymbol(currentUser?.currency || 'USD')}${Math.abs(calculatedBalance).toFixed(2)}`
+        : `${member.userData?.fullName || 'This member'} owes ${getCurrencySymbol(currentUser?.currency || 'USD')}${Math.abs(calculatedBalance).toFixed(2)}`;
+
       CrossPlatformAlert.alert(
         'Cannot Remove Member',
-        `${member.userData?.fullName || 'This member'} has pending balances. Please settle all expenses before removing them from the group.`,
-        [{ text: 'OK' }]
+        `You cannot remove ${member.userData?.fullName || 'this member'} because there's an outstanding balance.\n\n${balanceText}\n\nPlease settle all balances before removing them from the group.`,
+        [
+          { text: 'OK' },
+          {
+            text: 'Settle Now',
+            onPress: () => {
+              // Open settlement screen for this group
+              onOpenSettlement?.({ 
+                filter: 'groups', 
+                groupId: localGroupData.id 
+              });
+              onClose(); // Close the modal to show settlement screen
+            }
+          }
+        ]
       );
       return;
     }
@@ -674,6 +701,43 @@ export default function GroupDetailsModal({
 
   const handleAddFriendToGroup = async (friendId: string) => {
     if (!localGroupData || !currentUser) return;
+    
+    // Check if this friend already exists in the group (active or inactive)
+    const existingMember = localGroupData.members?.find(m => m.userId === friendId);
+    if (existingMember) {
+      if (existingMember.isActive === true) {
+        CrossPlatformAlert.alert('Already Member', 'This friend is already a member of the group');
+        return;
+      } else if (existingMember.isActive === false) {
+        CrossPlatformAlert.alert(
+          'Re-adding Member', 
+          'This friend was previously in the group. Adding them back will reactivate their membership.',
+          [
+            { text: 'Cancel' },
+            { 
+              text: 'Add Back', 
+              onPress: async () => {
+                try {
+                  await apiService.addGroupMember(localGroupData.id, friendId, 'member');
+                  CrossPlatformAlert.alert('Success', 'Friend has been added back to the group');
+                  setShowAddMember(false);
+                  await loadGroupData();
+                  onRefresh?.();
+                  await loadGroupExpenses();
+                  
+                  const refreshService = ExpenseRefreshService.getInstance();
+                  refreshService.notifyExpenseAdded();
+                } catch (error: any) {
+                  console.error('Re-add friend to group error:', error);
+                  CrossPlatformAlert.alert('Error', error.message || 'Failed to add friend back to group');
+                }
+              }
+            }
+          ]
+        );
+        return;
+      }
+    }
     
     try {
       await apiService.addGroupMember(localGroupData.id, friendId, 'member');
@@ -734,6 +798,41 @@ export default function GroupDetailsModal({
     setSelectedExpense(expense);
     setShowEditExpense(true);
     setShowExpenseDetail(false);
+  };
+
+  const handleEditGroup = () => {
+    if (!localGroupData) return;
+    setEditGroupName(localGroupData.name || '');
+    setShowEditGroupModal(true);
+  };
+
+  const handleSaveGroupName = async () => {
+    if (!localGroupData || !currentUser || !editGroupName.trim()) {
+      CrossPlatformAlert.alert('Error', 'Please enter a valid group name');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await apiService.updateGroup(localGroupData.id, { name: editGroupName.trim() });
+      
+      // Update local state
+      setLocalGroupData(prev => prev ? { ...prev, name: editGroupName.trim() } : null);
+      
+      setShowEditGroupModal(false);
+      setEditGroupName('');
+      
+      // Refresh data
+      await loadGroupData();
+      onRefresh?.();
+      
+      CrossPlatformAlert.alert('Success', 'Group name updated successfully');
+    } catch (error: any) {
+      console.error('Update group name error:', error);
+      CrossPlatformAlert.alert('Error', error.message || 'Failed to update group name');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Check if expense is editable based on settlement status
@@ -837,7 +936,7 @@ export default function GroupDetailsModal({
     
     return (
       <TouchableOpacity
-        key={member.userId}
+        key={`${member.userId}-${member.isActive ? 'active' : 'inactive'}`}
         style={[styles.card, { backgroundColor: theme.colors.surface }]}
         onPress={() => isUserAdmin && member.userId !== currentUser?.id ? setSelectedMemberForAction(member.userId) : null}
         activeOpacity={isUserAdmin && member.userId !== currentUser?.id ? 0.7 : 1}
@@ -977,24 +1076,13 @@ export default function GroupDetailsModal({
             <Icon name="back" size={20} color="white"  />
           </TouchableOpacity>
           
-          {/* Settle Button - Top Right */}
+          {/* Edit Button - Top Right */}
           <TouchableOpacity 
             style={styles.settleBtn}
-            onPress={() => {
-              if (onOpenSettlement && localGroupData?.id) {
-                onClose();
-                // Small delay to allow modal to close before opening settlement
-                setTimeout(() => {
-                  onOpenSettlement({
-                    filter: 'groups',
-                    groupId: localGroupData.id
-                  });
-                }, 100);
-              }
-            }}
+            onPress={handleEditGroup}
           >
-            <Icon name="receipt" size={18} color="white"  />
-            <Text style={styles.settleBtnText}>Settle</Text>
+            <Icon name="create" size={14} color="white"  />
+            <Text style={styles.settleBtnText}>Edit</Text>
           </TouchableOpacity>
           
           <View style={styles.groupHeader}>
@@ -1027,12 +1115,24 @@ export default function GroupDetailsModal({
                 </Text>
                 <Text style={styles.statLabel}>Total Spent</Text>
               </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {getCurrencySymbol(localGroupData?.currency || 'USD')}{isNaN(perPersonAmount) ? '0.00' : perPersonAmount.toFixed(2)}
-                </Text>
-                <Text style={styles.statLabel}>Per Person</Text>
-              </View>
+              <TouchableOpacity 
+                style={[styles.statItem, styles.settleStatButton]}
+                onPress={() => {
+                  if (onOpenSettlement && localGroupData?.id) {
+                    onClose();
+                    // Small delay to allow modal to close before opening settlement
+                    setTimeout(() => {
+                      onOpenSettlement({
+                        filter: 'groups',
+                        groupId: localGroupData.id
+                      });
+                    }, 100);
+                  }
+                }}
+              >
+                <Icon name="receipt" size={16} color="white" />
+                <Text style={[styles.statLabel, { color: 'white', fontWeight: 'bold' }]}>Settle</Text>
+              </TouchableOpacity>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{groupExpenses.length}</Text>
                 <Text style={styles.statLabel}>Expenses</Text>
@@ -1165,20 +1265,48 @@ export default function GroupDetailsModal({
                   return null;
                 })()}
                 
-                {(localGroupData?.members && Array.isArray(localGroupData.members) ? localGroupData.members : []).map((member, index) => {
-                  console.log(`🔄 Processing member ${index}:`, {
-                    member,
-                    hasUserId: !!member?.userId,
-                    userData: member?.userData
-                  });
-                  
-                  // Safety check for member data
-                  if (!member || !member.userId) {
-                    console.warn('⚠️ Invalid member data at index:', index, member);
-                    return null;
-                  }
-                  return renderMemberCard(member, index);
-                })}
+                {(localGroupData?.members && Array.isArray(localGroupData.members) ? localGroupData.members : [])
+                  .reduce((uniqueMembers, member, index) => {
+                    // Remove duplicates using reduce - this handles the add->remove->add scenario
+                    if (!member || !member.userId) {
+                      console.warn('⚠️ Invalid member data at index:', index, member);
+                      return uniqueMembers;
+                    }
+                    
+                    // Check if we already have this member
+                    const existingIndex = uniqueMembers.findIndex(m => m.userId === member.userId);
+                    
+                    if (existingIndex >= 0) {
+                      const existing = uniqueMembers[existingIndex];
+                      console.log(`🔍 Found duplicate member ${member.userData?.fullName} (${member.userId}):`, {
+                        existing: { isActive: existing.isActive },
+                        current: { isActive: member.isActive }
+                      });
+                      
+                      // Prioritize active members over inactive ones
+                      if (member.isActive === true && existing.isActive !== true) {
+                        console.log(`✅ Replacing inactive member with active one for ${member.userData?.fullName}`);
+                        uniqueMembers[existingIndex] = member;
+                      } else if (member.isActive === existing.isActive && member.isActive === true) {
+                        console.warn(`⚠️ Found multiple active records for ${member.userData?.fullName}, keeping the first one`);
+                      }
+                      // If current is inactive and existing is active, keep existing (do nothing)
+                    } else {
+                      // New member, add to list
+                      uniqueMembers.push(member);
+                    }
+                    
+                    return uniqueMembers;
+                  }, [] as any[])
+                  .map((member, index) => {
+                    console.log(`🔄 Processing member ${index}:`, {
+                      member,
+                      hasUserId: !!member?.userId,
+                      userData: member?.userData
+                    });
+                    
+                    return renderMemberCard(member, index);
+                  })}
               </View>
             )}
             
@@ -1564,6 +1692,70 @@ export default function GroupDetailsModal({
         friends={friends}
         isEditable={selectedExpenseForDetail ? isExpenseEditable(selectedExpenseForDetail) : false}
       />
+
+      {/* Edit Group Name Modal */}
+      <Modal
+        visible={showEditGroupModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowEditGroupModal(false);
+          setEditGroupName('');
+        }}
+      >
+        <View style={styles.editModalOverlay}>
+          <View style={[styles.editModal, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.editModalTitle, { color: theme.colors.text }]}>
+              Edit Group Name
+            </Text>
+            
+            <TextInput
+              style={[
+                styles.editModalInput,
+                {
+                  backgroundColor: theme.colors.background,
+                  color: theme.colors.text,
+                  borderColor: theme.colors.border,
+                }
+              ]}
+              value={editGroupName}
+              onChangeText={setEditGroupName}
+              placeholder="Group name"
+              placeholderTextColor={theme.colors.textSecondary}
+              autoFocus
+              maxLength={50}
+            />
+            
+            <View style={styles.editModalButtons}>
+              <TouchableOpacity
+                style={[styles.editModalButton, styles.editModalCancelButton]}
+                onPress={() => {
+                  setShowEditGroupModal(false);
+                  setEditGroupName('');
+                }}
+              >
+                <Text style={[styles.editModalButtonText, { color: theme.colors.textSecondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.editModalButton,
+                  styles.editModalSaveButton,
+                  { backgroundColor: theme.colors.primary }
+                ]}
+                onPress={handleSaveGroupName}
+                disabled={!editGroupName.trim()}
+              >
+                <Text style={[styles.editModalButtonText, { color: 'white' }]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1618,15 +1810,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
     zIndex: 10,
-    gap: 6,
+    gap: 4,
   },
   settleBtnText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   groupHeader: {
@@ -1683,32 +1875,37 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     width: '100%',
   },
   statItem: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    padding: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   statValue: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 2,
     textAlign: 'center',
   },
   statLabel: {
     color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '500',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     textAlign: 'center',
+  },
+  settleStatButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    gap: 4,
   },
   content: {
     flex: 1,
@@ -2137,5 +2334,58 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  editModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  editModal: {
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  editModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  editModalInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    marginBottom: 24,
+  },
+  editModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  editModalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  editModalCancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  editModalSaveButton: {
+    // backgroundColor will be set dynamically
+  },
+  editModalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

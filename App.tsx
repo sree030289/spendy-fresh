@@ -141,34 +141,56 @@ const AppNavigator = () => {
 
         // Only check for biometric/login flow if no user and not loading and splash has been shown
         if (!user && !isLoading && !showSplash) {
-          const lastSession = await apiService.getLastUserSession();
           console.log('🔍 No user authenticated, checking for biometric flow');
           
-          // If session expired or no session, check for biometric
-          if (lastSession && !biometricFailed) { // Don't show biometric if it failed before
-            console.log('🔍 Checking biometric for user:', lastSession.id, 'biometric enabled:', lastSession.biometricEnabled);
+          // Check for biometric using the same storage keys as LoginScreen
+          const lastEmail = await apiService.getLastEmail();
+          const lastBiometric = await apiService.getLastBiometricSetting();
+          
+          console.log('🔍 Stored user preferences:', { lastEmail, lastBiometric });
+          
+          // If we have email and biometric preference, check for biometric auth
+          if (lastEmail && lastBiometric && !biometricFailed) { // Don't show biometric if it failed before
+            console.log('🔍 Checking biometric for user email:', lastEmail, 'biometric enabled:', lastBiometric);
             
             // Check if biometric is available on device
             const isHardwareAvailable = await BiometricAuthService.isHardwareAvailable();
             console.log('🔍 Biometric hardware available:', isHardwareAvailable);
             
-            // Check if user has biometric enabled (from session or stored preference)
-            const userBiometricEnabled = lastSession.biometricEnabled || await BiometricAuthService.isBiometricEnabledForUser(lastSession.id);
-            console.log('🔍 User biometric enabled:', userBiometricEnabled);
-            
             // Check if we haven't exceeded attempts
             const hasExceededAttempts = await BiometricAuthService.hasExceededMaxAttempts();
             console.log('🔍 Exceeded biometric attempts:', hasExceededAttempts);
             
-            if (isHardwareAvailable && userBiometricEnabled && !hasExceededAttempts) {
+            if (isHardwareAvailable && lastBiometric && !hasExceededAttempts) {
               console.log('✅ All biometric conditions met, showing biometric screen');
-              setLastUserSession(lastSession);
+              // Try to get the user ID from stored biometric preferences
+              let userId = null;
+              try {
+                // Get all AsyncStorage keys
+                const allKeys = await AsyncStorage.getAllKeys();
+                const biometricKey = allKeys.find(key => key.startsWith('@spendy_biometric_enabled_') && key !== '@spendy_biometric_enabled');
+                if (biometricKey) {
+                  userId = biometricKey.replace('@spendy_biometric_enabled_', '');
+                  console.log('🔍 Found user ID from biometric preference:', userId);
+                }
+              } catch (error) {
+                console.error('Error getting user ID from stored preferences:', error);
+              }
+              
+              // Create a basic session object for the biometric screen
+              const sessionData = { 
+                id: userId,
+                email: lastEmail, 
+                biometricEnabled: lastBiometric,
+                sessionTimestamp: Date.now() // Use current timestamp
+              };
+              setLastUserSession(sessionData);
               setAuthFlowState('biometric');
               return;
             } else {
               console.log('❌ Biometric conditions not met:', {
                 hardware: isHardwareAvailable,
-                enabled: userBiometricEnabled, 
+                enabled: lastBiometric, 
                 notExceeded: !hasExceededAttempts
               });
             }

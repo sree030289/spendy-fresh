@@ -2,22 +2,18 @@ import React, { useEffect } from 'react';
 import {
   View,
   Text,
-  Dimensions,
   StyleSheet,
 } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSequence,
+  withSpring,
   withDelay,
-  interpolate,
-  Extrapolate,
   runOnJS,
 } from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 interface SplashScreenProps {
   onAnimationComplete?: () => void;
@@ -25,195 +21,102 @@ interface SplashScreenProps {
 
 const MeetNSplitSplash: React.FC<SplashScreenProps> = ({ onAnimationComplete }) => {
   // Animation values
-  const animationProgress = useSharedValue(0);
-  const titlePosition = useSharedValue(0);
+  const logoScale = useSharedValue(0.3);
   const logoOpacity = useSharedValue(0);
-  const backgroundProgress = useSharedValue(0);
-  const diamondSplit = useSharedValue(0);
-  const featureTagsOpacity = useSharedValue(0);
+  const titleOpacity = useSharedValue(0);
+  const titleTranslateY = useSharedValue(30);
+  const taglineOpacity = useSharedValue(0);
+  const taglineTranslateY = useSharedValue(20);
+  const containerOpacity = useSharedValue(1);
 
   // Start animation sequence
   useEffect(() => {
     const startAnimation = () => {
-      // Reset all values
-      animationProgress.value = 0;
-      titlePosition.value = 0;
-      logoOpacity.value = 0;
-      backgroundProgress.value = 0;
-      diamondSplit.value = 0;
-      featureTagsOpacity.value = 0;
+      // Phase 1: Logo appears with scale animation (0-800ms)
+      logoOpacity.value = withTiming(1, { duration: 300 });
+      logoScale.value = withSpring(1, {
+        damping: 15,
+        stiffness: 100,
+      });
 
-      // Sequence: 3-second animation
-      
-      // 1. Background change (0-1.2s): Pink to White
-      backgroundProgress.value = withTiming(1, { duration: 1200 });
-      
-      // 2. Title movement (0.9-1.35s): Center to Top
-      titlePosition.value = withDelay(900, withTiming(1, { duration: 450 }));
-      
-      // 3. Logo appears (1.35s)
-      logoOpacity.value = withDelay(1350, withTiming(1, { duration: 150 }));
-      
-      // 4. Diamond split animation (1.5-2.4s)
-      diamondSplit.value = withDelay(1500, withSequence(
-        withTiming(1, { duration: 300 }),
-        withTiming(0, { duration: 300 }),
-        withTiming(1, { duration: 300 })
-      ));
-      
-      // 5. Feature tags (2.1-3.0s)
-      featureTagsOpacity.value = withDelay(2100, withTiming(1, { duration: 900 }));
-      
-      // Complete animation
-      animationProgress.value = withTiming(1, { duration: 3000 }, (finished) => {
+      // Phase 2: Title appears (600ms)
+      titleOpacity.value = withDelay(600, withTiming(1, { duration: 400 }));
+      titleTranslateY.value = withDelay(600, withSpring(0, {
+        damping: 20,
+        stiffness: 150,
+      }));
+
+      // Phase 3: Tagline appears (1000ms)
+      taglineOpacity.value = withDelay(1000, withTiming(1, { duration: 400 }));
+      taglineTranslateY.value = withDelay(1000, withSpring(0, {
+        damping: 20,
+        stiffness: 150,
+      }));
+
+      // Phase 4: Fade out and complete (2500ms)
+      containerOpacity.value = withDelay(2500, withTiming(0, { duration: 400 }, (finished) => {
         if (finished && onAnimationComplete) {
           runOnJS(onAnimationComplete)();
         }
-      });
+      }));
     };
 
     startAnimation();
-
-    // Auto-restart for demo (remove in production)
-    const interval = setInterval(startAnimation, 4000);
-    return () => clearInterval(interval);
   }, []);
 
   // Animated styles
-  const backgroundStyle = useAnimatedStyle(() => {
-    const backgroundColor = interpolate(
-      backgroundProgress.value,
-      [0, 0.3, 1],
-      [0, 0, 1],
-      Extrapolate.CLAMP
-    );
-    
+  const logoStyle = useAnimatedStyle(() => {
     return {
-      backgroundColor: backgroundColor === 0 ? '#B0004F' : '#FFFFFF',
+      opacity: logoOpacity.value,
+      transform: [{ scale: logoScale.value }],
     };
   });
 
   const titleStyle = useAnimatedStyle(() => {
-    const translateY = interpolate(
-      titlePosition.value,
-      [0, 1],
-      [0, -screenHeight * 0.25],
-      Extrapolate.CLAMP
-    );
-    
-    const scale = interpolate(
-      titlePosition.value,
-      [0, 1],
-      [1, 0.6],
-      Extrapolate.CLAMP
-    );
-
     return {
-      transform: [
-        { translateY },
-        { scale }
-      ],
+      opacity: titleOpacity.value,
+      transform: [{ translateY: titleTranslateY.value }],
     };
   });
 
-  const logoStyle = useAnimatedStyle(() => {
+  const taglineStyle = useAnimatedStyle(() => {
     return {
-      opacity: logoOpacity.value,
+      opacity: taglineOpacity.value,
+      transform: [{ translateY: taglineTranslateY.value }],
     };
   });
 
-  const diamondStyle = useAnimatedStyle(() => {
-    const splitOffset = interpolate(
-      diamondSplit.value,
-      [0, 1],
-      [0, 15],
-      Extrapolate.CLAMP
-    );
-
+  const containerStyle = useAnimatedStyle(() => {
     return {
-      transform: [
-        { translateX: splitOffset },
-        { translateY: splitOffset },
-      ],
+      opacity: containerOpacity.value,
     };
   });
-
-  const featureTagsStyle = useAnimatedStyle(() => {
-    const translateY = interpolate(
-      featureTagsOpacity.value,
-      [0, 1],
-      [20, 0],
-      Extrapolate.CLAMP
-    );
-
-    return {
-      opacity: featureTagsOpacity.value,
-      transform: [{ translateY }],
-    };
-  });
-
-  // Diamond SVG Component
-  const DiamondShape = ({ color, style }: { color: string; style?: any }) => (
-    <Animated.View style={[styles.diamond, style]}>
-      <Svg width="50" height="50" viewBox="0 0 50 50">
-        <Path
-          d="M25 5 L45 25 L25 45 L5 25 Z"
-          fill={color}
-        />
-      </Svg>
-    </Animated.View>
-  );
 
   return (
-    <Animated.View style={[styles.container, backgroundStyle]}>
-      {/* Main Title */}
-      <Animated.View style={[styles.titleContainer, titleStyle]}>
-        <Text style={styles.titleText}>
-          <Text style={styles.meetN}>Meet n </Text>
-          <Text style={styles.split}>Spli</Text>
-          <Text style={styles.t}>t</Text>
-        </Text>
-      </Animated.View>
+    <Animated.View style={[styles.container, containerStyle]}>
+      <LinearGradient
+        colors={['#B0004F', '#D91A72']}
+        style={styles.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        {/* Logo */}
+        <Animated.View style={[styles.logoContainer, logoStyle]}>
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoText}>💰</Text>
+          </View>
+        </Animated.View>
 
-      {/* Diamond Logo */}
-      <Animated.View style={[styles.logoContainer, logoStyle]}>
-        <View style={styles.diamondCross}>
-          {/* Top Diamond - Orange */}
-          <DiamondShape 
-            color="#FF6B35" 
-            style={[styles.diamondTop, diamondStyle]} 
-          />
-          
-          {/* Right Diamond - Gray */}
-          <DiamondShape 
-            color="#4A4A4A" 
-            style={[styles.diamondRight, diamondStyle]} 
-          />
-          
-          {/* Bottom Diamond - Dark */}
-          <DiamondShape 
-            color="#2C2C2C" 
-            style={[styles.diamondBottom, diamondStyle]} 
-          />
-          
-          {/* Left Diamond - Pink */}
-          <DiamondShape 
-            color="#B8336A" 
-            style={[styles.diamondLeft, diamondStyle]} 
-          />
-        </View>
-      </Animated.View>
+        {/* Title */}
+        <Animated.View style={[styles.titleContainer, titleStyle]}>
+          <Text style={styles.titleText}>Meet n Split</Text>
+        </Animated.View>
 
-      {/* Feature Tags */}
-      <Animated.View style={[styles.featureTagsContainer, featureTagsStyle]}>
-        <Text style={styles.featureTag}>Meet</Text>
-        <Text style={styles.featureDot}>•</Text>
-        <Text style={styles.featureTag}>Spend</Text>
-        <Text style={styles.featureDot}>•</Text>
-        <Text style={styles.featureTag}>Split</Text>
-        <Text style={styles.featureDot}>•</Text>
-        <Text style={styles.featureTag}>Track</Text>
-      </Animated.View>
+        {/* Tagline */}
+        <Animated.View style={[styles.taglineContainer, taglineStyle]}>
+          <Text style={styles.taglineText}>Meet • Spend • Split • Track</Text>
+        </Animated.View>
+      </LinearGradient>
     </Animated.View>
   );
 };
@@ -221,80 +124,58 @@ const MeetNSplitSplash: React.FC<SplashScreenProps> = ({ onAnimationComplete }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  gradient: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#B0004F',
-  },
-  titleContainer: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleText: {
-    fontSize: 38,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  meetN: {
-    color: '#000000',
-  },
-  split: {
-    color: '#E53E3E',
-  },
-  t: {
-    color: '#000000',
   },
   logoContainer: {
-    position: 'absolute',
-    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoCircle: {
+    width: 100,
+    height: 100,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 50,
     justifyContent: 'center',
-  },
-  diamondCross: {
-    width: 120,
-    height: 120,
-    position: 'relative',
     alignItems: 'center',
-    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  diamond: {
-    position: 'absolute',
-    width: 50,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoText: {
+    fontSize: 48,
   },
-  diamondTop: {
-    top: 0,
-    left: 35,
+  titleContainer: {
+    marginBottom: 16,
   },
-  diamondRight: {
-    top: 35,
-    right: 0,
+  titleText: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    textShadowRadius: 8,
   },
-  diamondBottom: {
-    bottom: 0,
-    left: 35,
+  taglineContainer: {
+    paddingHorizontal: 32,
   },
-  diamondLeft: {
-    top: 35,
-    left: 0,
-  },
-  featureTagsContainer: {
-    position: 'absolute',
-    bottom: screenHeight * 0.15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-  },
-  featureTag: {
-    fontSize: 15,
+  taglineText: {
+    fontSize: 18,
     fontWeight: '500',
-    color: '#333333',
-  },
-  featureDot: {
-    fontSize: 12,
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    letterSpacing: 1,
   },
 });
 
