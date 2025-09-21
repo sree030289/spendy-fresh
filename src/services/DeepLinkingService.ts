@@ -6,12 +6,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Deep linking configuration
 const DEEP_LINK_CONFIG = {
   scheme: 'letssplit',
-  host: 'app.spendy.com.au',
+  host: 'app.meetnsplit.com',
   appStore: {
     ios: 'https://apps.apple.com/au/app/spendy/id123456789', // Replace with actual App Store ID
-    android: 'https://play.google.com/store/apps/details?id=com.spendy.app', // Replace with actual package name
+    android: 'https://play.google.com/store/apps/details?id=com.meetnsplit.app', // Replace with actual package name
   },
-  fallbackUrl: 'https://spendy.com.au',
+  fallbackUrl: 'https://meetnsplit.com',
 };
 
 // Link types that the app can handle
@@ -267,7 +267,7 @@ Don't have Spendy? Download it now and discover thousands of deals from your fav
 
       const universalLink = this.generateUniversalLink(LinkType.CATEGORY, category, params);
       
-      const shareMessage = `🛍️ Check out amazing ${category} deals on Spendy!
+      const shareMessage = `🛍️ Check out amazing ${category} deals on Meet-n-Split!
 
 ${source ? `From ${source} and other top retailers` : 'From all your favorite Australian retailers'}
 
@@ -277,7 +277,7 @@ Download Spendy to never miss a deal!`;
 
       const { Share } = require('react-native');
       await Share.share({
-        title: `${category} Deals on Spendy`,
+        title: `${category} Deals on Meet-n-Split`,
         message: shareMessage,
         url: universalLink,
       });
@@ -307,7 +307,7 @@ Download Spendy to never miss a deal!`;
 
       const sourceName = sourceNames[source] || source;
       
-      const shareMessage = `🏪 Amazing deals from ${sourceName} on Spendy!
+      const shareMessage = `🏪 Amazing deals from ${sourceName} on Meet-n-Split!
 
 Discover the latest offers, discounts, and special promotions.
 

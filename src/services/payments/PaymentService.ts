@@ -548,15 +548,15 @@ export class InviteService {
   }
   
   // Generate invite messages
-  static generateFriendInviteMessage(senderName: string, appName: string = 'Spendy'): string {
-    return `Hi! ${senderName} invited you to join ${appName} - the best app for splitting expenses with friends. Download now: https://spendy.app/download`;
+  static generateFriendInviteMessage(senderName: string, appName: string = 'Meet-n-Split'): string {
+    return `Hi! 👋 ${senderName} invited you to join ${appName} - the smart way to split expenses with friends! 💰\n\nJoin now: https://meetnsplit.com/register\nDownload app: https://meetnsplit.com/download\n\n✨ Split bills, track expenses, settle up easily!`;
   }
   
   static generateGroupInviteMessage(senderName: string, groupName: string, inviteCode: string): string {
-    return `${senderName} invited you to join "${groupName}" on Spendy! Use invite code: ${inviteCode} or click: https://spendy.app/join/${inviteCode}`;
+    return `🎉 ${senderName} invited you to join "${groupName}" on Meet-n-Split!\n\n💰 Use invite code: ${inviteCode}\n🔗 Quick join: https://meetnsplit.com/join/${inviteCode}\n📱 Download app: https://meetnsplit.com/download\n\n✨ Smart expense splitting made easy!`;
   }
   
   static generateExpenseNotification(senderName: string, amount: number, currency: string, description: string): string {
-    return `${senderName} added a new expense: ${description} for ${currency} ${amount}. Check Spendy app for details.`;
+    return `💸 ${senderName} added a new expense: "${description}" for ${currency} ${amount}\n\n📱 Check Meet-n-Split app for details\n🌐 Visit: https://meetnsplit.com`;
   }
 }

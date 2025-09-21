@@ -359,6 +359,14 @@ meetnsplitApp.post('/auth/register', async (req, res) => {
     // Create user in Firestore
     const userRef = await db.collection(COLLECTIONS.USERS).add(userData);
 
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(userData.email, userData.fullName);
+    } catch (emailError) {
+      console.error('❌ Failed to send welcome email:', emailError);
+      // Don't fail registration if welcome email fails
+    }
+
     // Generate JWT token
     const token = CryptoUtils.createJWTToken({ userId: userRef.id, email: userData.email }, JWT_SECRET);
 
@@ -526,6 +534,96 @@ meetnsplitApp.put('/auth/profile', authenticateJWT, async (req, res) => {
   }
 });
 
+// ===== WELCOME EMAIL FUNCTION =====
+
+async function sendWelcomeEmail(email, fullName) {
+  console.log(`📧 Sending welcome email to: ${email}`);
+  
+  const nodemailer = require('nodemailer');
+  
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.office365.com',
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: {
+      user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
+      pass: process.env.EMAIL_PASSWORD || 'vnzdrkkydkzqklvq'
+    },
+    tls: {
+      ciphers: 'SSLv3',
+      rejectUnauthorized: false
+    }
+  });
+
+  const mailOptions = {
+    from: '"Meet-n-Split" <admin@meetnsplit.com>',
+    to: email,
+    subject: 'Welcome to Meet-n-Split! 🎉',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+        <!-- Header Banner with Logo -->
+        <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; border-radius: 10px; color: white;">
+          <h1 style="margin: 0; font-size: 32px; font-weight: bold;">💰 Meet-n-Split</h1>
+          <p style="margin: 10px 0 0 0; font-size: 18px; opacity: 0.9;">Smart Expense Spliting APP</p>
+        </div>
+        
+        <!-- Welcome Content -->
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h2 style="color: #333; margin: 0 0 10px 0; font-size: 24px;">Welcome to Meet-n-Split, ${fullName}! 🎉</h2>
+          <p style="color: #666; font-size: 16px; margin: 10px 0;">You're now part of the Meet N Split community!</p>
+        </div>
+        
+        <!-- What you can do section -->
+        <div style="background-color: #f8f9ff; padding: 25px; border-radius: 10px; margin-bottom: 30px;">
+          <h3 style="color: #333; margin: 0 0 15px 0; text-align: center;">✨ What you can do with Meet-n-Split:</h3>
+          <ul style="color: #666; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
+            <li><strong>Split bills and expenses</strong> with friends effortlessly</li>
+            <li><strong>Track who owes what</strong> in real-time</li>
+            <li><strong>Send payment reminders</strong> to settle balances</li>
+            <li><strong>Manage group expenses</strong> for trips and events</li>
+            <li><strong>Connect multiple payment methods</strong> for easy settlements</li>
+            <li><strong>Get insights</strong> into your spending patterns</li>
+          </ul>
+        </div>
+        
+        <!-- Call to Action -->
+        <div style="text-align: center; margin-bottom: 30px;">
+          <a href="https://meetnsplit.com" style="display: inline-block; background-color: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-right: 10px;">Explore MeetNSplit.com</a>
+          <a href="https://youtu.be/your-app-tour-video" style="display: inline-block; background-color: #FF0000; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">📹 Watch App Tour</a>
+        </div>
+        
+        <!-- Getting Started -->
+        <div style="border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+          <h3 style="color: #333; margin: 0 0 15px 0;">🚀 Getting Started:</h3>
+          <ol style="color: #666; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
+            <li>Add friends by email or phone number</li>
+            <li>Create your first group or expense</li>
+            <li>Start splitting bills and tracking balances</li>
+            <li>Enjoy stress-free money management!</li>
+          </ol>
+        </div>
+        
+        <!-- Footer with Contact Info -->
+        <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
+          <div style="margin-bottom: 15px;">
+            <a href="https://meetnsplit.com" style="color: #667eea; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
+          </div>
+          <p style="color: #888; font-size: 12px; margin: 5px 0;">
+            Questions or need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #667eea;">admin@meetnsplit.com</a>
+          </p>
+          <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
+            Meet-n-Split - Smart Money Management | Welcome aboard! 🚀
+          </p>
+        </div>
+      </div>
+    `
+  };
+
+  await transporter.sendMail(mailOptions);
+  console.log(`✅ Welcome email sent successfully to: ${email}`);
+}
+
 // ===== PASSWORD RESET OTP ROUTES =====
 
 // Send OTP for password reset
@@ -578,23 +676,28 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
     try {
       const nodemailer = require('nodemailer');
       
-      // Create transporter (you'll need to configure this with your email service)
+      // Create transporter (configured for Microsoft/Outlook)
       const transporter = nodemailer.createTransporter({
-        service: 'gmail', // or your email service
+        service: 'hotmail', // Works for all Microsoft/Outlook emails
         auth: {
-          user: process.env.EMAIL_USER || 'your-email@gmail.com',
-          pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+          user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
+          pass: process.env.EMAIL_PASSWORD || 'your-microsoft-password'
         }
       });
 
       const mailOptions = {
-        from: process.env.EMAIL_USER || 'noreply@meetnsplit.com',
+        from: '"Meet-n-Split" <admin@meetnsplit.com>',
         to: normalizedEmail,
-        subject: 'Password Reset - Verification Code',
+        subject: 'Password Reset - Meet-n-Split',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <!-- Header Banner with Logo -->
+            <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; border-radius: 10px; color: white;">
+              <h1 style="margin: 0; font-size: 28px; font-weight: bold;">� Meet-n-Split</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
+            </div>
+            
             <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #667eea; margin: 0;">🔐 Meet-n-Split</h1>
               <h2 style="color: #333; margin: 10px 0;">Password Reset Code</h2>
             </div>
             
@@ -611,11 +714,22 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
               <p style="color: #666; line-height: 1.6;">
                 If you didn't request this code, please ignore this email. Your account remains secure.
               </p>
+              <p style="color: #666; line-height: 1.6; margin-top: 20px;">
+                Alternatively, you can reset your password directly in your browser: 
+                <a href="https://meetnsplit.com/reset-password?token=${sessionId}&email=${encodeURIComponent(normalizedEmail)}" style="color: #667eea; text-decoration: none;">Reset Password via Browser</a>
+              </p>
             </div>
             
+            <!-- Footer with Contact Info -->
             <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
-              <p style="color: #888; font-size: 12px;">
-                This is an automated message from Meet-n-Split. Please do not reply to this email.
+              <div style="margin-bottom: 15px;">
+                <a href="https://meetnsplit.com" style="color: #667eea; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
+              </div>
+              <p style="color: #888; font-size: 12px; margin: 5px 0;">
+                Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #667eea;">admin@meetnsplit.com</a>
+              </p>
+              <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
+                Meet-n-Split - Smart Money Management | This is an automated message.
               </p>
             </div>
           </div>
@@ -1339,6 +1453,62 @@ meetnsplitApp.post('/friends/requests/accept', authenticateJWT, async (req, res)
     batch.create(db.collection(COLLECTIONS.FRIENDS).doc(), friendshipData);
     
     await batch.commit();
+
+    // Get user data for notification
+    const accepterDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    const accepterData = accepterDoc.data();
+
+    // Send notification to friend request sender
+    await db.collection('appNotifications').add({
+      userId: requestData.fromUserId,
+      type: 'friend_accepted',
+      title: '🎉 Friend Request Accepted',
+      message: `${accepterData.fullName} accepted your friend request! You're now friends on Meet-n-Split.`,
+      data: {
+        friendId: userId,
+        friendName: accepterData.fullName,
+        friendEmail: accepterData.email,
+        navigationType: 'friends'
+      },
+      isRead: false,
+      createdAt: new Date()
+    });
+
+    // Send push notification to friend request sender
+    try {
+      const senderDoc = await db.collection(COLLECTIONS.USERS).doc(requestData.fromUserId).get();
+      const senderData = senderDoc.data();
+      
+      if (senderData && senderData.pushToken) {
+        console.log("📱 Sending push notification for friend accept to:", senderData.email);
+        
+        const expoPushNotification = {
+          title: "🎉 Friend Request Accepted",
+          body: `${accepterData.fullName} accepted your friend request!`,
+          data: {
+            type: "friend_accepted",
+            friendId: userId,
+            friendName: accepterData.fullName,
+            navigationType: "friends",
+            deepLink: {
+              screen: "MainTabs",
+              params: { 
+                initialTab: "Split",
+                openFriendsTab: true 
+              }
+            }
+          }
+        };
+
+        const pushResult = await sendExpoPushNotification(senderData.pushToken, expoPushNotification);
+        console.log("✅ Push notification sent for friend accept:", pushResult);
+      } else {
+        console.log("⚠️ No push token found for user:", requestData.fromUserId);
+      }
+    } catch (pushError) {
+      console.error("❌ Failed to send push notification for friend accept:", pushError);
+      // Don't fail the request if push notification fails
+    }
 
     res.json({
       success: true,
@@ -7193,10 +7363,10 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
           const nodemailer = require('nodemailer');
           
           const transporter = nodemailer.createTransporter({
-            service: 'gmail',
+            service: 'hotmail', // Works for all Microsoft/Outlook emails
             auth: {
-              user: process.env.EMAIL_USER || 'noreply@meetnsplit.com',
-              pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+              user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
+              pass: process.env.EMAIL_PASSWORD || 'your-microsoft-password'
             }
           });
 
@@ -7683,25 +7853,28 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
       try {
         const nodemailer = require('nodemailer');
         
-        // Create transporter using the same configuration as password reset
-        const transporter = nodemailer.createTransporter({
-          service: 'gmail',
-          auth: {
-            user: process.env.EMAIL_USER || 'noreply@spendy.com',
-            pass: process.env.EMAIL_PASSWORD || 'your-app-password'
-          }
-        });
-
-        // Determine email content based on invite type
+        // Create transporter using Microsoft/Outlook service
+  const transporter = nodemailer.createTransporter({
+    service: 'hotmail', // Works for all Microsoft/Outlook emails
+    auth: {
+      user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
+      pass: process.env.EMAIL_PASSWORD || 'your-microsoft-password'
+    }
+  });        // Determine email content based on invite type
         let subject, htmlContent;
         
         if (type === 'friend_reminder') {
-          subject = `${fromUserName} is waiting for your response on Spendy`;
+          subject = `${fromUserName} is waiting for your response on Meet-n-Split`;
           htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+              <!-- Header Banner with Logo -->
+              <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; border-radius: 10px; color: white;">
+                <h1 style="margin: 0; font-size: 28px; font-weight: bold;">💰 Meet-n-Split</h1>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
+              </div>
+              
               <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #667eea; margin: 0;">🤝 Spendy</h1>
-                <h2 style="color: #333; margin: 10px 0;">Friend Request Reminder</h2>
+                <h2 style="color: #333; margin: 10px 0;">🤝 Friend Request Reminder</h2>
               </div>
               
               <div style="background-color: #f8f9ff; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
@@ -7709,23 +7882,35 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
                   Hi there! 👋
                 </p>
                 <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
-                  <strong>${fromUserName}</strong> is still waiting for you to respond to their friend request on Spendy.
+                  <strong>${fromUserName}</strong> is still waiting for you to respond to their friend request on Meet-n-Split.
                 </p>
                 <p style="font-size: 14px; color: #666; margin: 0;">
-                  ${message || 'Join Spendy to start splitting expenses and managing shared costs with your friends!'}
+                  ${message || 'Join Meet-n-Split to start splitting expenses and managing shared costs with your friends!'}
                 </p>
+              </div>
+              
+              <!-- QR Code Section (Valid for 7 days) -->
+              <div style="background-color: #f0f4ff; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+                <h3 style="color: #333; margin: 0 0 10px 0;">📱 Quick Join via QR Code</h3>
+                <p style="color: #666; font-size: 12px; margin: 0;">QR code valid for 7 days from this email</p>
+                <!-- QR code would be generated and embedded here -->
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
                 ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Open in App</a>` : ''}
-                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Meet-n-Split</a>` : ''}
+                <a href="https://meetnsplit.com/register" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Register on MeetNSplit.com</a>
+                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #007AFF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download App</a>` : ''}
               </div>
               
-              <div style="border-top: 1px solid #eee; padding-top: 20px;">
-                <p style="color: #888; font-size: 12px; margin: 0;">
-                  This reminder was sent by ${fromUserName} (${fromUserEmail}). If you don't want to receive these reminders, you can ignore this email.
+              <!-- Footer with Contact Info -->
+              <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
+                <div style="margin-bottom: 15px;">
+                  <a href="https://meetnsplit.com" style="color: #667eea; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
+                </div>
+                <p style="color: #888; font-size: 12px; margin: 5px 0;">
+                  This reminder was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #667eea;">admin@meetnsplit.com</a>
                 </p>
-                <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
+                <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
                   Meet-n-Split - Smart Money Management | This is an automated message.
                 </p>
               </div>
@@ -7736,9 +7921,14 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
           subject = `${fromUserName} invited you to join Meet-n-Split!`;
           htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+              <!-- Header Banner with Logo -->
+              <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; border-radius: 10px; color: white;">
+                <h1 style="margin: 0; font-size: 28px; font-weight: bold;">💰 Meet-n-Split</h1>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
+              </div>
+              
               <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #667eea; margin: 0;">💰 Spendy</h1>
-                <h2 style="color: #333; margin: 10px 0;">You're Invited!</h2>
+                <h2 style="color: #333; margin: 10px 0;">🎉 You're Invited!</h2>
               </div>
               
               <div style="background-color: #f8f9ff; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
@@ -7754,26 +7944,39 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
-                <h3 style="color: #333; margin: 0 0 15px 0;">✨ What you can do with Spendy:</h3>
+                <h3 style="color: #333; margin: 0 0 15px 0;">✨ What you can do with Meet-n-Split:</h3>
                 <ul style="text-align: left; color: #666; font-size: 14px; margin: 0; padding-left: 20px;">
                   <li>Split bills and expenses with friends</li>
                   <li>Track who owes what in real-time</li>
                   <li>Send payment reminders</li>
                   <li>Manage group expenses for trips and events</li>
-                  <li>Connect your email for automatic bill detection</li>
+                  <li>Connect multiple payment methods</li>
+                  <li>Get detailed spending insights</li>
                 </ul>
+              </div>
+              
+              <!-- QR Code Section (Valid for 7 days) -->
+              <div style="background-color: #f0f4ff; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+                <h3 style="color: #333; margin: 0 0 10px 0;">📱 Quick Join via QR Code</h3>
+                <p style="color: #666; font-size: 12px; margin: 0;">QR code valid for 7 days from this email</p>
+                <!-- QR code would be generated and embedded here -->
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
                 ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Accept Invitation</a>` : ''}
-                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Meet-n-Split</a>` : ''}
+                <a href="https://meetnsplit.com/register" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Register on MeetNSplit.com</a>
+                ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #007AFF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download App</a>` : ''}
               </div>
               
-              <div style="border-top: 1px solid #eee; padding-top: 20px;">
-                <p style="color: #888; font-size: 12px; margin: 0;">
-                  This invitation was sent by ${fromUserName} (${fromUserEmail}). If you don't want to receive invitations from this person, you can ignore this email.
+              <!-- Footer with Contact Info -->
+              <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
+                <div style="margin-bottom: 15px;">
+                  <a href="https://meetnsplit.com" style="color: #667eea; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
+                </div>
+                <p style="color: #888; font-size: 12px; margin: 5px 0;">
+                  This invitation was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #667eea;">admin@meetnsplit.com</a>
                 </p>
-                <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
+                <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
                   Meet-n-Split - Smart Money Management | This is an automated message.
                 </p>
               </div>
@@ -7782,7 +7985,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
         }
 
         const mailOptions = {
-          from: `"Meet-n-Split" <${process.env.EMAIL_USER || 'noreply@meetnsplit.com'}>`,
+          from: '"Meet-n-Split" <admin@meetnsplit.com>',
           to: toUserEmail,
           subject: subject,
           html: htmlContent
@@ -7870,7 +8073,14 @@ async function sendExpoPushNotification(expoPushToken, notification) {
     const result = await response.json();
     console.log("📱 Expo push response:", result);
 
-    if (result.data && result.data[0] && result.data[0].status === "ok") {
+    // Check for both response formats: array and single object
+    const status = (result.data && Array.isArray(result.data) && result.data[0]) 
+      ? result.data[0].status 
+      : (result.data && result.data.status) 
+      ? result.data.status 
+      : null;
+
+    if (status === "ok") {
       console.log("✅ Expo push notification sent successfully");
       return true;
     } else {
@@ -8322,6 +8532,67 @@ meetnsplitApp.delete('/user/push-token', authenticateJWT, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to remove push token',
+      error: error.message
+    });
+  }
+});
+
+// Test push notification endpoint (for debugging)
+meetnsplitApp.post('/test-notification', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { message } = req.body;
+
+    console.log(`🧪 Testing push notification for user: ${userId}`);
+
+    // Get user data including push token
+    const userDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const userData = userDoc.data();
+    const pushToken = userData.pushToken;
+
+    if (!pushToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'No push token found for user'
+      });
+    }
+
+    console.log(`📱 Found push token: ${pushToken.substring(0, 20)}...`);
+
+    // Send test notification
+    const notification = {
+      title: 'Test Notification 🧪',
+      body: message || 'This is a test notification from Meet-n-Split!',
+      data: {
+        type: 'test',
+        timestamp: new Date().toISOString(),
+        source: 'debug_endpoint'
+      }
+    };
+
+    const success = await sendExpoPushNotification(pushToken, notification);
+
+    res.json({
+      success,
+      message: success ? 'Test notification sent successfully' : 'Failed to send test notification',
+      data: {
+        pushToken: pushToken.substring(0, 20) + '...',
+        notification
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Test notification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send test notification',
       error: error.message
     });
   }

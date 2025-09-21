@@ -148,7 +148,7 @@ export class SecureQRService {
       const deepLink = `spendy://qr?data=${base64Data}`;
       
       // In production, this would be your actual domain
-      const universalLink = `https://spendy.app/qr?data=${base64Data}`;
+      const universalLink = `https://meetnsplit.com/qr?data=${base64Data}`;
       
       // For now, return deep link - we'll implement universal link fallback
       return deepLink;
@@ -166,7 +166,7 @@ export class SecureQRService {
       // Handle both deep links and universal links
       if (qrString.startsWith('spendy://qr?data=')) {
         encodedData = qrString.replace('spendy://qr?data=', '');
-      } else if (qrString.includes('spendy.app/qr?data=')) {
+      } else if (qrString.includes('meetnsplit.com/qr?data=')) {
         encodedData = qrString.split('data=')[1];
       } else {
         throw new Error('Invalid QR code format');
@@ -352,7 +352,7 @@ export class SecureQRService {
 
       await apiService.sendPushNotification(inviterId, {
         title: 'New Friend Request! 👋',
-        body: `${requesterData.fullName} wants to be your friend on Spendy`,
+        body: `${requesterData.fullName} wants to be your friend on Meet-n-Split`,
         data: notificationData
       });
     } catch (error) {
@@ -483,11 +483,11 @@ export class SecureQRService {
   async shareQRCode(qrUrl: string, type: 'friend' | 'group', targetName: string): Promise<void> {
     try {
       const shareMessage = type === 'friend' 
-        ? `Add me as a friend on Spendy! Tap this link: ${qrUrl}`
-        : `Join "${targetName}" group on Spendy! Tap this link: ${qrUrl}`;
+        ? `👋 Add me as a friend on Meet-n-Split! 💰\n\nTap this link: ${qrUrl}\n\n✨ Split expenses easily!\n🌐 https://meetnsplit.com`
+        : `🎉 Join "${targetName}" group on Meet-n-Split! 💰\n\nTap this link: ${qrUrl}\n\n✨ Smart expense splitting!\n🌐 https://meetnsplit.com`;
 
       await Share.share({
-        title: type === 'friend' ? 'Add me on Spendy!' : `Join ${targetName}`,
+        title: type === 'friend' ? 'Add me on Meet-n-Split!' : `Join ${targetName}`,
         message: shareMessage,
         url: qrUrl
       });
@@ -507,7 +507,7 @@ export class SecureQRService {
     if (appStoreUrl) {
       CrossPlatformAlert.alert(
         'Download Spendy',
-        'You need to install Spendy app to accept this invitation.',
+        'You need to install Meet-n-Split app to accept this invitation.',
         [
           { text: 'Cancel', style: 'cancel' },
           { 

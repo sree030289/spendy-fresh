@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ENV } from '@/config/environment';
 
-interface OTPData {
-  otp: string;
+interface OTPSession {
+  sessionId: string;
   email: string;
   expiresAt: number;
   verified: boolean;
@@ -9,7 +10,7 @@ interface OTPData {
 
 export class EmailService {
   private static instance: EmailService;
-  private currentOTP: OTPData | null = null;
+  private currentSession: OTPSession | null = null;
 
   static getInstance(): EmailService {
     if (!EmailService.instance) {
@@ -18,37 +19,42 @@ export class EmailService {
     return EmailService.instance;
   }
 
-  private generateOTP(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
 
-  async sendOTP(email: string): Promise<{ success: boolean; message: string; otp?: string }> {
+
+  async sendOTP(email: string): Promise<{ success: boolean; message: string; sessionId?: string }> {
     try {
-      const otp = this.generateOTP();
-      const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes expiry
+      console.log('Sending OTP to', email, 'via EmailService');
+      
+      const response = await fetch(`${ENV.api.baseURL}/auth/send-password-reset-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.toLowerCase().trim() })
+      });
 
-      // Store OTP data
-      this.currentOTP = {
-        otp,
-        email: email.toLowerCase(),
-        expiresAt,
-        verified: false
-      };
+      const data = await response.json();
 
-      // In a real app, you would send this via your backend API to an email service
-      // For now, we'll use a cloud function approach or direct email service
-      const success = await this.sendEmailViaService(email, otp);
+      if (data.success && data.sessionId) {
+        // Store session data
+        this.currentSession = {
+          sessionId: data.sessionId,
+          email: email.toLowerCase(),
+          expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes expiry
+          verified: false
+        };
 
-      if (success) {
+        console.log('📧 Sending OTP to', email + ':', 'Session created with ID', data.sessionId);
+
         return {
           success: true,
-          message: 'OTP sent successfully to your email address',
-          otp // Remove this in production - only for demo
+          message: data.message,
+          sessionId: data.sessionId
         };
       } else {
         return {
           success: false,
-          message: 'Failed to send OTP. Please try again.'
+          message: data.message || 'Failed to send OTP. Please try again.'
         };
       }
     } catch (error) {
@@ -93,42 +99,44 @@ export class EmailService {
 
   async verifyOTP(email: string, otp: string): Promise<{ success: boolean; message: string }> {
     try {
-      if (!this.currentOTP) {
+      if (!this.currentSession) {
         return {
           success: false,
-          message: 'No OTP found. Please request a new one.'
+          message: 'No verification session found. Please request a new OTP.'
         };
       }
 
-      if (this.currentOTP.email !== email.toLowerCase()) {
+      console.log('AuthService: Verifying OTP for', email);
+
+      const response = await fetch(`${ENV.api.baseURL}/auth/verify-password-reset-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.toLowerCase().trim(),
+          otp: otp.trim(),
+          sessionId: this.currentSession.sessionId
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Mark session as verified
+        this.currentSession.verified = true;
+        console.log('✅ OTP verified successfully');
+
+        return {
+          success: true,
+          message: data.message
+        };
+      } else {
         return {
           success: false,
-          message: 'OTP was not sent to this email address.'
+          message: data.message || 'Invalid OTP. Please check and try again.'
         };
       }
-
-      if (Date.now() > this.currentOTP.expiresAt) {
-        this.currentOTP = null;
-        return {
-          success: false,
-          message: 'OTP has expired. Please request a new one.'
-        };
-      }
-
-      if (this.currentOTP.otp !== otp) {
-        return {
-          success: false,
-          message: 'Invalid OTP. Please check and try again.'
-        };
-      }
-
-      // Mark as verified
-      this.currentOTP.verified = true;
-      
-      return {
-        success: true,
-        message: 'OTP verified successfully!'
-      };
     } catch (error) {
       console.error('Error verifying OTP:', error);
       return {
@@ -139,20 +147,25 @@ export class EmailService {
   }
 
   isOTPVerified(email: string): boolean {
-    return this.currentOTP?.email === email.toLowerCase() && 
-           this.currentOTP?.verified === true &&
-           Date.now() <= this.currentOTP.expiresAt;
+    return this.currentSession?.email === email.toLowerCase() && 
+           this.currentSession?.verified === true &&
+           Date.now() <= this.currentSession.expiresAt;
   }
 
   clearOTP(): void {
-    this.currentOTP = null;
+    this.currentSession = null;
   }
 
   // Get remaining time for current OTP in seconds
   getOTPRemainingTime(): number {
-    if (!this.currentOTP) return 0;
-    const remaining = Math.max(0, Math.floor((this.currentOTP.expiresAt - Date.now()) / 1000));
+    if (!this.currentSession) return 0;
+    const remaining = Math.max(0, Math.floor((this.currentSession.expiresAt - Date.now()) / 1000));
     return remaining;
+  }
+
+  // Get current session ID for password reset
+  getSessionId(): string | null {
+    return this.currentSession?.sessionId || null;
   }
 }
 

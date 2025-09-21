@@ -9,9 +9,9 @@ const getEnvironmentConfig = () => {
   if (EXPO_ENVIRONMENT === 'production') {
     return {
       name: "Meet-n-Split",
-      slug: "spendy",
-      bundleIdentifier: "com.svaag.spendy",
-      package: "com.svaag.spendy",
+      slug: "meetnsplit",
+      bundleIdentifier: "com.svaag.meetnsplit",
+      package: "com.svaag.meetnsplit",
       googleServicesFile: process.env.NODE_ENV === 'production' ? "./GoogleService-Info-prod.plist" : undefined,
       androidGoogleServicesFile: process.env.NODE_ENV === 'production' ? "./google-services-prod.json" : undefined,
       firebase: {
@@ -32,9 +32,9 @@ const getEnvironmentConfig = () => {
   } else {
     return {
       name: "Meet-n-Split Dev",
-      slug: "spendy-dev", 
-      bundleIdentifier: "com.svaag.spendy.dev",
-      package: "com.svaag.spendy.dev",
+      slug: "spendy", 
+      bundleIdentifier: "com.svaag.meetnsplit.dev",
+      package: "com.svaag.meetnsplit.dev",
       googleServicesFile: process.env.NODE_ENV === 'production' ? "./GoogleService-Info-dev.plist" : undefined,
       androidGoogleServicesFile: process.env.NODE_ENV === 'production' ? "./google-services-dev.json" : undefined,
       firebase: {
@@ -63,7 +63,7 @@ export default {
     slug: envConfig.slug,
     version: "1.0.0",
     orientation: "portrait",
-    scheme: "spendy",
+    scheme: "meetnsplit",
     userInterfaceStyle: "automatic",
     projectId: envConfig.firebase.projectId,
     icon: "./assets/icon.png",
@@ -105,7 +105,7 @@ export default {
       intentFilters: [
         {
           action: "VIEW",
-          data: [{ scheme: "spendy" }],
+          data: [{ scheme: "meetnsplit" }],
           category: ["BROWSABLE", "DEFAULT"]
         }
       ],
@@ -166,7 +166,7 @@ export default {
     // Pass environment config to the app
     extra: {
       eas: {
-        projectId: "fdfe5c21-42b7-45a2-ad80-b39ab634bd55"
+        projectId: "8ba655ab-7839-4196-9893-2a71413248ed"
       },
       environment: EXPO_ENVIRONMENT,
       firebase: envConfig.firebase,

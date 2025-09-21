@@ -301,7 +301,7 @@ static decodeQRData(qrString: string): QRData {
 
     // Show appropriate dialog based on user existence and connection status
     let dialogTitle = 'Friend Invitation';
-    let dialogMessage = `${qrData.userData.fullName} wants to be your friend on Spendy.`;
+    let dialogMessage = `${qrData.userData.fullName} wants to be your friend on Meet-n-Split.`;
     let buttonText = 'Add Friend';
     
     if (userExists && connectionStatus) {
@@ -322,7 +322,7 @@ static decodeQRData(qrString: string): QRData {
     }
 
     if (!userExists) {
-      dialogMessage = `${qrData.userData.fullName} (${qrData.userData.email}) is not on Spendy yet. We'll save your invitation and automatically send them a friend request when they join!`;
+      dialogMessage = `${qrData.userData.fullName} (${qrData.userData.email}) is not on Meet-n-Split yet. We'll save your invitation and automatically send them a friend request when they join!`;
       buttonText = 'Send Invite';
     }
     
@@ -455,14 +455,14 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
       
       switch (qrData.type) {
         case 'friend_invite':
-          shareTitle = 'Add me on Spendy!';
+          shareTitle = 'Add me on Meet-n-Split!';
           shareMessage = InviteService.generateFriendInviteMessage(
             qrData.userData?.fullName || 'Friend'
           );
           break;
           
         case 'group_invite':
-          shareTitle = `Join "${qrData.groupData?.name}" on Spendy`;
+          shareTitle = `Join "${qrData.groupData?.name}" on Meet-n-Split`;
           shareMessage = InviteService.generateGroupInviteMessage(
             'Someone',
             qrData.groupData?.name || 'Group',
@@ -472,7 +472,7 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
           
         default:
           shareTitle = 'Spendy Invitation';
-          shareMessage = 'Join me on Spendy - the best expense splitting app!';
+          shareMessage = '💰 Join me on Meet-n-Split - the smart expense splitting app! ✨\n\n🌐 https://meetnsplit.com';
       }
       
       const shareOptions: any = {
@@ -513,7 +513,7 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
           break;
           
         default:
-          message = 'Join me on Spendy! ' + this.encodeQRData(qrData);
+          message = '💰 Join me on Meet-n-Split! ✨\n\n' + this.encodeQRData(qrData) + '\n\n🌐 https://meetnsplit.com';
       }
       
       await InviteService.sendSMSInvite(phoneNumber, message);
@@ -544,7 +544,7 @@ private static async handleGroupInviteQR(qrData: QRData, currentUserId: string):
           break;
           
         default:
-          message = 'Join me on Spendy! ' + this.encodeQRData(qrData);
+          message = '💰 Join me on Meet-n-Split! ✨\n\n' + this.encodeQRData(qrData) + '\n\n🌐 https://meetnsplit.com';
       }
       
       await InviteService.sendWhatsAppInvite(phoneNumber, message);

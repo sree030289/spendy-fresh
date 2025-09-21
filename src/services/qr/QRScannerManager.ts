@@ -278,7 +278,7 @@ export class QRScannerManager {
       let encodedData = '';
       if (qrData.includes('spendy://qr?data=')) {
         encodedData = qrData.replace('spendy://qr?data=', '');
-      } else if (qrData.includes('spendy.app/qr?data=')) {
+      } else if (qrData.includes('meetnsplit.com/qr?data=')) {
         encodedData = qrData.split('data=')[1];
       } else {
         return false; // Default to v1.0 for unknown formats

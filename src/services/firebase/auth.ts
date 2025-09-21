@@ -449,35 +449,42 @@ static async register(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, pa
     }
   }
 
-  // OTP-based password update
+  // OTP-based password update - Using backend API with sessionId
   static async updatePasswordWithOTP(email: string, newPassword: string): Promise<void> {
     console.log('AuthService: Update password with OTP for', email);
     
     try {
-      if (!firebaseAuth) {
-        throw new Error('Firebase not initialized');
+      // Get sessionId from EmailService
+      const { EmailService } = await import('../EmailService');
+      const emailService = EmailService.getInstance();
+      const sessionId = emailService.getSessionId();
+
+      if (!sessionId) {
+        throw new Error('No valid OTP session found. Please verify OTP first.');
       }
 
-      // Get current user
-      const currentUser = firebaseAuth.currentUser;
-      
-      if (!currentUser) {
-        throw new Error('User not authenticated');
-      }
-
-      if (currentUser.email?.toLowerCase() !== email.toLowerCase()) {
-        throw new Error('Email does not match current user');
-      }
-
-      const { updatePassword } = await import('firebase/auth');
-      
-      // Update password directly (OTP verification ensures user authorization)
-      await updatePassword(currentUser, newPassword);
-      
-      // Update user document with updated timestamp
-      await this.updateUser(currentUser.uid, { 
-        updatedAt: new Date()
+      // Use backend API to reset password
+      const { ENV } = await import('@/config/environment');
+      const response = await fetch(`${ENV.api.baseURL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.toLowerCase().trim(),
+          newPassword: newPassword,
+          sessionId: sessionId
+        })
       });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update password');
+      }
+
+      // Clear the OTP session after successful password reset
+      emailService.clearOTP();
       
       console.log('✅ Password updated successfully with OTP verification');
     } catch (error: any) {

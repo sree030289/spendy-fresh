@@ -371,8 +371,8 @@ export default function GroupDetailsModal({
     
     try {
       await Share.share({
-        message: `Join "${localGroupData.name}" on Spendy! Use invite code: ${localGroupData.inviteCode}\n\nDownload Spendy: https://spendy.app/join/${localGroupData.inviteCode}`,
-        title: `Join ${localGroupData.name} on Spendy`
+        message: `🎉 Join "${localGroupData.name}" on Meet-n-Split! 💰\n\nUse invite code: ${localGroupData.inviteCode}\n\n🌐 Register: https://meetnsplit.com/join/${localGroupData.inviteCode}\n📱 Download app: https://meetnsplit.com/download\n\n✨ Smart expense splitting made easy!`,
+        title: `Join ${localGroupData.name} on Meet-n-Split`
       });
     } catch (error) {
       console.error('Share error:', error);
@@ -1539,7 +1539,7 @@ export default function GroupDetailsModal({
               </>
             )}
 
-            {/* Pending Friends Section - Only users already on Spendy */}
+            {/* Pending Friends Section - Only users already on Meet-n-Split */}
             {friends.filter(friend => 
               (friend.status === 'pending' || friend.status === 'invited') && 
               !friend.isNewUser &&
@@ -1550,7 +1550,7 @@ export default function GroupDetailsModal({
                   Pending Friend Requests
                 </Text>
                 <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary, marginBottom: 12 }]}>
-                  Friends on Spendy who haven't accepted your request yet
+                  Friends on Meet-n-Split who haven't accepted your request yet
                 </Text>
                 
                 {friends

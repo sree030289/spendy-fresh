@@ -1043,10 +1043,26 @@ export default function ProfileScreen() {
             </View>
             <TouchableOpacity 
               style={[styles.statItem, styles.mobileStatItem, { backgroundColor: theme.colors.surface }]}
-              onPress={() => Alert.alert('Mobile Number', user.mobile)}
+              onPress={() => {
+                if (user.mobile && user.mobile.trim()) {
+                  Alert.alert('Mobile Number', user.mobile);
+                } else {
+                  Alert.alert(
+                    'Mobile Number',
+                    'No mobile number set. You can update your mobile number by contacting support.',
+                    [
+                      { text: 'OK', style: 'cancel' },
+                      { 
+                        text: 'Contact Support', 
+                        onPress: () => Alert.alert('Contact', 'Email: support@meetnsplit.com\nPhone: +1-800-MEETNSPLIT')
+                      }
+                    ]
+                  );
+                }
+              }}
             >
-              <Text style={[styles.statValue, { color: theme.colors.text }]} numberOfLines={1} ellipsizeMode="middle">
-                {user.mobile}
+              <Text style={[styles.statValue, { color: user.mobile && user.mobile.trim() ? theme.colors.text : theme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="middle">
+                {user.mobile && user.mobile.trim() ? user.mobile : 'Not set'}
               </Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
                 Mobile (tap to view)

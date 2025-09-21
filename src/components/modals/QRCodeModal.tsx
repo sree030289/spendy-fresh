@@ -153,8 +153,18 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
               setLoading(true);
               try {
                 const message = mode === 'friend' 
-                  ? `Add me as a friend on Spendy! ${qrString}`
-                  : `Join "${selectedGroup?.name}" group on Spendy! ${qrString}`;
+                  ? `👋 Add me as a friend on Meet-n-Split! 💰
+
+📱 ${qrString}
+
+✨ Split expenses easily!
+🌐 https://meetnsplit.com`
+                  : `🎉 Join "${selectedGroup?.name}" group on Meet-n-Split! 💰
+
+📱 ${qrString}
+
+✨ Smart expense splitting!
+🌐 https://meetnsplit.com`;
                 
                 // Use native SMS sharing
                 await Share.share({ message });
@@ -187,11 +197,11 @@ export default function QRCodeModal({ visible, onClose, user, selectedGroup }: Q
           onPress: async (phoneNumber) => {
             if (phoneNumber && !loading) {
               setLoading(true);
-              try {
-                const message = mode === 'friend' 
-                  ? `Add me as a friend on Spendy! ${qrString}`
-                  : `Join "${selectedGroup?.name}" group on Spendy! ${qrString}`;
+              const message = mode === 'friend' 
+                ? `👋 Add me as a friend on Meet-n-Split! 💰\n\n📱 ${qrString}\n\n✨ Split expenses easily!\n🌐 https://meetnsplit.com`
+                : `🎉 Join "${selectedGroup?.name}" group on Meet-n-Split! 💰\n\n📱 ${qrString}\n\n✨ Smart expense splitting!\n🌐 https://meetnsplit.com`;
                 
+              try {
                 // Use WhatsApp URL scheme
                 const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
                 await Linking.openURL(whatsappUrl);
@@ -406,7 +416,7 @@ const handleScannerClose = useCallback(() => {
         </Text>
         <Text style={[styles.qrDescription, { color: theme.colors.textSecondary }]}>
           {mode === 'friend' 
-            ? 'Share this QR code or send it to friends so they can add you on Spendy'
+            ? 'Share this QR code or send it to friends so they can add you on Meet-n-Split'
             : `Share this QR code to invite people to join the "${selectedGroup?.name}" group`
           }
         </Text>
@@ -421,7 +431,7 @@ const handleScannerClose = useCallback(() => {
             style={styles.inviteCodeButton}
             onPress={() => {
               Share.share({
-                message: `Join "${selectedGroup.name}" on Spendy! Use invite code: ${selectedGroup.inviteCode}`
+                message: `🎉 Join "${selectedGroup.name}" on Meet-n-Split! 💰\n\nUse invite code: ${selectedGroup.inviteCode}\n\n🌐 https://meetnsplit.com/join/${selectedGroup.inviteCode}\n\n✨ Smart expense splitting!`
               });
             }}
           >
