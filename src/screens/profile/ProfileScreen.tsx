@@ -1054,7 +1054,7 @@ export default function ProfileScreen() {
                       { text: 'OK', style: 'cancel' },
                       { 
                         text: 'Contact Support', 
-                        onPress: () => Alert.alert('Contact', 'Email: support@meetnsplit.com\nPhone: +1-800-MEETNSPLIT')
+                        onPress: () => Alert.alert('Contact', 'Email: admin@meetnsplit.com\nPhone: +1-800-MEETNSPLIT')
                       }
                     ]
                   );
@@ -1231,7 +1231,7 @@ export default function ProfileScreen() {
           <ProfileItem
             icon="help-circle-outline"
             title="Help & Support"
-            onPress={() => Alert.alert('Contact', 'Email: support@meetnsplit.com\nPhone: +1-800-MEETNSPLIT')}
+            onPress={() => Alert.alert('Contact', 'Email: admin@meetnsplit.com\nPhone: +1-800-MEETNSPLIT')}
           />
           
           <ProfileItem

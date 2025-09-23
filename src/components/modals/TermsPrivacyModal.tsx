@@ -97,7 +97,7 @@ These Terms are governed by the laws of the State of California, United States.
 
 15. CONTACT INFORMATION
 If you have questions about these Terms, please contact us at:
-Email: legal@spendy.com
+Email: admin@meetnsplit.com
 Address: Spendy Inc., Trugnaina, Victoria
 
 By using Spendy, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
@@ -225,10 +225,10 @@ We may update this Privacy Policy periodically. We will notify you of material c
 14. CONTACT US
 
 For privacy-related questions or requests:
-Email: privacy@spendy.com
+Email: admin@meetnsplit.com
 Address: Spendy Inc., 123 Finance Street, San Francisco, CA 94105
 
-Data Protection Officer: privacy@spendy.com
+Data Protection Officer: admin@meetnsplit.com
 
 If you're in the EU, you may also contact your local data protection authority.
 

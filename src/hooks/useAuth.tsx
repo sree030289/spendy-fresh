@@ -1,4 +1,5 @@
-import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+[
+  ]import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { ApiService } from '@/services/api/ApiService';
 import { User } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -83,13 +84,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             email: profileData.email,
             fullName: profileData.fullName,
             currency: profileData.currency,
-            profilePicture: profileData.profileImage || profileData.profilePicture,
-            profileImage: profileData.profileImage || profileData.profilePicture,
+            profilePicture: profileData.profileImage || (profileData as any).profilePicture,
+            profileImage: profileData.profileImage || (profileData as any).profilePicture,
             isPremium: profileData.isPremium,
             biometricEnabled: finalBiometricSetting,
             country: parsedUser.country || 'US',
-            mobile: parsedUser.mobile || '',
-            phoneNumber: parsedUser.mobile || '',
+            mobile: (profileData as any).mobile || (profileData as any).phoneNumber || '',
+            phoneNumber: (profileData as any).mobile || (profileData as any).phoneNumber || '',
             subscriptionStatus: profileData.isPremium ? 'premium' : 'expired',
             createdAt: parsedUser.createdAt ? new Date(parsedUser.createdAt) : new Date(),
             updatedAt: new Date(),
@@ -131,13 +132,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email: response.user.email,
         fullName: response.user.fullName,
         currency: response.user.currency,
-        profilePicture: response.user.profileImage || response.user.profilePicture,
-        profileImage: response.user.profileImage || response.user.profilePicture,
+        profilePicture: response.user.profileImage || (response.user as any).profilePicture,
+        profileImage: response.user.profileImage || (response.user as any).profilePicture,
         isPremium: response.user.isPremium,
         biometricEnabled: false, // Will be updated from stored preferences
-        country: 'US', // Default, will be updated from profile
-        mobile: '', // Will be updated from profile
-        phoneNumber: '', // Will be updated from profile
+        country: (response.user as any).country || 'US',
+        mobile: (response.user as any).mobile || (response.user as any).phoneNumber || '',
+        phoneNumber: (response.user as any).mobile || (response.user as any).phoneNumber || '',
         subscriptionStatus: response.user.isPremium ? 'premium' : 'expired',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -478,13 +479,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email: profileData.email,
         fullName: profileData.fullName,
         currency: profileData.currency,
-        profilePicture: profileData.profileImage || profileData.profilePicture,
-        profileImage: profileData.profileImage || profileData.profilePicture,
+        profilePicture: profileData.profileImage || (profileData as any).profilePicture,
+        profileImage: profileData.profileImage || (profileData as any).profilePicture,
         isPremium: profileData.isPremium,
         biometricEnabled: finalBiometricSetting,
         country: parsedUser.country || 'US',
-        mobile: parsedUser.mobile || '',
-        phoneNumber: parsedUser.mobile || '',
+        mobile: (profileData as any).mobile || (profileData as any).phoneNumber || '',
+        phoneNumber: (profileData as any).mobile || (profileData as any).phoneNumber || '',
         subscriptionStatus: profileData.isPremium ? 'premium' : 'expired',
         createdAt: parsedUser.createdAt ? new Date(parsedUser.createdAt) : new Date(),
         updatedAt: new Date(),

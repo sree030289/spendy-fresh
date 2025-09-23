@@ -1113,7 +1113,7 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
           // Send email using nodemailer
           const nodemailer = require("nodemailer");
           
-          const emailUser = process.env.EMAIL_USER || "noreply@meetnsplit.com";
+          const emailUser = process.env.EMAIL_USER || "admin@meetnsplit.com";
           const emailPass = process.env.EMAIL_PASSWORD || "your-app-password";
           
           console.log("📧 Email configuration:", {
