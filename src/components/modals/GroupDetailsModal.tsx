@@ -1067,8 +1067,8 @@ export default function GroupDetailsModal({
           }
         ]}
       >
-        {/* Header with Gradient */}
-        <View style={styles.header}>
+        {/* Brand Header - consistent with login/register */}
+        <View style={[styles.header, { backgroundColor: theme.colors.brand }]}>
           <TouchableOpacity 
             style={styles.backBtn}
             onPress={onClose}
@@ -1081,7 +1081,7 @@ export default function GroupDetailsModal({
             style={styles.settleBtn}
             onPress={handleEditGroup}
           >
-            <Icon name="create" size={14} color="white"  />
+            <Icon name="edit" size={14} color="white"  />
             <Text style={styles.settleBtnText}>Edit</Text>
           </TouchableOpacity>
           
@@ -1130,8 +1130,14 @@ export default function GroupDetailsModal({
                   }
                 }}
               >
-                <Icon name="receipt" size={16} color="white" />
-                <Text style={[styles.statLabel, { color: 'white', fontWeight: 'bold' }]}>Settle</Text>
+                <Icon name="cash" size={20} color="#10B981" />
+                <Text style={[styles.statLabel, { 
+                  color: 'white', 
+                  fontWeight: '800', 
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  textTransform: 'uppercase'
+                }]}>SETTLE</Text>
               </TouchableOpacity>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{groupExpenses.length}</Text>
@@ -1784,16 +1790,17 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   header: {
-    backgroundColor: '#667eea',
-    paddingTop: 60, // Increased to avoid status bar overlap
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+    width: '100%',
+    paddingTop: 60, // Safe area for status bar
     paddingHorizontal: 24,
     paddingBottom: 40,
     position: 'relative',
-    overflow: 'hidden',
   },
   backBtn: {
     position: 'absolute',
-    top: 35, // Moved down to avoid status bar overlap
+    top: 35, // Lower to avoid battery/status bar
     left: 20,
     width: 40,
     height: 40,
@@ -1805,7 +1812,7 @@ const styles = StyleSheet.create({
   },
   settleBtn: {
     position: 'absolute',
-    top: 35, // Same position as back button
+    top: 35, // Same as back button
     right: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1823,17 +1830,18 @@ const styles = StyleSheet.create({
   },
   groupHeader: {
     alignItems: 'center',
+    marginTop: 20, // Space from buttons
     zIndex: 2,
   },
   groupAvatar: {
     width: 72,
     height: 72,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   groupAvatarText: {
@@ -1903,9 +1911,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   settleStatButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)', // Same as other cards
+    borderColor: 'rgba(255, 255, 255, 0.2)', // Same as other cards
+    borderWidth: 1, // Same as other cards
     gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 6,
+    transform: [{ scale: 1 }], // For press animation
   },
   content: {
     flex: 1,
