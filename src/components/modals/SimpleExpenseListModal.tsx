@@ -441,13 +441,9 @@ export default function SimpleExpenseListModal({
       onRequestClose={onClose}
     >
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Gradient Header */}
-        <LinearGradient
-          colors={[theme.colors.primary, theme.colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
+        {/* Brand Header - consistent with login/register */}
+        <View style={[styles.headerGradient, { backgroundColor: theme.colors.brand }]}>
+        
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Icon name="close" size={24} color="white"  />
@@ -465,7 +461,7 @@ export default function SimpleExpenseListModal({
               {expenses.length} expenses • {formatCurrency(totalAmount)}
             </Text>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Simple Filter Section */}
         <View style={[styles.filterSection, { backgroundColor: theme.colors.surfaceSecondary }]}>
@@ -614,6 +610,8 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingBottom: 16,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
   },
   header: {
     flexDirection: 'row',

@@ -216,7 +216,7 @@ const FullScreenSuccessAnimation: React.FC<FullScreenSuccessAnimationProps> = ({
       
       {/* Background Gradient */}
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={['#B0004F', '#D91A72']}
         style={styles.background}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -277,7 +277,7 @@ const FullScreenSuccessAnimation: React.FC<FullScreenSuccessAnimationProps> = ({
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={['#4CAF50', '#45a049']}
+              colors={['#FFFFFF', '#F3F4F6']}
               style={styles.buttonGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -407,14 +407,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    color: 'white',
+    color: '#B0004F',
     fontSize: 18,
     fontWeight: '600',
   },
   particle: {
     position: 'absolute',
     borderRadius: 50,
-    backgroundColor: 'rgba(76, 175, 80, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
   particle1: {
     width: 6,
