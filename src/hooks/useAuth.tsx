@@ -1,5 +1,4 @@
-[
-  ]import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { ApiService } from '@/services/api/ApiService';
 import { User } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
