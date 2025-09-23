@@ -3591,7 +3591,7 @@ export default function RealSplittingScreen() {
                     Total spent
                   </Text>
                   <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                    <Text>{getCurrencySymbol(group.currency)}</Text><Text>{(((group as any).totalExpenses || 0)).toFixed(2)}</Text>
+                    <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{(((group as any).totalExpenses || 0)).toFixed(2)}</Text>
                   </Text>
                 </View>
                 <View style={styles.groupStat}>
@@ -3607,7 +3607,7 @@ export default function RealSplittingScreen() {
                              theme.colors.error 
                     }
                   ]}>
-                    {shareStatus === 'settled' ? '✓' : `${getCurrencySymbol(group.currency)}${(userShare || 0).toFixed(2)}`}
+                    {shareStatus === 'settled' ? '✓' : `${getCurrencySymbol(user?.currency || 'USD')}${(userShare || 0).toFixed(2)}`}
                   </Text>
                 </View>
               </View>

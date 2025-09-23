@@ -563,7 +563,7 @@ async function sendWelcomeEmail(email, fullName) {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
         <!-- Header Banner with Logo -->
-        <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; border-radius: 10px; color: white;">
+        <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 40px 20px; border-radius: 10px; color: white;">
           <h1 style="margin: 0; font-size: 32px; font-weight: bold;">💰 Meet-n-Split</h1>
           <p style="margin: 10px 0 0 0; font-size: 18px; opacity: 0.9;">Smart Expense Spliting APP</p>
         </div>
@@ -589,7 +589,7 @@ async function sendWelcomeEmail(email, fullName) {
         
         <!-- Call to Action -->
         <div style="text-align: center; margin-bottom: 30px;">
-          <a href="https://meetnsplit.com" style="display: inline-block; background-color: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-right: 10px;">Explore MeetNSplit.com</a>
+          <a href="https://meetnsplit.com" style="display: inline-block; background-color: #B0004F; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-right: 10px;">Explore MeetNSplit.com</a>
           <a href="https://youtu.be/your-app-tour-video" style="display: inline-block; background-color: #FF0000; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">📹 Watch App Tour</a>
         </div>
         
@@ -607,10 +607,10 @@ async function sendWelcomeEmail(email, fullName) {
         <!-- Footer with Contact Info -->
         <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
           <div style="margin-bottom: 15px;">
-            <a href="https://meetnsplit.com" style="color: #667eea; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
+            <a href="https://meetnsplit.com" style="color: #B0004F; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
           </div>
           <p style="color: #888; font-size: 12px; margin: 5px 0;">
-            Questions or need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #667eea;">admin@meetnsplit.com</a>
+            Questions or need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
           </p>
           <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
             Meet-n-Split - Smart Money Management | Welcome aboard! 🚀
@@ -692,7 +692,7 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
             <!-- Header Banner with Logo -->
-            <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; border-radius: 10px; color: white;">
+            <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 30px 20px; border-radius: 10px; color: white;">
               <h1 style="margin: 0; font-size: 28px; font-weight: bold;">� Meet-n-Split</h1>
               <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
             </div>
@@ -703,7 +703,7 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
             
             <div style="background-color: #f8f9ff; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 30px;">
               <p style="color: #666; margin-bottom: 15px;">Your verification code is:</p>
-              <div style="font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 4px; margin: 20px 0;">${otp}</div>
+              <div style="font-size: 32px; font-weight: bold; color: #B0004F; letter-spacing: 4px; margin: 20px 0;">${otp}</div>
               <p style="color: #888; font-size: 14px;">This code will expire in 10 minutes</p>
             </div>
             
@@ -716,17 +716,17 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
               </p>
               <p style="color: #666; line-height: 1.6; margin-top: 20px;">
                 Alternatively, you can reset your password directly in your browser: 
-                <a href="https://meetnsplit.com/reset-password?token=${sessionId}&email=${encodeURIComponent(normalizedEmail)}" style="color: #667eea; text-decoration: none;">Reset Password via Browser</a>
+                <a href="https://meetnsplit.com/reset-password?token=${sessionId}&email=${encodeURIComponent(normalizedEmail)}" style="color: #B0004F; text-decoration: none;">Reset Password via Browser</a>
               </p>
             </div>
             
             <!-- Footer with Contact Info -->
             <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
               <div style="margin-bottom: 15px;">
-                <a href="https://meetnsplit.com" style="color: #667eea; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
+                <a href="https://meetnsplit.com" style="color: #B0004F; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
               </div>
               <p style="color: #888; font-size: 12px; margin: 5px 0;">
-                Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #667eea;">admin@meetnsplit.com</a>
+                Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
               </p>
               <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
                 Meet-n-Split - Smart Money Management | This is an automated message.
@@ -1147,7 +1147,7 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
               `margin: 0 auto; padding: 20px; border: 1px solid #ddd; ` +
               `border-radius: 10px;">
               <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #667eea; margin: 0;">💰 Meet-n-Split</h1>
+                <h1 style="color: #B0004F; margin: 0;">💰 Meet-n-Split</h1>
                 <h2 style="color: #333; margin: 10px 0;">You're Invited!</h2>
               </div>
               
@@ -1182,7 +1182,7 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
               
               <div style="text-align: center; margin-bottom: 30px;">
                 <a href="${deepLink}" style="display: inline-block; ` +
-                  `background-color: #667eea; color: white; padding: 12px 24px; ` +
+                  `background-color: #B0004F; color: white; padding: 12px 24px; ` +
                   `text-decoration: none; border-radius: 6px; font-weight: bold; ` +
                   `margin-right: 10px;">Accept Invitation</a>
                 <a href="${appStoreLink}" style="display: inline-block; ` +
@@ -7377,7 +7377,7 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
           const htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
               <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #667eea; margin: 0;">🤝 Spendy</h1>
+                <h1 style="color: #B0004F; margin: 0;">🤝 Spendy</h1>
                 <h2 style="color: #333; margin: 10px 0;">${isUserRegistered ? 'Friend Request Reminder' : 'Join Spendy!'}</h2>
               </div>
               
@@ -7396,7 +7396,7 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
-                <a href="https://meetnsplit.app/download" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                <a href="https://meetnsplit.app/download" style="display: inline-block; background-color: #B0004F; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
                   ${isUserRegistered ? 'Open Meet-n-Split App' : 'Download Meet-n-Split'}
                 </a>
               </div>
@@ -7868,7 +7868,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
           htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
               <!-- Header Banner with Logo -->
-              <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; border-radius: 10px; color: white;">
+              <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 30px 20px; border-radius: 10px; color: white;">
                 <h1 style="margin: 0; font-size: 28px; font-weight: bold;">💰 Meet-n-Split</h1>
                 <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
               </div>
@@ -7897,7 +7897,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
-                ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Open in App</a>` : ''}
+                ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #B0004F; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Open in App</a>` : ''}
                 <a href="https://meetnsplit.com/register" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Register on MeetNSplit.com</a>
                 ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #007AFF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download App</a>` : ''}
               </div>
@@ -7905,10 +7905,10 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
               <!-- Footer with Contact Info -->
               <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
                 <div style="margin-bottom: 15px;">
-                  <a href="https://meetnsplit.com" style="color: #667eea; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
+                  <a href="https://meetnsplit.com" style="color: #B0004F; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
                 </div>
                 <p style="color: #888; font-size: 12px; margin: 5px 0;">
-                  This reminder was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #667eea;">admin@meetnsplit.com</a>
+                  This reminder was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
                   Meet-n-Split - Smart Money Management | This is an automated message.
@@ -7922,7 +7922,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
           htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
               <!-- Header Banner with Logo -->
-              <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; border-radius: 10px; color: white;">
+              <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 30px 20px; border-radius: 10px; color: white;">
                 <h1 style="margin: 0; font-size: 28px; font-weight: bold;">💰 Meet-n-Split</h1>
                 <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
               </div>
@@ -7963,7 +7963,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
-                ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Accept Invitation</a>` : ''}
+                ${deepLink ? `<a href="${deepLink}" style="display: inline-block; background-color: #B0004F; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Accept Invitation</a>` : ''}
                 <a href="https://meetnsplit.com/register" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Register on MeetNSplit.com</a>
                 ${appStoreLink ? `<a href="${appStoreLink}" style="display: inline-block; background-color: #007AFF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download App</a>` : ''}
               </div>
@@ -7971,10 +7971,10 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
               <!-- Footer with Contact Info -->
               <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center;">
                 <div style="margin-bottom: 15px;">
-                  <a href="https://meetnsplit.com" style="color: #667eea; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
+                  <a href="https://meetnsplit.com" style="color: #B0004F; text-decoration: none; font-weight: bold;">Visit MeetNSplit.com</a>
                 </div>
                 <p style="color: #888; font-size: 12px; margin: 5px 0;">
-                  This invitation was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #667eea;">admin@meetnsplit.com</a>
+                  This invitation was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
                   Meet-n-Split - Smart Money Management | This is an automated message.

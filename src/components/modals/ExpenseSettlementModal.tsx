@@ -282,7 +282,7 @@ export default function ExpenseSettlementModal({
               {item.userName}
             </Text>
             <Text style={[styles.owedAmount, { color: theme.colors.error }]}>
-              Owes {getCurrencySymbol(expense?.currency || 'USD')}{item.amountOwed.toFixed(2)}
+              Owes {getCurrencySymbol(currentUser?.currency || 'USD')}{item.amountOwed.toFixed(2)}
             </Text>
           </View>
         </View>
@@ -308,7 +308,7 @@ export default function ExpenseSettlementModal({
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount Paid</Text>
             <View style={styles.amountContainer}>
               <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
-                {getCurrencySymbol(expense?.currency || 'USD')}
+                {getCurrencySymbol(currentUser?.currency || 'USD')}
               </Text>
               <TextInput
                 style={[styles.amountTextInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
@@ -374,7 +374,7 @@ export default function ExpenseSettlementModal({
             {expense.description}
           </Text>
           <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-            {getCurrencySymbol(expense.currency)}{expense.amount.toFixed(2)}
+            {getCurrencySymbol(currentUser?.currency || 'USD')}{expense.amount.toFixed(2)}
           </Text>
           <Text style={[styles.expenseDate, { color: theme.colors.textSecondary }]}>
             {expense.date.toLocaleDateString()} • Paid by {expense.paidByData.fullName}
@@ -389,20 +389,20 @@ export default function ExpenseSettlementModal({
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>Total Outstanding</Text>
               <Text style={[styles.summaryValue, { color: theme.colors.error }]}>
-                {getCurrencySymbol(expense.currency)}{totalOwed.toFixed(2)}
+                {getCurrencySymbol(currentUser?.currency || 'USD')}{totalOwed.toFixed(2)}
               </Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>To be Settled</Text>
               <Text style={[styles.summaryValue, { color: theme.colors.success }]}>
-                {getCurrencySymbol(expense.currency)}{totalToPay.toFixed(2)}
+                {getCurrencySymbol(currentUser?.currency || 'USD')}{totalToPay.toFixed(2)}
               </Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabelBold, { color: theme.colors.text }]}>Remaining</Text>
               <Text style={[styles.summaryValueBold, { color: theme.colors.text }]}>
-                {getCurrencySymbol(expense.currency)}{(totalOwed - totalToPay).toFixed(2)}
+                {getCurrencySymbol(currentUser?.currency || 'USD')}{(totalOwed - totalToPay).toFixed(2)}
               </Text>
             </View>
           </View>

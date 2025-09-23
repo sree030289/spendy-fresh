@@ -670,7 +670,7 @@ export default function UnifiedSettlementScreen({
           {settlementHistory.map((transaction, index) => (
             <View key={transaction.id || index} style={styles.historyItem}>
               <Text style={[styles.historyText, { color: theme.colors.text }]}>
-                {transaction.fromUserData.fullName} paid {transaction.toUserData.fullName} {getCurrencySymbol(transaction.currency)}{transaction.amount.toFixed(0)}
+                {transaction.fromUserData.fullName} paid {transaction.toUserData.fullName} {getCurrencySymbol(user?.currency || 'USD')}{transaction.amount.toFixed(0)}
               </Text>
               <Text style={[styles.historyDate, { color: theme.colors.textSecondary }]}>
                 {transaction.date.toLocaleDateString()} • Settled

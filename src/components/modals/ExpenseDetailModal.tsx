@@ -176,8 +176,8 @@ export default function ExpenseDetailModal({
   };
 
   const formatExpenseCurrency = (amount: number) => {
-    // Use expense currency if available, fallback to user currency, then USD
-    const currencyCode = expense.currency || user?.currency || 'USD';
+    // Use user's preferred currency for display consistency
+    const currencyCode = user?.currency || 'USD';
     return formatCurrency(amount, currencyCode);
   };
 

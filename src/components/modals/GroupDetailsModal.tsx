@@ -567,7 +567,7 @@ export default function GroupDetailsModal({
     if (member.balance !== 0) {
       CrossPlatformAlert.alert(
         'Cannot Remove Admin',
-        `${member.userData?.fullName || 'This member'} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(localGroupData?.currency || 'USD')}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
+        `${member.userData?.fullName || 'This member'} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
         [{ text: 'OK' }]
       );
       return;
@@ -905,7 +905,7 @@ export default function GroupDetailsModal({
             </View>
           </View>
           <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-            {getCurrencySymbol(localGroupData?.currency || 'USD')}{
+            {getCurrencySymbol(user?.currency || 'USD')}{
               isNaN(expense.amount) ? '0.00' : (expense.amount || 0).toFixed(2)
             }
           </Text>
@@ -1101,7 +1101,7 @@ export default function GroupDetailsModal({
                 </Text>
               </View>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>💰 {localGroupData.currency}</Text>
+                <Text style={styles.badgeText}>💰 {user?.currency}</Text>
               </View>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>👥 {getActiveMemberCount(localGroupData.members || [])} members</Text>
@@ -1111,7 +1111,7 @@ export default function GroupDetailsModal({
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
-                  {getCurrencySymbol(localGroupData?.currency || 'USD')}{isNaN(totalExpenses) ? '0.00' : totalExpenses.toFixed(2)}
+                  {getCurrencySymbol(user?.currency || 'USD')}{isNaN(totalExpenses) ? '0.00' : totalExpenses.toFixed(2)}
                 </Text>
                 <Text style={styles.statLabel}>Total Spent</Text>
               </View>

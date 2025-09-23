@@ -9,6 +9,8 @@ import {
   Alert,
   Dimensions,
   Platform,
+  ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import SubscriptionConfigService, { SubscriptionConfig } from '@/services/firebase/SubscriptionConfigService';
@@ -84,10 +86,16 @@ export default function SubscriptionModal({
         const userCurrency = user?.currency || 'USD';
         console.log('💱 Using user currency:', userCurrency);
         
+        // Force clear currency cache to get latest rates (especially for INR)
+        console.log('🧹 Force clearing all currency caches for fresh rates');
+        const currencyService = (await import('@/services/firebase/CurrencyConversionService')).default.getInstance();
+        await currencyService.forceClearAllCaches();
+        
         const config = configService.getCurrentConfigForUser(userCurrency);
         setSubscriptionConfig(config);
         setSelectedPlan(config.displayConfig.defaultPlan);
-        setShowPromoInput(config.displayConfig.promoCodeEnabled);
+        // Keep promo input closed by default, let user click to open it
+        setShowPromoInput(false);
         
         // Load real pricing from payment service
         await loadRealPricing();
@@ -228,6 +236,15 @@ export default function SubscriptionModal({
       const yearlyTotal = realPricing.monthly * 12;
       const savings = Math.round(((yearlyTotal - realPricing.yearly) / yearlyTotal) * 100);
       
+      console.log('💰 Pricing calculation:', {
+        monthly: realPricing.monthly,
+        yearly: realPricing.yearly,
+        yearlyMonthlyPrice,
+        yearlyTotal,
+        savings,
+        currency: realPricing.currency
+      });
+      
       return {
         monthlyPrice: realPricing.monthly,
         yearlyPrice: realPricing.yearly,
@@ -252,14 +269,40 @@ export default function SubscriptionModal({
     
     const { pricing } = subscriptionConfig;
     console.log('📈 Using Firebase pricing:', pricing);
+    
+    const monthlyPrice = pricing.monthly.price;
+    const yearlyPrice = pricing.yearly.price;
+    const yearlyMonthlyPrice = pricing.yearly.monthlyEquivalent || yearlyPrice / 12;
+    
+    // Calculate correct savings: How much you save per year compared to monthly plan
+    const yearlyTotal = monthlyPrice * 12; // What you'd pay for 12 months at monthly rate
+    const actualSavings = Math.round(((yearlyTotal - yearlyPrice) / yearlyTotal) * 100);
+    
+    // If savings is negative, the yearly plan is more expensive - this is a config error
+    if (actualSavings < 0) {
+      console.warn('⚠️ PRICING ERROR: Yearly plan is more expensive than monthly!', {
+        monthlyPrice,
+        yearlyPrice,
+        yearlyTotal,
+        deficit: yearlyPrice - yearlyTotal
+      });
+    }
+    
     const result = {
-      monthlyPrice: pricing.monthly.price,
-      yearlyPrice: pricing.yearly.price,
-      yearlyMonthlyPrice: pricing.yearly.monthlyEquivalent || pricing.yearly.price / 12,
-      savings: pricing.savings?.percentage || 0,
+      monthlyPrice,
+      yearlyPrice,
+      yearlyMonthlyPrice,
+      savings: Math.max(0, actualSavings), // Ensure savings is never negative in display
       currency: pricing.monthly.currency || user?.currency || 'USD'
     };
     console.log('💸 Final pricing result:', result);
+    console.log('📊 Savings calculation:', {
+      monthlyPrice,
+      yearlyPrice,
+      yearlyTotal,
+      actualSavings,
+      configSavings: pricing.savings?.percentage
+    });
     return result;
   };
 
@@ -335,13 +378,13 @@ export default function SubscriptionModal({
       case 'firstTime':
         return '🎉 Welcome to Premium!';
       case 'groupLimit':
-        return '📊 Upgrade for More Groups';
+        return '🎉  Upgrade for More Groups';
       case 'memberLimit':
-        return '👥 Upgrade for More Members';
+        return '🎉  Upgrade for More Members';
       case 'transactionLimit':
-        return '💳 Upgrade for Unlimited';
+        return '🎉 Upgrade for Unlimited';
       case 'premium_feature':
-        return `🚀 Unlock ${featureName}`;
+        return `🎉  Unlock ${featureName}`;
       default:
         return '✨ Upgrade to Premium';
     }
@@ -413,7 +456,7 @@ export default function SubscriptionModal({
     <FullscreenModal
       visible={visible}
       onClose={canCloseModal ? handleClose : () => {}}
-      title={getModalTitle()}
+      title=""
       showBackButton={canCloseModal}
       rightActions={
         !canCloseModal && countdown > 0 ? (
@@ -432,147 +475,213 @@ export default function SubscriptionModal({
         )
       }
     >
-      <View style={styles.container}>
-        {/* Header Section */}
-        <View style={styles.header}>
-          <Text style={styles.subtitle}>{getModalSubtitle()}</Text>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView 
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+        {/* Enhanced Header Banner */}
+        <View style={styles.enhancedHeaderBanner}>
+          <View style={styles.enhancedBannerContent}>
+            <Text style={styles.enhancedBannerTitle}>{getModalTitle()}</Text>
+            <Text style={styles.enhancedBannerSubtitle}>{getModalSubtitle()}</Text>
+          </View>
           
-          {/* Key Features Grid */}
-          <View style={styles.featuresGrid}>
-            {keyFeatures.map((feature: string, index: number) => (
-              <View key={index} style={styles.featureChip}>
-                <Text style={styles.featureChipText}>✓ {feature}</Text>
+          {/* Premium Features List */}
+          <View style={styles.premiumFeaturesContainer}>
+            <View style={styles.featuresColumn}>
+              <View style={styles.featureRow}>
+                <Text style={styles.featureIcon}>∞</Text>
+                <Text style={styles.featureText}>Unlimited Groups</Text>
               </View>
-            ))}
+              <View style={styles.featureRow}>
+                <Text style={styles.featureIcon}>$</Text>
+                <Text style={styles.featureText}>Unlimited Expenses</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <Text style={styles.featureIcon}>→</Text>
+                <Text style={styles.featureText}>QR Code Invites</Text>
+              </View>
+            </View>
+            
+            <View style={styles.featuresColumn}>
+              <View style={styles.featureRow}>
+                <Text style={styles.featureIcon}>↗</Text>
+                <Text style={styles.featureText}>Smart Analytics</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <Text style={styles.featureIcon}>@</Text>
+                <Text style={styles.featureText}>Group Chat</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <Text style={styles.featureIcon}>$</Text>
+                <Text style={styles.featureText}>Advanced Reports</Text>
+              </View>
+            </View>
           </View>
         </View>
 
-        {/* Plan Selection */}
-        <View style={styles.planSection}>
-          <View style={styles.planOptions}>
+        {/* Compact Plan Selection */}
+        <View style={styles.compactPlanSection}>
+          <View style={styles.compactPlanOptions}>
             {/* Yearly Plan */}
             <TouchableOpacity
               style={[
-                styles.planOption,
-                selectedPlan === 'yearly' && styles.selectedPlan
+                styles.compactPlanOption,
+                selectedPlan === 'yearly' && styles.selectedCompactPlan
               ]}
               onPress={() => setSelectedPlan('yearly')}
             >
-              <View style={styles.planBadge}>
-                <Text style={styles.planBadgeText}>SAVE {savings}%</Text>
+              <View style={styles.compactPlanBadge}>
+                <Text style={styles.compactPlanBadgeText}>SAVE {savings}%</Text>
               </View>
-              <Text style={styles.planName}>Yearly</Text>
               
-              {/* Show discounted price if promo code is valid */}
-              {promoValidation.valid && selectedPlan === 'yearly' && promoValidation.discountedPrice ? (
-                <View style={styles.priceContainer}>
-                  <Text style={[styles.planPrice, styles.originalPrice]}>
-                    {formatCurrency(yearlyPrice, currency)}
-                  </Text>
-                  <Text style={styles.planPrice}>
-                    {formatCurrency(promoValidation.discountedPrice, currency)}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.planPrice}>{formatCurrency(yearlyPrice, currency)}</Text>
-              )}
+              <View style={styles.compactPlanHeader}>
+                <Text style={styles.compactPlanName}>Annual</Text>
+                <Text style={styles.compactPlanSubtitle}>Most Popular</Text>
+              </View>
               
-              <Text style={styles.planPriceSubtext}>{formatCurrency(yearlyMonthlyPrice, currency)}/month</Text>
-              <Text style={styles.planBenefit}>2 months FREE</Text>
+              <View style={styles.compactPlanPriceRow}>
+                {promoValidation.valid && selectedPlan === 'yearly' && promoValidation.discountedPrice ? (
+                  <View style={styles.priceContainer}>
+                    <Text style={[styles.compactPlanPrice, styles.originalPrice]}>
+                      {formatCurrency(yearlyPrice, currency)}
+                    </Text>
+                    <Text style={styles.compactPlanPrice}>
+                      {formatCurrency(promoValidation.discountedPrice, currency)}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.compactPlanPrice}>{formatCurrency(yearlyPrice, currency)}</Text>
+                )}
+                
+                <Text style={styles.compactPlanPriceSubtext}>{formatCurrency(yearlyMonthlyPrice, currency)}/mo</Text>
+              </View>
+              
+              <Text style={styles.compactPlanBenefit}>
+                {monthlyPrice * 12 > yearlyPrice 
+                  ? `✓ Save ${formatCurrency(monthlyPrice * 12 - yearlyPrice, currency)} per year`
+                  : `✓ Best Value Plan`
+                }
+              </Text>
             </TouchableOpacity>
 
             {/* Monthly Plan */}
             <TouchableOpacity
               style={[
-                styles.planOption,
-                selectedPlan === 'monthly' && styles.selectedPlan
+                styles.compactPlanOption,
+                selectedPlan === 'monthly' && styles.selectedCompactPlan
               ]}
               onPress={() => setSelectedPlan('monthly')}
             >
-              <Text style={styles.planName}>Monthly</Text>
+              <View style={styles.compactPlanHeader}>
+                <Text style={styles.compactPlanName}>Monthly</Text>
+                <Text style={styles.compactPlanSubtitle}>Flexible</Text>
+              </View>
               
-              {/* Show discounted price if promo code is valid */}
-              {promoValidation.valid && selectedPlan === 'monthly' && promoValidation.discountedPrice ? (
-                <View style={styles.priceContainer}>
-                  <Text style={[styles.planPrice, styles.originalPrice]}>
-                    {formatCurrency(monthlyPrice, currency)}
-                  </Text>
-                  <Text style={styles.planPrice}>
-                    {formatCurrency(promoValidation.discountedPrice, currency)}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.planPrice}>{formatCurrency(monthlyPrice, currency)}</Text>
-              )}
+              <View style={styles.compactPlanPriceRow}>
+                {promoValidation.valid && selectedPlan === 'monthly' && promoValidation.discountedPrice ? (
+                  <View style={styles.priceContainer}>
+                    <Text style={[styles.compactPlanPrice, styles.originalPrice]}>
+                      {formatCurrency(monthlyPrice, currency)}
+                    </Text>
+                    <Text style={styles.compactPlanPrice}>
+                      {formatCurrency(promoValidation.discountedPrice, currency)}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.compactPlanPrice}>{formatCurrency(monthlyPrice, currency)}</Text>
+                )}
+                
+                <Text style={styles.compactPlanPriceSubtext}>per month</Text>
+              </View>
               
-              <Text style={styles.planPriceSubtext}>per month</Text>
-              <Text style={styles.planBenefit}>Cancel anytime</Text>
+              <Text style={styles.compactPlanBenefit}>✓ Cancel anytime</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Promo Code */}
+        {/* Compact Promo Code - Fixed positioning */}
         {subscriptionConfig?.displayConfig.promoCodeEnabled && (
-          showPromoInput ? (
-            <View style={styles.promoSection}>
-              <View style={[
-                styles.promoInputContainer,
-                promoValidation.isValidating && styles.promoInputValidating,
-                promoValidation.valid && styles.promoInputValid,
-                promoValidation.error && styles.promoInputError
-              ]}>
-                <TextInput
-                  style={styles.promoInput}
-                  placeholder="Enter promo code"
-                  placeholderTextColor="rgba(255,255,255,0.6)"
-                  value={promoCode}
-                  onChangeText={setPromoCode}
-                  autoCapitalize="characters"
-                />
-                {promoValidation.isValidating && (
-                  <Text style={styles.promoStatus}>⏳</Text>
-                )}
-                {promoValidation.valid && (
-                  <Text style={styles.promoStatus}>✅</Text>
-                )}
-                {promoValidation.error && !promoValidation.isValidating && (
-                  <Text style={styles.promoStatus}>❌</Text>
-                )}
+          <View style={styles.compactPromoSection}>
+            {showPromoInput ? (
+              <View style={styles.compactPromoContainer}>
+                {/* Input Container */}
+                <View style={[
+                  styles.compactPromoInputContainer,
+                  promoValidation.isValidating && styles.promoInputValidating,
+                  promoValidation.valid && styles.promoInputValid,
+                  promoValidation.error && styles.promoInputError
+                ]}>
+                  <TextInput
+                    style={styles.compactPromoInput}
+                    placeholder="Enter promo code"
+                    placeholderTextColor="#999"
+                    value={promoCode}
+                    onChangeText={setPromoCode}
+                    autoCapitalize="characters"
+                  />
+                  {promoValidation.isValidating && (
+                    <Text style={styles.promoStatus}>⏳</Text>
+                  )}
+                  {promoValidation.valid && (
+                    <Text style={styles.promoStatus}>✅</Text>
+                  )}
+                  {promoValidation.error && !promoValidation.isValidating && (
+                    <Text style={styles.promoStatus}>❌</Text>
+                  )}
+                  <TouchableOpacity
+                    style={styles.compactPromoCloseButton}
+                    onPress={() => {
+                      setShowPromoInput(false);
+                      setPromoCode('');
+                      setPromoValidation({ valid: false });
+                    }}
+                  >
+                    <Text style={styles.promoCloseText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Apply Button - Outside the input container */}
                 <TouchableOpacity
-                  style={styles.promoCloseButton}
+                  style={styles.applyPromoButton}
                   onPress={() => {
-                    setShowPromoInput(false);
-                    setPromoCode('');
-                    setPromoValidation({ valid: false });
+                    // Trigger promo validation manually
+                    if (promoCode.trim()) {
+                      setPromoValidation({ valid: false, isValidating: true });
+                    }
                   }}
+                  disabled={!promoCode.trim() || promoValidation.isValidating}
                 >
-                  <Text style={styles.promoCloseText}>✕</Text>
+                  <Text style={styles.applyPromoText}>Apply</Text>
                 </TouchableOpacity>
-              </View>
-              
-              {/* Promo validation feedback */}
-              {promoValidation.valid && promoValidation.discountAmount && (
-                <View style={styles.promoSuccess}>
-                  <Text style={styles.promoSuccessText}>
-                    🎉 {formatCurrency(promoValidation.discountAmount, currency)} discount applied!
+                
+                {/* Compact Promo validation feedback */}
+                {promoValidation.valid && promoValidation.discountAmount && (
+                  <Text style={styles.compactPromoSuccessText}>
+                    🎉 {formatCurrency(promoValidation.discountAmount, currency)} off!
                   </Text>
-                </View>
-              )}
-              
-              {promoValidation.error && !promoValidation.isValidating && (
-                <View style={styles.promoError}>
-                  <Text style={styles.promoErrorText}>{promoValidation.error}</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.promoToggle}
-              onPress={() => setShowPromoInput(true)}
-            >
-              <Text style={styles.promoToggleText}>Have a promo code?</Text>
-            </TouchableOpacity>
-          )
+                )}
+                
+                {promoValidation.error && !promoValidation.isValidating && (
+                  <Text style={styles.compactPromoErrorText}>{promoValidation.error}</Text>
+                )}
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.compactPromoToggle}
+                onPress={() => setShowPromoInput(true)}
+              >
+                <Text style={styles.compactPromoToggleText}>🏷️ Have a promo code?</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         {/* Footer */}
@@ -600,7 +709,8 @@ export default function SubscriptionModal({
             Cancel anytime • Secure payment • 30-day guarantee
           </Text>
         </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </FullscreenModal>
   );
 }
@@ -608,52 +718,57 @@ export default function SubscriptionModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#667eea',
-    paddingHorizontal: 20,
-    justifyContent: 'space-between',
+    backgroundColor: 'white',
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 40, // Extra padding for keyboard
   },
   header: {
     paddingTop: 20,
+    paddingBottom: 16,
   },
   subtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
-    lineHeight: 22,
+    fontSize: 18,
+    color: '#333',
+    lineHeight: 24,
     textAlign: 'center',
     marginBottom: 24,
+    fontWeight: '500',
   },
   featuresGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 24,
   },
   featureChip: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: '#e9ecef',
   },
   featureChipText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '500',
+    color: '#B0004F',
+    fontSize: 13,
+    fontWeight: '600',
   },
   countdownContainer: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FF0000',
+    backgroundColor: '#B0004F',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#FFFFFF',
-    shadowColor: '#000000',
+    shadowColor: '#B0004F',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 10,
     position: 'absolute',
@@ -665,9 +780,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '900',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
     textAlign: 'center',
     includeFontPadding: false,
     lineHeight: 22,
@@ -676,9 +788,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 8,
     fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
     textAlign: 'center',
     marginTop: -2,
     includeFontPadding: false,
@@ -689,187 +798,488 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   planOptions: {
-    flexDirection: 'row',
     gap: 16,
   },
   planOption: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 2,
+    borderColor: '#e9ecef',
     position: 'relative',
-    minHeight: 160,
-    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   selectedPlan: {
-    borderColor: 'white',
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    transform: [{ scale: 1.02 }],
+    borderColor: '#B0004F',
+    backgroundColor: '#fff5f5',
+    shadowColor: '#B0004F',
+    shadowOpacity: 0.2,
   },
   planBadge: {
     position: 'absolute',
-    top: -8,
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    shadowColor: '#000',
+    top: -10,
+    right: 16,
+    backgroundColor: '#B0004F',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    shadowColor: '#B0004F',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   planBadgeText: {
-    color: '#667eea',
+    color: 'white',
     fontSize: 11,
     fontWeight: 'bold',
   },
-  planName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
+  planHeader: {
+    marginBottom: 16,
   },
-  planPrice: {
-    fontSize: 28,
+  planName: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#333',
     marginBottom: 4,
   },
-  planPriceSubtext: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 8,
-  },
-  planBenefit: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
+  planSubtitle: {
+    fontSize: 14,
+    color: '#666',
     fontWeight: '500',
   },
-  promoSection: {
+  planPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
     marginBottom: 16,
+  },
+  planPrice: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#B0004F',
+    flex: 1,
+  },
+  planPriceSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'right',
+  },
+  planBenefit: {
+    fontSize: 14,
+    color: '#28a745',
+    fontWeight: '600',
+    textAlign: 'center',
+    backgroundColor: '#f8fff8',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  promoSection: {
+    marginBottom: 20,
+  },
+  promoLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
   },
   promoInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'white',
     borderRadius: 12,
     paddingRight: 4,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: '#e9ecef',
   },
   promoInputValidating: {
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderColor: '#6c757d',
   },
   promoInputValid: {
-    borderColor: '#4CAF50',
-    backgroundColor: 'rgba(76,175,80,0.15)',
+    borderColor: '#28a745',
+    backgroundColor: '#f8fff8',
   },
   promoInputError: {
-    borderColor: '#F44336',
-    backgroundColor: 'rgba(244,67,54,0.15)',
+    borderColor: '#dc3545',
+    backgroundColor: '#fff5f5',
   },
   promoInput: {
     flex: 1,
-    padding: 12,
-    color: 'white',
-    fontSize: 14,
+    padding: 16,
+    color: '#333',
+    fontSize: 16,
   },
   promoStatus: {
-    fontSize: 16,
-    marginRight: 8,
+    fontSize: 18,
+    marginRight: 12,
   },
   promoCloseButton: {
-    padding: 8,
+    padding: 12,
     marginRight: 4,
   },
   promoCloseText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 16,
+    color: '#6c757d',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   promoToggle: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 16,
     marginBottom: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   promoToggleText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    textDecorationLine: 'underline',
+    color: '#B0004F',
+    fontSize: 15,
+    fontWeight: '600',
   },
   footer: {
     paddingBottom: Platform.OS === 'ios' ? 40 : 20,
   },
   subscribeButton: {
-    backgroundColor: 'white',
+    backgroundColor: '#B0004F',
     borderRadius: 16,
-    padding: 18,
+    padding: 20,
     alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
+    marginBottom: 16,
+    shadowColor: '#B0004F',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
   subscribeButtonDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: '#ccc',
   },
   subscribeButtonText: {
-    color: '#667eea',
+    color: 'white',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
   },
   loadingText: {
     fontSize: 16,
-    color: '#667eea',
+    color: '#B0004F',
     textAlign: 'center',
     marginTop: 20,
   },
   termsText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    color: '#666',
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   priceContainer: {
     alignItems: 'center',
   },
   originalPrice: {
     textDecorationLine: 'line-through',
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 18,
-    marginBottom: 2,
+    color: '#999',
+    fontSize: 20,
+    marginBottom: 4,
   },
   promoSuccess: {
-    backgroundColor: 'rgba(76,175,80,0.2)',
-    borderRadius: 8,
-    padding: 8,
-    marginTop: 8,
+    backgroundColor: '#f8fff8',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: '#28a745',
   },
   promoSuccessText: {
-    color: '#4CAF50',
-    fontSize: 12,
+    color: '#28a745',
+    fontSize: 14,
     textAlign: 'center',
     fontWeight: '600',
   },
   promoError: {
-    backgroundColor: 'rgba(244,67,54,0.2)',
-    borderRadius: 8,
-    padding: 8,
-    marginTop: 8,
+    backgroundColor: '#fff5f5',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
     borderWidth: 1,
-    borderColor: '#F44336',
+    borderColor: '#dc3545',
   },
   promoErrorText: {
-    color: '#F44336',
-    fontSize: 12,
+    color: '#dc3545',
+    fontSize: 14,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  // Header Banner Styles
+  headerBanner: {
+    backgroundColor: '#f8f9ff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e3e6ff',
+  },
+  bannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  bannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#B0004F',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  bannerEmoji: {
+    fontSize: 20,
+  },
+  bannerText: {
+    flex: 1,
+  },
+  bannerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 2,
+  },
+  bannerSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  compactFeaturesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  compactFeatureChip: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e3e6ff',
+  },
+  compactFeatureText: {
+    color: '#B0004F',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  // Compact Plan Styles
+  compactPlanSection: {
+    marginVertical: 16,
+  },
+  compactPlanOptions: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  compactPlanOption: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#e9ecef',
+    position: 'relative',
+    minHeight: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  selectedCompactPlan: {
+    borderColor: '#B0004F',
+    backgroundColor: '#fff5f5',
+  },
+  compactPlanBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 8,
+    backgroundColor: '#B0004F',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  compactPlanBadgeText: {
+    color: 'white',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  compactPlanHeader: {
+    marginBottom: 8,
+  },
+  compactPlanName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  compactPlanSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  compactPlanPriceRow: {
+    marginBottom: 12,
+  },
+  compactPlanPrice: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#B0004F',
+  },
+  compactPlanPriceSubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  compactPlanBenefit: {
+    fontSize: 10,
+    color: '#28a745',
+    fontWeight: '600',
+    textAlign: 'center',
+    backgroundColor: '#f8fff8',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  // Compact Promo Styles
+  compactPromoSection: {
+    marginBottom: 12,
+  },
+  compactPromoContainer: {
+    alignItems: 'center',
+  },
+  compactPromoInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    paddingRight: 4,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    width: '100%',
+    maxWidth: 280,
+    marginBottom: 12,
+  },
+  compactPromoInput: {
+    flex: 1,
+    padding: 10,
+    color: '#333',
+    fontSize: 14,
+  },
+  compactPromoCloseButton: {
+    padding: 8,
+  },
+  compactPromoToggle: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  compactPromoToggleText: {
+    color: '#B0004F',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  compactPromoSuccessText: {
+    color: '#28a745',
+    fontSize: 11,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  compactPromoErrorText: {
+    color: '#dc3545',
+    fontSize: 11,
+    textAlign: 'center',
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  applyPromoButton: {
+    backgroundColor: '#B0004F',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+    width: '100%',
+    maxWidth: 280,
+  },
+  applyPromoText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Enhanced Header Banner Styles
+  enhancedHeaderBanner: {
+    backgroundColor: '#f8f9ff',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e3e6ff',
+  },
+  enhancedBannerContent: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  enhancedBannerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  enhancedBannerSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  // Premium Features Container
+  premiumFeaturesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  featuresColumn: {
+    flex: 1,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  featureIcon: {
+    fontSize: 18,
+    marginRight: 10,
+    width: 24,
+    textAlign: 'center',
+  },
+  featureText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    flex: 1,
   },
 });

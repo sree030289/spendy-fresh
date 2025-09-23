@@ -55,17 +55,17 @@ class SubscriptionConfigService {
   private defaultConfig: SubscriptionConfig = {
     pricing: {
       monthly: {
-        price: 2.99,
+        price: 0.99,
         currency: 'USD'
       },
       yearly: {
-        price: 25.99,
+        price: 10.99,
         currency: 'USD',
-        monthlyEquivalent: 2.17
+        monthlyEquivalent: 0.92
       },
       savings: {
-        percentage: 28,
-        amount: 10.89
+        percentage: 8,
+        amount: 0.89
       }
     },
     features: {

@@ -221,7 +221,7 @@ export default function ExpenseDeletionModal({
               styles.balanceValue,
               { color: impact.currentBalance >= 0 ? theme.colors.success : theme.colors.error }
             ]}>
-              {getCurrencySymbol(expense?.currency || 'USD')}{Math.abs(impact.currentBalance).toFixed(2)}
+              {getCurrencySymbol(currentUser?.currency || 'USD')}{Math.abs(impact.currentBalance).toFixed(2)}
               {impact.currentBalance >= 0 ? ' owed to them' : ' they owe'}
             </Text>
           </View>
@@ -233,7 +233,7 @@ export default function ExpenseDeletionModal({
               styles.balanceValue,
               { color: impact.newBalance >= 0 ? theme.colors.success : theme.colors.error }
             ]}>
-              {getCurrencySymbol(expense?.currency || 'USD')}{Math.abs(impact.newBalance).toFixed(2)}
+              {getCurrencySymbol(currentUser?.currency || 'USD')}{Math.abs(impact.newBalance).toFixed(2)}
               {impact.newBalance >= 0 ? ' owed to them' : ' they owe'}
             </Text>
           </View>
@@ -247,7 +247,7 @@ export default function ExpenseDeletionModal({
           styles.impactAmount,
           { color: impact.impactAmount > 0 ? theme.colors.success : theme.colors.error }
         ]}>
-          {impact.impactAmount > 0 ? '+' : ''}{getCurrencySymbol(expense?.currency || 'USD')}{impact.impactAmount.toFixed(2)}
+          {impact.impactAmount > 0 ? '+' : ''}{getCurrencySymbol(currentUser?.currency || 'USD')}{impact.impactAmount.toFixed(2)}
         </Text>
       </View>
     </View>
@@ -279,7 +279,7 @@ export default function ExpenseDeletionModal({
                   {expense?.description}
                 </Text>
                 <Text style={[styles.expenseAmount, { color: theme.colors.text }]}>
-                  {getCurrencySymbol(expense?.currency || 'USD')}{expense?.amount.toFixed(2)}
+                  {getCurrencySymbol(currentUser?.currency || 'USD')}{expense?.amount.toFixed(2)}
                 </Text>
                 <Text style={[styles.expenseDate, { color: theme.colors.textSecondary }]}>
                   {expense?.date.toLocaleDateString()} • Paid by {expense?.paidByData.fullName}

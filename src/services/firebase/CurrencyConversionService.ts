@@ -26,7 +26,7 @@ class CurrencyConversionService {
     CAD: 1.25,
     CHF: 0.92,
     CNY: 6.45,
-    INR: 74.5,
+    INR: 83.5,
     BRL: 5.2,
     MXN: 20.1,
     KRW: 1180.0,
@@ -215,6 +215,8 @@ class CurrencyConversionService {
     const convertedAmount = usdAmount * toRate;
 
     console.log(`💱 Converting ${amount} ${from} to ${to}: ${convertedAmount.toFixed(2)}`);
+    console.log(`💱 Rates used - ${from}: ${fromRate}, ${to}: ${toRate}`);
+    console.log(`💱 Exchange rates available:`, Object.keys(this.exchangeRates).length > 0 ? this.exchangeRates : 'Using fallback rates');
     return convertedAmount;
   }
 
@@ -306,6 +308,41 @@ class CurrencyConversionService {
     const toRate = this.exchangeRates[to] || this.fallbackRates[to] || 1;
 
     return toRate / fromRate;
+  }
+
+  /**
+   * Clear cached exchange rates and use fresh fallback rates
+   */
+  clearCache(): void {
+    console.log('🧹 Clearing currency exchange cache, using updated fallback rates');
+    this.exchangeRates = { ...this.fallbackRates };
+    this.lastUpdated = new Date();
+    console.log('💱 Now using fallback rates:', this.exchangeRates);
+  }
+
+  /**
+   * Force clear all caches including Firebase and use only fallback rates
+   */
+  async forceClearAllCaches(): Promise<void> {
+    console.log('🗑️ Force clearing ALL currency caches');
+    this.exchangeRates = { ...this.fallbackRates };
+    this.lastUpdated = new Date();
+    
+    // Clear Firebase cache by setting lastUpdated to very old date
+    try {
+      const { getFirestore, doc, setDoc } = await import('firebase/firestore');
+      const db = getFirestore();
+      const currencyDoc = doc(db, 'appConfig', 'currencyRates');
+      await setDoc(currencyDoc, {
+        baseCurrency: this.baseCurrency,
+        exchangeRates: this.fallbackRates,
+        lastUpdated: new Date(2020, 0, 1), // Very old date to force refresh
+        source: 'fallback'
+      });
+      console.log('💾 Firebase currency cache cleared');
+    } catch (error) {
+      console.warn('Failed to clear Firebase currency cache:', error);
+    }
   }
 }
 

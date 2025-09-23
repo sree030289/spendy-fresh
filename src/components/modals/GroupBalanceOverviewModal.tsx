@@ -149,7 +149,7 @@ export default function GroupBalanceOverviewModal({
     try {
       Alert.alert(
         'Mark Payment as Complete',
-        `Confirm that ${suggestion.fromUserName} has paid ${getCurrencySymbol(currency)}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}?`,
+        `Confirm that ${suggestion.fromUserName} has paid ${getCurrencySymbol(user?.currency || 'USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -252,7 +252,7 @@ export default function GroupBalanceOverviewModal({
                         
                         <View style={styles.amountContainer}>
                           <Text style={[styles.simpleAmount, { color: theme.colors.success }]}>
-                            {getCurrencySymbol(currency)}{suggestion.amount.toFixed(0)}
+                            {getCurrencySymbol(user?.currency || 'USD')}{suggestion.amount.toFixed(0)}
                           </Text>
                         </View>
                         
