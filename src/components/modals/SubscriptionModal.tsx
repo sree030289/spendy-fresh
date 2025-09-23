@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import SubscriptionConfigService, { SubscriptionConfig } from '@/services/firebase/SubscriptionConfigService';
+import CouponService, { CouponValidationResult } from '@/services/firebase/CouponService';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/utils/currency';
 
@@ -49,13 +50,9 @@ export default function SubscriptionModal({
   const [countdown, setCountdown] = useState(autoCloseAfter || 0);
   const [loading, setLoading] = useState(false);
   
-  // Real-time promo code validation
-  const [promoValidation, setPromoValidation] = useState<{
-    valid: boolean;
-    error?: string;
-    discountedPrice?: number;
+  // Real-time coupon code validation
+  const [promoValidation, setPromoValidation] = useState<CouponValidationResult & {
     originalPrice?: number;
-    discountAmount?: number;
     isValidating?: boolean;
   }>({ valid: false });
   
@@ -185,18 +182,18 @@ export default function SubscriptionModal({
       setPromoValidation({ valid: false, isValidating: true });
 
       try {
-        const { default: PromoCodeService } = await import('@/services/PromoCodeService');
-        const promoService = PromoCodeService.getInstance();
+        // Use new CouponService for validation
+        const couponService = CouponService.getInstance();
+        await couponService.initialize();
         
         // Get current pricing
         const pricing = getCurrentPricing();
         const currentPrice = selectedPlan === 'yearly' ? pricing.yearlyPrice : pricing.monthlyPrice;
         
-        const validation = await promoService.validatePromoCode(
-          promoCode,
+        const validation = await couponService.validateCoupon(
+          promoCode.trim(),
           selectedPlan,
           currentPrice,
-          user.id,
           pricing.currency
         );
         
@@ -204,8 +201,9 @@ export default function SubscriptionModal({
           valid: validation.valid,
           error: validation.error,
           discountedPrice: validation.discountedPrice,
-          originalPrice: validation.originalPrice,
+          originalPrice: currentPrice,
           discountAmount: validation.discountAmount,
+          coupon: validation.coupon,
           isValidating: false
         });
         
@@ -220,8 +218,8 @@ export default function SubscriptionModal({
       }
     };
 
-    // Debounce validation
-    const timeoutId = setTimeout(validatePromoCode, 500);
+    // Debounce validation - increased to reduce flickering
+    const timeoutId = setTimeout(validatePromoCode, 1000);
     return () => clearTimeout(timeoutId);
   }, [promoCode, selectedPlan, user?.id, subscriptionConfig]);
 
@@ -548,13 +546,13 @@ export default function SubscriptionModal({
               </View>
               
               <View style={styles.compactPlanPriceRow}>
-                {promoValidation.valid && selectedPlan === 'yearly' && promoValidation.discountedPrice ? (
+                {promoValidation.valid && selectedPlan === 'yearly' && promoValidation.discountedPrice !== undefined ? (
                   <View style={styles.priceContainer}>
                     <Text style={[styles.compactPlanPrice, styles.originalPrice]}>
                       {formatCurrency(yearlyPrice, currency)}
                     </Text>
                     <Text style={styles.compactPlanPrice}>
-                      {formatCurrency(promoValidation.discountedPrice, currency)}
+                      {promoValidation.discountedPrice === 0 ? 'FREE' : formatCurrency(promoValidation.discountedPrice, currency)}
                     </Text>
                   </View>
                 ) : (
@@ -586,13 +584,13 @@ export default function SubscriptionModal({
               </View>
               
               <View style={styles.compactPlanPriceRow}>
-                {promoValidation.valid && selectedPlan === 'monthly' && promoValidation.discountedPrice ? (
+                {promoValidation.valid && selectedPlan === 'monthly' && promoValidation.discountedPrice !== undefined ? (
                   <View style={styles.priceContainer}>
                     <Text style={[styles.compactPlanPrice, styles.originalPrice]}>
                       {formatCurrency(monthlyPrice, currency)}
                     </Text>
                     <Text style={styles.compactPlanPrice}>
-                      {formatCurrency(promoValidation.discountedPrice, currency)}
+                      {promoValidation.discountedPrice === 0 ? 'FREE' : formatCurrency(promoValidation.discountedPrice, currency)}
                     </Text>
                   </View>
                 ) : (
@@ -625,7 +623,8 @@ export default function SubscriptionModal({
                     placeholderTextColor="#999"
                     value={promoCode}
                     onChangeText={setPromoCode}
-                    autoCapitalize="characters"
+                    autoCapitalize="none"
+                    autoCorrect={false}
                   />
                   {promoValidation.isValidating && (
                     <Text style={styles.promoStatus}>⏳</Text>
@@ -651,21 +650,35 @@ export default function SubscriptionModal({
                 {/* Apply Button - Outside the input container */}
                 <TouchableOpacity
                   style={styles.applyPromoButton}
-                  onPress={() => {
-                    // Trigger promo validation manually
-                    if (promoCode.trim()) {
+                  onPress={async () => {
+                    if (promoCode.trim() && promoValidation.valid) {
+                      try {
+                        const couponService = CouponService.getInstance();
+                        const applied = await couponService.applyCoupon(promoCode.trim());
+                        
+                        if (applied) {
+                          console.log(`✅ Coupon ${promoCode.trim()} applied successfully`);
+                          // You might want to show a success message here
+                        }
+                      } catch (error) {
+                        console.error('❌ Error applying coupon:', error);
+                      }
+                    } else if (promoCode.trim()) {
+                      // Trigger validation manually if not validated yet
                       setPromoValidation({ valid: false, isValidating: true });
                     }
                   }}
                   disabled={!promoCode.trim() || promoValidation.isValidating}
                 >
-                  <Text style={styles.applyPromoText}>Apply</Text>
+                  <Text style={styles.applyPromoText}>
+                    {promoValidation.valid ? 'Apply' : 'Validate'}
+                  </Text>
                 </TouchableOpacity>
                 
                 {/* Compact Promo validation feedback */}
-                {promoValidation.valid && promoValidation.discountAmount && (
+                {promoValidation.valid && promoValidation.coupon && (
                   <Text style={styles.compactPromoSuccessText}>
-                    🎉 {formatCurrency(promoValidation.discountAmount, currency)} off!
+                    🎉 {promoValidation.coupon.discountPercent}% OFF - Save {formatCurrency(promoValidation.discountAmount || 0, currency)}!
                   </Text>
                 )}
                 

@@ -1,0 +1,42 @@
+{
+  "appConfig": {
+    "couponCodes": {
+      "MeetnSplit30": {
+        "code": "MeetnSplit30",
+        "discountPercent": 30,
+        "discountType": "percentage",
+        "isActive": true,
+        "description": "30% off subscription",
+        "validUntil": "2025-12-31T23:59:59.000Z",
+        "usageLimit": null,
+        "usageCount": 0,
+        "applicableToPlans": ["monthly", "yearly"],
+        "createdAt": "2025-09-23T00:00:00.000Z"
+      },
+      "MeetnSplit50": {
+        "code": "MeetnSplit50",
+        "discountPercent": 50,
+        "discountType": "percentage",
+        "isActive": true,
+        "description": "50% off subscription",
+        "validUntil": "2025-12-31T23:59:59.000Z",
+        "usageLimit": 100,
+        "usageCount": 0,
+        "applicableToPlans": ["monthly", "yearly"],
+        "createdAt": "2025-09-23T00:00:00.000Z"
+      },
+      "MeetnSplit100": {
+        "code": "MeetnSplit100",
+        "discountPercent": 100,
+        "discountType": "percentage",
+        "isActive": true,
+        "description": "100% off subscription - Free trial",
+        "validUntil": "2025-12-31T23:59:59.000Z",
+        "usageLimit": 50,
+        "usageCount": 0,
+        "applicableToPlans": ["monthly", "yearly"],
+        "createdAt": "2025-09-23T00:00:00.000Z"
+      }
+    }
+  }
+}

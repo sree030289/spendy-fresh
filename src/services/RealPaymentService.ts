@@ -60,12 +60,12 @@ class RealPaymentService {
   // Product identifiers for App Store and Play Store
   private readonly PRODUCT_IDS = {
     monthly: Platform.select({
-      ios: 'com.svaag.letssplit.monthly',
-      android: 'letssplit_monthly_subscription',
+      ios: 'com.svaag.meetnsplit.monthly',
+      android: 'meetnsplit_monthly_subscription',
     }) || '',
     yearly: Platform.select({
-      ios: 'com.svaag.letssplit.yearly',
-      android: 'letssplit_yearly_subscription',
+      ios: 'com.svaag.meetnsplit.yearly',
+      android: 'meetnsplit_yearly_subscription',
     }) || '',
   };
 
