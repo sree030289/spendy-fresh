@@ -1,0 +1,8 @@
+CREATE TABLE unified_invites (
+    id SERIAL PRIMARY KEY,
+    inviter_id INT NOT NULL,
+    invitee_phone VARCHAR(15) NOT NULL,
+    invite_status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
