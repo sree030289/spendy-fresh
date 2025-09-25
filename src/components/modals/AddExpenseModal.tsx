@@ -1,5 +1,5 @@
 // Complete src/components/modals/AddExpenseModal.tsx with validation and fixed custom split
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Platform,
   Keyboard,
   Image,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Icon } from '../common/Icon';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -69,6 +70,9 @@ export default function AddExpenseModal({
   const [loading, setLoading] = useState(false);
   const [isSwipeActive, setIsSwipeActive] = useState(false);
   
+  // Ref for scrolling to Notes section
+  const scrollViewRef = useRef<ScrollView>(null);
+  
   // Safety checks for props
   const safeGroups = Array.isArray(groups) ? groups : [];
   const safeFriends = Array.isArray(friends) ? friends : [];
@@ -84,6 +88,9 @@ export default function AddExpenseModal({
   const [notes, setNotes] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Local input states to prevent clearing while typing
+  const [localSplitInputs, setLocalSplitInputs] = useState<{[key: string]: string}>({});
 
   // Receipt scanning
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
@@ -128,6 +135,9 @@ export default function AddExpenseModal({
     setExpenseDate(new Date());
     setErrors({});
     setActiveStep('details');
+    
+    // Reset local input states
+    setLocalSplitInputs({});
     
     // Reset receipt scanning
     setReceiptImage(null);
@@ -394,6 +404,32 @@ const initializeSplitData = () => {
           : split
       );
     });
+  };
+
+  // Handle text input for custom amounts
+  const handleCustomAmountInput = (userId: string, text: string) => {
+    // Update local input state immediately for smooth typing
+    setLocalSplitInputs(prev => ({
+      ...prev,
+      [userId]: text
+    }));
+    
+    // Update split data with parsed number
+    const newAmount = parseFloat(text) || 0;
+    updateSplitAmount(userId, newAmount);
+  };
+
+  // Handle text input for percentage amounts
+  const handlePercentageInput = (userId: string, text: string) => {
+    // Update local input state immediately for smooth typing
+    setLocalSplitInputs(prev => ({
+      ...prev,
+      [`${userId}_percentage`]: text
+    }));
+    
+    // Update split data with parsed number
+    const newPercentage = parseFloat(text) || 0;
+    updateSplitPercentage(userId, newPercentage);
   };
 
   const toggleSplitInclusion = (userId: string) => {
@@ -864,7 +900,19 @@ const initializeSplitData = () => {
   };
 
   const renderDetailsStep = () => (
-    <ScrollView contentContainerStyle={styles.stepContent}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 140 : 20}
+    >
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={[styles.stepContent, { paddingBottom: 100 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets={false}
+        contentInsetAdjustmentBehavior="automatic"
+      >
       {/* Receipt Scanning Section */}
       <View style={styles.inputContainer}>
         <View style={styles.scanReceiptHeader}>
@@ -939,6 +987,12 @@ const initializeSplitData = () => {
             setDescription(text);
             if (errors.description) setErrors((prev: any) => ({ ...prev, description: '' }));
           }}
+          onFocus={() => {
+            // Scroll to make description field visible
+            setTimeout(() => {
+              scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+            }, 100);
+          }}
           maxLength={100}
         />
         {errors.description && (
@@ -970,6 +1024,12 @@ const initializeSplitData = () => {
             onChangeText={(text) => {
               setAmount(text);
               if (errors.amount) setErrors((prev: any) => ({ ...prev, amount: '' }));
+            }}
+            onFocus={() => {
+              // Scroll to make amount field visible above keypad
+              setTimeout(() => {
+                scrollViewRef.current?.scrollTo({ y: 200, animated: true });
+              }, 100);
             }}
             keyboardType="numeric"
             returnKeyType="done"
@@ -1169,12 +1229,22 @@ const initializeSplitData = () => {
           placeholderTextColor={theme.colors.textSecondary}
           value={notes}
           onChangeText={setNotes}
+          onFocus={() => {
+            // Scroll to bottom when Notes field is focused
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+          }}
           multiline
           numberOfLines={3}
           maxLength={500}
+          returnKeyType="done"
+          onSubmitEditing={() => Keyboard.dismiss()}
+          blurOnSubmit={true}
         />
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 
   const renderSplitStep = () => (
@@ -1190,6 +1260,7 @@ const initializeSplitData = () => {
             ]}
             onPress={() => {
               setSplitType('equal');
+              setLocalSplitInputs({}); // Clear local inputs
               recalculateEqual();
             }}
           >
@@ -1210,7 +1281,10 @@ const initializeSplitData = () => {
               styles.splitTypeOption,
               splitType === 'custom' && [styles.selectedSplitType, { backgroundColor: theme.colors.primary + '20' }]
             ]}
-            onPress={() => setSplitType('custom')}
+            onPress={() => {
+              setSplitType('custom');
+              setLocalSplitInputs({}); // Clear local inputs
+            }}
           >
             <Icon name="calculator"
               size={24}
@@ -1229,7 +1303,10 @@ const initializeSplitData = () => {
               styles.splitTypeOption,
               splitType === 'percentage' && [styles.selectedSplitType, { backgroundColor: theme.colors.primary + '20' }]
             ]}
-            onPress={() => setSplitType('percentage')}
+            onPress={() => {
+              setSplitType('percentage');
+              setLocalSplitInputs({}); // Clear local inputs
+            }}
           >
             <Icon
               name="pie-chart"
@@ -1319,10 +1396,16 @@ const initializeSplitData = () => {
                       borderColor: theme.colors.border,
                       backgroundColor: theme.colors.background
                     }]}
-                    value={split.amount.toFixed(2)}
-                    onChangeText={(text) => {
-                      const newAmount = parseFloat(text) || 0;
-                      updateSplitAmount(split.userId, newAmount);
+                    value={localSplitInputs[split.userId] !== undefined ? localSplitInputs[split.userId] : split.amount.toFixed(2)}
+                    onChangeText={(text) => handleCustomAmountInput(split.userId, text)}
+                    onFocus={() => {
+                      // Initialize local input when focused
+                      if (localSplitInputs[split.userId] === undefined) {
+                        setLocalSplitInputs(prev => ({
+                          ...prev,
+                          [split.userId]: split.amount.toFixed(2)
+                        }));
+                      }
                     }}
                     keyboardType="numeric"
                     returnKeyType="done"
@@ -1336,15 +1419,23 @@ const initializeSplitData = () => {
                   <View style={styles.percentageContainer}>
                     <TextInput
                       style={[styles.splitPercentageInput, { color: theme.colors.text }]}
-                      value={split.percentage.toFixed(1)}
-                      onChangeText={(text) => {
-                        const newPercentage = parseFloat(text) || 0;
-                        updateSplitPercentage(split.userId, newPercentage);
+                      value={localSplitInputs[`${split.userId}_percentage`] !== undefined ? localSplitInputs[`${split.userId}_percentage`] : split.percentage.toFixed(1)}
+                      onChangeText={(text) => handlePercentageInput(split.userId, text)}
+                      onFocus={() => {
+                        // Initialize local input when focused
+                        if (localSplitInputs[`${split.userId}_percentage`] === undefined) {
+                          setLocalSplitInputs(prev => ({
+                            ...prev,
+                            [`${split.userId}_percentage`]: split.percentage.toFixed(1)
+                          }));
+                        }
                       }}
                       keyboardType="numeric"
                       returnKeyType="done"
                       onSubmitEditing={() => Keyboard.dismiss()}
                       blurOnSubmit={true}
+                      placeholder="0.0"
+                      placeholderTextColor={theme.colors.textSecondary}
                     />
                     <Text style={[styles.percentageSymbol, { color: theme.colors.textSecondary }]}>%</Text>
                   </View>

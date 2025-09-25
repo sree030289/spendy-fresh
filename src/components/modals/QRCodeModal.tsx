@@ -456,14 +456,7 @@ const handleScannerClose = useCallback(() => {
         <Text style={[styles.shareOptionText, { color: theme.colors.text }]}>SMS</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.shareOption, { backgroundColor: theme.colors.surface }]}
-        onPress={handleSendWhatsApp}
-        disabled={loading}
-      >
-        <Icon name="send" size={24} color="#25D366" />
-        <Text style={[styles.shareOptionText, { color: theme.colors.text }]}>WhatsApp</Text>
-      </TouchableOpacity>
+
 
       <TouchableOpacity
         style={[styles.shareOption, { backgroundColor: theme.colors.surface }]}

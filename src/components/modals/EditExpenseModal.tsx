@@ -9,6 +9,8 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Keyboard,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Icon } from '../common/Icon';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -71,6 +73,9 @@ export default function EditExpenseModal({
   const isInitialized = useRef(false);
   const currentExpenseId = useRef<string | null>(null);
   
+  // Ref for scrolling to Notes section
+  const scrollViewRef = useRef<ScrollView>(null);
+  
   // Form data - exactly like AddExpenseModal
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -82,6 +87,9 @@ export default function EditExpenseModal({
   const [notes, setNotes] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // Local input states to prevent clearing while typing
+  const [localSplitInputs, setLocalSplitInputs] = useState<{[key: string]: string}>({});
   
   // Errors
   const [errors, setErrors] = useState<any>({});
@@ -444,38 +452,43 @@ export default function EditExpenseModal({
   };
 
 const updateSplitAmount = (userId: string, newAmount: number) => {
-    const totalAmount = parseFloat(amount);
-    
     setSplitData(prev => {
-      const updated = prev.map(split => 
+      return prev.map(split => 
         split.userId === userId 
-          ? { ...split, amount: newAmount }
+          ? { 
+              ...split, 
+              amount: newAmount,
+              percentage: parseFloat(amount) > 0 ? (newAmount / parseFloat(amount)) * 100 : 0
+            }
           : split
       );
-      
-      // Auto-adjust remaining amounts for custom split
-      if (splitType === 'custom') {
-        const otherIncludedSplits = updated.filter(s => s.userId !== userId && s.isIncluded);
-        
-        if (otherIncludedSplits.length > 0) {
-          const remainingAmount = totalAmount - newAmount;
-          const amountPerOther = remainingAmount / otherIncludedSplits.length;
-          
-          return updated.map(split => {
-            if (split.userId !== userId && split.isIncluded) {
-              return { 
-                ...split, 
-                amount: Math.max(0, amountPerOther),
-                percentage: totalAmount > 0 ? (amountPerOther / totalAmount) * 100 : 0
-              };
-            }
-            return split;
-          });
-        }
-      }
-      
-      return updated;
     });
+  };
+
+  // Handle text input for custom amounts
+  const handleCustomAmountInput = (userId: string, text: string) => {
+    // Update local input state immediately for smooth typing
+    setLocalSplitInputs(prev => ({
+      ...prev,
+      [userId]: text
+    }));
+    
+    // Update split data with parsed number
+    const newAmount = parseFloat(text) || 0;
+    updateSplitAmount(userId, newAmount);
+  };
+
+  // Handle text input for percentage amounts
+  const handlePercentageInput = (userId: string, text: string) => {
+    // Update local input state immediately for smooth typing
+    setLocalSplitInputs(prev => ({
+      ...prev,
+      [`${userId}_percentage`]: text
+    }));
+    
+    // Update split data with parsed number
+    const newPercentage = parseFloat(text) || 0;
+    updateSplitPercentage(userId, newPercentage);
   };
 
 const updateSplitPercentage = (userId: string, percentage: number) => {
@@ -641,7 +654,19 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
   );
 
   const renderDetailsStep = () => (
-    <ScrollView contentContainerStyle={styles.stepContent}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 140 : 20}
+    >
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={[styles.stepContent, { paddingBottom: 100 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets={false}
+        contentInsetAdjustmentBehavior="automatic"
+      >
       {/* Description */}
       <View style={styles.inputContainer}>
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>What was this expense for? *</Text>
@@ -660,6 +685,12 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
           onChangeText={(text) => {
             setDescription(text);
             if (errors.description) setErrors((prev: any) => ({ ...prev, description: '' }));
+          }}
+          onFocus={() => {
+            // Scroll to make description field visible
+            setTimeout(() => {
+              scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+            }, 100);
           }}
           maxLength={100}
         />
@@ -692,6 +723,12 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
             onChangeText={(text) => {
               setAmount(text);
               if (errors.amount) setErrors((prev: any) => ({ ...prev, amount: '' }));
+            }}
+            onFocus={() => {
+              // Scroll to make amount field visible above keypad
+              setTimeout(() => {
+                scrollViewRef.current?.scrollTo({ y: 200, animated: true });
+              }, 100);
             }}
             keyboardType="decimal-pad"
           />
@@ -851,12 +888,22 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
           placeholderTextColor={theme.colors.textSecondary}
           value={notes}
           onChangeText={setNotes}
+          onFocus={() => {
+            // Scroll to bottom when Notes field is focused
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+          }}
           multiline
           numberOfLines={3}
           maxLength={500}
+          returnKeyType="done"
+          onSubmitEditing={() => Keyboard.dismiss()}
+          blurOnSubmit={true}
         />
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 
   const renderSplitStep = () => (
@@ -872,6 +919,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
             ]}
             onPress={() => {
               setSplitType('equal');
+              setLocalSplitInputs({}); // Clear local inputs
               recalculateEqual();
             }}
           >
@@ -892,7 +940,10 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
               styles.splitTypeOption,
               splitType === 'custom' && [styles.selectedSplitType, { backgroundColor: theme.colors.primary + '20' }]
             ]}
-            onPress={() => setSplitType('custom')}
+            onPress={() => {
+              setSplitType('custom');
+              setLocalSplitInputs({}); // Clear local inputs
+            }}
           >
             <Icon name="calculator"
               size={24}
@@ -911,7 +962,10 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
               styles.splitTypeOption,
               splitType === 'percentage' && [styles.selectedSplitType, { backgroundColor: theme.colors.primary + '20' }]
             ]}
-            onPress={() => setSplitType('percentage')}
+            onPress={() => {
+              setSplitType('percentage');
+              setLocalSplitInputs({}); // Clear local inputs
+            }}
           >
             <Icon
               name="pie-chart"
@@ -982,24 +1036,46 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
                 {splitType === 'custom' && (
                   <TextInput
                     style={[styles.splitAmountInput, { color: theme.colors.text }]}
-                    value={split.amount.toFixed(2)}
-                    onChangeText={(text) => {
-                      const newAmount = parseFloat(text) || 0;
-                      updateSplitAmount(split.userId, newAmount);
+                    value={localSplitInputs[split.userId] !== undefined ? localSplitInputs[split.userId] : split.amount.toFixed(2)}
+                    onChangeText={(text) => handleCustomAmountInput(split.userId, text)}
+                    onFocus={() => {
+                      // Initialize local input when focused
+                      if (localSplitInputs[split.userId] === undefined) {
+                        setLocalSplitInputs(prev => ({
+                          ...prev,
+                          [split.userId]: split.amount.toFixed(2)
+                        }));
+                      }
                     }}
                     keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={() => Keyboard.dismiss()}
+                    blurOnSubmit={true}
+                    placeholder="0.00"
+                    placeholderTextColor={theme.colors.textSecondary}
                   />
                 )}
                 {splitType === 'percentage' && (
                   <View style={styles.percentageContainer}>
                     <TextInput
                       style={[styles.splitPercentageInput, { color: theme.colors.text }]}
-                      value={(split.percentage || 0).toFixed(1)}
-                      onChangeText={(text) => {
-                        const newPercentage = parseFloat(text) || 0;
-                        updateSplitPercentage(split.userId, newPercentage);
+                      value={localSplitInputs[`${split.userId}_percentage`] !== undefined ? localSplitInputs[`${split.userId}_percentage`] : (split.percentage || 0).toFixed(1)}
+                      onChangeText={(text) => handlePercentageInput(split.userId, text)}
+                      onFocus={() => {
+                        // Initialize local input when focused
+                        if (localSplitInputs[`${split.userId}_percentage`] === undefined) {
+                          setLocalSplitInputs(prev => ({
+                            ...prev,
+                            [`${split.userId}_percentage`]: (split.percentage || 0).toFixed(1)
+                          }));
+                        }
                       }}
                       keyboardType="decimal-pad"
+                      returnKeyType="done"
+                      onSubmitEditing={() => Keyboard.dismiss()}
+                      blurOnSubmit={true}
+                      placeholder="0.0"
+                      placeholderTextColor={theme.colors.textSecondary}
                     />
                     <Text style={[styles.percentageSymbol, { color: theme.colors.textSecondary }]}>%</Text>
                   </View>

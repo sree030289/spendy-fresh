@@ -226,22 +226,7 @@ export default function RemindModal({
             <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.optionButton, { backgroundColor: theme.colors.surface }]}
-            onPress={() => handleSendReminder('whatsapp')}
-            disabled={isSending}
-          >
-            <Icon name="send" size={24} color="#25D366" />
-            <View style={styles.optionContent}>
-              <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
-                Send WhatsApp
-              </Text>
-              <Text style={[styles.optionSubtitle, { color: theme.colors.textSecondary }]}>
-                Send a WhatsApp message
-              </Text>
-            </View>
-            <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
-          </TouchableOpacity>
+
 
           <TouchableOpacity
             style={[styles.optionButton, { backgroundColor: theme.colors.surface }]}
