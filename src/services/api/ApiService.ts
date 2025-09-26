@@ -1172,6 +1172,158 @@ class ApiService {
     const response = await this.request('POST', '/notifications/payment-reminder', data);
     return response;
   }
+
+  // ========================
+  // UNIFIED INVITE SYSTEM
+  // ========================
+  
+  /**
+   * Create a unified invite (SMS/Email for registered/unregistered users)
+   */
+  async createUnifiedInvite(inviteData: {
+    inviterId: string;
+    recipientPhone?: string;
+    recipientEmail?: string;
+    countryCode?: string; // Required for SMS invites
+    message?: string;
+    sentVia: 'SMS' | 'EMAIL' | 'PUSH' | 'QR';
+    autoAccept?: boolean;
+  }): Promise<any> {
+    const response = await this.request('POST', '/invites/unified', inviteData);
+    return response;
+  }
+
+  /**
+   * Get invite by ID
+   */
+  async getUnifiedInvite(inviteId: string): Promise<any> {
+    const response = await this.request('GET', `/invites/unified/${inviteId}`);
+    return response;
+  }
+
+  /**
+   * Accept a unified invite
+   */
+  async acceptUnifiedInvite(inviteId: string): Promise<any> {
+    const response = await this.request('POST', `/invites/unified/${inviteId}/accept`);
+    return response;
+  }
+
+  /**
+   * Decline a unified invite
+   */
+  async declineUnifiedInvite(inviteId: string): Promise<any> {
+    const response = await this.request('POST', `/invites/unified/${inviteId}/decline`);
+    return response;
+  }
+
+  /**
+   * Find pending invites by phone number and email
+   */
+  async findPendingInvites(phoneNumber?: string, email?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (phoneNumber) params.append('phone', phoneNumber);
+    if (email) params.append('email', email);
+    
+    const response = await this.request('GET', `/invites/unified/pending?${params.toString()}`);
+    return response;
+  }
+
+  /**
+   * Check for pending invites during user registration
+   */
+  async checkPendingInvitesOnRegistration(data: {
+    userId: string;
+    phoneNumber: string;
+    email: string;
+    countryCode?: string;
+  }): Promise<any> {
+    try {
+      // Make direct API call to get full response structure
+      const options: RequestInit = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      };
+
+      console.log(`🌐 API Request: POST /invites/unified/check-registration`);
+      
+      const response = await fetch(`${this.baseURL}/invites/unified/check-registration`, options);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ API Response: /invites/unified/check-registration`, result.success ? 'Success' : 'Failed');
+      
+      return result; // Return the full response object with hasPendingInvites etc.
+    } catch (error) {
+      console.error('❌ Check registration invites error:', error);
+      return {
+        success: false,
+        hasPendingInvites: false,
+        invites: [],
+        autoAcceptedCount: 0,
+        newFriendships: [],
+        message: 'Failed to check pending invites'
+      };
+    }
+  }
+
+  /**
+   * Search for users by phone number or email (for invite system)
+   */
+  async searchUsersByContact(query: string): Promise<any> {
+    const response = await this.request('GET', `/users/search-contact?q=${encodeURIComponent(query)}`);
+    return response;
+  }
+
+  /**
+   * Create friendship between two users
+   */
+  async createFriendship(userId1: string, userId2: string): Promise<any> {
+    const response = await this.request('POST', '/friends/create-friendship', {
+      userId1,
+      userId2
+    });
+    return response;
+  }
+
+  /**
+   * Get invite statistics for a user
+   */
+  async getInviteStats(userId: string): Promise<any> {
+    const response = await this.request('GET', `/invites/unified/stats/${userId}`);
+    return response;
+  }
+
+  /**
+   * Resend an invite
+   */
+  async resendUnifiedInvite(inviteId: string): Promise<any> {
+    const response = await this.request('POST', `/invites/unified/${inviteId}/resend`);
+    return response;
+  }
+
+  /**
+   * Cancel an invite
+   */
+  async cancelUnifiedInvite(inviteId: string): Promise<any> {
+    const response = await this.request('DELETE', `/invites/unified/${inviteId}`);
+    return response;
+  }
+
+  /**
+   * Get all invites for a user (sent and received)
+   */
+  async getUserInvites(userId: string, type?: 'sent' | 'received'): Promise<any> {
+    const params = type ? `?type=${type}` : '';
+    const response = await this.request('GET', `/invites/unified/user/${userId}${params}`);
+    return response;
+  }
 }
 
 export default ApiService;

@@ -60,7 +60,7 @@ You agree not to:
 - You grant us permission to access transaction data for service functionality
 
 6. PAYMENT PROCESSING
-- Spendy facilitates payment tracking but does not process actual payments
+- Meet-n-Split facilitates payment tracking but does not process actual payments
 - Users are responsible for their own payment arrangements
 - We are not liable for payment disputes between users
 
@@ -74,7 +74,7 @@ Your privacy is important to us. Please review our Privacy Policy to understand 
 - We may change subscription prices with notice
 
 9. INTELLECTUAL PROPERTY
-- The Service and its content are owned by Spendy Inc.
+- The Service and its content are owned by Meet-n-Split Inc.
 - You retain ownership of content you create
 - You grant us a license to use your content for service operation
 
@@ -84,7 +84,7 @@ Your privacy is important to us. Please review our Privacy Policy to understand 
 - We are not responsible for financial decisions based on our Service
 
 11. LIMITATION OF LIABILITY
-In no event shall Spendy Inc. be liable for any indirect, incidental, special, consequential, or punitive damages.
+In no event shall Meet-n-Split Inc. be liable for any indirect, incidental, special, consequential, or punitive damages.
 
 12. TERMINATION
 We may terminate or suspend your account at any time for violations of these Terms.
@@ -98,9 +98,9 @@ These Terms are governed by the laws of the State of California, United States.
 15. CONTACT INFORMATION
 If you have questions about these Terms, please contact us at:
 Email: admin@meetnsplit.com
-Address: Spendy Inc., Trugnaina, Victoria
+Address: Meet-n-Split Inc., Trugnaina, Victoria
 
-By using Spendy, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+By using Meet-n-Split, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
   `;
 
   const privacyContent = `
@@ -108,7 +108,7 @@ PRIVACY POLICY
 
 Last updated: ${new Date().toLocaleDateString()}
 
-Spendy Inc. ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and services.
+Meet-n-Split Inc. ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and services.
 
 1. INFORMATION WE COLLECT
 
@@ -226,7 +226,7 @@ We may update this Privacy Policy periodically. We will notify you of material c
 
 For privacy-related questions or requests:
 Email: admin@meetnsplit.com
-Address: Spendy Inc., 123 Finance Street, San Francisco, CA 94105
+Address: Meet-n-Split Inc., 123 Finance Street, San Francisco, CA 94105
 
 Data Protection Officer: admin@meetnsplit.com
 

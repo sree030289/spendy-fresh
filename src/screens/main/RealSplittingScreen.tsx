@@ -1888,7 +1888,7 @@ export default function RealSplittingScreen() {
         
         if (success) {
           if (isNewUser) {
-            showAnimatedSuccess('Invitation Sent! 📧', message || 'User will receive an email invitation to join Spendy');
+            showAnimatedSuccess('Invitation Sent! 📧', message || 'User will receive an email invitation to join Meet-n-Split');
           } else {
             showAnimatedSuccess('Friend Request Sent! 🤝', message || 'Friend request sent successfully! They will be notified.');
           }
@@ -1911,7 +1911,7 @@ export default function RealSplittingScreen() {
           const contactNames = contacts.map(c => c.name || 'Friend').join(', ');
           showAnimatedSuccess(
             'Invitation Sent!', 
-            `${method.toUpperCase()} invitation${contacts.length > 1 ? 's' : ''} sent to ${contactNames}. They'll appear in your friends list once they join Spendy.`
+            `${method.toUpperCase()} invitation${contacts.length > 1 ? 's' : ''} sent to ${contactNames}. They'll appear in your friends list once they join Meet-n-Split.`
           );
           
           setShowAddFriend(false);
@@ -2407,7 +2407,7 @@ export default function RealSplittingScreen() {
         } else {
           Alert.alert(
             'Invite Pending',
-            `${friend.friendData.fullName || friend.friendData.email} hasn't joined Spendy yet. They'll appear as your friend once they sign up and accept your invitation.`,
+            `${friend.friendData.fullName || friend.friendData.email} hasn't joined Meet-n-Split yet. They'll appear as your friend once they sign up and accept your invitation.`,
             [{ text: 'OK' }]
           );
         }
@@ -2477,7 +2477,7 @@ export default function RealSplittingScreen() {
             }
           } else {
             successMessage = `✅ Invitation sent via ${actualMethod} to ${recipient}`;
-            successMessage += `\n\n${friend.friendData.fullName} will receive your friend request once they join Spendy!`;
+            successMessage += `\n\n${friend.friendData.fullName} will receive your friend request once they join Meet-n-Split!`;
           }
           
           if (originalInviteMethod && originalInviteMethod !== actualMethod) {
@@ -2492,7 +2492,7 @@ export default function RealSplittingScreen() {
           const methods = response.availableMethods.join(', ');
           Alert.alert(
             'User Not Registered',
-            `${friend.friendData.fullName} hasn't installed Spendy yet.\n\nAvailable reminder methods: ${methods}`,
+            `${friend.friendData.fullName} hasn't installed Meet-n-Split yet.\n\nAvailable reminder methods: ${methods}`,
             [{ text: 'OK' }]
           );
         } else {
@@ -2528,7 +2528,7 @@ export default function RealSplittingScreen() {
                 });
                 
                 if (friend.requestId) {
-                  // For existing Spendy users, delete the friend request
+                  // For existing Meet-n-Split users, delete the friend request
                   console.log('📡 Calling API to decline friend request:', friend.requestId);
                   await apiService.declineFriendRequest(friend.requestId);
                   console.log('✅ API call successful, friend request cancelled');
@@ -3799,7 +3799,7 @@ export default function RealSplittingScreen() {
         recipientId: friendId,
         recipientName: friend.friendData.fullName,
         recipientEmail: friend.friendData.email,
-        description: `Payment via Spendy`
+        description: `Payment via Meet-n-Split`
       };
 
       await PaymentService.initiatePayment(method, paymentRequest, user.id, friendId);
@@ -4445,7 +4445,7 @@ export default function RealSplittingScreen() {
           if (qrData === 'INVALID_QR_FORMAT') {
             Alert.alert(
               'Invalid QR Code',
-              'This QR code is not compatible with Spendy. Please scan a valid Spendy QR code.',
+              'This QR code is not compatible with Meet-n-Split. Please scan a valid Meet-n-Split QR code.',
               [
                 { text: 'Try Again', style: 'default' },
                 { text: 'Cancel', style: 'cancel', onPress: () => {
@@ -4501,7 +4501,7 @@ export default function RealSplittingScreen() {
               console.log('❌ QR code processing failed:', result.error);
               Alert.alert(
                 'Processing Failed',
-                result.error || 'Unable to process this QR code. Please check that it\'s a valid Spendy QR code.',
+                result.error || 'Unable to process this QR code. Please check that it\'s a valid Meet-n-Split QR code.',
                 [{ text: 'OK' }]
               );
             }

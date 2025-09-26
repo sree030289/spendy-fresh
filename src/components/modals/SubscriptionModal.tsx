@@ -401,7 +401,7 @@ export default function SubscriptionModal({
       case 'premium_feature':
         return `Access ${featureName} and all premium features`;
       default:
-        return 'Get the most out of Spendy with premium features';
+        return 'Get the most out of Meet-n-Split with premium features';
     }
   };
 

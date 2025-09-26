@@ -521,7 +521,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
       <View style={styles.infoCard}>
         <Icon name="information" size={20} color={theme.colors.primary}  />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
-          Your friend will receive an email invitation to join Spendy and connect with you.
+          Your friend will receive an email invitation to join Meet-n-Split and connect with you.
         </Text>
       </View>
     </View>
@@ -707,8 +707,8 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         <Icon name="mail" size={20} color={theme.colors.primary} />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
           {selectedContacts.length > 0 
-            ? `Send invitations to ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''} via SMS or WhatsApp with a link to download Spendy.`
-            : `Select up to ${MAX_CONTACTS} contacts and send invitations via SMS or WhatsApp with a link to download Spendy.`
+            ? `Send invitations to ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''} via SMS or WhatsApp with a link to download Meet-n-Split.`
+            : `Select up to ${MAX_CONTACTS} contacts and send invitations via SMS or WhatsApp with a link to download Meet-n-Split.`
           }
         </Text>
       </View>

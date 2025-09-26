@@ -229,6 +229,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       
       setUser(user);
+      
+      // Check for pending invites after successful registration
+      try {
+        console.log('🔍 Checking for pending invites after registration...');
+        const inviteCheckResponse = await apiService.checkPendingInvitesOnRegistration({
+          userId: user.id,
+          phoneNumber: userData.mobile,
+          email: userData.email,
+          countryCode: userData.country // Pass the country code from registration data
+        });
+        
+        console.log('📋 Invite check response:', inviteCheckResponse);
+        
+        if (inviteCheckResponse?.hasPendingInvites && inviteCheckResponse?.autoAcceptedCount > 0) {
+          console.log('🎉 Auto-accepted pending invites:', {
+            count: inviteCheckResponse.autoAcceptedCount,
+            newFriendships: inviteCheckResponse.newFriendships
+          });
+          
+          // You can show a welcome modal or notification here
+          // For now, just log the success
+        } else {
+          console.log('✅ No pending invites to process');
+        }
+      } catch (inviteError) {
+        console.error('⚠️ Failed to check pending invites:', inviteError);
+        // Don't fail registration if invite check fails
+      }
+      
       setIsLoading(false); 
       console.log('Registration successful');
     } catch (error) {

@@ -364,7 +364,7 @@ export default function ProfileScreen() {
           if (requestResult.status !== 'granted') {
             Alert.alert(
               'Permission Required',
-              'Please allow photo library access in Settings > Privacy & Security > Photos > Spendy.',
+              'Please allow photo library access in Settings > Privacy & Security > Photos > Meet-n-Split.',
               [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Open Settings', onPress: () => Linking.openURL('app-settings:') }
@@ -784,7 +784,7 @@ export default function ProfileScreen() {
           errorMessage = 'Invalid image selected. Please try selecting a different image.';
         } else if (error.message.includes('permission')) {
           errorMessage = Platform.OS === 'ios' 
-            ? 'Permission denied. Please go to Settings > Privacy & Security > Photos > Spendy and allow access.'
+            ? 'Permission denied. Please go to Settings > Privacy & Security > Photos > Meet-n-Split and allow access.'
             : 'Permission denied. Please allow access and try again.';
         } else if (error.message.includes('fetch') || error.message.includes('blob')) {
           errorMessage = 'Failed to process image. Please try taking a new photo or selecting a different image.';
@@ -1277,7 +1277,7 @@ export default function ProfileScreen() {
 
         {/* App Version */}
         <Text style={[styles.appVersion, { color: theme.colors.textSecondary }]}>
-          Spendy v1.0.0
+          Meet-n-Split v1.0.0
         </Text>
       </ScrollView>
 

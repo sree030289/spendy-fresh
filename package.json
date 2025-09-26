@@ -84,6 +84,7 @@
     "firebase": "^11.8.1",
     "firebase-admin": "^13.4.0",
     "firebase-functions": "^6.3.2",
+    "libphonenumber-js": "^1.12.22",
     "lottie-react-native": "7.2.2",
     "lucide-react": "^0.263.1",
     "lucide-react-native": "^0.525.0",

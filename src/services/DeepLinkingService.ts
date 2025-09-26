@@ -207,7 +207,7 @@ export class DeepLinkingService {
       ? (deal.originalPrice - deal.discountedPrice).toFixed(2)
       : '0.00';
 
-    return `🔥 AMAZING DEAL from Spendy! 🔥
+    return `🔥 AMAZING DEAL from Meet-n-Split! 🔥
 
 ${deal.title}
 
@@ -220,9 +220,9 @@ ${deal.description ? deal.description.substring(0, 100) + '...' : ''}
 ${deal.businessName ? `🏪 ${deal.businessName}` : ''}
 ${deal.location ? `📍 ${deal.location}` : ''}
 
-📱 Open in Spendy: ${universalLink}
+📱 Open in Meet-n-Split: ${universalLink}
 
-Don't have Spendy? Download it now and discover thousands of deals from your favorite Australian retailers!
+Don't have Meet-n-Split? Download it now and discover thousands of deals from your favorite Australian retailers!
 
 #SpeendyDeals #${deal.source || 'Deals'} #AustralianDeals`;
   }

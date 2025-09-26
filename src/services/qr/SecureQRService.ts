@@ -290,7 +290,7 @@ export class SecureQRService {
       return {
         success: true,
         message: result?.isNewUser === true
-          ? `Invitation saved! ${qrData.inviterData.fullName} will get your friend request when they join Spendy.`
+          ? `Invitation saved! ${qrData.inviterData.fullName} will get your friend request when they join Meet-n-Split.`
           : `Friend request sent to ${qrData.inviterData.fullName}! They'll receive a notification.`,
         shouldShowModal: false
       };

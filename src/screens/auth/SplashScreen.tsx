@@ -53,7 +53,7 @@ export default function SplashScreen({ onSplashComplete }: SplashScreenProps) {
         <View style={styles.logoContainer}>
           <Text style={styles.logoEmoji}>💰</Text>
         </View>
-        <Text style={styles.title}>Spendy</Text>
+        <Text style={styles.title}>Meet-n-Split</Text>
         <Text style={styles.tagline}>Track. Split. Pay.</Text>
       </Animated.View>
     </LinearGradient>

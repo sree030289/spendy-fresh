@@ -345,7 +345,7 @@ static decodeQRData(qrString: string): QRData {
               );
               
               if (result.isNewUser) {
-                CrossPlatformAlert.alert('Invitation Saved!', result.message || `We've saved your invitation for ${qrData.userData!.fullName}. They'll get a friend request automatically when they join Spendy!`);
+                CrossPlatformAlert.alert('Invitation Saved!', result.message || `We've saved your invitation for ${qrData.userData!.fullName}. They'll get a friend request automatically when they join Meet-n-Split!`);
               } else {
                 CrossPlatformAlert.alert('Success!', result.message || `Friend request sent to ${qrData.userData!.fullName}! They'll receive a notification about your request.`);
               }

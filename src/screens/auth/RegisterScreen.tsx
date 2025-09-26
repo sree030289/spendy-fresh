@@ -408,7 +408,7 @@ export default function RegisterScreen() {
               <View style={styles.header}>
                 <Text style={styles.title}>Let's get started</Text>
                 <Text style={styles.subtitle}>
-                  Join Spendy to track and split expenses
+                  Join Meet-n-Split to track and split expenses
                 </Text>
               </View>
 

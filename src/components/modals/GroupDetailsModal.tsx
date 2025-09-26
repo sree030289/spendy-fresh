@@ -1614,7 +1614,7 @@ export default function GroupDetailsModal({
                   No friends available to add
                 </Text>
                 <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                  Invite new users to Spendy or accept pending friend requests to add them to groups
+                  Invite new users to Meet-n-Split or accept pending friend requests to add them to groups
                 </Text>
               </View>
             )}

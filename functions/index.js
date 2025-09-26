@@ -12,7 +12,36 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
+// Import libphonenumber-js for phone number normalization
+const {parsePhoneNumber} = require("libphonenumber-js");
 
+/**
+ * Phone number normalization utility
+ * @param {string} phoneNumber - Raw phone number
+ * @param {string} countryCode - ISO country code (e.g., 'US', 'AU')
+ * @return {string} - Normalized phone number in E.164 format
+ */
+function normalizePhoneNumber(phoneNumber, countryCode) {
+  try {
+    if (!phoneNumber || !phoneNumber.trim()) {
+      throw new Error("Phone number is required");
+    }
+
+    const parsedNumber = parsePhoneNumber(phoneNumber.trim(), countryCode);
+    
+    if (!parsedNumber) {
+      throw new Error("Unable to parse phone number");
+    }
+
+    if (!parsedNumber.isValid()) {
+      throw new Error("Invalid phone number format");
+    }
+
+    return parsedNumber.format("E.164");
+  } catch (error) {
+    throw new Error(`Phone number validation failed: ${error.message}`);
+  }
+}
 
 // ===== MEET-N-SPLIT API ===== 
 // Complete REST API for Meet-n-Split expense splitting application
@@ -300,7 +329,8 @@ const COLLECTIONS = {
   FRIENDS: 'friendships',
   FRIEND_REQUESTS: 'friendRequests',
   SETTLEMENTS: 'settlements',
-  NOTIFICATIONS: 'notifications'
+  NOTIFICATIONS: 'notifications',
+  UNIFIED_INVITES: 'unifiedInvites'
 };
 
 // ===== AUTHENTICATION ROUTES =====
@@ -324,16 +354,41 @@ meetnsplitApp.post('/auth/register', async (req, res) => {
       });
     }
 
-    // Check if user already exists
-    const existingUsers = await db.collection(COLLECTIONS.USERS)
+    // Check if user with email already exists
+    const existingEmailUsers = await db.collection(COLLECTIONS.USERS)
       .where('email', '==', email.toLowerCase())
       .get();
 
-    if (!existingUsers.empty) {
+    if (!existingEmailUsers.empty) {
       return res.status(409).json({
         success: false,
         message: 'User with this email already exists'
       });
+    }
+
+    // Normalize and validate mobile number if provided
+    let normalizedMobile = "";
+    if (mobile && mobile.trim()) {
+      try {
+        normalizedMobile = normalizePhoneNumber(mobile.trim(), country);
+        
+        // Check if normalized phone number already exists
+        const existingPhoneUsers = await db.collection(COLLECTIONS.USERS)
+            .where("normalizedMobile", "==", normalizedMobile)
+            .get();
+
+        if (!existingPhoneUsers.empty) {
+          return res.status(409).json({
+            success: false,
+            message: "User with this phone number already exists",
+          });
+        }
+      } catch (phoneError) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid phone number: ${phoneError.message}`,
+        });
+      }
     }
 
     // Hash password
@@ -344,16 +399,17 @@ meetnsplitApp.post('/auth/register', async (req, res) => {
       email: email.toLowerCase(),
       fullName: fullName.trim(),
       name: fullName.trim(),
-      mobile: mobile || '',
-      phoneNumber: mobile || '',
+      mobile: mobile || "",
+      phoneNumber: mobile || "",
+      normalizedMobile: normalizedMobile, // Normalized phone for duplicates
       country: country.toUpperCase(),
-      currency: currency ? currency.toUpperCase() : 'USD',
+      currency: currency ? currency.toUpperCase() : "USD",
       biometricEnabled: false,
       isPremium: false,
-      subscriptionStatus: 'expired',
+      subscriptionStatus: "expired",
       password: hashedPassword,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     // Create user in Firestore
@@ -1689,6 +1745,684 @@ meetnsplitApp.get('/friends/requests', authenticateJWT, async (req, res) => {
       success: false,
       message: 'Failed to get friend requests',
       error: 'FRIEND_REQUESTS_ERROR'
+    });
+  }
+});
+
+// ===== UNIFIED INVITE SYSTEM =====
+
+// Helper function to normalize phone numbers
+function normalizePhoneNumber(phone) {
+  if (!phone) return null;
+  // Remove all non-digit characters except '+'
+  let normalized = phone.replace(/[^\d+]/g, '');
+  // Ensure it starts with '+'
+  if (!normalized.startsWith('+')) {
+    // Assume US number if no country code
+    normalized = '+1' + normalized;
+  }
+  return normalized;
+}
+
+// Helper function to generate invite token
+function generateInviteToken() {
+  return `invite_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+}
+
+// Helper function to generate secure token for unregistered users
+function generateSecureToken() {
+  return `secure_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+}
+
+// Search users by phone number or email
+meetnsplitApp.get('/users/search-contact', async (req, res) => {
+  try {
+    const { q: query } = req.query;
+
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query is required',
+        error: 'MISSING_QUERY'
+      });
+    }
+
+    const isPhone = query.includes('+') || /^\d/.test(query);
+    const isEmail = query.includes('@');
+
+    let users = [];
+
+    if (isPhone) {
+      const normalizedPhone = normalizePhoneNumber(query);
+      const phoneQuery = await db.collection(COLLECTIONS.USERS)
+        .where('mobile', '==', normalizedPhone)
+        .get();
+      
+      if (!phoneQuery.empty) {
+        users = phoneQuery.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
+    } else if (isEmail) {
+      const emailQuery = await db.collection(COLLECTIONS.USERS)
+        .where('email', '==', query.toLowerCase())
+        .get();
+      
+      if (!emailQuery.empty) {
+        users = emailQuery.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
+    }
+
+    // Remove sensitive data
+    const sanitizedUsers = users.map(user => ({
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      mobile: user.mobile,
+      profileImage: user.profileImage
+    }));
+
+    res.json({
+      success: true,
+      message: 'Users found',
+      users: sanitizedUsers
+    });
+  } catch (error) {
+    console.error('❌ Search users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search users',
+      error: 'SEARCH_ERROR'
+    });
+  }
+});
+
+// Create unified invite
+meetnsplitApp.post('/invites/unified', authenticateJWT, async (req, res) => {
+  try {
+    const { recipientPhone, recipientEmail, message, sentVia, countryCode } = req.body;
+    const inviterId = req.user.id;
+
+    if (!recipientPhone && !recipientEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Either phone number or email is required",
+        error: "MISSING_RECIPIENT",
+      });
+    }
+
+    if (!sentVia || !["SMS", "EMAIL", "PUSH"].includes(sentVia)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid sentVia method is required",
+        error: "INVALID_SENT_VIA",
+      });
+    }
+
+    // For SMS invites, country code is required
+    if (recipientPhone && sentVia === "SMS" && !countryCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Country code is required for SMS invites",
+        error: "MISSING_COUNTRY_CODE",
+      });
+    }
+
+    // Get inviter data
+    const inviterDoc = await db.collection(COLLECTIONS.USERS).doc(inviterId).get();
+    if (!inviterDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "Inviter not found",
+        error: "INVITER_NOT_FOUND",
+      });
+    }
+
+    const inviter = inviterDoc.data();
+    let existingUser = null;
+    let normalizedPhone = null;
+
+    // Check if recipient user exists
+    if (recipientPhone) {
+      try {
+        normalizedPhone = normalizePhoneNumber(recipientPhone, countryCode);
+        
+        // Search by normalized phone number
+        const phoneQuery = await db.collection(COLLECTIONS.USERS)
+            .where("normalizedMobile", "==", normalizedPhone)
+            .get();
+      
+        if (!phoneQuery.empty) {
+          existingUser = {id: phoneQuery.docs[0].id, ...phoneQuery.docs[0].data()};
+        }
+      } catch (phoneError) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid phone number: ${phoneError.message}`,
+          error: "INVALID_PHONE_NUMBER",
+        });
+      }
+    }
+
+    if (!existingUser && recipientEmail) {
+      const emailQuery = await db.collection(COLLECTIONS.USERS)
+          .where("email", "==", recipientEmail.toLowerCase())
+          .get();
+      
+      if (!emailQuery.empty) {
+        existingUser = {
+          id: emailQuery.docs[0].id,
+          ...emailQuery.docs[0].data(),
+        };
+      }
+    }
+
+    let invite;
+    let isRegisteredUser = false;
+
+    if (existingUser) {
+      // Flow 1: Registered user
+      isRegisteredUser = true;
+
+      // Check friendship status
+      const friendshipQuery = await db.collection(COLLECTIONS.FRIENDS)
+        .where('userId', '==', inviterId)
+        .where('friendId', '==', existingUser.id)
+        .where('status', '==', 'accepted')
+        .get();
+
+      const reverseFriendshipQuery = await db.collection(COLLECTIONS.FRIENDS)
+        .where('userId', '==', existingUser.id)
+        .where('friendId', '==', inviterId)
+        .where('status', '==', 'accepted')
+        .get();
+
+      if (!friendshipQuery.empty || !reverseFriendshipQuery.empty) {
+        return res.status(400).json({
+          success: false,
+          message: `You are already friends with ${existingUser.fullName}`,
+          isRegisteredUser: true,
+          friendshipStatus: 'already_friends'
+        });
+      }
+
+      // Check pending requests
+      const pendingQuery = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+        .where('fromUserId', '==', inviterId)
+        .where('toUserId', '==', existingUser.id)
+        .where('status', '==', 'pending')
+        .get();
+
+      const reversePendingQuery = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+        .where('fromUserId', '==', existingUser.id)
+        .where('toUserId', '==', inviterId)
+        .where('status', '==', 'pending')
+        .get();
+
+      if (!pendingQuery.empty || !reversePendingQuery.empty) {
+        return res.status(400).json({
+          success: false,
+          message: `Friend request already pending with ${existingUser.fullName}`,
+          isRegisteredUser: true,
+          friendshipStatus: 'request_pending'
+        });
+      }
+
+      invite = {
+        inviterId,
+        inviterData: {
+          fullName: inviter.fullName,
+          email: inviter.email,
+          profileImage: inviter.profileImage
+        },
+        recipientUserId: existingUser.id,
+        recipientPhone: recipientPhone || existingUser.mobile || '',
+        recipientEmail: existingUser.email,
+        status: 'PENDING',
+        type: 'SMS_REGISTERED_USER',
+        inviteToken: generateInviteToken(),
+        sentVia,
+        message: message || '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+      };
+    } else {
+      // Flow 2: Unregistered user
+      invite = {
+        inviterId,
+        inviterData: {
+          fullName: inviter.fullName,
+          email: inviter.email,
+          profileImage: inviter.profileImage
+        },
+        recipientUserId: null,
+        recipientPhone: normalizedPhone || recipientPhone || "",
+        recipientEmail: recipientEmail || null,
+        status: 'SIGNUP_PENDING',
+        type: 'SMS_UNREGISTERED_USER',
+        inviteToken: generateSecureToken(),
+        sentVia,
+        message: message || '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+      };
+    }
+
+    // Save invite to unified invites collection
+    const inviteRef = await db.collection('unifiedInvites').add(invite);
+    const savedInvite = { ...invite, id: inviteRef.id };
+
+    // Send notifications to registered users
+    if (isRegisteredUser && existingUser && existingUser.pushToken) {
+      try {
+        console.log("� Sending push notification to registered user:", {
+          userId: existingUser.id,
+          pushToken: existingUser.pushToken,
+          inviterName: invite.inviterData.fullName
+        });
+
+        const expoPushNotification = {
+          to: existingUser.pushToken,
+          sound: "default",
+          title: "New Friend Request!",
+          body: `${invite.inviterData.fullName} sent you a friend request`,
+          data: {
+            type: "FRIEND_REQUEST",
+            inviteId: inviteRef.id,
+            inviterId: inviterId,
+            inviterName: invite.inviterData.fullName,
+            inviterImage: invite.inviterData.profileImage
+          },
+        };
+
+        const pushResult = await sendExpoPushNotification(
+          existingUser.pushToken,
+          expoPushNotification
+        );
+        console.log("✅ Push notification sent:", pushResult);
+
+        // Also create an in-app notification
+        const inAppNotification = {
+          userId: existingUser.id,
+          type: "FRIEND_REQUEST",
+          title: "New Friend Request!",
+          message: `${invite.inviterData.fullName} sent you a friend request`,
+          data: {
+            inviteId: inviteRef.id,
+            inviterId: inviterId,
+            inviterName: invite.inviterData.fullName,
+            inviterImage: invite.inviterData.profileImage
+          },
+          isRead: false,
+          createdAt: new Date(),
+        };
+
+        await db.collection("appNotifications").add(inAppNotification);
+        console.log("🔔 In-app notification created for registered user");
+
+      } catch (notifError) {
+        console.error("❌ Failed to send push notification:", notifError);
+        // Don't fail the request if notification fails
+      }
+    } else if (isRegisteredUser) {
+      console.log("📱 No push token available for registered user:", existingUser ? existingUser.id : "unknown");
+    } else {
+      console.log("📧 SMS invite sent to unregistered user - no push notification needed");
+    }
+
+    res.status(201).json({
+      success: true,
+      message: isRegisteredUser ? 
+        `Invite sent to ${existingUser.fullName}` : 
+        `Signup invitation sent to ${recipientPhone || recipientEmail}`,
+      invite: savedInvite,
+      isRegisteredUser,
+      friendshipStatus: 'no_relationship'
+    });
+  } catch (error) {
+    console.error('❌ Create unified invite error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create invite',
+      error: 'CREATE_INVITE_ERROR'
+    });
+  }
+});
+
+// Find pending invites by phone/email
+meetnsplitApp.get('/invites/unified/pending', async (req, res) => {
+  try {
+    const { phone, email } = req.query;
+
+    if (!phone && !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either phone or email parameter is required',
+        error: 'MISSING_SEARCH_PARAMS'
+      });
+    }
+
+    let query = db.collection('unifiedInvites');
+    
+    if (phone) {
+      const normalizedPhone = normalizePhoneNumber(phone);
+      query = query.where('recipientPhone', '==', normalizedPhone);
+    }
+    
+    if (email) {
+      query = query.where('recipientEmail', '==', email.toLowerCase());
+    }
+
+    const querySnapshot = await query
+      .where('status', 'in', ['SIGNUP_PENDING', 'PENDING'])
+      .get();
+
+    const invites = [];
+    const now = new Date();
+
+    querySnapshot.docs.forEach(doc => {
+      const invite = { id: doc.id, ...doc.data() };
+      // Only include non-expired invites
+      if (new Date(invite.expiresAt.toDate ? invite.expiresAt.toDate() : invite.expiresAt) > now) {
+        invites.push(invite);
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Pending invites retrieved successfully',
+      invites
+    });
+  } catch (error) {
+    console.error('❌ Find pending invites error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to find pending invites',
+      error: 'FIND_INVITES_ERROR'
+    });
+  }
+});
+
+// Check for pending invites during registration
+meetnsplitApp.post("/invites/unified/check-registration", async (req, res) => {
+  try {
+    const {userId, phoneNumber, email, countryCode} = req.body;
+
+    if (!userId || !phoneNumber || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "userId, phoneNumber, and email are required",
+        error: "MISSING_REGISTRATION_DATA",
+      });
+    }
+
+    let normalizedPhone = null;
+    try {
+      // Try to normalize with country code if provided
+      normalizedPhone = normalizePhoneNumber(phoneNumber,
+          countryCode || "US"); // Default to US if no country code
+    } catch (phoneError) {
+      console.log("Phone normalization failed:", phoneError.message);
+      // Continue with original phone number if normalization fails
+      normalizedPhone = phoneNumber;
+    }
+
+    // Find pending invites by phone or email
+    const phoneQuery = db.collection("unifiedInvites")
+        .where("recipientPhone", "==", normalizedPhone)
+        .where("status", "==", "SIGNUP_PENDING");
+
+    const emailQuery = db.collection("unifiedInvites")
+        .where("recipientEmail", "==", email.toLowerCase())
+        .where("status", "==", "SIGNUP_PENDING");
+
+    const [phoneSnapshot, emailSnapshot] = await Promise.all([
+      phoneQuery.get(),
+      emailQuery.get(),
+    ]);
+
+    const allInvites = [...phoneSnapshot.docs, ...emailSnapshot.docs];
+    const validInvites = [];
+    const now = new Date();
+
+    // Filter for valid, non-expired invites
+    for (const doc of allInvites) {
+      const invite = {id: doc.id, ...doc.data()};
+      const expiresAt = new Date(invite.expiresAt.toDate ?
+          invite.expiresAt.toDate() : invite.expiresAt);
+      
+      if (expiresAt > now) {
+        validInvites.push({doc, invite});
+      }
+    }
+
+    if (validInvites.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No pending invites found',
+        hasPendingInvites: false,
+        invites: [],
+        autoAcceptedCount: 0,
+        newFriendships: []
+      });
+    }
+
+    // Convert pending invites and create friendships
+    const batch = db.batch();
+    const newFriendships = [];
+
+    for (const { doc, invite } of validInvites) {
+      // Update invite to accepted status
+      const updatedInvite = {
+        ...invite,
+        recipientUserId: userId,
+        recipientEmail: email.toLowerCase(),
+        status: 'ACCEPTED',
+        type: 'SMS_REGISTERED_USER',
+        updatedAt: new Date(),
+        acceptedAt: new Date(),
+        convertedFromPendingAt: new Date()
+      };
+
+      batch.update(doc.ref, updatedInvite);
+
+      // Create friendship records (bidirectional)
+      const friendship1Ref = db.collection(COLLECTIONS.FRIENDS).doc();
+      const friendship2Ref = db.collection(COLLECTIONS.FRIENDS).doc();
+
+      const friendshipData1 = {
+        userId: invite.inviterId,
+        friendId: userId,
+        status: 'accepted',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const friendshipData2 = {
+        userId: userId,
+        friendId: invite.inviterId,
+        status: 'accepted',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      batch.set(friendship1Ref, friendshipData1);
+      batch.set(friendship2Ref, friendshipData2);
+
+      newFriendships.push(invite.inviterId);
+    }
+
+    await batch.commit();
+
+    console.log('🎉 Auto-converted pending invites:', {
+      userId,
+      inviteCount: validInvites.length,
+      newFriendships
+    });
+
+    res.json({
+      success: true,
+      message: `Converted ${validInvites.length} pending invites`,
+      hasPendingInvites: true,
+      invites: validInvites.map(v => ({ ...v.invite, status: 'ACCEPTED' })),
+      autoAcceptedCount: validInvites.length,
+      newFriendships
+    });
+  } catch (error) {
+    console.error('❌ Check registration invites error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check registration invites',
+      error: 'CHECK_REGISTRATION_ERROR'
+    });
+  }
+});
+
+// Accept a unified invite
+meetnsplitApp.post('/invites/unified/:inviteId/accept', authenticateJWT, async (req, res) => {
+  try {
+    const { inviteId } = req.params;
+    const userId = req.user.id;
+
+    const inviteDoc = await db.collection('unifiedInvites').doc(inviteId).get();
+    if (!inviteDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invite not found',
+        error: 'INVITE_NOT_FOUND'
+      });
+    }
+
+    const invite = inviteDoc.data();
+
+    if (invite.recipientUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to accept this invite',
+        error: 'UNAUTHORIZED'
+      });
+    }
+
+    if (invite.status !== 'PENDING') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invite is not in pending status',
+        error: 'INVALID_STATUS'
+      });
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(invite.expiresAt.toDate ? invite.expiresAt.toDate() : invite.expiresAt);
+    
+    if (now > expiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invite has expired',
+        error: 'INVITE_EXPIRED'
+      });
+    }
+
+    // Update invite status and create friendship
+    const batch = db.batch();
+
+    const updatedInvite = {
+      ...invite,
+      status: 'ACCEPTED',
+      acceptedAt: now,
+      updatedAt: now
+    };
+
+    batch.update(inviteDoc.ref, updatedInvite);
+
+    // Create bidirectional friendship
+    const friendship1Ref = db.collection(COLLECTIONS.FRIENDS).doc();
+    const friendship2Ref = db.collection(COLLECTIONS.FRIENDS).doc();
+
+    const friendshipData1 = {
+      userId: invite.inviterId,
+      friendId: userId,
+      status: 'accepted',
+      createdAt: now,
+      updatedAt: now
+    };
+
+    const friendshipData2 = {
+      userId: userId,
+      friendId: invite.inviterId,
+      status: 'accepted',
+      createdAt: now,
+      updatedAt: now
+    };
+
+    batch.set(friendship1Ref, friendshipData1);
+    batch.set(friendship2Ref, friendshipData2);
+
+    await batch.commit();
+
+    console.log('✅ Invite accepted and friendship created:', {
+      inviteId,
+      inviterId: invite.inviterId,
+      accepterId: userId
+    });
+
+    res.json({
+      success: true,
+      message: 'Invite accepted successfully',
+      invite: updatedInvite
+    });
+  } catch (error) {
+    console.error('❌ Accept invite error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to accept invite',
+      error: 'ACCEPT_INVITE_ERROR'
+    });
+  }
+});
+
+// Get invite by ID
+meetnsplitApp.get('/invites/unified/:inviteId', authenticateJWT, async (req, res) => {
+  try {
+    const { inviteId } = req.params;
+    const userId = req.user.id;
+
+    const inviteDoc = await db.collection('unifiedInvites').doc(inviteId).get();
+    if (!inviteDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invite not found',
+        error: 'INVITE_NOT_FOUND'
+      });
+    }
+
+    const invite = { id: inviteDoc.id, ...inviteDoc.data() };
+
+    // Check if user has permission to view this invite
+    if (invite.inviterId !== userId && invite.recipientUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to view this invite',
+        error: 'UNAUTHORIZED'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Invite retrieved successfully',
+      invite
+    });
+  } catch (error) {
+    console.error('❌ Get invite error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get invite',
+      error: 'GET_INVITE_ERROR'
     });
   }
 });
@@ -7371,26 +8105,26 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
           });
 
           const subject = isUserRegistered ? 
-            `${senderData.fullName} sent you a friend request reminder on Spendy` :
-            `${senderData.fullName} is waiting for you to join Spendy!`;
+            `${senderData.fullName} sent you a friend request reminder on Meet-n-Split` :
+            `${senderData.fullName} is waiting for you to join Meet-n-Split!`;
 
           const htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
               <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #B0004F; margin: 0;">🤝 Spendy</h1>
-                <h2 style="color: #333; margin: 10px 0;">${isUserRegistered ? 'Friend Request Reminder' : 'Join Spendy!'}</h2>
+                <h1 style="color: #B0004F; margin: 0;">🤝 Meet-n-Split</h1>
+                <h2 style="color: #333; margin: 10px 0;">${isUserRegistered ? 'Friend Request Reminder' : 'Join Meet-n-Split!'}</h2>
               </div>
               
               <div style="background-color: #f8f9ff; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
                 <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">Hi there! 👋</p>
                 <p style="font-size: 16px; color: #333; margin: 0 0 15px 0;">
                   <strong>${senderData.fullName}</strong> ${isUserRegistered ? 
-                    'is still waiting for you to respond to their friend request on Spendy.' :
+                    'is still waiting for you to respond to their friend request on Meet-n-Split.' :
                     'has invited you to join Meet-n-Split and wants to be your friend!'}
                 </p>
                 ${isUserRegistered ? '' : `
                 <p style="font-size: 14px; color: #666; margin: 0;">
-                  Join Spendy to start splitting expenses and managing shared costs with your friends!
+                  Join Meet-n-Split to start splitting expenses and managing shared costs with your friends!
                 </p>
                 `}
               </div>
@@ -7439,7 +8173,7 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
                 fromUserEmail: senderData.email,
                 toUserEmail: recipientEmail,
                 inviteMethod: 'email',
-                message: `${senderData.fullName} is still waiting for you to join Spendy and accept their friend request!`,
+                message: `${senderData.fullName} is still waiting for you to join Meet-n-Split and accept their friend request!`,
                 deepLink: `letssplit://friend-request/${requestId}`,
                 appStoreLink: 'https://meetnsplit.app/download',
                 friendRequestId: requestId
