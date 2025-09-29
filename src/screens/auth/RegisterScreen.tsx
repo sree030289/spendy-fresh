@@ -12,6 +12,7 @@ import {
   Modal,
   Keyboard,
   TouchableWithoutFeedback,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../../components/common/Icon';
@@ -23,7 +24,8 @@ import { BrandHeader } from '@/components/common/BrandHeader';
 import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
 import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
-import { COUNTRIES } from '@/constants/countries';
+import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
+import { COUNTRIES, POPULAR_COUNTRIES, CURRENCIES } from '@/constants/countries';
 
 export default function RegisterScreen() {
   const navigation = useNavigation();
@@ -34,6 +36,8 @@ export default function RegisterScreen() {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [countrySearchQuery, setCountrySearchQuery] = useState('');
+  const [currencySearchQuery, setCurrencySearchQuery] = useState('');
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -51,7 +55,6 @@ export default function RegisterScreen() {
 
   const selectedCountry = COUNTRIES.find(c => c.code === formData.country) || COUNTRIES[0];
   const styles = getStyles(theme.colors);
-  const currencies = [...new Set(COUNTRIES.map(c => c.currency))].sort();
 
   // Note: Navigation to main app happens automatically in App.tsx when user state changes
   // No manual navigation needed here
@@ -198,15 +201,37 @@ export default function RegisterScreen() {
 
   const completeRegistration = async (biometricEnabled: boolean) => {
     try {
+      // Normalize phone number to E.164 format
+      let normalizedMobile = formData.mobile.trim();
+      try {
+        if (normalizedMobile) {
+          normalizedMobile = PhoneNumberService.normalize(normalizedMobile, formData.country as any);
+          console.log('📱 Phone number normalized for registration:', { 
+            original: formData.mobile.trim(), 
+            normalized: normalizedMobile 
+          });
+        }
+      } catch (phoneError) {
+        console.error('⚠️ Phone normalization failed during registration:', phoneError);
+        // Continue with original number if normalization fails
+        Alert.alert(
+          'Phone Number Warning', 
+          'Unable to format phone number. Please ensure you\'ve entered a valid number with country code.',
+          [{ text: 'Continue Anyway', style: 'default' }]
+        );
+      }
+
       const userData = {
         fullName: formData.fullName.trim(),
         email: formData.email.trim().toLowerCase(),
-        mobile: formData.mobile.trim(),
+        mobile: normalizedMobile,
         password: formData.password,
         country: formData.country,
         currency: formData.currency,
         biometricEnabled,
       };
+      
+      console.log('📝 Registration data prepared:', { ...userData, password: '[HIDDEN]' });
       
       await register(userData);
       
@@ -237,102 +262,199 @@ export default function RegisterScreen() {
     }
   };
 
-  const CountryPicker = () => (
-    <Modal
-      visible={showCountryPicker}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
-            <Icon name="close" size={24} color={theme.colors.text}  />
-          </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-            Select Country
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <ScrollView style={styles.optionsList}>
-          {COUNTRIES.map((country) => (
-            <TouchableOpacity
-              key={country.code}
-              style={[styles.optionItem, { backgroundColor: theme.colors.surface }]}
-              onPress={() => {
-                setFormData({ 
-                  ...formData, 
-                  country: country.code,
-                  currency: country.currency // Auto-set currency based on country
-                });
-                setShowCountryPicker(false);
-              }}
-            >
-              <Text style={styles.optionFlag}>{country.flag}</Text>
-              <View style={styles.optionInfo}>
-                <Text style={[styles.optionName, { color: theme.colors.text }]}>
-                  {country.name}
-                </Text>
-                <Text style={[styles.optionSubtext, { color: theme.colors.textSecondary }]}>
-                  {country.phoneCode} • {country.currency}
-                </Text>
-              </View>
-              {formData.country === country.code && (
-                <Icon name="checkmark" size={24} color={theme.colors.primary}  />
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
+  const CountryPicker = () => {
+    const filteredCountries = countrySearchQuery
+      ? COUNTRIES.filter(country =>
+          country.name.toLowerCase().includes(countrySearchQuery.toLowerCase()) ||
+          country.code.toLowerCase().includes(countrySearchQuery.toLowerCase()) ||
+          country.phoneCode.includes(countrySearchQuery)
+        )
+      : COUNTRIES;
 
-  const CurrencyPicker = () => (
-    <Modal
-      visible={showCurrencyPicker}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
-            <Icon name="close" size={24} color={theme.colors.text}  />
-          </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-            Select Currency
+    const renderCountryItem = ({ item }: { item: typeof COUNTRIES[0] }) => (
+      <TouchableOpacity
+        style={[styles.optionItem, { backgroundColor: theme.colors.surface }]}
+        onPress={() => {
+          setFormData({ 
+            ...formData, 
+            country: item.code,
+            currency: item.currency // Auto-set currency based on country
+          });
+          setShowCountryPicker(false);
+          setCountrySearchQuery('');
+        }}
+      >
+        <Text style={styles.optionFlag}>{item.flag}</Text>
+        <View style={styles.optionInfo}>
+          <Text style={[styles.optionName, { color: theme.colors.text }]}>
+            {item.name}
           </Text>
-          <View style={{ width: 24 }} />
+          <Text style={[styles.optionSubtext, { color: theme.colors.textSecondary }]}>
+            {item.phoneCode} • {item.currency}
+          </Text>
         </View>
-        <ScrollView style={styles.optionsList}>
-          {currencies.map((currency) => {
-            const country = COUNTRIES.find(c => c.currency === currency);
-            return (
-              <TouchableOpacity
-                key={currency}
-                style={[styles.optionItem, { backgroundColor: theme.colors.surface }]}
-                onPress={() => {
-                  setFormData({ ...formData, currency });
-                  setShowCurrencyPicker(false);
-                }}
-              >
-                <Text style={styles.optionFlag}>{country?.flag || '💰'}</Text>
-                <View style={styles.optionInfo}>
-                  <Text style={[styles.optionName, { color: theme.colors.text }]}>
-                    {currency}
-                  </Text>
-                  <Text style={[styles.optionSubtext, { color: theme.colors.textSecondary }]}>
-                    {country?.name || 'Multiple countries'}
-                  </Text>
-                </View>
-                {formData.currency === currency && (
-                  <Icon name="checkmark" size={24} color={theme.colors.primary}  />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
+        {formData.country === item.code && (
+          <Icon name="checkmark" size={24} color={theme.colors.primary}  />
+        )}
+      </TouchableOpacity>
+    );
+
+    return (
+      <Modal
+        visible={showCountryPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCountryPicker(false)}
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => {
+              setShowCountryPicker(false);
+              setCountrySearchQuery('');
+            }}>
+              <Icon name="close" size={24} color={theme.colors.text}  />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Select Country
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {/* Search Bar */}
+          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
+            <Icon name="search" size={20} color={theme.colors.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.colors.text }]}
+              placeholder="Search countries..."
+              placeholderTextColor={theme.colors.textSecondary}
+              value={countrySearchQuery}
+              onChangeText={setCountrySearchQuery}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+
+          {/* Popular Countries Section */}
+          {!countrySearchQuery && (
+            <>
+              <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
+                Popular Countries
+              </Text>
+              <FlatList
+                data={POPULAR_COUNTRIES}
+                keyExtractor={(item) => `popular-${item.code}`}
+                renderItem={renderCountryItem}
+                scrollEnabled={false}
+                style={styles.popularSection}
+              />
+              <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary, marginTop: 20 }]}>
+                All Countries
+              </Text>
+            </>
+          )}
+
+          {/* Countries List */}
+          <FlatList
+            data={filteredCountries}
+            keyExtractor={(item) => item.code}
+            renderItem={renderCountryItem}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+            style={styles.optionsList}
+          />
+        </SafeAreaView>
+      </Modal>
+    );
+  };
+
+  const CurrencyPicker = () => {
+    const filteredCurrencies = currencySearchQuery
+      ? CURRENCIES.filter(currency =>
+          currency.toLowerCase().includes(currencySearchQuery.toLowerCase()) ||
+          COUNTRIES.find(c => c.currency === currency)?.name.toLowerCase().includes(currencySearchQuery.toLowerCase())
+        )
+      : CURRENCIES;
+
+    const renderCurrencyItem = ({ item: currency }: { item: string }) => {
+      const country = COUNTRIES.find(c => c.currency === currency);
+      const countriesWithCurrency = COUNTRIES.filter(c => c.currency === currency);
+      const subtitle = countriesWithCurrency.length === 1 
+        ? country?.name 
+        : `${countriesWithCurrency.length} countries`;
+
+      return (
+        <TouchableOpacity
+          style={[styles.optionItem, { backgroundColor: theme.colors.surface }]}
+          onPress={() => {
+            setFormData({ ...formData, currency });
+            setShowCurrencyPicker(false);
+            setCurrencySearchQuery('');
+          }}
+        >
+          <Text style={styles.optionFlag}>{country?.flag || '💰'}</Text>
+          <View style={styles.optionInfo}>
+            <Text style={[styles.optionName, { color: theme.colors.text }]}>
+              {currency}
+            </Text>
+            <Text style={[styles.optionSubtext, { color: theme.colors.textSecondary }]}>
+              {subtitle}
+            </Text>
+          </View>
+          {formData.currency === currency && (
+            <Icon name="checkmark" size={24} color={theme.colors.primary}  />
+          )}
+        </TouchableOpacity>
+      );
+    };
+
+    return (
+      <Modal
+        visible={showCurrencyPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCurrencyPicker(false)}
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => {
+              setShowCurrencyPicker(false);
+              setCurrencySearchQuery('');
+            }}>
+              <Icon name="close" size={24} color={theme.colors.text}  />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Select Currency
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {/* Search Bar */}
+          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
+            <Icon name="search" size={20} color={theme.colors.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.colors.text }]}
+              placeholder="Search currencies..."
+              placeholderTextColor={theme.colors.textSecondary}
+              value={currencySearchQuery}
+              onChangeText={setCurrencySearchQuery}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+
+          {/* Currencies List */}
+          <FlatList
+            data={filteredCurrencies}
+            keyExtractor={(item) => item}
+            renderItem={renderCurrencyItem}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+            style={styles.optionsList}
+          />
+        </SafeAreaView>
+      </Modal>
+    );
+  };
 
   const BiometricPrompt = () => (
     <Modal
@@ -853,6 +975,33 @@ const getStyles = (colors: any) => StyleSheet.create({
   optionSubtext: {
     fontSize: 14,
     marginTop: 2,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 4,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  popularSection: {
+    flexGrow: 0,
+    marginBottom: 8,
   },
   biometricModalOverlay: {
     flex: 1,

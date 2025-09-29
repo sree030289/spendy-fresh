@@ -692,6 +692,38 @@ class ApiService {
     return response;
   }
 
+  // Send SMS friend request 
+  async sendSMSFriendRequest(
+    recipientPhone: string, 
+    message?: string, 
+    countryCode?: string
+  ): Promise<{ 
+    success: boolean; 
+    isRegistered?: boolean; 
+    message?: string; 
+    data?: {
+      requestId: string;
+      recipientPhone: string;
+      recipientName?: string;
+      smsMessage: string;
+    }
+  }> {
+    console.log('📱 Sending SMS friend request:', { recipientPhone, countryCode, message });
+    
+    if (!recipientPhone?.trim()) {
+      throw new Error('Recipient phone number is required for SMS friend request');
+    }
+    
+    const response = await this.request('POST', '/friends/requests/send-sms', {
+      recipientPhone: recipientPhone.trim(),
+      message: message || 'Sent via SMS',
+      countryCode: countryCode || 'US'
+    });
+    
+    console.log('📱 SMS friend request response:', response);
+    return response;
+  }
+
   // Respond to friend request (accept/decline)
   async respondToFriendRequest(requestId: string, userId: string, response: 'accepted' | 'declined'): Promise<any> {
     const result = await this.request('POST', '/friends/requests/respond', {

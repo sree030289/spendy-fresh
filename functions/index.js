@@ -1448,6 +1448,186 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
   }
 });
 
+// Send SMS Friend Request Endpoint
+meetnsplitApp.post('/friends/requests/send-sms', authenticateJWT, async (req, res) => {
+  try {
+    const { recipientPhone, message, countryCode } = req.body;
+    
+    if (!recipientPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Recipient phone number is required',
+        error: 'MISSING_PHONE'
+      });
+    }
+
+    // Normalize phone number to E.164 format
+    let normalizedPhone;
+    try {
+      normalizedPhone = normalizePhoneNumber(recipientPhone, countryCode || 'US');
+      console.log('📱 Normalized phone number:', { original: recipientPhone, normalized: normalizedPhone });
+    } catch (phoneError) {
+      console.error('❌ Phone number normalization failed:', phoneError);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid phone number format',
+        error: 'INVALID_PHONE',
+        details: phoneError.message
+      });
+    }
+
+    // Find target user by normalized phone number
+    const targetUserSnapshot = await db.collection(COLLECTIONS.USERS)
+      .where('normalizedMobile', '==', normalizedPhone)
+      .limit(1)
+      .get();
+
+    const senderDoc = await db.collection(COLLECTIONS.USERS).doc(req.user.id).get();
+    if (!senderDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sender user not found',
+        error: 'SENDER_NOT_FOUND'
+      });
+    }
+    const senderData = senderDoc.data();
+
+    if (targetUserSnapshot.empty) {
+      // Unregistered user - create pending SMS invite
+      const newUserInvite = {
+        fromUserId: req.user.id,
+        toUserId: null, // No user ID for new users
+        toPhone: normalizedPhone,
+        toUserData: {
+          phone: normalizedPhone,
+          isNewUser: true,
+          fullName: `SMS Contact ${normalizedPhone.slice(-4)}` // Temporary name
+        },
+        message: message || '',
+        status: 'pending',
+        type: 'sms_invite',
+        inviteMethod: 'sms',
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+      };
+
+      const friendRequestRef = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+        .add(newUserInvite);
+
+      console.log('📱 Created SMS invite for unregistered user:', friendRequestRef.id);
+
+      // Return success for client-side SMS sending
+      return res.status(200).json({
+        success: true,
+        message: 'SMS invite created for unregistered user',
+        data: {
+          requestId: friendRequestRef.id,
+          isRegistered: false,
+          recipientPhone: normalizedPhone,
+          smsMessage: `👋 ${senderData.fullName} invited you to join Spendy! Download the app and they'll be added as your friend automatically: https://spendy.app/download?invite=${friendRequestRef.id}`
+        }
+      });
+    }
+
+    // Registered user found
+    const targetUser = targetUserSnapshot.docs[0];
+    const targetUserId = targetUser.id;
+    const targetUserData = targetUser.data();
+
+    // Check if they're already friends
+    const existingFriendship = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', 'in', [req.user.id, targetUserId])
+      .where('user2Id', 'in', [req.user.id, targetUserId])
+      .where('status', '==', 'active')
+      .get();
+
+    if (!existingFriendship.empty) {
+      return res.status(409).json({
+        success: false,
+        message: `You're already friends with ${targetUserData.fullName}`,
+        error: 'ALREADY_FRIENDS'
+      });
+    }
+
+    // Check for existing pending friend request
+    const existingRequest = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('fromUserId', '==', req.user.id)
+      .where('toUserId', '==', targetUserId)
+      .where('status', '==', 'pending')
+      .get();
+
+    if (!existingRequest.empty) {
+      return res.status(409).json({
+        success: false,
+        message: `Friend request already pending with ${targetUserData.fullName}`,
+        error: 'REQUEST_PENDING'
+      });
+    }
+
+    // Create friend request for registered user
+    const registeredUserInvite = {
+      fromUserId: req.user.id,
+      toUserId: targetUserId,
+      toPhone: normalizedPhone,
+      message: message || '',
+      status: 'pending',
+      type: 'sms_invite',
+      inviteMethod: 'sms', 
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+    };
+
+    const friendRequestRef = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .add(registeredUserInvite);
+
+    console.log('📱 Created SMS friend request for registered user:', friendRequestRef.id);
+
+    // Send push notification to registered user
+    try {
+      await db.collection('appNotifications').add({
+        userId: targetUserId,
+        type: 'friend_request',
+        title: '👋 New Friend Request!',
+        message: `${senderData.fullName} sent you a friend request via SMS`,
+        data: {
+          friendRequestId: friendRequestRef.id,
+          fromUserId: req.user.id,
+          fromUserName: senderData.fullName,
+          fromUserEmail: senderData.email,
+          navigationType: 'friend_requests'
+        },
+        createdAt: new Date(),
+        read: false
+      });
+      console.log('✅ Push notification sent to registered user');
+    } catch (notificationError) {
+      console.error('⚠️ Push notification failed:', notificationError);
+      // Don't fail the request if notification fails
+    }
+
+    // Return success for client-side SMS sending
+    return res.status(200).json({
+      success: true,
+      message: `Friend request sent to ${targetUserData.fullName}!`,
+      data: {
+        requestId: friendRequestRef.id,
+        isRegistered: true,
+        recipientPhone: normalizedPhone,
+        recipientName: targetUserData.fullName,
+        smsMessage: `🎉 ${senderData.fullName} sent you a friend request on Spendy! Open the app to accept it.`
+      }
+    });
+
+  } catch (error) {
+    console.error('Send SMS friend request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send SMS friend request',
+      error: 'SMS_FRIEND_REQUEST_ERROR'
+    });
+  }
+});
+
 // Accept Friend Request Endpoint
 meetnsplitApp.post('/friends/requests/accept', authenticateJWT, async (req, res) => {
   try {
@@ -6760,15 +6940,35 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
 
     console.log('🔍 Checking for pending friend requests during registration:', { userId, phoneNumber, email });
 
+    // Normalize the phone number for consistent matching
+    let normalizedPhone;
+    try {
+      normalizedPhone = normalizePhoneNumber(phoneNumber, 'US'); // Default to US, but should use user's country
+      console.log('📱 Normalized phone for invite check:', { original: phoneNumber, normalized: normalizedPhone });
+    } catch (phoneError) {
+      console.error('⚠️ Phone normalization failed during invite check:', phoneError);
+      normalizedPhone = phoneNumber; // Fallback to original
+    }
+
     // Find pending friend requests by email
     const emailFriendRequests = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
       .where('toEmail', '==', email.toLowerCase())
       .where('status', '==', 'pending')
       .get();
 
-    console.log(`📧 Found ${emailFriendRequests.docs.length} pending email friend requests`);
+    // Find pending SMS friend requests by phone number
+    const smsFriendRequests = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('toPhone', '==', normalizedPhone)
+      .where('status', '==', 'pending')
+      .get();
 
-    if (emailFriendRequests.empty) {
+    console.log(`📧 Found ${emailFriendRequests.docs.length} pending email friend requests`);
+    console.log(`📱 Found ${smsFriendRequests.docs.length} pending SMS friend requests`);
+
+    // Combine all pending requests
+    const allPendingRequests = [...emailFriendRequests.docs, ...smsFriendRequests.docs];
+
+    if (allPendingRequests.length === 0) {
       return res.json({
         success: true,
         message: 'No pending invites found',
@@ -6784,12 +6984,13 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
     const newFriendships = [];
     const processedInvites = [];
 
-    for (const doc of emailFriendRequests.docs) {
+    for (const doc of allPendingRequests) {
       const requestData = doc.data();
       const fromUserId = requestData.fromUserId;
+      const inviteType = requestData.type || 'email_invite'; // Default to email for backwards compatibility
 
       try {
-        console.log('🤝 Auto-accepting friend request:', doc.id, 'from:', fromUserId);
+        console.log(`🤝 Auto-accepting ${inviteType}:`, doc.id, 'from:', fromUserId);
 
         // Check if friendship already exists
         const existingFriendship = await db.collection(COLLECTIONS.FRIENDS)
@@ -6804,12 +7005,22 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
         }
 
         // Update the friend request with the new user ID and accept it
-        await doc.ref.update({
+        const updateData = {
           toUserId: userId,
           status: 'accepted',
           acceptedAt: new Date(),
           updatedAt: new Date()
-        });
+        };
+
+        // For SMS invites, also update the user data
+        if (inviteType === 'sms_invite' && requestData.toUserData) {
+          updateData.toUserData = {
+            ...requestData.toUserData,
+            isNewUser: false // User is now registered
+          };
+        }
+
+        await doc.ref.update(updateData);
 
         // Create mutual friendship
         const batch = db.batch();
@@ -6843,7 +7054,7 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
           ...requestData
         });
 
-        console.log('✅ Auto-accepted friend request and created friendship:', doc.id);
+        console.log(`✅ Auto-accepted ${inviteType} and created friendship:`, doc.id);
 
         // Send notification to the original inviter
         try {
@@ -6855,20 +7066,28 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
             const newUserData = newUserDoc.data();
             
             if (inviterData.pushToken) {
+              const notificationTitle = inviteType === 'sms_invite' 
+                ? '🎉 SMS Invite Accepted!' 
+                : '🎉 Friend Request Accepted!';
+              const notificationBody = inviteType === 'sms_invite'
+                ? `${newUserData.fullName} joined Spendy from your SMS invite and you're now friends!`
+                : `${newUserData.fullName} joined Meet-n-Split and you're now friends!`;
+
               const notification = {
-                title: '🎉 Friend Request Accepted!',
-                body: `${newUserData.fullName} joined Meet-n-Split and you're now friends!`,
+                title: notificationTitle,
+                body: notificationBody,
                 data: {
                   type: 'friend_request_accepted',
                   fromUserId: userId,
                   fromUserName: newUserData.fullName,
                   friendRequestId: doc.id,
-                  autoAccepted: true
+                  autoAccepted: true,
+                  inviteType: inviteType
                 }
               };
 
               await sendExpoPushNotification(inviterData.pushToken, notification);
-              console.log('✅ Sent auto-acceptance notification to inviter');
+              console.log(`✅ Sent auto-acceptance notification to inviter for ${inviteType}`);
             }
           }
         } catch (notificationError) {
