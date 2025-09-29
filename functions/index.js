@@ -7335,6 +7335,164 @@ meetnsplitApp.get('/gmail/callback', async (req, res) => {
   }
 });
 
+// Check for pending friend requests during registration
+meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
+  try {
+    const { userId, phoneNumber, email } = req.body;
+
+    if (!userId || !phoneNumber || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId, phoneNumber, and email are required'
+      });
+    }
+
+    console.log('🔍 Checking for pending friend requests during registration:', { userId, phoneNumber, email });
+
+    // Find pending friend requests by email
+    const emailFriendRequests = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('toEmail', '==', email.toLowerCase())
+      .where('status', '==', 'pending')
+      .get();
+
+    console.log(`📧 Found ${emailFriendRequests.docs.length} pending email friend requests`);
+
+    if (emailFriendRequests.empty) {
+      return res.json({
+        success: true,
+        message: 'No pending invites found',
+        hasPendingInvites: false,
+        invites: [],
+        autoAcceptedCount: 0,
+        newFriendships: []
+      });
+    }
+
+    // Process each pending request and create friendships
+    let autoAcceptedCount = 0;
+    const newFriendships = [];
+    const processedInvites = [];
+
+    for (const doc of emailFriendRequests.docs) {
+      const requestData = doc.data();
+      const fromUserId = requestData.fromUserId;
+
+      try {
+        console.log('🤝 Auto-accepting friend request:', doc.id, 'from:', fromUserId);
+
+        // Check if friendship already exists
+        const existingFriendship = await db.collection(COLLECTIONS.FRIENDS)
+          .where('userId', 'in', [fromUserId, userId])
+          .where('friendId', 'in', [fromUserId, userId])
+          .where('status', '==', 'accepted')
+          .get();
+
+        if (!existingFriendship.empty) {
+          console.log('⚠️ Friendship already exists, skipping');
+          continue;
+        }
+
+        // Update the friend request with the new user ID and accept it
+        await doc.ref.update({
+          toUserId: userId,
+          status: 'accepted',
+          acceptedAt: new Date(),
+          updatedAt: new Date()
+        });
+
+        // Create mutual friendship
+        const batch = db.batch();
+
+        const friendship1 = {
+          userId: fromUserId,
+          friendId: userId,
+          status: 'accepted',
+          createdAt: new Date(),
+          friendRequestId: doc.id
+        };
+
+        const friendship2 = {
+          userId: userId,
+          friendId: fromUserId,
+          status: 'accepted',
+          createdAt: new Date(),
+          friendRequestId: doc.id
+        };
+
+        batch.set(db.collection(COLLECTIONS.FRIENDS).doc(), friendship1);
+        batch.set(db.collection(COLLECTIONS.FRIENDS).doc(), friendship2);
+
+        await batch.commit();
+
+        autoAcceptedCount++;
+        newFriendships.push(fromUserId);
+        processedInvites.push({
+          id: doc.id,
+          inviterId: fromUserId,
+          ...requestData
+        });
+
+        console.log('✅ Auto-accepted friend request and created friendship:', doc.id);
+
+        // Send notification to the original inviter
+        try {
+          const inviterDoc = await db.collection(COLLECTIONS.USERS).doc(fromUserId).get();
+          const newUserDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+          
+          if (inviterDoc.exists && newUserDoc.exists) {
+            const inviterData = inviterDoc.data();
+            const newUserData = newUserDoc.data();
+            
+            if (inviterData.pushToken) {
+              const notification = {
+                title: '🎉 Friend Request Accepted!',
+                body: `${newUserData.fullName} joined Meet-n-Split and you're now friends!`,
+                data: {
+                  type: 'friend_request_accepted',
+                  fromUserId: userId,
+                  fromUserName: newUserData.fullName,
+                  friendRequestId: doc.id,
+                  autoAccepted: true
+                }
+              };
+
+              await sendExpoPushNotification(inviterData.pushToken, notification);
+              console.log('✅ Sent auto-acceptance notification to inviter');
+            }
+          }
+        } catch (notificationError) {
+          console.error('⚠️ Failed to send notification:', notificationError);
+          // Don't fail the whole process for notification errors
+        }
+
+      } catch (error) {
+        console.error('❌ Failed to process friend request:', doc.id, error);
+        // Continue processing other requests even if one fails
+      }
+    }
+
+    const response = {
+      success: true,
+      message: autoAcceptedCount > 0 ? `Converted ${autoAcceptedCount} pending invites` : 'No pending invites found',
+      hasPendingInvites: autoAcceptedCount > 0,
+      invites: processedInvites,
+      autoAcceptedCount,
+      newFriendships
+    };
+
+    console.log('📋 Registration invite check response:', response);
+    res.json(response);
+
+  } catch (error) {
+    console.error('❌ Check registration invites error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check pending invites',
+      error: error.message
+    });
+  }
+});
+
 // Export Meet-n-Split API as Firebase Function
 exports.meetnsplitApi = functions.https.onRequest(meetnsplitApp);
 
