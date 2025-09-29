@@ -273,7 +273,7 @@ export default function RegisterScreen() {
 
     const renderCountryItem = ({ item }: { item: typeof COUNTRIES[0] }) => (
       <TouchableOpacity
-        style={[styles.optionItem, { backgroundColor: theme.colors.surface }]}
+        style={[styles.optionItem, { borderBottomColor: theme.colors.border }]}
         onPress={() => {
           setFormData({ 
             ...formData, 
@@ -361,6 +361,7 @@ export default function RegisterScreen() {
             showsVerticalScrollIndicator={true}
             keyboardShouldPersistTaps="handled"
             style={styles.optionsList}
+            contentContainerStyle={styles.optionsListContent}
           />
         </SafeAreaView>
       </Modal>
@@ -952,18 +953,22 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   optionsList: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 0,
+  },
+  optionsListContent: {
+    paddingBottom: 16,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
   },
   optionFlag: {
-    fontSize: 24,
+    fontSize: 20,
+    marginRight: 12,
   },
   optionInfo: {
     flex: 1,
@@ -995,9 +1000,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 8,
-    marginTop: 8,
   },
   popularSection: {
     flexGrow: 0,
