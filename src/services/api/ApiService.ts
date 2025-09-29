@@ -1157,16 +1157,16 @@ class ApiService {
         body: JSON.stringify(data),
       };
 
-      console.log(`🌐 API Request: POST /invites/unified/check-registration`);
+      console.log(`🌐 API Request: POST /friends/check-registration`);
       
-      const response = await fetch(`${this.baseURL}/invites/unified/check-registration`, options);
+      const response = await fetch(`${this.baseURL}/friends/check-registration`, options);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
-      console.log(`✅ API Response: /invites/unified/check-registration`, result.success ? 'Success' : 'Failed');
+      console.log(`✅ API Response: /friends/check-registration`, result.success ? 'Success' : 'Failed');
       
       return result; // Return the full response object with hasPendingInvites etc.
     } catch (error) {
