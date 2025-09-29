@@ -29,21 +29,11 @@ npm run logs                 # View function logs
 npm run lint                 # Run ESLint (currently disabled - exits 0)
 ```
 
-### API Server (Express.js)
-```bash
-# Located in /api directory
-cd api
-npm install                  # Install dependencies
-npm run build               # Build TypeScript
-npm start                   # Start production server
-npm run dev                 # Start development server with auto-reload
-```
-
 ## Project Architecture
 
 ### Tech Stack
 - **Frontend**: React Native with Expo SDK 53
-- **Backend**: Express.js TypeScript API + Firebase Cloud Functions
+- **Backend**: Firebase Cloud Functions (Serverless)
 - **Database**: Firebase Firestore
 - **Authentication**: Custom JWT implementation via API Service
 - **Navigation**: React Navigation 7 with bottom tabs + swipe support
@@ -52,17 +42,18 @@ npm run dev                 # Start development server with auto-reload
 
 ### Core Architecture Patterns
 
-#### API-First Design
-The project uses a custom REST API (`/api`) as the primary backend, with Firebase Cloud Functions as secondary support. All data operations go through `ApiService.ts` singleton:
+#### Serverless Architecture
+The project uses Firebase Cloud Functions as the primary backend. All data operations go through `ApiService.ts` singleton:
 
 ```typescript
-// Primary data flow
-App -> useAuth/Components -> ApiService -> Express API -> Firestore
+// Data flow
+App -> useAuth/Components -> ApiService -> Firebase Functions -> Firestore
 ```
 
-#### Dual Service Architecture
-- **Primary**: Express.js API server (`/api`) - handles auth, CRUD operations, friends, groups, expenses
-- **Secondary**: Firebase Cloud Functions (`/functions`) - handles push notifications, scheduled tasks
+#### Firebase Functions Backend
+- **Primary**: Firebase Cloud Functions (`/functions/index.js`) - handles all API operations
+- **Features**: auth, CRUD operations, friends, groups, expenses, notifications, scheduled tasks
+- **Serverless**: No server infrastructure to maintain
 
 #### Navigation Structure
 - **Main App**: Bottom tab navigator with 5 tabs (Split, Smart Money, Add Action, Reminders, Profile)
@@ -148,23 +139,24 @@ Follows React Context pattern with providers:
 - Integration tests for settlement algorithms
 - Component tests for modals
 
-## API Integration Notes
+## Firebase Functions Integration Notes
 
 ### Base URLs
-- **Production API**: `https://us-central1-spendy-97913.cloudfunctions.net/spendyApi`
-- **Local Development**: Configure in `ApiService.ts`
+- **Production**: `https://us-central1-spendy-97913.cloudfunctions.net/meetnsplitApi`
+- **Development**: `https://us-central1-spendy-develop.cloudfunctions.net/meetnsplitApi`
 
 ### Key API Patterns
 - All requests include JWT Bearer token when authenticated
 - Consistent response format: `{ success: boolean, message: string, data?: any }`
-- Rate limiting and validation on server side
+- Rate limiting and validation on Firebase Functions
 - Graceful handling of new user scenarios (empty data arrays)
 
 ### Firebase Integration
 - Firestore as primary database
-- Firebase Functions for background tasks
+- Firebase Functions for all API endpoints and background tasks
 - Push notifications via Firebase Cloud Messaging
 - File storage for profile pictures (planned)
+- Scheduled functions for notifications and cleanup
 
 ## Important Development Notes
 
@@ -173,9 +165,9 @@ Uses **Yarn** as primary package manager (configured in packageManager field)
 
 ### Build System
 - **Expo CLI** for React Native builds
-- **TypeScript** compilation for both frontend and backend
+- **Firebase Functions** for serverless backend deployment
 - **Metro** bundler for React Native
 - **Jest** for testing
 
 ### Environment Variables
-The API server requires `.env` configuration with Firebase project ID, JWT secrets, and other service credentials.
+Firebase Functions require `.env` configuration with Firebase project ID, JWT secrets, and other service credentials.
