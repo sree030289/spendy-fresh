@@ -1478,7 +1478,7 @@ meetnsplitApp.post('/friends/requests/send-sms', authenticateJWT, async (req, re
 
     // Find target user by normalized phone number
     const targetUserSnapshot = await db.collection(COLLECTIONS.USERS)
-      .where('mobile', '==', normalizedPhone)
+      .where('normalizedMobile', '==', normalizedPhone)
       .limit(1)
       .get();
 

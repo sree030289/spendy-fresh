@@ -23,6 +23,7 @@ import { BrandHeader } from '@/components/common/BrandHeader';
 import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
 import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
+import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
 import { COUNTRIES } from '@/constants/countries';
 
 export default function RegisterScreen() {
@@ -198,15 +199,37 @@ export default function RegisterScreen() {
 
   const completeRegistration = async (biometricEnabled: boolean) => {
     try {
+      // Normalize phone number to E.164 format
+      let normalizedMobile = formData.mobile.trim();
+      try {
+        if (normalizedMobile) {
+          normalizedMobile = PhoneNumberService.normalize(normalizedMobile, formData.country as any);
+          console.log('📱 Phone number normalized for registration:', { 
+            original: formData.mobile.trim(), 
+            normalized: normalizedMobile 
+          });
+        }
+      } catch (phoneError) {
+        console.error('⚠️ Phone normalization failed during registration:', phoneError);
+        // Continue with original number if normalization fails
+        Alert.alert(
+          'Phone Number Warning', 
+          'Unable to format phone number. Please ensure you\'ve entered a valid number with country code.',
+          [{ text: 'Continue Anyway', style: 'default' }]
+        );
+      }
+
       const userData = {
         fullName: formData.fullName.trim(),
         email: formData.email.trim().toLowerCase(),
-        mobile: formData.mobile.trim(),
+        mobile: normalizedMobile,
         password: formData.password,
         country: formData.country,
         currency: formData.currency,
         biometricEnabled,
       };
+      
+      console.log('📝 Registration data prepared:', { ...userData, password: '[HIDDEN]' });
       
       await register(userData);
       
