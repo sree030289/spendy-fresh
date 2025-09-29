@@ -329,8 +329,7 @@ const COLLECTIONS = {
   FRIENDS: 'friendships',
   FRIEND_REQUESTS: 'friendRequests',
   SETTLEMENTS: 'settlements',
-  NOTIFICATIONS: 'notifications',
-  UNIFIED_INVITES: 'unifiedInvites'
+  NOTIFICATIONS: 'notifications'
 };
 
 // ===== AUTHENTICATION ROUTES =====
