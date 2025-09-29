@@ -19,6 +19,9 @@ import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { InviteService } from '@/services/payments/PaymentService';
+import { SMSInviteService } from '@/services/invite/SMSInviteService';
+import PhoneNumberInput, { Country } from '@/components/common/PhoneNumberInput';
+import { getDefaultCountry } from '@/components/common/CountryCodePicker';
 import { requestCameraPermissionsAsync } from 'expo-image-picker';
 import * as Contacts from 'expo-contacts';
 
@@ -46,6 +49,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   const [errors, setErrors] = useState({ email: '', phone: '', name: '' });
   const [showContactNameInput, setShowContactNameInput] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<Country>(getDefaultCountry());
 
   const MAX_CONTACTS = 5;
 
@@ -329,60 +333,95 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   };
 
   const handleSendSMS = async () => {
-    if (selectedContacts.length === 0) {
-      Alert.alert('No Contacts Selected', 'Please select at least one contact to send SMS invitations.');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const successfulInvites: string[] = [];
-      const failedInvites: string[] = [];
+    // For the new SMS flow, we handle single phone number entries differently
+    if (showManualInput && phoneNumber && contactName) {
+      // Manual single entry flow using SMSInviteService
+      if (!validatePhone(phoneNumber) || !validateName(contactName)) {
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        const smsInviteService = SMSInviteService.getInstance();
+        const result = await smsInviteService.sendSMSInvite({
+          phoneNumber,
+          message: `Hi! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
+          countryCode: selectedCountry.code as any
+        });
 
-      // Validate all contacts have names before sending
-      const validatedContacts = selectedContacts.map(contact => ({
-        ...contact,
-        name: contact.name?.trim() || 'Friend'
-      }));
-
-      for (const contact of validatedContacts) {
-        try {
-          const message = InviteService.generateFriendInviteMessage(user?.fullName || 'Friend');
-          await InviteService.sendSMSInvite(contact.phoneNumber, message);
-          successfulInvites.push(contact.name);
-        } catch (error) {
-          console.error(`Failed to send SMS to ${contact.name}:`, error);
-          failedInvites.push(contact.name);
+        if (result.success) {
+          Alert.alert('SMS Invite Sent!', result.message, [{ text: 'OK' }]);
+          
+          // Reset form
+          setPhoneNumber('');
+          setContactName('');
+          setShowManualInput(false);
+          onClose();
+        } else {
+          Alert.alert('Invite Failed', result.message || 'Failed to send SMS invite', [{ text: 'OK' }]);
         }
+      } catch (error) {
+        console.error('SMS invite error:', error);
+        Alert.alert('Error', 'Failed to send SMS invite. Please try again.', [{ text: 'OK' }]);
+      } finally {
+        setLoading(false);
       }
+    } else if (selectedContacts.length > 0) {
+      // Multiple contacts flow (legacy support)
+      setLoading(true);
+      try {
+        const successfulInvites: string[] = [];
+        const failedInvites: string[] = [];
+        const smsInviteService = SMSInviteService.getInstance();
 
-      // Send all contacts to parent for friend creation
-      await onSubmit('', 'sms', validatedContacts);
-      
-      // Show results
-      let resultMessage = '';
-      if (successfulInvites.length > 0) {
-        resultMessage += `SMS invitations sent to: ${successfulInvites.join(', ')}`;
+        for (const contact of selectedContacts) {
+          try {
+            const result = await smsInviteService.sendSMSInvite({
+              phoneNumber: contact.phoneNumber,
+              message: `Hi ${contact.name}! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
+              countryCode: selectedCountry.code as any
+            });
+
+            if (result.success) {
+              successfulInvites.push(contact.name);
+            } else {
+              failedInvites.push(contact.name);
+            }
+          } catch (error) {
+            console.error(`Failed to send SMS to ${contact.name}:`, error);
+            failedInvites.push(contact.name);
+          }
+        }
+
+        // Show results
+        let resultMessage = '';
+        if (successfulInvites.length > 0) {
+          resultMessage += `SMS invitations sent to: ${successfulInvites.join(', ')}`;
+        }
+        if (failedInvites.length > 0) {
+          if (resultMessage) resultMessage += '\n\n';
+          resultMessage += `Failed to send to: ${failedInvites.join(', ')}`;
+        }
+        
+        Alert.alert(
+          successfulInvites.length > 0 ? 'Invitations Sent!' : 'Some Invitations Failed',
+          resultMessage,
+          [{ text: 'OK' }]
+        );
+
+        if (successfulInvites.length > 0) {
+          // Reset and close
+          setSelectedContacts([]);
+          onClose();
+        }
+      } catch (error) {
+        console.error('SMS batch invite error:', error);
+        Alert.alert('Error', 'Failed to send SMS invites. Please try again.', [{ text: 'OK' }]);
+      } finally {
+        setLoading(false);
       }
-      if (failedInvites.length > 0) {
-        if (resultMessage) resultMessage += '\n\n';
-        resultMessage += `Failed to send to: ${failedInvites.join(', ')}`;
-      }
-      
-      Alert.alert(
-        successfulInvites.length > 0 ? 'Invitations Sent!' : 'Some Invitations Failed',
-        resultMessage,
-        [{ text: 'OK' }]
-      );
-      
-      // Reset and close
-      setSelectedContacts([]);
-      resetPhoneForm();
-      onClose();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send SMS invitations');
-    } finally {
-      setLoading(false);
+    } else {
+      Alert.alert('No Contact Information', 'Please enter a phone number or select contacts to invite.');
     }
   };
 
@@ -612,26 +651,17 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         <View style={styles.manualInputContainer}>
           <View style={styles.inputContainer}>
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Phone Number</Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: errors.phone ? theme.colors.error : theme.colors.border,
-                  color: theme.colors.text,
-                }
-              ]}
-              placeholder="Enter phone number with country code"
-              placeholderTextColor={theme.colors.textSecondary}
+            <PhoneNumberInput
               value={phoneNumber}
-              onChangeText={handlePhoneNumberChange}
-              keyboardType="phone-pad"
+              onChangeText={(text) => {
+                setPhoneNumber(text);
+                if (errors.phone) validatePhone(text);
+              }}
+              onCountryChange={setSelectedCountry}
+              placeholder="Enter phone number"
+              error={errors.phone}
+              autoFocus={true}
             />
-            {errors.phone ? (
-              <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                {errors.phone}
-              </Text>
-            ) : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -675,11 +705,19 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.addManualButton, { backgroundColor: theme.colors.primary }]}
-              onPress={addManualContact}
-              disabled={!phoneNumber.trim() || !contactName.trim()}
+              style={[
+                styles.addManualButton, 
+                { backgroundColor: (!phoneNumber.trim() || !contactName.trim()) ? theme.colors.disabled : theme.colors.primary }
+              ]}
+              onPress={handleSendSMS}
+              disabled={!phoneNumber.trim() || !contactName.trim() || loading}
             >
-              <Text style={styles.addManualText}>Add Contact</Text>
+              <Text style={[
+                styles.addManualText, 
+                { color: (!phoneNumber.trim() || !contactName.trim()) ? theme.colors.textSecondary : 'white' }
+              ]}>
+                {loading ? 'Sending...' : 'Send SMS Invite'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

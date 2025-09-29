@@ -1272,7 +1272,6 @@ class ApiService {
     return response;
   }
 }
-}
 
 export default ApiService;
 export { ApiService };
