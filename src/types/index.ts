@@ -29,52 +29,11 @@ export interface AuthState {
   isAuthenticated: boolean;
 }
 
-// Unified Invite System Types
-export interface UnifiedInvite {
-  id: string;
-  inviterId: string;
-  inviterData: {
-    fullName: string;
-    email: string;
-    profilePicture?: string;
-  };
-  recipientUserId: string | null; // null for unregistered users
-  recipientPhone: string; // E.164 format
-  recipientEmail: string | null; // null for unregistered users initially
-  status: 'PENDING' | 'SIGNUP_PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED';
-  type: 'SMS_REGISTERED_USER' | 'SMS_UNREGISTERED_USER' | 'EMAIL_REGISTERED_USER' | 'EMAIL_UNREGISTERED_USER';
-  inviteToken: string; // Unique token for tracking
-  sentVia: 'SMS' | 'EMAIL' | 'PUSH' | 'QR';
-  message?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  expiresAt: Date;
-  acceptedAt?: Date;
-  convertedFromPendingAt?: Date; // When SIGNUP_PENDING was converted to PENDING/ACCEPTED
-}
-
-export interface InviteCreationRequest {
-  inviterId: string;
-  recipientPhone?: string;
-  recipientEmail?: string;
-  countryCode?: string; // Required for SMS invites (ISO 3166-1 alpha-2, e.g., 'US', 'AU')
-  message?: string;
-  sentVia: 'SMS' | 'EMAIL' | 'PUSH' | 'QR';
-  autoAccept?: boolean; // For unregistered users who sign up
-}
-
-export interface InviteResponse {
-  success: boolean;
-  invite?: UnifiedInvite;
-  isRegisteredUser: boolean;
-  friendshipStatus?: 'already_friends' | 'request_pending' | 'request_received' | 'no_relationship';
-  message: string;
-}
-
+// Registration invite check result
 export interface PendingInviteCheckResult {
   hasPendingInvites: boolean;
-  invites: UnifiedInvite[];
-  autoAcceptedCount: number;
+  invites: any[]; // Friend request data
+  autoAcceptedCount: number;  
   newFriendships: string[]; // Array of new friend user IDs
 }
 

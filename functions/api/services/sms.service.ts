@@ -3,7 +3,7 @@ import { ENV } from '../config/env';
 /**
  * SMS Service for sending invite notifications
  * 
- * This service handles SMS sending for unified invites.
+ * This service handles SMS sending for friend invites.
  * Currently using a mock implementation but can be easily 
  * switched to Twilio, AWS SNS, or other SMS providers.
  */
