@@ -13,8 +13,7 @@ export const COLLECTIONS = {
   BANK_ACCOUNTS: 'bankAccounts',
   TRANSACTIONS: 'transactions',
   SUBSCRIPTIONS: 'subscriptions',
-  DEALS: 'deals',
-  UNIFIED_INVITES: 'unifiedInvites'
+  DEALS: 'deals'
 } as const;
 
 export const FRIEND_STATUS = {

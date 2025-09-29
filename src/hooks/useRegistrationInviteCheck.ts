@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { UnifiedInviteService } from '../services/invite/UnifiedInviteService';
+import { ApiService } from '../services/api/ApiService';
 import { PendingInviteCheckResult } from '../types';
 
 interface UseRegistrationInviteCheckProps {
@@ -34,7 +34,7 @@ export function useRegistrationInviteCheck({
   
   // Use ref to prevent multiple simultaneous checks
   const isCheckingRef = useRef(false);
-  const inviteService = useRef(UnifiedInviteService.getInstance());
+  const apiService = useRef(ApiService.getInstance());
 
   const checkForPendingInvites = async (): Promise<void> => {
     // Prevent multiple simultaneous checks
@@ -61,11 +61,11 @@ export function useRegistrationInviteCheck({
     try {
       console.log('🔍 Checking for pending invites:', { userId, phoneNumber, email });
 
-      const result = await inviteService.current.checkPendingInvitesOnRegistration(
+      const result = await apiService.current.checkPendingInvitesOnRegistration({
         userId,
         phoneNumber,
         email
-      );
+      });
 
       console.log('✅ Pending invite check complete:', result);
 
@@ -153,12 +153,12 @@ export function usePendingInvitesCheck(phoneNumber: string | null, email: string
     setError(null);
 
     try {
-      const inviteService = UnifiedInviteService.getInstance();
-      const result = await inviteService.checkPendingInvitesOnRegistration(
-        '', // No user ID for simple check
-        phoneNumber || '',
-        email || ''
-      );
+      const apiService = ApiService.getInstance();
+      const result = await apiService.checkPendingInvitesOnRegistration({
+        userId: '', // No user ID for simple check
+        phoneNumber: phoneNumber || '',
+        email: email || ''
+      });
       
       setPendingInvites(result.invites || []);
     } catch (err) {
@@ -185,28 +185,24 @@ export function usePendingInvitesCheck(phoneNumber: string | null, email: string
 }
 
 /**
- * Hook for handling individual invite responses (accept/decline)
+ * Hook for handling individual friend request responses (accept/decline)
  */
 export function useInviteResponse() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inviteService = useRef(UnifiedInviteService.getInstance());
+  const apiService = useRef(ApiService.getInstance());
 
-  const acceptInvite = async (inviteId: string, userId: string): Promise<boolean> => {
+  const acceptInvite = async (requestId: string): Promise<boolean> => {
     setIsProcessing(true);
     setError(null);
 
     try {
-      const success = await inviteService.current.acceptInvite(inviteId, userId);
-      if (success) {
-        console.log('✅ Invite accepted successfully');
-      } else {
-        setError('Failed to accept invite');
-      }
-      return success;
+      await apiService.current.acceptFriendRequest(requestId);
+      console.log('✅ Friend request accepted successfully');
+      return true;
     } catch (err) {
-      console.error('❌ Error accepting invite:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to accept invite';
+      console.error('❌ Error accepting friend request:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to accept friend request';
       setError(errorMessage);
       return false;
     } finally {
@@ -214,21 +210,17 @@ export function useInviteResponse() {
     }
   };
 
-  const declineInvite = async (inviteId: string, userId: string): Promise<boolean> => {
+  const declineInvite = async (requestId: string): Promise<boolean> => {
     setIsProcessing(true);
     setError(null);
 
     try {
-      const success = await inviteService.current.declineInvite(inviteId, userId);
-      if (success) {
-        console.log('✅ Invite declined successfully');
-      } else {
-        setError('Failed to decline invite');
-      }
-      return success;
+      await apiService.current.declineFriendRequest(requestId);
+      console.log('✅ Friend request declined successfully');
+      return true;
     } catch (err) {
-      console.error('❌ Error declining invite:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to decline invite';
+      console.error('❌ Error declining friend request:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to decline friend request';
       setError(errorMessage);
       return false;
     } finally {

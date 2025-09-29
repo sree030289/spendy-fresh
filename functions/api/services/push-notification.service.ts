@@ -1,7 +1,7 @@
 import { messaging } from '../config/firebase';
 
 /**
- * Push Notification Service for unified invites
+ * Push Notification Service for friend invites
  * 
  * Handles push notifications for registered users via Firebase Cloud Messaging (FCM)
  */
