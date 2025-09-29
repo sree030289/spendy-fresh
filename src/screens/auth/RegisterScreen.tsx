@@ -26,6 +26,7 @@ import { BiometricService } from '@/services/biometric';
 import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
 import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
 import { COUNTRIES, POPULAR_COUNTRIES, CURRENCIES } from '@/constants/countries';
+import CountryCodePicker, { Country, findCountryByCode, convertToPickerCountry } from '@/components/common/CountryCodePicker';
 
 export default function RegisterScreen() {
   const navigation = useNavigation();
@@ -33,11 +34,12 @@ export default function RegisterScreen() {
   const { register, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
-  const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [countrySearchQuery, setCountrySearchQuery] = useState('');
   const [currencySearchQuery, setCurrencySearchQuery] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState<Country>(
+    findCountryByCode('AU') || findCountryByCode('US')!
+  );
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -53,8 +55,15 @@ export default function RegisterScreen() {
     password: '',
   });
 
-  const selectedCountry = COUNTRIES.find(c => c.code === formData.country) || COUNTRIES[0];
   const styles = getStyles(theme.colors);
+
+  // Update selectedCountry when formData.country changes
+  React.useEffect(() => {
+    const country = findCountryByCode(formData.country);
+    if (country) {
+      setSelectedCountry(country);
+    }
+  }, [formData.country]);
 
   // Note: Navigation to main app happens automatically in App.tsx when user state changes
   // No manual navigation needed here
@@ -260,111 +269,6 @@ export default function RegisterScreen() {
     } else {
       Keyboard.dismiss();
     }
-  };
-
-  const CountryPicker = () => {
-    const filteredCountries = countrySearchQuery
-      ? COUNTRIES.filter(country =>
-          country.name.toLowerCase().includes(countrySearchQuery.toLowerCase()) ||
-          country.code.toLowerCase().includes(countrySearchQuery.toLowerCase()) ||
-          country.phoneCode.includes(countrySearchQuery)
-        )
-      : COUNTRIES;
-
-    const renderCountryItem = ({ item }: { item: typeof COUNTRIES[0] }) => (
-      <TouchableOpacity
-        style={[styles.optionItem, { backgroundColor: theme.colors.surface }]}
-        onPress={() => {
-          setFormData({ 
-            ...formData, 
-            country: item.code,
-            currency: item.currency // Auto-set currency based on country
-          });
-          setShowCountryPicker(false);
-          setCountrySearchQuery('');
-        }}
-      >
-        <Text style={styles.optionFlag}>{item.flag}</Text>
-        <View style={styles.optionInfo}>
-          <Text style={[styles.optionName, { color: theme.colors.text }]}>
-            {item.name}
-          </Text>
-          <Text style={[styles.optionSubtext, { color: theme.colors.textSecondary }]}>
-            {item.phoneCode} • {item.currency}
-          </Text>
-        </View>
-        {formData.country === item.code && (
-          <Icon name="checkmark" size={24} color={theme.colors.primary}  />
-        )}
-      </TouchableOpacity>
-    );
-
-    return (
-      <Modal
-        visible={showCountryPicker}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowCountryPicker(false)}
-      >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => {
-              setShowCountryPicker(false);
-              setCountrySearchQuery('');
-            }}>
-              <Icon name="close" size={24} color={theme.colors.text}  />
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-              Select Country
-            </Text>
-            <View style={{ width: 24 }} />
-          </View>
-
-          {/* Search Bar */}
-          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-            <Icon name="search" size={20} color={theme.colors.textSecondary} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.colors.text }]}
-              placeholder="Search countries..."
-              placeholderTextColor={theme.colors.textSecondary}
-              value={countrySearchQuery}
-              onChangeText={setCountrySearchQuery}
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-          </View>
-
-          {/* Popular Countries Section */}
-          {!countrySearchQuery && (
-            <>
-              <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
-                Popular Countries
-              </Text>
-              <FlatList
-                data={POPULAR_COUNTRIES}
-                keyExtractor={(item) => `popular-${item.code}`}
-                renderItem={renderCountryItem}
-                scrollEnabled={false}
-                style={styles.popularSection}
-              />
-              <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary, marginTop: 20 }]}>
-                All Countries
-              </Text>
-            </>
-          )}
-
-          {/* Countries List */}
-          <FlatList
-            data={filteredCountries}
-            keyExtractor={(item) => item.code}
-            renderItem={renderCountryItem}
-            showsVerticalScrollIndicator={true}
-            keyboardShouldPersistTaps="handled"
-            style={styles.optionsList}
-          />
-        </SafeAreaView>
-      </Modal>
-    );
   };
 
   const CurrencyPicker = () => {
@@ -600,20 +504,26 @@ export default function RegisterScreen() {
                 ) : null}
               </View>
 
-              <TouchableOpacity
-                style={[styles.selector, { 
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.border 
-                }]}
-                onPress={() => setShowCountryPicker(true)}
-              >
+              <View style={[styles.countryPickerContainer, { 
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border 
+              }]}>
                 <Icon name="flag-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
-                <Text style={styles.selectorFlag}>{selectedCountry.flag}</Text>
-                <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                  {selectedCountry.name}
-                </Text>
-                <Icon name="chevron-down" size={20} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
+                <CountryCodePicker
+                  selectedCountry={selectedCountry}
+                  onSelectCountry={(country: Country) => {
+                    setSelectedCountry(country);
+                    // Find matching country in constants to get currency
+                    const constantsCountry = COUNTRIES.find(c => c.phoneCode === country.dialCode && c.code === country.code);
+                    setFormData({ 
+                      ...formData, 
+                      country: country.code,
+                      currency: constantsCountry?.currency || formData.currency
+                    });
+                  }}
+                  style={styles.countryPickerWrapper}
+                />
+              </View>
 
               <View style={styles.phoneContainer}>
                 <View style={[styles.countryCode, { 
@@ -621,7 +531,7 @@ export default function RegisterScreen() {
                   borderColor: theme.colors.border 
                 }]}>
                   <Text style={{ color: theme.colors.text }}>
-                    {selectedCountry.phoneCode}
+                    {selectedCountry.dialCode}
                   </Text>
                 </View>
                 <View style={styles.phoneInputContainer}>
@@ -748,7 +658,6 @@ export default function RegisterScreen() {
         </TouchableWithoutFeedback>
       </View>
 
-      <CountryPicker />
       <CurrencyPicker />
       <BiometricPrompt />
     </SafeAreaView>
@@ -869,6 +778,24 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
     // color will be overridden by theme
+  },
+  countryPickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 12,
+    minHeight: 56,
+  },
+  countryPickerWrapper: {
+    flex: 1,
+    borderWidth: 0, // Remove border from picker since container has it
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   phoneContainer: {
     flexDirection: 'row',
