@@ -337,7 +337,7 @@ class ApiService {
     });
     
     if (response.success && response.data) {
-      return response.data.user;
+      return response.data;
     } else {
       throw new Error(response.message || 'Failed to update profile');
     }
@@ -360,77 +360,6 @@ class ApiService {
   // ========================
   // FRIENDS MANAGEMENT
   // ========================
-  async sendFriendRequestByEmail(recipientEmail: string, message?: string): Promise<any> {
-    const response = await this.makeRequest('/friends/requests/send', {
-      method: 'POST',
-      body: JSON.stringify({
-        recipientEmail,
-        message: message || 'Sent via Spendy'
-      })
-    });
-    
-    if (response.success) {
-      return response.data;
-    } else {
-      throw new Error(response.message || 'Failed to send friend request');
-    }
-  }
-
-  async acceptFriendRequest(requestId: string): Promise<any> {
-    const response = await this.makeRequest(`/friends/requests/${requestId}/accept`, {
-      method: 'POST'
-    });
-    
-    if (response.success) {
-      return response.data;
-    } else {
-      throw new Error(response.message || 'Failed to accept friend request');
-    }
-  }
-
-  async declineFriendRequest(requestId: string): Promise<any> {
-    const response = await this.makeRequest(`/friends/requests/${requestId}/reject`, {
-      method: 'POST'
-    });
-    
-    if (response.success) {
-      return response.data;
-    } else {
-      throw new Error(response.message || 'Failed to decline friend request');
-    }
-  }
-
-  async getFriends(): Promise<any> {
-    const response = await this.makeRequest('/friends');
-    
-    if (response.success) {
-      return response.data;
-    } else {
-      throw new Error(response.message || 'Failed to get friends');
-    }
-  }
-
-  async getFriendRequests(): Promise<any> {
-    const response = await this.makeRequest('/friends/requests');
-    
-    if (response.success) {
-      return response.data;
-    } else {
-      throw new Error(response.message || 'Failed to get friend requests');
-    }
-  }
-
-  async removeFriend(userId: string, friendId: string): Promise<any> {
-    const response = await this.makeRequest(`/friends/${friendId}`, {
-      method: 'DELETE'
-    });
-    
-    if (response.success) {
-      return response.data;
-    } else {
-      throw new Error(response.message || 'Failed to remove friend');
-    }
-  }
 
   // ========================
   // SESSION MANAGEMENT
@@ -1239,7 +1168,6 @@ class ApiService {
     });
     return response;
   }
-}
 }
 
 export default ApiService;
