@@ -53,8 +53,8 @@ class RealPaymentService {
 
   // RevenueCat Configuration
   private readonly REVENUECAT_API_KEY = Platform.select({
-    ios: 'appl_XYZYourIOSRevenueCatKey', // Replace with your actual iOS key
-    android: 'goog_XYZYourAndroidRevenueCatKey', // Replace with your actual Android key
+    ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY || 'appl_YOUR_PUBLIC_IOS_KEY_HERE', // Use PUBLIC key (starts with appl_)
+    android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY || 'goog_YOUR_PUBLIC_ANDROID_KEY_HERE', // Use PUBLIC key (starts with goog_)
   }) || '';
 
   // Product identifiers for App Store and Play Store
