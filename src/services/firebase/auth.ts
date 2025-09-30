@@ -25,44 +25,17 @@ const initializeFirebase = async () => {
     const { getFirestore } = await import('firebase/firestore');
     const { getStorage } = await import('firebase/storage');
 
-    // Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyA3PwHVfgqpxizujlimha-xTjsh_-5Tsc0",
-      authDomain: "spendy-97913.firebaseapp.com",
-      projectId: "spendy-97913",
-      storageBucket: "spendy-97913.firebasestorage.app",
-      messagingSenderId: "576826934856",
-      appId: "1:576826934856:web:7a74ac9644f9bfc7da7a7d",
-      measurementId: "G-ZHGC7PM0HZ"
-    };
-
-    // Initialize app
-    let app;
-    if (getApps().length === 0) {
-      console.log('📱 Creating new Firebase app...');
-      app = initializeApp(firebaseConfig);
-    } else {
-      console.log('📱 Using existing Firebase app...');
-      app = getApps()[0];
-    }
+    // Use centralized Firebase services
+    const { getFirebaseApp, getFirebaseAuth, getFirebaseFirestore, getFirebaseStorage } = await import('./config');
+    const { ENV } = await import('../../config/environment');
     
-    // Initialize auth
-    try {
-      console.log('🔐 Initializing Auth...');
-      firebaseAuth = getAuth(app);
-      console.log('✅ Auth initialized!');
-    } catch (error) {
-      console.log('❌ Auth initialization failed:', error);
-      throw error;
-    }
+    console.log(`📱 Getting Firebase services for: ${ENV.environment}...`);
+    const app = await getFirebaseApp();
+    firebaseAuth = await getFirebaseAuth();
+    firebaseDb = await getFirebaseFirestore();
+    firebaseStorage = await getFirebaseStorage();
     
-    // Initialize firestore
-    console.log('💾 Initializing Firestore...');
-    firebaseDb = getFirestore(app);
-    
-    // Initialize storage
-    console.log('📦 Initializing Storage...');
-    firebaseStorage = getStorage(app);
+    console.log('✅ All Firebase services initialized!');
     
     console.log('✅ Firebase initialized successfully!');
     return true;

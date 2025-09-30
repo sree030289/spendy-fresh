@@ -327,7 +327,7 @@ const COLLECTIONS = {
   GROUPS: 'groups',
   EXPENSES: 'expenses',
   FRIENDS: 'friendships',
-  FRIEND_REQUESTS: 'friendRequests',
+  FRIEND_REQUESTS: 'FriendRequests',
   SETTLEMENTS: 'settlements',
   NOTIFICATIONS: 'notifications'
 };
@@ -1054,10 +1054,21 @@ meetnsplitApp.get('/friends', authenticateJWT, async (req, res) => {
       }
     }
 
+    // Deduplicate friends by user ID (remove duplicates from bidirectional friendships)
+    const uniqueFriends = [];
+    const seenUserIds = new Set();
+    
+    for (const friend of friends) {
+      if (!seenUserIds.has(friend.id)) {
+        seenUserIds.add(friend.id);
+        uniqueFriends.push(friend);
+      }
+    }
+
     res.json({
       success: true,
       message: 'Friends retrieved successfully',
-      data: { friends, totalFriends: friends.length }
+      data: { friends: uniqueFriends, totalFriends: uniqueFriends.length }
     });
   } catch (error) {
     console.error('Get friends error:', error);
@@ -5529,7 +5540,7 @@ meetnsplitApp.get('/gmail/auth-url', authenticateJWT, async (req, res) => {
     
     // Use Google OAuth credentials from environment variables
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    const redirectUri = encodeURIComponent('https://us-central1-spendy-develop.cloudfunctions.net/spendyApi/gmail/callback');
+    const redirectUri = encodeURIComponent('https://us-central1-spendy-develop.cloudfunctions.net/meetnsplitApi/gmail/callback');
     const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email');
     
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code&access_type=offline&prompt=consent&state=${userId}`;
@@ -5615,7 +5626,7 @@ meetnsplitApp.post('/gmail/connect', authenticateJWT, async (req, res) => {
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
         code: code,
         grant_type: 'authorization_code',
-        redirect_uri: 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi/gmail/callback'
+        redirect_uri: 'https://us-central1-spendy-develop.cloudfunctions.net/meetnsplitApi/gmail/callback'
       })
     });
     
@@ -6873,7 +6884,7 @@ meetnsplitApp.get('/gmail/callback', async (req, res) => {
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
         code: code,
         grant_type: 'authorization_code',
-        redirect_uri: 'https://us-central1-spendy-develop.cloudfunctions.net/spendyApi/gmail/callback'
+        redirect_uri: 'https://us-central1-spendy-develop.cloudfunctions.net/meetnsplitApi/gmail/callback'
       })
     });
     
@@ -6931,14 +6942,23 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
   try {
     const { userId, phoneNumber, email, countryCode } = req.body;
 
+    console.log("🚀 CHECK-REGISTRATION CALLED!", {
+      userId, phoneNumber, email, countryCode
+    });
+
     if (!userId || !phoneNumber || !email) {
+      console.log("❌ Missing required fields:", {
+        userId: !!userId, phoneNumber: !!phoneNumber, email: !!email
+      });
       return res.status(400).json({
         success: false,
-        message: 'userId, phoneNumber, and email are required'
+        message: "userId, phoneNumber, and email are required",
       });
     }
 
-    console.log('🔍 Checking for pending friend requests during registration:', { userId, phoneNumber, email, countryCode });
+    console.log("🔍 Checking for pending friend requests:", {
+      userId, phoneNumber, email, countryCode
+    });
 
     // Normalize the phone number for consistent matching
     let normalizedPhone;
@@ -6950,11 +6970,39 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
       normalizedPhone = phoneNumber; // Fallback to original
     }
 
+    // DEBUG: Log the exact query parameters
+    console.log("� SEARCHING FOR EMAIL INVITES:", {
+      collection: COLLECTIONS.FRIEND_REQUESTS,
+      toEmail: email.toLowerCase(),
+      originalEmail: email,
+      status: "pending"
+    });
+
     // Find pending friend requests by email
     const emailFriendRequests = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
-      .where('toEmail', '==', email.toLowerCase())
-      .where('status', '==', 'pending')
+      .where("toEmail", "==", email.toLowerCase())
+      .where("status", "==", "pending")
       .get();
+
+    console.log("📧 EMAIL QUERY RESULT:", {
+      count: emailFriendRequests.docs.length,
+      empty: emailFriendRequests.empty
+    });
+
+    // DEBUG: Log detailed results
+    console.log(`📧 Found ${emailFriendRequests.docs.length} pending email friend requests`);
+    if (emailFriendRequests.docs.length > 0) {
+      emailFriendRequests.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`📧 DEBUG Email Request ${index + 1}:`, {
+          id: doc.id,
+          toEmail: data.toEmail,
+          status: data.status,
+          fromUserId: data.fromUserId,
+          type: data.type
+        });
+      });
+    }
 
     // Find pending SMS friend requests by phone number
     const smsFriendRequests = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
@@ -6962,8 +7010,19 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
       .where('status', '==', 'pending')
       .get();
 
-    console.log(`📧 Found ${emailFriendRequests.docs.length} pending email friend requests`);
-    console.log(`📱 Found ${smsFriendRequests.docs.length} pending SMS friend requests`);
+    console.log(`� Found ${smsFriendRequests.docs.length} pending SMS friend requests`);
+    if (smsFriendRequests.docs.length > 0) {
+      smsFriendRequests.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`📱 DEBUG SMS Request ${index + 1}:`, {
+          id: doc.id,
+          toPhone: data.toPhone,
+          status: data.status,
+          fromUserId: data.fromUserId,
+          type: data.type
+        });
+      });
+    }
 
     // Combine all pending requests
     const allPendingRequests = [...emailFriendRequests.docs, ...smsFriendRequests.docs];
@@ -7026,17 +7085,17 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
         const batch = db.batch();
 
         const friendship1 = {
-          userId: fromUserId,
-          friendId: userId,
-          status: 'accepted',
+          user1Id: fromUserId,
+          user2Id: userId,
+          status: 'active',
           createdAt: new Date(),
           friendRequestId: doc.id
         };
 
         const friendship2 = {
-          userId: userId,
-          friendId: fromUserId,
-          status: 'accepted',
+          user1Id: userId,
+          user2Id: fromUserId,
+          status: 'active',
           createdAt: new Date(),
           friendRequestId: doc.id
         };
@@ -7943,7 +8002,7 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
 
     if (!requestDoc.exists) {
       // Try alternative collection name for backwards compatibility
-      requestRef = db.collection('friendRequests').doc(requestId);
+      requestRef = db.collection('FriendRequests').doc(requestId);
       requestDoc = await requestRef.get();
       
       console.log('🔍 Alternative collection lookup:', {
@@ -8122,7 +8181,7 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
         if (!isUserRegistered) {
           // Call external invite service
           try {
-            const inviteResponse = await fetch(`${process.env.FUNCTIONS_EMULATOR_URL || 'https://us-central1-spendy-develop.cloudfunctions.net'}/spendyApi/invites/send`, {
+            const inviteResponse = await fetch(`${process.env.FUNCTIONS_EMULATOR_URL || 'https://us-central1-spendy-develop.cloudfunctions.net'}/meetnsplitApi/invites/send`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -8156,7 +8215,7 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
         // For unregistered users, send external SMS invite
         if (!isUserRegistered) {
           try {
-            const inviteResponse = await fetch(`${process.env.FUNCTIONS_EMULATOR_URL || 'https://us-central1-spendy-develop.cloudfunctions.net'}/spendyApi/invites/send`, {
+            const inviteResponse = await fetch(`${process.env.FUNCTIONS_EMULATOR_URL || 'https://us-central1-spendy-develop.cloudfunctions.net'}/meetnsplitApi/invites/send`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

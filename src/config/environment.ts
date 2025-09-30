@@ -1,4 +1,4 @@
-// src/config/environment.ts
+// src/config/environment.ts - Runtime environment configuration
 import Constants from 'expo-constants';
 
 export interface EnvironmentConfig {
@@ -10,14 +10,20 @@ export interface EnvironmentConfig {
     storageBucket: string;
     messagingSenderId: string;
     appId: string;
+    measurementId?: string;
+    useEmulator: boolean;
   };
   api: {
     baseURL: string;
     jwtSecret: string;
   };
-  environment: 'development' | 'staging' | 'production';
+  environment: 'local' | 'development' | 'production';
   isDevelopment: boolean;
   isProduction: boolean;
+  isLocal: () => boolean;
+  getEmulatorConfig: () => any;
+  getEmulatorHost: (service: string) => string;
+  getEmulatorPort: (service: string) => number;
   google: {
     visionApiKey?: string;
     clientSecret?: string;
@@ -33,30 +39,56 @@ export interface EnvironmentConfig {
 
 // Get configuration from Expo Constants (from app.config.js extra section)
 const getEnvironmentConfig = (): EnvironmentConfig => {
-  const extra = Constants.expoConfig?.extra || Constants.manifest?.extra;
+  // Get values from Expo Constants (app.config.js extra section)
+  const extra = Constants.expoConfig?.extra || {};
   
-  if (!extra) {
-    throw new Error('Environment configuration not found. Please check app.config.js');
+  // Try to get environment info from app.config.js
+  const envInfo = extra.environment || {};
+  let environment: 'local' | 'development' | 'production' = 'local';
+  
+  if (envInfo.isProduction) {
+    environment = 'production';
+  } else if (envInfo.isDevelopment) {
+    environment = 'development';
+  } else if (envInfo.isLocal) {
+    environment = 'local';
   }
 
-  const environment = extra.environment || 'development';
-  
-  return {
+  // Fallback configuration if extra is not available (development mode)
+  const fallbackConfig = {
     firebase: {
-      projectId: extra.firebase?.projectId || '',
-      apiKey: extra.firebase?.apiKey || '',
-      authDomain: extra.firebase?.authDomain || '',
-      databaseURL: extra.firebase?.databaseURL || '',
-      storageBucket: extra.firebase?.storageBucket || '',
-      messagingSenderId: extra.firebase?.messagingSenderId || '',
-      appId: extra.firebase?.appId || '',
+      projectId: 'spendy-develop',
+      apiKey: 'AIzaSyA3PwHVfgqpxizujlimha-xTjsh_-5Tsc0',
+      authDomain: 'spendy-develop.firebaseapp.com',
+      databaseURL: 'https://spendy-develop-default-rtdb.firebaseio.com',
+      storageBucket: 'spendy-develop.appspot.com',
+      messagingSenderId: '827143652568',
+      appId: '1:827143652568:web:a8b9c0d1e2f3g4h5i6j7k8',
     },
     api: {
-      baseURL: extra.api?.baseURL || 'https://meetnsplitapi-2fy22mkg6q-uc.a.run.app',
-      jwtSecret: extra.api?.jwtSecret || 'dev-jwt-secret',
+      baseURL: 'http://192.168.0.144:5001/spendy-develop/us-central1/meetnsplitApi',
+      jwtSecret: 'dev-jwt-secret-for-development',
     },
-    environment: environment as 'development' | 'staging' | 'production',
-    isDevelopment: environment === 'development',
+  };
+
+  return {
+    firebase: {
+      projectId: extra.firebase?.projectId || fallbackConfig.firebase.projectId,  
+      apiKey: extra.firebase?.apiKey || fallbackConfig.firebase.apiKey,
+      authDomain: extra.firebase?.authDomain || fallbackConfig.firebase.authDomain,
+      databaseURL: extra.firebase?.databaseURL || fallbackConfig.firebase.databaseURL,
+      storageBucket: extra.firebase?.storageBucket || fallbackConfig.firebase.storageBucket,
+      messagingSenderId: extra.firebase?.messagingSenderId || fallbackConfig.firebase.messagingSenderId,
+      appId: extra.firebase?.appId || fallbackConfig.firebase.appId,
+      measurementId: extra.firebase?.measurementId,
+      useEmulator: environment === 'local',
+    },
+    api: {
+      baseURL: extra.api?.baseURL || fallbackConfig.api.baseURL,
+      jwtSecret: extra.api?.jwtSecret || fallbackConfig.api.jwtSecret,
+    },
+    environment,
+    isDevelopment: environment === 'development' || environment === 'local',
     isProduction: environment === 'production',
     google: {
       visionApiKey: extra.google?.visionApiKey,
@@ -66,8 +98,29 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
       secret: extra.qrService?.secret || 'dev-qr-secret',
     },
     external: {
-      expoProjectId: extra.external?.expoProjectId,
+      expoProjectId: extra.external?.expoProjectId || extra.eas?.projectId,
       sentryDsn: extra.external?.sentryDsn,
+    },
+    
+    // Helper methods
+    isLocal: () => environment === 'local',
+    getEmulatorConfig: () => environment === 'local' ? {
+      auth: { host: '127.0.0.1', port: 9099 },
+      firestore: { host: '127.0.0.1', port: 8080 },
+      functions: { host: '127.0.0.1', port: 5001 },
+      storage: { host: '127.0.0.1', port: 9199 },
+      database: { host: '127.0.0.1', port: 9000 },
+    } : null,
+    getEmulatorHost: (service: string) => '127.0.0.1',
+    getEmulatorPort: (service: string) => {
+      const ports: Record<string, number> = {
+        auth: 9099,
+        firestore: 8080,
+        functions: 5001,
+        storage: 9199,
+        database: 9000,
+      };
+      return ports[service] || 8080;
     },
   };
 };

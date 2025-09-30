@@ -1,59 +1,245 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+// src/services/firebase/config.ts - Environment-aware Firebase initialization
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAuth, initializeAuth, connectAuthEmulator, Auth } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator, Firestore, initializeFirestore } from 'firebase/firestore';
 import { getMessaging } from 'firebase/messaging';
-import { getStorage } from 'firebase/storage';
+import { getStorage, connectStorageEmulator, FirebaseStorage } from 'firebase/storage';
+import { getDatabase, connectDatabaseEmulator, Database } from 'firebase/database';
+import { getFunctions, connectFunctionsEmulator, Functions } from 'firebase/functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { firebaseDevConfig } from '../../config/firebase.dev';
-import { firebaseProdConfig } from '../../config/firebase.prod';
+import { ENV } from '../../config/environment';
 
-// OPTIMIZATION: Environment-based configuration for cost management
-const getFirebaseConfig = () => {
-  const environment = process.env.NODE_ENV || 'development';
-  const buildType = process.env.EXPO_PUBLIC_BUILD_TYPE || 'dev';
-  
-  console.log('🔧 Firebase Environment:', environment, 'Build:', buildType);
-  
-  // Use dev config for development builds (but respect prod override)
-  if (buildType === 'dev' || (environment === 'development' && buildType !== 'prod')) {
-    console.log('🔧 Using DEVELOPMENT Firebase project');
-    return firebaseDevConfig;
+interface FirebaseServices {
+  app: FirebaseApp;
+  auth: Auth;
+  firestore: Firestore;
+  storage: FirebaseStorage;
+  database: Database;
+  functions: Functions;
+  messaging?: any;
+}
+
+class FirebaseConfig {
+  private static instance: FirebaseConfig;
+  private services: FirebaseServices | null = null;
+  private initialized = false;
+
+  private constructor() {}
+
+  static getInstance(): FirebaseConfig {
+    if (!FirebaseConfig.instance) {
+      FirebaseConfig.instance = new FirebaseConfig();
+    }
+    return FirebaseConfig.instance;
   }
-  
-  // Use production config for production builds
-  console.log('🔧 Using PRODUCTION Firebase project');
-  return firebaseProdConfig;
+
+  /**
+   * Initialize Firebase with environment-specific configuration
+   */
+  async initialize(): Promise<FirebaseServices> {
+    if (this.initialized && this.services) {
+      return this.services;
+    }
+
+    console.log(`🔥 Initializing Firebase for: ${ENV.environment}`);
+
+    // Get Firebase config from environment
+    const firebaseConfig = ENV.firebase;
+    
+    // Initialize Firebase app
+    let app: FirebaseApp;
+    const existingApps = getApps();
+    
+    if (existingApps.length > 0) {
+      app = existingApps[0];
+      console.log('📱 Using existing Firebase app');
+    } else {
+      app = initializeApp(firebaseConfig);
+      console.log('📱 Created new Firebase app');
+    }
+
+    // Initialize Firebase Auth
+    let auth: Auth;
+    try {
+      auth = getAuth(app);
+    } catch (error) {
+      // If there's an issue, try initializing fresh
+      auth = getAuth(app);
+    }
+
+    // Initialize Firestore with emulator awareness
+    let firestore: Firestore;
+    try {
+      if (ENV.isLocal() && ENV.firebase.useEmulator) {
+        // For emulator, initialize Firestore differently
+        firestore = initializeFirestore(app, {
+          host: `${ENV.getEmulatorHost('firestore')}:${ENV.getEmulatorPort('firestore')}`,
+          ssl: false,
+        });
+      } else {
+        firestore = getFirestore(app);
+      }
+    } catch (error) {
+      // Fallback to regular initialization
+      firestore = getFirestore(app);
+    }
+
+    // Initialize other services
+    const storage = getStorage(app);
+    const database = getDatabase(app);
+    const functions = getFunctions(app);
+    const messaging = Platform.OS === 'web' ? getMessaging(app) : null;
+
+    // Connect to emulators if in local environment
+    if (ENV.isLocal() && ENV.firebase.useEmulator) {
+      await this.connectEmulators(auth, firestore, storage, database, functions);
+    }
+
+    this.services = {
+      app,
+      auth,
+      firestore,
+      storage,
+      database,
+      functions,
+      messaging,
+    };
+
+    this.initialized = true;
+    
+    console.log(`✅ Firebase initialized successfully:`, {
+      environment: ENV.environment,
+      projectId: firebaseConfig.projectId,
+      useEmulator: ENV.firebase.useEmulator,
+    });
+
+    return this.services;
+  }
+
+  /**
+   * Connect services to Firebase emulators
+   */
+  private async connectEmulators(
+    auth: Auth,
+    firestore: Firestore,
+    storage: FirebaseStorage,
+    database: Database,
+    functions: Functions
+  ): Promise<void> {
+    const emulators = ENV.getEmulatorConfig();
+    
+    if (!emulators) {
+      console.warn('⚠️ No emulator configuration found');
+      return;
+    }
+
+    try {
+      // Connect Auth Emulator
+      const authUrl = `http://${emulators.auth.host}:${emulators.auth.port}`;
+      connectAuthEmulator(auth, authUrl, { disableWarnings: true });
+      console.log(`🔐 Connected to Auth emulator: ${authUrl}`);
+
+      // Note: Firestore emulator connection is handled during initialization
+
+      // Connect Storage Emulator
+      connectStorageEmulator(storage, emulators.storage.host, emulators.storage.port);
+      console.log(`📁 Connected to Storage emulator: ${emulators.storage.host}:${emulators.storage.port}`);
+
+      // Connect Database Emulator
+      if (emulators.database) {
+        connectDatabaseEmulator(database, emulators.database.host, emulators.database.port);
+        console.log(`💾 Connected to Database emulator: ${emulators.database.host}:${emulators.database.port}`);
+      }
+
+      // Connect Functions Emulator
+      connectFunctionsEmulator(functions, emulators.functions.host, emulators.functions.port);
+      console.log(`⚡ Connected to Functions emulator: ${emulators.functions.host}:${emulators.functions.port}`);
+
+    } catch (error) {
+      console.warn('⚠️ Some emulators could not be connected:', error);
+      // Continue anyway - some emulators might already be connected
+    }
+  }
+
+  /**
+   * Get initialized Firebase services
+   */
+  getServices(): FirebaseServices {
+    if (!this.services) {
+      throw new Error('Firebase not initialized. Call initialize() first.');
+    }
+    return this.services;
+  }
+
+  /**
+   * Reinitialize Firebase (useful for environment switching)
+   */
+  async reinitialize(): Promise<FirebaseServices> {
+    console.log('🔄 Reinitializing Firebase...');
+    this.initialized = false;
+    this.services = null;
+    return this.initialize();
+  }
+}
+
+// Export singleton instance
+export const firebaseConfig = FirebaseConfig.getInstance();
+
+// Initialize and export services
+let globalServices: FirebaseServices | null = null;
+
+const initializeGlobalServices = async () => {
+  if (!globalServices) {
+    globalServices = await firebaseConfig.initialize();
+  }
+  return globalServices;
 };
 
-// Get environment-specific config
-const firebaseConfig = getFirebaseConfig();
+// Modern async exports
+export const getFirebaseApp = async () => (await initializeGlobalServices()).app;
+export const getFirebaseAuth = async () => (await initializeGlobalServices()).auth;
+export const getFirebaseFirestore = async () => (await initializeGlobalServices()).firestore;
+export const getFirebaseStorage = async () => (await initializeGlobalServices()).storage;
+export const getFirebaseDatabase = async () => (await initializeGlobalServices()).database;
+export const getFirebaseFunctions = async () => (await initializeGlobalServices()).functions;
 
-export const app = initializeApp(firebaseConfig);
+// Legacy synchronous exports (for backward compatibility)
+let legacyInitialized = false;
+export let app: FirebaseApp;
+export let auth: Auth;  
+export let db: Firestore;
+export let storage: FirebaseStorage;
+export let database: Database;
+export let functions: Functions;
+export let messaging: any;
 
-// Initialize Firebase Auth with proper React Native persistence
-let auth;
-if (Platform.OS === 'web') {
-  auth = getAuth(app);
-} else {
-  try {
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage)
-    });
-  } catch (error) {
-    // If already initialized, use getAuth
-    auth = getAuth(app);
+// Auto-initialize legacy exports
+const initializeLegacyExports = async () => {
+  if (!legacyInitialized) {
+    try {
+      const services = await initializeGlobalServices();
+      app = services.app;
+      auth = services.auth;
+      db = services.firestore;
+      storage = services.storage;
+      database = services.database;
+      functions = services.functions;
+      messaging = services.messaging;
+      legacyInitialized = true;
+      
+      if (__DEV__) {
+        console.log(`🔧 Firebase initialized in ${ENV.environment} mode`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize Firebase:', error);
+      throw error;
+    }
   }
-}
+};
 
-export { auth };
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Initialize on module load for backward compatibility
+initializeLegacyExports().catch(console.error);
 
-// Initialize messaging for web only
-export const messaging = Platform.OS === 'web' ? getMessaging(app) : null;
-
-// Optional: Reduce Firestore connection warnings in development
-if (__DEV__) {
-  console.log('🔧 Firebase initialized in development mode');
-}
+// Export types
+export type { FirebaseServices };
