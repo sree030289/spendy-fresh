@@ -6929,7 +6929,7 @@ meetnsplitApp.get('/gmail/callback', async (req, res) => {
 // Check for pending friend requests during registration
 meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
   try {
-    const { userId, phoneNumber, email } = req.body;
+    const { userId, phoneNumber, email, countryCode } = req.body;
 
     if (!userId || !phoneNumber || !email) {
       return res.status(400).json({
@@ -6938,13 +6938,13 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
       });
     }
 
-    console.log('🔍 Checking for pending friend requests during registration:', { userId, phoneNumber, email });
+    console.log('🔍 Checking for pending friend requests during registration:', { userId, phoneNumber, email, countryCode });
 
     // Normalize the phone number for consistent matching
     let normalizedPhone;
     try {
-      normalizedPhone = normalizePhoneNumber(phoneNumber, 'US'); // Default to US, but should use user's country
-      console.log('📱 Normalized phone for invite check:', { original: phoneNumber, normalized: normalizedPhone });
+      normalizedPhone = normalizePhoneNumber(phoneNumber, countryCode || 'US'); // Use user's country code
+      console.log('📱 Normalized phone for invite check:', { original: phoneNumber, normalized: normalizedPhone, countryCode });
     } catch (phoneError) {
       console.error('⚠️ Phone normalization failed during invite check:', phoneError);
       normalizedPhone = phoneNumber; // Fallback to original

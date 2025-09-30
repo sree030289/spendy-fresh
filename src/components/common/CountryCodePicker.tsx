@@ -457,3 +457,18 @@ export function getCountryByCode(code: string): Country | undefined {
 export function getDefaultCountry(): Country {
   return ALL_COUNTRIES.find(country => country.code === 'US') || POPULAR_COUNTRIES[0];
 }
+
+// Utility function to convert from constants/countries format to CountryCodePicker format
+export function convertToPickerCountry(countryData: { code: string; name: string; phoneCode: string; flag: string }): Country {
+  return {
+    code: countryData.code,
+    name: countryData.name,
+    dialCode: countryData.phoneCode,
+    flag: countryData.flag
+  };
+}
+
+// Utility function to find country by code from ALL_COUNTRIES
+export function findCountryByCode(code: string): Country | undefined {
+  return ALL_COUNTRIES.find(country => country.code === code);
+}
