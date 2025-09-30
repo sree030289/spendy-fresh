@@ -7123,6 +7123,176 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
   }
 });
 
+// Check for pending friend requests during registration (New friendRequests-based endpoint)
+meetnsplitApp.post('/friends/check-registration', async (req, res) => {
+  try {
+    const { userId, phoneNumber, email } = req.body;
+
+    if (!userId || !phoneNumber || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId, phoneNumber, and email are required'
+      });
+    }
+
+    console.log('🔍 Checking for pending friend requests during registration:', { userId, phoneNumber, email });
+
+    // Normalize the phone number for consistent matching
+    let normalizedPhone;
+    try {
+      normalizedPhone = normalizePhoneNumber(phoneNumber, 'US'); // Default to US, but should use user's country
+      console.log('📱 Normalized phone for invite check:', { original: phoneNumber, normalized: normalizedPhone });
+    } catch (phoneError) {
+      console.error('⚠️ Phone normalization failed during invite check:', phoneError);
+      normalizedPhone = phoneNumber; // Fallback to original
+    }
+
+    // Find pending friend requests by email
+    const emailFriendRequests = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('toEmail', '==', email.toLowerCase())
+      .where('status', '==', 'pending')
+      .get();
+
+    // Find pending SMS friend requests by phone number
+    const smsFriendRequests = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('toPhone', '==', normalizedPhone)
+      .where('status', '==', 'pending')
+      .get();
+
+    console.log(`📧 Found ${emailFriendRequests.docs.length} pending email friend requests`);
+    console.log(`📱 Found ${smsFriendRequests.docs.length} pending SMS friend requests`);
+
+    // Combine all pending requests
+    const allPendingRequests = [...emailFriendRequests.docs, ...smsFriendRequests.docs];
+
+    if (allPendingRequests.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No pending invites found',
+        hasPendingInvites: false,
+        invites: [],
+        autoAcceptedCount: 0,
+        newFriendships: []
+      });
+    }
+
+    // Auto-accept and create friendships for pending invites
+    let autoAcceptedCount = 0;
+    const newFriendships = [];
+    const processedInvites = [];
+
+    for (const doc of allPendingRequests) {
+      const requestData = doc.data();
+      const fromUserId = requestData.fromUserId;
+      const inviteType = requestData.toPhone ? 'sms_invite' : 'email_invite';
+
+      try {
+        // Update friend request status to accepted
+        await doc.ref.update({
+          status: 'accepted',
+          acceptedAt: new Date()
+        });
+
+        // Create mutual friendship
+        const batch = db.batch();
+        
+        const friendship1 = {
+          user1Id: fromUserId,
+          user2Id: userId,
+          status: 'active',
+          createdAt: new Date(),
+          friendRequestId: doc.id
+        };
+
+        const friendship2 = {
+          user1Id: userId,
+          user2Id: fromUserId,
+          status: 'active',
+          createdAt: new Date(),
+          friendRequestId: doc.id
+        };
+
+        batch.set(db.collection(COLLECTIONS.FRIENDS).doc(), friendship1);
+        batch.set(db.collection(COLLECTIONS.FRIENDS).doc(), friendship2);
+
+        await batch.commit();
+
+        autoAcceptedCount++;
+        newFriendships.push(fromUserId);
+        processedInvites.push({
+          id: doc.id,
+          inviterId: fromUserId,
+          ...requestData
+        });
+
+        console.log(`✅ Auto-accepted ${inviteType} and created friendship:`, doc.id);
+
+        // Send notification to the original inviter
+        try {
+          const inviterDoc = await db.collection(COLLECTIONS.USERS).doc(fromUserId).get();
+          const newUserDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+          
+          if (inviterDoc.exists && newUserDoc.exists) {
+            const inviterData = inviterDoc.data();
+            const newUserData = newUserDoc.data();
+            
+            if (inviterData.pushToken) {
+              const notificationTitle = inviteType === 'sms_invite' 
+                ? '🎉 SMS Invite Accepted!' 
+                : '🎉 Friend Request Accepted!';
+              const notificationBody = inviteType === 'sms_invite'
+                ? `${newUserData.fullName} joined Spendy from your SMS invite and you're now friends!`
+                : `${newUserData.fullName} joined Meet-n-Split and you're now friends!`;
+
+              const notification = {
+                title: notificationTitle,
+                body: notificationBody,
+                data: {
+                  type: 'friend_request_accepted',
+                  fromUserId: userId,
+                  fromUserName: newUserData.fullName,
+                  friendRequestId: doc.id,
+                  autoAccepted: true,
+                  inviteType: inviteType
+                }
+              };
+
+              await sendExpoPushNotification(inviterData.pushToken, notification);
+              console.log(`✅ Sent auto-acceptance notification to inviter for ${inviteType}`);
+            }
+          }
+        } catch (notificationError) {
+          console.error('❌ Failed to send auto-acceptance notification:', notificationError);
+          // Continue processing - notification failure shouldn't break the flow
+        }
+      } catch (error) {
+        console.error('❌ Failed to process friend request:', doc.id, error);
+        // Continue processing other requests even if one fails
+      }
+    }
+
+    const response = {
+      success: true,
+      message: autoAcceptedCount > 0 ? `Converted ${autoAcceptedCount} pending invites` : 'No pending invites found',
+      hasPendingInvites: autoAcceptedCount > 0,
+      invites: processedInvites,
+      autoAcceptedCount,
+      newFriendships
+    };
+
+    console.log('📋 Registration invite check response:', response);
+    res.json(response);
+
+  } catch (error) {
+    console.error('❌ Check registration invites error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check pending invites',
+      error: error.message
+    });
+  }
+});
+
 // Export Meet-n-Split API as Firebase Function
 exports.meetnsplitApi = functions.https.onRequest(meetnsplitApp);
 

@@ -271,6 +271,113 @@ export default function RegisterScreen() {
     }
   };
 
+
+  const CountryPicker = () => {
+    const filteredCountries = countrySearchQuery
+      ? COUNTRIES.filter(country =>
+          country.name.toLowerCase().includes(countrySearchQuery.toLowerCase()) ||
+          country.code.toLowerCase().includes(countrySearchQuery.toLowerCase()) ||
+          country.phoneCode.includes(countrySearchQuery)
+        )
+      : COUNTRIES;
+
+    const renderCountryItem = ({ item }: { item: typeof COUNTRIES[0] }) => (
+      <TouchableOpacity
+        style={[styles.optionItem, { borderBottomColor: theme.colors.border }]}
+        onPress={() => {
+          setFormData({ 
+            ...formData, 
+            country: item.code,
+            currency: item.currency // Auto-set currency based on country
+          });
+          setShowCountryPicker(false);
+          setCountrySearchQuery('');
+        }}
+      >
+        <Text style={styles.optionFlag}>{item.flag}</Text>
+        <View style={styles.optionInfo}>
+          <Text style={[styles.optionName, { color: theme.colors.text }]}>
+            {item.name}
+          </Text>
+          <Text style={[styles.optionSubtext, { color: theme.colors.textSecondary }]}>
+            {item.phoneCode} • {item.currency}
+          </Text>
+        </View>
+        {formData.country === item.code && (
+          <Icon name="checkmark" size={24} color={theme.colors.primary}  />
+        )}
+      </TouchableOpacity>
+    );
+
+    return (
+      <Modal
+        visible={showCountryPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCountryPicker(false)}
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => {
+              setShowCountryPicker(false);
+              setCountrySearchQuery('');
+            }}>
+              <Icon name="close" size={24} color={theme.colors.text}  />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Select Country
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {/* Search Bar */}
+          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
+            <Icon name="search" size={20} color={theme.colors.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.colors.text }]}
+              placeholder="Search countries..."
+              placeholderTextColor={theme.colors.textSecondary}
+              value={countrySearchQuery}
+              onChangeText={setCountrySearchQuery}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+
+          {/* Popular Countries Section */}
+          {!countrySearchQuery && (
+            <>
+              <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
+                Popular Countries
+              </Text>
+              <FlatList
+                data={POPULAR_COUNTRIES}
+                keyExtractor={(item) => `popular-${item.code}`}
+                renderItem={renderCountryItem}
+                scrollEnabled={false}
+                style={styles.popularSection}
+              />
+              <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary, marginTop: 20 }]}>
+                All Countries
+              </Text>
+            </>
+          )}
+
+          {/* Countries List */}
+          <FlatList
+            data={filteredCountries}
+            keyExtractor={(item) => item.code}
+            renderItem={renderCountryItem}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+            style={styles.optionsList}
+            contentContainerStyle={styles.optionsListContent}
+          />
+        </SafeAreaView>
+      </Modal>
+    );
+  };
+
   const CurrencyPicker = () => {
     const filteredCurrencies = currencySearchQuery
       ? CURRENCIES.filter(currency =>
@@ -879,18 +986,22 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   optionsList: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 0,
+  },
+  optionsListContent: {
+    paddingBottom: 16,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
   },
   optionFlag: {
-    fontSize: 24,
+    fontSize: 20,
+    marginRight: 12,
   },
   optionInfo: {
     flex: 1,
@@ -922,9 +1033,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 8,
-    marginTop: 8,
   },
   popularSection: {
     flexGrow: 0,
