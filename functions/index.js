@@ -1595,6 +1595,7 @@ meetnsplitApp.post('/friends/requests/send-sms', authenticateJWT, async (req, re
 
     // Send push notification to registered user
     try {
+      // Add to appNotifications collection for tracking
       await db.collection('appNotifications').add({
         userId: targetUserId,
         type: 'friend_request',
@@ -1609,6 +1610,19 @@ meetnsplitApp.post('/friends/requests/send-sms', authenticateJWT, async (req, re
         },
         createdAt: new Date(),
         read: false
+      });
+
+      // Send actual push notification
+      await sendPushNotificationToUser(targetUserId, {
+        title: '👋 New Friend Request!',
+        body: `${senderData.fullName} sent you a friend request via SMS`,
+        data: {
+          friendRequestId: friendRequestRef.id,
+          fromUserId: req.user.id,
+          fromUserName: senderData.fullName,
+          fromUserEmail: senderData.email,
+          navigationType: 'friend_requests'
+        }
       });
       console.log('✅ Push notification sent to registered user');
     } catch (notificationError) {
@@ -1941,17 +1955,16 @@ meetnsplitApp.get('/friends/requests', authenticateJWT, async (req, res) => {
 
 // ===== UNIFIED INVITE SYSTEM =====
 
-// Helper function to normalize phone numbers
-function normalizePhoneNumber(phone) {
+// Helper function to normalize phone numbers (uses proper phone number parsing)
+function normalizePhoneForSearch(phone) {
   if (!phone) return null;
-  // Remove all non-digit characters except '+'
-  let normalized = phone.replace(/[^\d+]/g, '');
-  // Ensure it starts with '+'
-  if (!normalized.startsWith('+')) {
-    // Assume US number if no country code
-    normalized = '+1' + normalized;
+  try {
+    // Use the main normalizePhoneNumber function for consistency
+    return normalizePhoneNumber(phone, 'US'); // Default to US for search compatibility
+  } catch (error) {
+    console.error('Phone normalization error:', error);
+    return null;
   }
-  return normalized;
 }
 
 // Helper function to generate invite token
@@ -1983,7 +1996,7 @@ meetnsplitApp.get('/users/search-contact', async (req, res) => {
     let users = [];
 
     if (isPhone) {
-      const normalizedPhone = normalizePhoneNumber(query);
+      const normalizedPhone = normalizePhoneNumber(query, 'US'); // Use proper function with country code
       const phoneQuery = await db.collection(COLLECTIONS.USERS)
         .where('mobile', '==', normalizedPhone)
         .get();
@@ -6942,12 +6955,13 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
   try {
     const { userId, phoneNumber, email, countryCode } = req.body;
 
-    console.log("🚀 CHECK-REGISTRATION CALLED!", {
-      userId, phoneNumber, email, countryCode
+    console.log("🚀🚀🚀 CHECK-REGISTRATION CALLED - ENHANCED LOGGING!", {
+      userId, phoneNumber, email, countryCode, 
+      timestamp: new Date().toISOString(),
     });
 
     if (!userId || !phoneNumber || !email) {
-      console.log("❌ Missing required fields:", {
+      console.log("❌❌❌ Missing required fields:", {
         userId: !!userId, phoneNumber: !!phoneNumber, email: !!email
       });
       return res.status(400).json({
@@ -6979,10 +6993,26 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
     });
 
     // Find pending friend requests by email
-    const emailFriendRequests = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
-      .where("toEmail", "==", email.toLowerCase())
-      .where("status", "==", "pending")
-      .get();
+    console.log("🔍🔍🔍 ABOUT TO QUERY EMAIL INVITES:", {
+      collection: COLLECTIONS.FRIEND_REQUESTS,
+      emailQuery: email.toLowerCase(),
+      status: "pending"
+    });
+
+    let emailFriendRequests;
+    try {
+      emailFriendRequests = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+        .where("toEmail", "==", email.toLowerCase())
+        .where("status", "==", "pending")
+        .get();
+      console.log("✅✅✅ EMAIL QUERY COMPLETED:", {
+        count: emailFriendRequests.docs.length,
+        empty: emailFriendRequests.empty
+      });
+    } catch (emailQueryError) {
+      console.error("❌❌❌ EMAIL QUERY FAILED:", emailQueryError);
+      emailFriendRequests = { docs: [], empty: true };
+    }
 
     console.log("📧 EMAIL QUERY RESULT:", {
       count: emailFriendRequests.docs.length,

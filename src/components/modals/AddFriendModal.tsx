@@ -22,6 +22,7 @@ import { InviteService } from '@/services/payments/PaymentService';
 import { SMSInviteService } from '@/services/invite/SMSInviteService';
 import PhoneNumberInput, { Country } from '@/components/common/PhoneNumberInput';
 import { getDefaultCountry } from '@/components/common/CountryCodePicker';
+import SuccessAnimationModal from '@/components/modals/SuccessAnimationModal';
 import { requestCameraPermissionsAsync } from 'expo-image-picker';
 import * as Contacts from 'expo-contacts';
 
@@ -50,6 +51,10 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   const [showContactNameInput, setShowContactNameInput] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(getDefaultCountry());
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successTitle, setSuccessTitle] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
 
   const MAX_CONTACTS = 5;
 
@@ -346,17 +351,22 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         const result = await smsInviteService.sendSMSInvite({
           phoneNumber,
           message: `Hi! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
-          countryCode: selectedCountry.code as any
+          countryCode: selectedCountry.code as any,
+          senderName: user?.fullName || 'Your friend'
         });
 
+        console.log('📱 SMS invite result:', result);
+
         if (result.success) {
-          Alert.alert('SMS Invite Sent!', result.message, [{ text: 'OK' }]);
+          // Show full-screen success animation like email invites
+          setSuccessTitle(result.isRegistered ? 'SMS Invite Sent! 📱' : 'SMS Invitation Sent! 📱');
+          setSuccessMessage(result.message);
+          setShowSuccessModal(true);
           
           // Reset form
           setPhoneNumber('');
           setContactName('');
           setShowManualInput(false);
-          onClose();
         } else {
           Alert.alert('Invite Failed', result.message || 'Failed to send SMS invite', [{ text: 'OK' }]);
         }
@@ -379,7 +389,8 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
             const result = await smsInviteService.sendSMSInvite({
               phoneNumber: contact.phoneNumber,
               message: `Hi ${contact.name}! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
-              countryCode: selectedCountry.code as any
+              countryCode: selectedCountry.code as any,
+              senderName: user?.fullName || 'Your friend'
             });
 
             if (result.success) {
@@ -655,7 +666,10 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
               value={phoneNumber}
               onChangeText={(text) => {
                 setPhoneNumber(text);
-                if (errors.phone) validatePhone(text);
+                // Clear error when user starts typing, but don't validate immediately
+                if (errors.phone) {
+                  setErrors(prev => ({ ...prev, phone: '' }));
+                }
               }}
               onCountryChange={setSelectedCountry}
               placeholder="Enter phone number"
@@ -789,7 +803,8 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   );
 
   return (
-    <FullscreenModal
+    <>
+      <FullscreenModal
       visible={visible}
       onClose={onClose}
       title="Add Friend"
@@ -869,7 +884,20 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           {activeMethod === 'phone' && renderPhoneMethod()}
           {activeMethod === 'qr' && renderQRMethod()}
         </ScrollView>
-    </FullscreenModal>
+      </FullscreenModal>
+
+      {/* SMS Success Animation Modal */}
+      <SuccessAnimationModal
+        visible={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          onClose(); // Close the AddFriendModal too
+        }}
+        title={successTitle}
+        message={successMessage}
+        buttonText="Done"
+      />
+    </>
   );
 }
 

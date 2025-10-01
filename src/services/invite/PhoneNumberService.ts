@@ -91,7 +91,10 @@ export class PhoneNumberService {
       const formatter = new AsYouType(defaultCountry);
       return formatter.input(phoneNumber.trim());
     } catch (error) {
-      console.error('Phone number as-you-type formatting error:', error);
+      // Only log errors for longer inputs (avoid TOO_SHORT spam while typing)
+      if (phoneNumber?.length >= 8) {
+        console.error('Phone number formatting error:', error);
+      }
       return phoneNumber;
     }
   }

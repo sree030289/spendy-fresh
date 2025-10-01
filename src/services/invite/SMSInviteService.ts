@@ -15,6 +15,7 @@ export interface SMSInviteRequest {
   phoneNumber: string;
   message?: string;
   countryCode?: CountryCode;
+  senderName?: string;
 }
 
 /**
@@ -79,37 +80,61 @@ export class SMSInviteService {
         };
       }
 
-      if (!apiResponse.success) {
+      console.log('📱 API Response data check:', !!apiResponse);
+      // Check if we have a valid response with requestId (from your logs, requestId is at top level)
+      if (!apiResponse || !(apiResponse as any).requestId) {
+        console.log('📱 API response invalid, returning early');
         return {
           success: false,
-          message: apiResponse.message || 'Failed to create friend request',
+          message: 'Failed to create friend request - invalid response',
           error: 'API_ERROR'
         };
       }
 
-      // Step 3: Send SMS using device native messaging
+      console.log('📱 API success confirmed, proceeding to SMS sending...');
+      
+      // Step 3: Send SMS using device native messaging FIRST
+      const apiResponseData = apiResponse as any;
+      const phoneToUse = apiResponseData.recipientPhone || normalizedPhone;
+      
       try {
-        const smsMessage = apiResponse.data?.smsMessage || this.getDefaultMessage(apiResponse.isRegistered);
-        await this.sendNativeSMS(normalizedPhone, smsMessage);
+        // Get user's name from request context
+        const senderName = request.senderName || 'A friend';
+        
+        // Create enhanced SMS message with app download and deep link
+        const enhancedSmsMessage = this.createEnhancedSMSMessage(senderName, apiResponseData.isRegistered);
+        
+        console.log('📱 Sending enhanced SMS to phone:', phoneToUse);
+        console.log('📱 Enhanced SMS content:', enhancedSmsMessage);
+        
+        await this.sendNativeSMS(phoneToUse, enhancedSmsMessage);
         console.log('📱 Native SMS sent successfully');
+        
       } catch (smsError) {
         console.error('❌ SMS sending failed:', smsError);
         // Don't fail the whole process if SMS fails - the friend request was created
         console.log('⚠️ Friend request created but SMS failed - user can manually share');
+        
+        return {
+          success: true, // Friend request was created
+          isRegistered: apiResponseData.isRegistered,
+          message: `Friend request created but SMS failed to send. You may need to share the invitation manually.`,
+          requestId: apiResponseData.requestId
+        };
       }
 
-      // Step 4: Return success with appropriate message
-      const successMessage = this.getSuccessMessage(
-        apiResponse.isRegistered,
-        apiResponse.data?.recipientName,
-        normalizedPhone
+      // Step 4: Return success with full-screen message
+      const fullScreenMessage = this.getFullScreenSuccessMessage(
+        apiResponseData.isRegistered,
+        apiResponseData.recipientName,
+        request.senderName
       );
 
       return {
         success: true,
-        isRegistered: apiResponse.isRegistered,
-        message: successMessage,
-        requestId: apiResponse.data?.requestId
+        isRegistered: apiResponseData.isRegistered,
+        message: fullScreenMessage,
+        requestId: apiResponseData.requestId
       };
 
     } catch (error) {
@@ -126,6 +151,7 @@ export class SMSInviteService {
    * Send SMS using device's native messaging app
    */
   private async sendNativeSMS(phoneNumber: string, message: string): Promise<void> {
+    console.log('📱 sendNativeSMS called with:', { phoneNumber, messageLength: message?.length });
     try {
       if (!phoneNumber?.trim()) {
         throw new Error('Phone number is required for SMS');
@@ -218,5 +244,34 @@ export class SMSInviteService {
    */
   static arePhoneNumbersEqual(phone1: string, phone2: string, countryCode?: CountryCode): boolean {
     return PhoneNumberService.areEqual(phone1, phone2, countryCode);
+  }
+
+  /**
+   * Create enhanced SMS message with app download link and deep link
+   */
+  private createEnhancedSMSMessage(senderName: string, isRegistered: boolean): string {
+    // TODO: Replace with actual app store links
+    const appStoreLink = 'https://apps.apple.com/app/spendy-meet-n-split';
+    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.spendy.meetnspli';
+    const deepLink = 'meetnsplit://friends/pending'; // Deep link to friends pending tab
+    
+    if (isRegistered) {
+      // For registered users - they already have the app
+      return `Hello! ${senderName} wants to be friends on Meet-n-Split app. Open the app to accept their friend request: ${deepLink}`;
+    } else {
+      // For unregistered users - need to download app first
+      return `Hello! ${senderName} wants to be friends on Meet-n-Split app for splitting expenses.\n\nDownload the app:\niOS: ${appStoreLink}\nAndroid: ${playStoreLink}\n\nOnce installed, they'll be automatically added as your friend!`;
+    }
+  }
+
+  /**
+   * Get full-screen success message after SMS is sent
+   */
+  private getFullScreenSuccessMessage(isRegistered: boolean, recipientName?: string, senderName?: string): string {
+    if (isRegistered && recipientName) {
+      return `SMS sent to ${recipientName}!\n\nThey will receive a notification to accept your friend request. You'll be notified once they accept and they'll appear in your friends list.`;
+    } else {
+      return `SMS invite sent!\n\nThey will receive instructions to download Meet-n-Split and will be automatically added as your friend. You'll be notified once they join and they'll appear in your friends list.`;
+    }
   }
 }

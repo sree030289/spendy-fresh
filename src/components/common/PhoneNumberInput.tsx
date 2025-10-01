@@ -46,12 +46,16 @@ export default function PhoneNumberInput({
         const formatted = PhoneNumberService.formatAsYouType(value, selectedCountry.code as any);
         setFormattedValue(formatted);
         
-        // Validate the number
-        const isValidNumber = PhoneNumberService.validate(value, selectedCountry.code as any);
-        setIsValid(isValidNumber);
+        // Only validate if value has reasonable length (prevent premature validation)
+        if (value.length >= 8) {
+          const isValidNumber = PhoneNumberService.validate(value, selectedCountry.code as any);
+          setIsValid(isValidNumber);
+        } else {
+          setIsValid(true); // Don't show error for short inputs
+        }
       } catch {
         setFormattedValue(value);
-        setIsValid(false);
+        setIsValid(value.length < 8); // Only show error for longer invalid inputs
       }
     } else {
       setFormattedValue('');
