@@ -43,7 +43,6 @@ interface AddExpenseModalProps {
 }
 
 const EXPENSE_CATEGORIES = [
-  { id: 'settlement', name: 'Settlement', icon: '💸', isSpecial: true },
   { id: 'food', name: 'Food & Dining', icon: '🍽️' },
   { id: 'transport', name: 'Transportation', icon: '🚗' },
   { id: 'entertainment', name: 'Entertainment', icon: '🎬' },
@@ -1062,7 +1061,11 @@ const initializeSplitData = () => {
                     { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary }
                   ]
                 ]}
-                onPress={() => setSelectedCategory(category)}
+                onPress={() => {
+                  setSelectedCategory(category);
+                  // Auto-open date picker after category selection
+                  setTimeout(() => setShowDatePicker(true), 300);
+                }}
               >
                 <Text style={styles.categoryIcon}>{category.icon}</Text>
                 <Text style={[
@@ -1110,6 +1113,10 @@ const initializeSplitData = () => {
           maximumDate={new Date()}
           onDateSelect={(selectedDate) => {
             setExpenseDate(selectedDate);
+            // Scroll to Groups section after date selection
+            setTimeout(() => {
+              scrollViewRef.current?.scrollTo({ y: 350, animated: true });
+            }, 400);
           }}
           onClose={() => setShowDatePicker(false)}
         />
@@ -1141,7 +1148,13 @@ const initializeSplitData = () => {
                       { backgroundColor: theme.colors.primary + '20', borderColor: theme.colors.primary }
                     ]
                   ]}
-                  onPress={() => setSelectedGroup(group)}
+                  onPress={() => {
+                    setSelectedGroup(group);
+                    // Scroll to Paid By section after group selection
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollTo({ y: 600, animated: true });
+                    }, 300);
+                  }}
                 >
                   <Text style={styles.groupIcon}>{group.avatar}</Text>
                   <Text style={[
@@ -1188,6 +1201,10 @@ const initializeSplitData = () => {
                   onPress={() => {
                     console.log('🔍 PAYER SELECTED:', member.userId, member.userData?.fullName || 'Unknown');
                     setPaidBy(member.userId);
+                    // Scroll to Notes field after selecting who paid
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({ animated: true });
+                    }, 300);
                   }}
                 >
                   <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>

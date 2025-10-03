@@ -154,6 +154,7 @@ import { QRCodeService } from '@/services/qr/QRCodeService';
 import AddExpenseModal from '@/components/modals/AddExpenseModal';
 import AddFriendModal from '@/components/modals/AddFriendModal';
 import CreateGroupModal from '@/components/modals/CreateGroupModal';
+import JoinGroupModal from '@/components/modals/JoinGroupModal';
 import QRCodeModal from '@/components/modals/QRCodeModal';
 import GroupChatModal from '@/components/modals/GroupChatModal';
 import ReceiptScannerModal from '@/components/modals/ReceiptScannerModal';
@@ -253,6 +254,7 @@ export default function RealSplittingScreen() {
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showJoinGroup, setShowJoinGroup] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [qrScanSource, setQrScanSource] = useState<'direct' | 'addFriend' | null>(null);
@@ -1840,7 +1842,7 @@ export default function RealSplittingScreen() {
   };
 
   // SUBSCRIPTION-AWARE: Add friend with QR code limit checking
-  const handleAddFriend = async (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData | ContactData[]) => {
+  const handleAddFriend = async (email: string, method: 'email' | 'sms' | 'qr', contactData?: ContactData | ContactData[]) => {
     try {
       if (!user?.id) return;
       
@@ -1902,21 +1904,21 @@ export default function RealSplittingScreen() {
         }
         
         setShowAddFriend(false);
-      } else if (method === 'sms' || method === 'whatsapp') {
+      } else if (method === 'sms') {
         if (contactData) {
           const contacts = Array.isArray(contactData) ? contactData : [contactData];
           
-          // For SMS/WhatsApp invitations, we don't need to create server records
+          // For SMS invitations, we don't need to create server records
           // since these are local invitations that will be resolved when users sign up
           const contactNames = contacts.map(c => c.name || 'Friend').join(', ');
           showAnimatedSuccess(
             'Invitation Sent!', 
-            `${method.toUpperCase()} invitation${contacts.length > 1 ? 's' : ''} sent to ${contactNames}. They'll appear in your friends list once they join Meet-n-Split.`
+            `SMS invitation${contacts.length > 1 ? 's' : ''} sent to ${contactNames}. They'll appear in your friends list once they join Meet-n-Split.`
           );
           
           setShowAddFriend(false);
           
-          console.log(`📱 ${method.toUpperCase()} invitations sent to:`, contacts.map(c => c.name || 'Friend'));
+          console.log(`📱 SMS invitations sent to:`, contacts.map(c => c.name || 'Friend'));
         }
       } else if (method === 'qr') {
         // Show QR code for sharing (not scanning)
@@ -3467,6 +3469,13 @@ export default function RealSplittingScreen() {
         <Text style={[styles.tabTitle, { color: theme.colors.text }]}>Your Groups</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: theme.colors.primary, marginRight: 8 }]}
+            onPress={() => setShowJoinGroup(true)}
+          >
+            <Icon name="enter" size={18} color="white"  />
+            <Text style={styles.headerButtonText}>Join</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
             onPress={async () => {
               if (!user?.id) return;
@@ -4127,6 +4136,21 @@ export default function RealSplittingScreen() {
         onClose={() => setShowCreateGroup(false)}
         onSubmit={handleCreateGroup}
         friends={friends}
+      />
+    );
+  }
+
+  // If showJoinGroup is true, render JoinGroupModal as full-screen
+  if (showJoinGroup) {
+    return (
+      <JoinGroupModal
+        visible={showJoinGroup}
+        onClose={() => setShowJoinGroup(false)}
+        onSuccess={() => {
+          // Refresh data after successfully joining a group
+          onRefresh();
+        }}
+        userId={user?.id || ''}
       />
     );
   }

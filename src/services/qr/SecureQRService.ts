@@ -501,7 +501,7 @@ export class SecureQRService {
   static handleNonAppUser(qrUrl: string): void {
     const appStoreUrl = Platform.select({
       ios: 'https://apps.apple.com/app/spendy/id123456789',
-      android: 'https://play.google.com/store/apps/details?id=com.svaag.spendy'
+      android: 'https://play.google.com/store/apps/details?id=com.svaag.meetnsplit'
     });
 
     if (appStoreUrl) {

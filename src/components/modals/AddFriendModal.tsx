@@ -18,8 +18,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
-import { InviteService } from '@/services/payments/PaymentService';
 import { SMSInviteService } from '@/services/invite/SMSInviteService';
+import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
 import PhoneNumberInput, { Country } from '@/components/common/PhoneNumberInput';
 import { getDefaultCountry } from '@/components/common/CountryCodePicker';
 import SuccessAnimationModal from '@/components/modals/SuccessAnimationModal';
@@ -34,7 +34,7 @@ interface ContactData {
 interface AddFriendModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (email: string, method: 'email' | 'sms' | 'whatsapp' | 'qr', contactData?: ContactData | ContactData[]) => void;
+  onSubmit: (email: string, method: 'email' | 'sms' | 'qr', contactData?: ContactData | ContactData[]) => void;
   onOpenQRScanner?: () => void;
 }
 
@@ -73,17 +73,25 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   };
 
   const validatePhone = (phone: string): boolean => {
-    const phoneRegex = /^\+?[\d\s-()]+$/;
     if (!phone.trim()) {
       setErrors(prev => ({ ...prev, phone: 'Phone number is required' }));
       return false;
     }
-    if (!phoneRegex.test(phone.trim())) {
+
+    try {
+      // Use PhoneNumberService for proper validation
+      const isValid = PhoneNumberService.validate(phone, selectedCountry.code as any);
+      if (!isValid) {
+        setErrors(prev => ({ ...prev, phone: 'Please enter a valid phone number' }));
+        return false;
+      }
+      setErrors(prev => ({ ...prev, phone: '' }));
+      return true;
+    } catch (error) {
+      console.error('Phone validation error:', error);
       setErrors(prev => ({ ...prev, phone: 'Please enter a valid phone number' }));
       return false;
     }
-    setErrors(prev => ({ ...prev, phone: '' }));
-    return true;
   };
 
   const validateName = (name: string): boolean => {
@@ -97,6 +105,19 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
     }
     setErrors(prev => ({ ...prev, name: '' }));
     return true;
+  };
+
+  // Reset form state to initial values
+  const resetFormState = () => {
+    setEmail('');
+    setPhoneNumber('');
+    setContactName('');
+    setSelectedContacts([]);
+    setLoading(false);
+    setErrors({ email: '', phone: '', name: '' });
+    setShowContactNameInput(false);
+    setShowManualInput(false);
+    setActiveMethod('email');
   };
 
   const requestContactsPermission = async (): Promise<boolean> => {
@@ -436,63 +457,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
     }
   };
 
-  const handleSendWhatsApp = async () => {
-    if (selectedContacts.length === 0) {
-      Alert.alert('No Contacts Selected', 'Please select at least one contact to send WhatsApp invitations.');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const successfulInvites: string[] = [];
-      const failedInvites: string[] = [];
 
-      // Validate all contacts have names before sending
-      const validatedContacts = selectedContacts.map(contact => ({
-        ...contact,
-        name: contact.name?.trim() || 'Friend'
-      }));
-
-      for (const contact of validatedContacts) {
-        try {
-          const message = InviteService.generateFriendInviteMessage(user?.fullName || 'Friend');
-          await InviteService.sendWhatsAppInvite(contact.phoneNumber, message);
-          successfulInvites.push(contact.name);
-        } catch (error) {
-          console.error(`Failed to send WhatsApp to ${contact.name}:`, error);
-          failedInvites.push(contact.name);
-        }
-      }
-
-      // Send all contacts to parent for friend creation
-      await onSubmit('', 'whatsapp', validatedContacts);
-      
-      // Show results
-      let resultMessage = '';
-      if (successfulInvites.length > 0) {
-        resultMessage += `WhatsApp invitations sent to: ${successfulInvites.join(', ')}`;
-      }
-      if (failedInvites.length > 0) {
-        if (resultMessage) resultMessage += '\n\n';
-        resultMessage += `Failed to send to: ${failedInvites.join(', ')}`;
-      }
-      
-      Alert.alert(
-        successfulInvites.length > 0 ? 'Invitations Sent!' : 'Some Invitations Failed',
-        resultMessage,
-        [{ text: 'OK' }]
-      );
-      
-      // Reset and close
-      setSelectedContacts([]);
-      resetPhoneForm();
-      onClose();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send WhatsApp invitations');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const resetPhoneForm = () => {
     setPhoneNumber('');
@@ -746,12 +711,6 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
             loading={loading}
             style={StyleSheet.flatten([styles.phoneButton, { backgroundColor: '#2563EB' }])}
           />
-          <Button
-            title={`Send WhatsApp (${selectedContacts.length})`}
-            onPress={handleSendWhatsApp}
-            loading={loading}
-            style={StyleSheet.flatten([styles.phoneButton, { backgroundColor: '#25D366' }])}
-          />
         </View>
       )}
 
@@ -759,8 +718,8 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         <Icon name="mail" size={20} color={theme.colors.primary} />
         <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
           {selectedContacts.length > 0 
-            ? `Send invitations to ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''} via SMS or WhatsApp with a link to download Meet-n-Split.`
-            : `Select up to ${MAX_CONTACTS} contacts and send invitations via SMS or WhatsApp with a link to download Meet-n-Split.`
+            ? `Send SMS invitations to ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''} with a link to download Meet-n-Split.`
+            : `Select up to ${MAX_CONTACTS} contacts and send SMS invitations with a link to download Meet-n-Split.`
           }
         </Text>
       </View>
@@ -806,7 +765,10 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
     <>
       <FullscreenModal
       visible={visible}
-      onClose={onClose}
+      onClose={() => {
+        resetFormState();
+        onClose();
+      }}
       title="Add Friend"
       rightActions={
         <TouchableOpacity
@@ -891,6 +853,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         visible={showSuccessModal}
         onClose={() => {
           setShowSuccessModal(false);
+          resetFormState();
           onClose(); // Close the AddFriendModal too
         }}
         title={successTitle}

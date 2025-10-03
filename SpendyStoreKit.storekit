@@ -1,0 +1,104 @@
+{
+  "identifier" : "9F3A1D2E",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6670917583",
+    "_developerTeamID" : "AJKJRJJ938",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 717893580.85568404,
+    "_locale" : "en_US",
+    "_storefront" : "USA"
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21482551",
+      "localizations" : [
+
+      ],
+      "name" : "Premium Subscriptions",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "0.99",
+          "familyShareable" : false,
+          "id" : "com.svaag.spendy.dev.Monthly",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Monthly subscription for unlimited groups, members, and transactions",
+              "displayName" : "Monthly Premium",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.svaag.meetnsplit.dev.Monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Monthly Premium",
+          "subscriptionGroupID" : "21482551",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "10.99",
+          "familyShareable" : false,
+          "id" : "com.svaag.spendy.dev.Annual",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Annual subscription for unlimited groups, members, and transactions",
+              "displayName" : "Annual Premium",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.svaag.meetnsplit.dev.Annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Annual Premium",
+          "subscriptionGroupID" : "21482551",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "49.99",
+          "familyShareable" : false,
+          "id" : "com.svaag.spendy.dev.Lifetime",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Lifetime access to all premium features",
+              "displayName" : "Lifetime Premium",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.svaag.meetnsplit.dev.Lifetime",
+          "recurringSubscriptionPeriod" : "P99Y",
+          "referenceName" : "Lifetime Premium",
+          "subscriptionGroupID" : "21482551",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

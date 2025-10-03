@@ -22,6 +22,7 @@ interface CountryCodePickerProps {
   selectedCountry: Country;
   onSelectCountry: (country: Country) => void;
   style?: any;
+  displayMode?: 'name' | 'dialCode'; // 'name' shows country name, 'dialCode' shows dial code (default)
 }
 
 // Popular countries for quick access
@@ -268,7 +269,7 @@ const ALL_COUNTRIES: Country[] = [
   { code: 'ZW', name: 'Zimbabwe', dialCode: '+263', flag: '🇿🇼' },
 ];
 
-export default function CountryCodePicker({ selectedCountry, onSelectCountry, style }: CountryCodePickerProps) {
+export default function CountryCodePicker({ selectedCountry, onSelectCountry, style, displayMode = 'dialCode' }: CountryCodePickerProps) {
   const { theme } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -311,7 +312,15 @@ export default function CountryCodePicker({ selectedCountry, onSelectCountry, st
         onPress={() => setModalVisible(true)}
       >
         <Text style={[styles.flag, { color: theme.colors.text }]}>{selectedCountry.flag}</Text>
-        <Text style={[styles.dialCode, { color: theme.colors.text }]}>{selectedCountry.dialCode}</Text>
+        {displayMode === 'name' ? (
+          <Text style={[styles.countryName, { color: theme.colors.text }]} numberOfLines={1}>
+            {selectedCountry.name}
+          </Text>
+        ) : (
+          <Text style={[styles.dialCode, { color: theme.colors.text }]}>
+            {selectedCountry.dialCode}
+          </Text>
+        )}
         <Icon name="chevron-down" size={16} color={theme.colors.textSecondary} />
       </TouchableOpacity>
 

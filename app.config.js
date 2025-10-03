@@ -17,7 +17,7 @@ const getAppConfig = () => {
   
   return {
     name: isProduction ? "Meet-n-Split" : "Meet-n-Split Dev",
-    slug: isProduction ? "meetnsplit" : "spendy",
+    slug: isProduction ? "meetnsplit" : "meetnsplit-dev",
     bundleIdentifier: isProduction ? "com.svaag.meetnsplit" : "com.svaag.meetnsplit.dev",
     package: isProduction ? "com.svaag.meetnsplit" : "com.svaag.meetnsplit.dev",
     

@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>spendy</string>
-          <string>com.svaag.spendy.dev</string>
+          <string>com.svaag.meetnsplit.dev</string>
         </array>
       </dict>
       <dict>

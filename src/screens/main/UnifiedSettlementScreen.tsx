@@ -93,6 +93,7 @@ export default function UnifiedSettlementScreen({
   // State management
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [settlingId, setSettlingId] = useState<string | null>(null); // Track which settlement is being processed
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
     mode === 'group-specific' ? groupId || null : null
@@ -102,7 +103,7 @@ export default function UnifiedSettlementScreen({
   );
   const [settlementSuggestions, setSettlementSuggestions] = useState<SettlementSuggestion[]>([]);
   const [groupMembers, setGroupMembers] = useState<Group['members']>([]);
-  const [recordingPayment, setRecordingPayment] = useState(false);
+  const [recordingPayment, setRecordingPayment] = useState<string | null>(null); // Track which settlement ID is being processed
   
   // Tab state for settlement screen
   const [activeTab, setActiveTab] = useState<'settle' | 'history'>('settle');
@@ -400,7 +401,9 @@ export default function UnifiedSettlementScreen({
             style: 'default',
             onPress: async () => {
               try {
-                setRecordingPayment(true);
+                // Create unique ID for this settlement
+                const settlementId = `${suggestion.fromUserId}_${suggestion.toUserId}_${suggestion.groupId || 'friend'}`;
+                setRecordingPayment(settlementId);
                 console.log('💰 Recording settlement payment:', suggestion);
                 
                 // Record the settlement payment via API
@@ -447,7 +450,7 @@ export default function UnifiedSettlementScreen({
                 
                 CrossPlatformAlert.alert('Error', `Failed to record payment: ${errorMessage}`);
               } finally {
-                setRecordingPayment(false);
+                setRecordingPayment(null);
               }
             }
           }
@@ -560,14 +563,14 @@ export default function UnifiedSettlementScreen({
               
               <TouchableOpacity
                 style={[
-                  styles.settleButton, 
+                  styles.settleButton,
                   { backgroundColor: theme.colors.primary },
-                  recordingPayment && { opacity: 0.6 }
+                  recordingPayment === `${suggestion.fromUserId}_${suggestion.toUserId}_${suggestion.groupId || 'friend'}` && { opacity: 0.6 }
                 ]}
                 onPress={() => handleMarkAsPaid(suggestion)}
-                disabled={recordingPayment}
+                disabled={recordingPayment === `${suggestion.fromUserId}_${suggestion.toUserId}_${suggestion.groupId || 'friend'}`}
               >
-                {recordingPayment ? (
+                {recordingPayment === `${suggestion.fromUserId}_${suggestion.toUserId}_${suggestion.groupId || 'friend'}` ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
                   <Text style={styles.settleButtonText}>

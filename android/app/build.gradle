@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.svaag.spendy.dev'
+    namespace 'com.svaag.meetnsplit.dev'
     defaultConfig {
-        applicationId 'com.svaag.spendy.dev'
+        applicationId 'com.svaag.meetnsplit.dev'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

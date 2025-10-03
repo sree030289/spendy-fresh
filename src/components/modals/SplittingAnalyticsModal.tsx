@@ -10,12 +10,15 @@ import {
   Dimensions,
   ActivityIndicator,
   Animated,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface SplittingAnalytics {
   userId: string;
@@ -66,45 +69,11 @@ interface SplittingAnalyticsModalProps {
   onClose: () => void;
 }
 
-interface TabButtonProps {
-  title: string;
-  icon: string;
-  isActive: boolean;
-  onPress: () => void;
-  color: string;
-}
-
-const TabButton: React.FC<TabButtonProps> = ({ title, icon, isActive, onPress, color }) => {
-  const { theme } = useTheme();
-  
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={[
-        styles.tabButton,
-        isActive && [styles.activeTab, { backgroundColor: color }],
-        !isActive && { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }
-      ]}
-    >
-      <Icon
-        name={icon as any}
-        size={18}
-        color={isActive ? 'white' : theme.colors.textSecondary}
-      />
-      <Text style={[
-        styles.tabText,
-        { color: isActive ? 'white' : theme.colors.textSecondary }
-      ]}>
-        {title}
-      </Text>
-    </TouchableOpacity>
-  );
-};
-
 const SplittingAnalyticsModal: React.FC<SplittingAnalyticsModalProps> = ({ visible, analytics, onClose }) => {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<'overview' | 'groups' | 'friends' | 'trends'>('overview');
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
@@ -121,332 +90,508 @@ const SplittingAnalyticsModal: React.FC<SplittingAnalyticsModalProps> = ({ visib
       <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={[styles.loadingText, { color: theme.colors.text }]}>
-              Loading splitting analytics...
-            </Text>
+            <ActivityIndicator size="large" color="#B0004F" />
+            <Text style={styles.loadingText}>Loading analytics...</Text>
           </View>
         </SafeAreaView>
       </Modal>
     );
   }
 
+  // Calculate settlement speed (mock data for now)
+  const settlementSpeed = analytics.friendAnalytics.map((friend) => ({
+    name: friend.friendName,
+    avgDays: Math.random() * 7,
+    status: (Math.random() * 7) < 2 ? 'fast' : (Math.random() * 7) < 5 ? 'medium' : 'slow' as 'fast' | 'medium' | 'slow',
+  }));
+
+  // Top payers per group
+  const topPayers = analytics.groupAnalytics.map((group) => ({
+    groupName: group.groupName,
+    topPayer: 'You', // Mock - would come from actual data
+    percentage: ((group.userBalance / group.totalSpent) * 100) || 0,
+  }));
+
+  const renderCircularProgress = (percentage: number, color: string, size: number = 120) => {
+    const radius = (size - 12) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (circumference * percentage) / 100;
+
+    return (
+      <Svg width={size} height={size}>
+        <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="#E5E7EB"
+            strokeWidth={12}
+            fill="transparent"
+          />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={color}
+            strokeWidth={12}
+            fill="transparent"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+          />
+        </G>
+        <SvgText
+          x={size / 2}
+          y={size / 2 + 6}
+          fontSize="18"
+          fontWeight="bold"
+          fill={color}
+          textAnchor="middle"
+        >
+          {percentage.toFixed(0)}%
+        </SvgText>
+      </Svg>
+    );
+  };
+
   const renderHeader = () => (
     <LinearGradient
-      colors={['#B0004F', '#8B003F']}
+      colors={['#B0004F', '#8B0000']}
       style={styles.header}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
-      <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-        <Icon name="close" size={24} color="white" />
-      </TouchableOpacity>
-      
-      <Text style={styles.headerTitle}>Splitting Analytics</Text>
+      <View style={styles.headerContent}>
+        <View>
+          <Text style={styles.headerTitle}>Analytics</Text>
+          <Text style={styles.headerSubtitle}>Your spending insights</Text>
+        </View>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Icon name="close" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
     </LinearGradient>
   );
 
-  const renderTabs = () => (
-    <View style={[styles.tabContainer, { backgroundColor: theme.colors.background }]}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
-        <TabButton
-          title="Overview"
-          icon="analytics"
-          isActive={activeTab === 'overview'}
-          onPress={() => setActiveTab('overview')}
-          color={theme.colors.brand}
-        />
-        <TabButton
-          title="Groups"
-          icon="people"
-          isActive={activeTab === 'groups'}
-          onPress={() => setActiveTab('groups')}
-          color="#10B981"
-        />
-        <TabButton
-          title="Friends"
-          icon="person"
-          isActive={activeTab === 'friends'}
-          onPress={() => setActiveTab('friends')}
-          color="#F59E0B"
-        />
-        <TabButton
-          title="Trends"
-          icon="trending"
-          isActive={activeTab === 'trends'}
-          onPress={() => setActiveTab('trends')}
-          color={theme.colors.brand}
-        />
-      </ScrollView>
+  const renderTimeRangeSelector = () => (
+    <View style={styles.timeRangeContainer}>
+      {(['Week', 'Month', 'Quarter', 'Year'] as const).map((range) => (
+        <TouchableOpacity
+          key={range}
+          style={[
+            styles.timeRangeButton,
+            analytics.period === range.toLowerCase() && styles.timeRangeButtonActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.timeRangeText,
+              analytics.period === range.toLowerCase() && styles.timeRangeTextActive,
+            ]}
+          >
+            {range}
+          </Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 
-  const renderOverviewTab = () => (
-    <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-      {/* Balance Overview */}
-      <LinearGradient
-        colors={['#B0004F', '#8B003F']}
-        style={styles.heroCard}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <Text style={styles.heroTitle}>Your Splitting Summary</Text>
-        <View style={styles.heroStats}>
-          <View style={styles.heroStat}>
-            <Text style={styles.heroStatValue}>
-              ${Math.abs(analytics.netBalance).toLocaleString()}
-            </Text>
-            <Text style={styles.heroStatLabel}>
-              {analytics.netBalance >= 0 ? "You're owed" : "You owe"}
-            </Text>
-          </View>
-          <View style={styles.heroStat}>
-            <Text style={styles.heroStatValue}>
-              ${analytics.totalSpent.toLocaleString()}
-            </Text>
-            <Text style={styles.heroStatLabel}>Total Spent</Text>
-          </View>
-        </View>
-      </LinearGradient>
+  const renderOverviewTab = () => {
+    const maxTrend = Math.max(...analytics.monthlyTrends.map(t => t.spent));
 
-      {/* Quick Stats */}
-      <View style={styles.quickStatsContainer}>
-        <View style={[styles.quickStat, { backgroundColor: theme.colors.surface }]}>
-          <View style={[styles.quickStatIcon, { backgroundColor: '#10B981' }]}>
-            <Icon name="trending" size={20} color="white" />
-          </View>
-          <View style={styles.quickStatContent}>
-            <Text style={[styles.quickStatValue, { color: theme.colors.success }]}>
+    return (
+      <ScrollView
+        style={styles.tabContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+      >
+        {/* Time Range Selector */}
+        {renderTimeRangeSelector()}
+
+        {/* Hero Stats with Visual Cards */}
+        <View style={styles.heroCardsContainer}>
+          <LinearGradient
+            colors={['#B0004F', '#8B0000']}
+            style={styles.heroCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Icon name="wallet" size={32} color="white" />
+            <Text style={styles.heroCardValue}>${analytics.totalSpent.toLocaleString()}</Text>
+            <Text style={styles.heroCardLabel}>Total Spent</Text>
+          </LinearGradient>
+
+          <View style={[styles.heroCard, styles.heroCardLight]}>
+            <Icon name="trending-up" size={32} color="#10B981" />
+            <Text style={[styles.heroCardValue, { color: '#10B981' }]}>
               ${analytics.totalOwed.toLocaleString()}
             </Text>
-            <Text style={[styles.quickStatLabel, { color: theme.colors.textSecondary }]}>
-              You're owed
-            </Text>
+            <Text style={styles.heroCardLabelDark}>You're Owed</Text>
           </View>
-        </View>
 
-        <View style={[styles.quickStat, { backgroundColor: theme.colors.surface }]}>
-          <View style={[styles.quickStatIcon, { backgroundColor: '#EF4444' }]}>
-            <Icon name="trending" size={20} color="white" />
-          </View>
-          <View style={styles.quickStatContent}>
-            <Text style={[styles.quickStatValue, { color: theme.colors.error }]}>
+          <View style={[styles.heroCard, styles.heroCardLight]}>
+            <Icon name="trending-down" size={32} color="#EF4444" />
+            <Text style={[styles.heroCardValue, { color: '#EF4444' }]}>
               ${analytics.totalOwing.toLocaleString()}
             </Text>
-            <Text style={[styles.quickStatLabel, { color: theme.colors.textSecondary }]}>
-              You owe
+            <Text style={styles.heroCardLabelDark}>You Owe</Text>
+          </View>
+
+          <LinearGradient
+            colors={analytics.netBalance >= 0 ? ['#10B981', '#059669'] : ['#EF4444', '#DC2626']}
+            style={styles.heroCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Icon name={analytics.netBalance >= 0 ? 'checkmark-circle' : 'alert-circle'} size={32} color="white" />
+            <Text style={styles.heroCardValue}>
+              ${Math.abs(analytics.netBalance).toLocaleString()}
             </Text>
+            <Text style={styles.heroCardLabel}>
+              {analytics.netBalance >= 0 ? 'Net Credit' : 'Net Debit'}
+            </Text>
+          </LinearGradient>
+        </View>
+
+        {/* Spending Trend Chart */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <Icon name="trending-up" size={24} color="#B0004F" />
+            <Text style={styles.chartTitle}>Spending Trend</Text>
+          </View>
+          <View style={styles.trendChart}>
+            {analytics.monthlyTrends.map((trend, index) => {
+              const height = (trend.spent / maxTrend) * 150;
+              return (
+                <View key={index} style={styles.trendBar}>
+                  <LinearGradient
+                    colors={['#B0004F', '#FF6B6B']}
+                    style={[styles.trendBarFill, { height: Math.max(height, 20) }]}
+                  >
+                    <Text style={styles.trendAmount}>${(trend.spent / 1000).toFixed(1)}k</Text>
+                  </LinearGradient>
+                  <Text style={styles.trendPeriod}>{trend.month}</Text>
+                </View>
+              );
+            })}
           </View>
         </View>
-      </View>
 
-      {/* Top Categories */}
-      <View style={styles.sectionContainer}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Top Spending Categories
-        </Text>
-        {analytics.categoryBreakdown.slice(0, 4).map((category, index) => (
-          <View key={category.category} style={[styles.categoryItem, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.categoryLeft}>
-              <Text style={styles.categoryEmoji}>{category.icon}</Text>
-              <View>
-                <Text style={[styles.categoryName, { color: theme.colors.text }]}>
-                  {category.category}
-                </Text>
-                <Text style={[styles.categoryCount, { color: theme.colors.textSecondary }]}>
-                  {category.count} expenses
-                </Text>
-              </View>
-            </View>
-            <View style={styles.categoryRight}>
-              <Text style={[styles.categoryAmount, { color: theme.colors.text }]}>
-                ${category.amount.toLocaleString()}
-              </Text>
-              <Text style={[styles.categoryPercentage, { color: category.color }]}>
-                {category.percentage.toFixed(1)}%
-              </Text>
-            </View>
+        {/* Category Breakdown with Circular Charts */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <Icon name="pie-chart" size={24} color="#B0004F" />
+            <Text style={styles.chartTitle}>Spending by Category</Text>
           </View>
-        ))}
-      </View>
 
-      {/* Insights */}
-      {analytics.insights && analytics.insights.length > 0 && (
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Splitting Insights
-          </Text>
-          {analytics.insights.slice(0, 2).map((insight, index) => (
-            <View key={index} style={[styles.insightCard, { backgroundColor: theme.colors.surface }]}>
-              <Text style={styles.insightIcon}>{insight.icon}</Text>
-              <View style={styles.insightContent}>
-                <Text style={[styles.insightTitle, { color: theme.colors.text }]}>
-                  {insight.title}
-                </Text>
-                <Text style={[styles.insightDescription, { color: theme.colors.textSecondary }]}>
-                  {insight.description}
+          <View style={styles.categoryCircles}>
+            {analytics.categoryBreakdown.slice(0, 3).map((cat, index) => (
+              <View key={index} style={styles.categoryCircleItem}>
+                {renderCircularProgress(cat.percentage, cat.color, 100)}
+                <Text style={styles.categoryCircleLabel} numberOfLines={1}>{cat.category}</Text>
+                <Text style={[styles.categoryCircleAmount, { color: cat.color }]}>
+                  ${cat.amount.toLocaleString()}
                 </Text>
               </View>
-            </View>
-          ))}
+            ))}
+          </View>
+
+          <View style={styles.categoryList}>
+            {analytics.categoryBreakdown.map((cat, index) => (
+              <View key={index} style={styles.categoryRow}>
+                <View style={styles.categoryLeft}>
+                  <View style={[styles.categoryDot, { backgroundColor: cat.color }]} />
+                  <Text style={styles.categoryName}>{cat.icon} {cat.category}</Text>
+                </View>
+                <View style={styles.categoryRight}>
+                  <Text style={styles.categoryAmount}>${cat.amount.toLocaleString()}</Text>
+                  <Text style={[styles.categoryPercentage, { color: cat.color }]}>
+                    {cat.percentage.toFixed(1)}%
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
-      )}
-    </ScrollView>
-  );
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    );
+  };
 
   const renderGroupsTab = () => (
     <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.sectionContainer}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Group Spending Analysis
-        </Text>
-        {analytics.groupAnalytics.map((group, index) => (
-          <View key={index} style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.groupHeader}>
-              <View style={[styles.groupIcon, { backgroundColor: theme.colors.primary }]}>
-                <Icon name="people" size={24} color="white" />
+      <View style={styles.sectionHeader}>
+        <Icon name="people" size={28} color="#B0004F" />
+        <Text style={styles.sectionTitle}>Group Insights</Text>
+      </View>
+
+      {/* Top Payer per Group */}
+      <View style={styles.chartCard}>
+        <Text style={styles.chartSubtitle}>Who Pays Most</Text>
+        {topPayers.map((item, index) => (
+          <View key={index} style={styles.topPayerRow}>
+            <View style={styles.topPayerLeft}>
+              <View style={[styles.rankBadge, index === 0 && styles.rankBadgeGold]}>
+                <Text style={styles.rankText}>#{index + 1}</Text>
               </View>
-              <View style={styles.groupInfo}>
-                <Text style={[styles.groupName, { color: theme.colors.text }]}>
-                  {group.groupName}
-                </Text>
-                <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>
-                  {group.memberCount} members
-                </Text>
-              </View>
-            </View>
-            
-            <View style={styles.groupStats}>
-              <View style={styles.groupStat}>
-                <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-                  Total Spent
-                </Text>
-                <Text style={[styles.groupStatValue, { color: theme.colors.text }]}>
-                  ${group.totalSpent.toLocaleString()}
-                </Text>
-              </View>
-              <View style={styles.groupStat}>
-                <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
-                  Your Balance
-                </Text>
-                <Text style={[
-                  styles.groupStatValue,
-                  { 
-                    color: Math.abs(group.userBalance) < 0.01 ? theme.colors.textSecondary :
-                           group.userBalance > 0 ? theme.colors.success : theme.colors.error
-                  }
-                ]}>
-                  {Math.abs(group.userBalance) < 0.01 ? 'Settled' : 
-                   `${group.userBalance > 0 ? '+' : ''}$${Math.abs(group.userBalance).toFixed(2)}`}
-                </Text>
+              <View>
+                <Text style={styles.topPayerGroup}>{item.groupName}</Text>
+                <Text style={styles.topPayerName}>Top: {item.topPayer}</Text>
               </View>
             </View>
+            <Text style={styles.topPayerPercentage}>{item.percentage.toFixed(0)}%</Text>
           </View>
         ))}
       </View>
+
+      {/* Group Cards */}
+      {analytics.groupAnalytics.map((group, index) => (
+        <View key={index} style={styles.groupCard}>
+          <View style={styles.groupCardHeader}>
+            <LinearGradient
+              colors={['#B0004F', '#8B0000']}
+              style={styles.groupIcon}
+            >
+              <Icon name="people" size={24} color="white" />
+            </LinearGradient>
+            <View style={styles.groupInfo}>
+              <Text style={styles.groupName}>{group.groupName}</Text>
+              <Text style={styles.groupMembers}>{group.memberCount} members</Text>
+            </View>
+          </View>
+
+          <View style={styles.groupStatsRow}>
+            <View style={styles.groupStat}>
+              <Text style={styles.groupStatLabel}>Total Spent</Text>
+              <Text style={styles.groupStatValue}>${group.totalSpent.toLocaleString()}</Text>
+            </View>
+            <View style={styles.groupStatDivider} />
+            <View style={styles.groupStat}>
+              <Text style={styles.groupStatLabel}>Your Balance</Text>
+              <Text
+                style={[
+                  styles.groupStatValue,
+                  {
+                    color: Math.abs(group.userBalance) < 0.01
+                      ? '#6B7280'
+                      : group.userBalance > 0
+                      ? '#10B981'
+                      : '#EF4444',
+                  },
+                ]}
+              >
+                {Math.abs(group.userBalance) < 0.01
+                  ? 'Settled'
+                  : `${group.userBalance > 0 ? '+' : ''}$${Math.abs(group.userBalance).toFixed(2)}`}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ))}
     </ScrollView>
   );
 
   const renderFriendsTab = () => (
     <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.sectionContainer}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Friend Activity
-        </Text>
-        {analytics.friendAnalytics.map((friend, index) => (
-          <View key={index} style={[styles.friendCard, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.friendHeader}>
-              <View style={[styles.friendAvatar, { backgroundColor: theme.colors.primary }]}>
-                <Icon name="person" size={20} color="white" />
+      <View style={styles.sectionHeader}>
+        <Icon name="person" size={28} color="#B0004F" />
+        <Text style={styles.sectionTitle}>Friend Analytics</Text>
+      </View>
+
+      {/* Settlement Speed */}
+      <View style={styles.chartCard}>
+        <View style={styles.chartHeader}>
+          <Icon name="time" size={24} color="#B0004F" />
+          <Text style={styles.chartTitle}>Settlement Speed</Text>
+        </View>
+        {settlementSpeed.map((friend, index) => {
+          const statusColors = {
+            fast: '#10B981',
+            medium: '#F59E0B',
+            slow: '#EF4444',
+          };
+          return (
+            <View key={index} style={styles.settlementRow}>
+              <View style={styles.settlementLeft}>
+                <View style={[styles.statusDot, { backgroundColor: statusColors[friend.status] }]} />
+                <Text style={styles.settlementName}>{friend.name}</Text>
               </View>
-              <View style={styles.friendInfo}>
-                <Text style={[styles.friendName, { color: theme.colors.text }]}>
-                  {friend.friendName}
+              <View style={styles.settlementRight}>
+                <Text style={[styles.settlementDays, { color: statusColors[friend.status] }]}>
+                  {friend.avgDays.toFixed(1)} days
                 </Text>
-                <Text style={[styles.friendExpenses, { color: theme.colors.textSecondary }]}>
-                  {friend.expenseCount} shared expenses
-                </Text>
+                <Icon
+                  name={friend.status === 'fast' ? 'checkmark-circle' : friend.status === 'medium' ? 'time' : 'alert-circle'}
+                  size={20}
+                  color={statusColors[friend.status]}
+                />
               </View>
             </View>
-            
-            <View style={styles.friendStats}>
-              <View style={styles.friendStat}>
-                <Text style={[styles.friendStatLabel, { color: theme.colors.textSecondary }]}>
-                  Total Shared
-                </Text>
-                <Text style={[styles.friendStatValue, { color: theme.colors.text }]}>
-                  ${friend.totalShared.toLocaleString()}
-                </Text>
-              </View>
-              <View style={styles.friendStat}>
-                <Text style={[styles.friendStatLabel, { color: theme.colors.textSecondary }]}>
-                  Balance
-                </Text>
-                <Text style={[
-                  styles.friendStatValue,
-                  { 
-                    color: Math.abs(friend.currentBalance) < 0.01 ? theme.colors.textSecondary :
-                           friend.currentBalance > 0 ? theme.colors.success : theme.colors.error
-                  }
-                ]}>
-                  {Math.abs(friend.currentBalance) < 0.01 ? 'Settled' : 
-                   `${friend.currentBalance > 0 ? '+' : ''}$${Math.abs(friend.currentBalance).toFixed(2)}`}
-                </Text>
-              </View>
+          );
+        })}
+      </View>
+
+      {/* Friend Cards */}
+      {analytics.friendAnalytics.map((friend, index) => (
+        <View key={index} style={styles.friendCard}>
+          <View style={styles.friendHeader}>
+            <View style={styles.friendAvatar}>
+              <Text style={styles.friendInitial}>{friend.friendName.charAt(0)}</Text>
+            </View>
+            <View style={styles.friendInfo}>
+              <Text style={styles.friendName}>{friend.friendName}</Text>
+              <Text style={styles.friendExpenses}>{friend.expenseCount} shared expenses</Text>
             </View>
           </View>
-        ))}
-      </View>
+
+          <View style={styles.friendStatsRow}>
+            <View style={styles.friendStat}>
+              <Text style={styles.friendStatLabel}>Total Shared</Text>
+              <Text style={styles.friendStatValue}>${friend.totalShared.toLocaleString()}</Text>
+            </View>
+            <View style={styles.friendStatDivider} />
+            <View style={styles.friendStat}>
+              <Text style={styles.friendStatLabel}>Balance</Text>
+              <Text
+                style={[
+                  styles.friendStatValue,
+                  {
+                    color: Math.abs(friend.currentBalance) < 0.01
+                      ? '#6B7280'
+                      : friend.currentBalance > 0
+                      ? '#10B981'
+                      : '#EF4444',
+                  },
+                ]}
+              >
+                {Math.abs(friend.currentBalance) < 0.01
+                  ? 'Settled'
+                  : `${friend.currentBalance > 0 ? '+' : ''}$${Math.abs(friend.currentBalance).toFixed(2)}`}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ))}
     </ScrollView>
   );
 
-  const renderTrendsTab = () => (
-    <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.sectionContainer}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Monthly Trends
-        </Text>
-        {analytics.monthlyTrends.map((trend, index) => (
-          <View key={index} style={[styles.trendCard, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.trendHeader}>
-              <Text style={[styles.trendMonth, { color: theme.colors.text }]}>
-                {trend.month}
-              </Text>
-              <View style={styles.trendIcons}>
-                <Icon name="trending" size={16} color={theme.colors.primary} />
-              </View>
+  const renderTrendsTab = () => {
+    const maxValue = Math.max(...analytics.monthlyTrends.map(t => Math.max(t.spent, t.settled)));
+
+    return (
+      <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.sectionHeader}>
+          <Icon name="stats-chart" size={28} color="#B0004F" />
+          <Text style={styles.sectionTitle}>Monthly Trends</Text>
+        </View>
+
+        {/* Trend Comparison Chart */}
+        <View style={styles.chartCard}>
+          <View style={styles.trendComparisonChart}>
+            {analytics.monthlyTrends.map((trend, index) => {
+              const spentHeight = (trend.spent / maxValue) * 180;
+              const settledHeight = (trend.settled / maxValue) * 180;
+
+              return (
+                <View key={index} style={styles.trendComparisonBar}>
+                  <View style={styles.barPair}>
+                    <LinearGradient
+                      colors={['#B0004F', '#FF6B6B']}
+                      style={[styles.barSpent, { height: Math.max(spentHeight, 20) }]}
+                    />
+                    <LinearGradient
+                      colors={['#10B981', '#059669']}
+                      style={[styles.barSettled, { height: Math.max(settledHeight, 20) }]}
+                    />
+                  </View>
+                  <Text style={styles.trendComparisonMonth}>{trend.month.slice(0, 3)}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.trendLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#B0004F' }]} />
+              <Text style={styles.legendText}>Spent</Text>
             </View>
-            
-            <View style={styles.trendStats}>
-              <View style={styles.trendStat}>
-                <Text style={[styles.trendStatLabel, { color: theme.colors.textSecondary }]}>
-                  Spent
-                </Text>
-                <Text style={[styles.trendStatValue, { color: theme.colors.text }]}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+              <Text style={styles.legendText}>Settled</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Trend Details */}
+        {analytics.monthlyTrends.map((trend, index) => (
+          <View key={index} style={styles.trendDetailCard}>
+            <Text style={styles.trendDetailMonth}>{trend.month}</Text>
+            <View style={styles.trendDetailRow}>
+              <View style={styles.trendDetailItem}>
+                <Text style={styles.trendDetailLabel}>Spent</Text>
+                <Text style={[styles.trendDetailValue, { color: '#B0004F' }]}>
                   ${trend.spent.toLocaleString()}
                 </Text>
               </View>
-              <View style={styles.trendStat}>
-                <Text style={[styles.trendStatLabel, { color: theme.colors.textSecondary }]}>
-                  Settled
-                </Text>
-                <Text style={[styles.trendStatValue, { color: theme.colors.success }]}>
+              <View style={styles.trendDetailItem}>
+                <Text style={styles.trendDetailLabel}>Settled</Text>
+                <Text style={[styles.trendDetailValue, { color: '#10B981' }]}>
                   ${trend.settled.toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.trendDetailItem}>
+                <Text style={styles.trendDetailLabel}>Pending</Text>
+                <Text style={[styles.trendDetailValue, { color: '#F59E0B' }]}>
+                  ${(trend.spent - trend.settled).toLocaleString()}
                 </Text>
               </View>
             </View>
           </View>
         ))}
-      </View>
-    </ScrollView>
-  );
+      </ScrollView>
+    );
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={styles.container}>
         {renderHeader()}
-        {renderTabs()}
-        
+
+        {/* Tab Bar */}
+        <View style={styles.tabBar}>
+          {[
+            { key: 'overview', label: 'Overview', icon: 'analytics' },
+            { key: 'groups', label: 'Groups', icon: 'people' },
+            { key: 'friends', label: 'Friends', icon: 'person' },
+            { key: 'trends', label: 'Trends', icon: 'trending-up' },
+          ].map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+              onPress={() => setActiveTab(tab.key as any)}
+            >
+              <Icon
+                name={tab.icon as any}
+                size={20}
+                color={activeTab === tab.key ? '#B0004F' : '#6B7280'}
+              />
+              <Text
+                style={[
+                  styles.tabLabel,
+                  activeTab === tab.key && styles.tabLabelActive,
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           {activeTab === 'overview' && renderOverviewTab()}
           {activeTab === 'groups' && renderGroupsTab()}
@@ -461,6 +606,7 @@ const SplittingAnalyticsModal: React.FC<SplittingAnalyticsModalProps> = ({ visib
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F9FAFB',
   },
   loadingContainer: {
     flex: 1,
@@ -470,15 +616,27 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    fontWeight: '500',
+    color: '#6B7280',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: Platform.OS === 'ios' ? 20 : 40,
     paddingBottom: 24,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 4,
   },
   closeButton: {
     width: 40,
@@ -488,135 +646,220 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  tabContainer: {
-    paddingVertical: 16,
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderBottomColor: '#E5E7EB',
   },
-  tabScroll: {
-    paddingHorizontal: 20,
-  },
-  tabButton: {
+  tab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    justifyContent: 'center',
     paddingVertical: 8,
-    marginRight: 12,
-    borderRadius: 20,
-    borderWidth: 1,
+    borderRadius: 8,
   },
-  activeTab: {
-    borderWidth: 0,
+  tabActive: {
+    backgroundColor: '#FEF2F2',
   },
-  tabText: {
-    fontSize: 14,
+  tabLabel: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#6B7280',
     marginLeft: 6,
+  },
+  tabLabelActive: {
+    color: '#B0004F',
   },
   content: {
     flex: 1,
   },
   tabContent: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
-  heroCard: {
-    padding: 24,
-    borderRadius: 20,
-    marginVertical: 16,
-  },
-  heroTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  heroStats: {
+  timeRangeContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 4,
+    marginVertical: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: { elevation: 3 },
+    }),
   },
-  heroStat: {
+  timeRangeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  heroStatValue: {
+  timeRangeButtonActive: {
+    backgroundColor: '#B0004F',
+  },
+  timeRangeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  timeRangeTextActive: {
+    color: 'white',
+  },
+  heroCardsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 20,
+  },
+  heroCard: {
+    width: (SCREEN_WIDTH - 44) / 2,
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: { elevation: 6 },
+    }),
+  },
+  heroCardLight: {
+    backgroundColor: 'white',
+  },
+  heroCardValue: {
     fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
+    marginTop: 12,
   },
-  heroStatLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+  heroCardLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 4,
   },
-  quickStatsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
+  heroCardLabelDark: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 4,
   },
-  quickStat: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+  chartCard: {
+    backgroundColor: 'white',
     borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
-  quickStatIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+  chartHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 12,
+    marginBottom: 20,
   },
-  quickStatContent: {
-    flex: 1,
-  },
-  quickStatValue: {
+  chartTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 2,
+    color: '#111827',
+    marginLeft: 12,
   },
-  quickStatLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  sectionContainer: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  chartSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
     marginBottom: 16,
   },
-  categoryItem: {
+  trendChart: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    alignItems: 'flex-end',
+    height: 180,
+  },
+  trendBar: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  trendBarFill: {
+    width: '100%',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 8,
+  },
+  trendAmount: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  trendPeriod: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 8,
+  },
+  categoryCircles: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 24,
+  },
+  categoryCircleItem: {
+    alignItems: 'center',
+    width: 100,
+  },
+  categoryCircleLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  categoryCircleAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  categoryList: {
+    marginTop: 16,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   categoryLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
-  categoryEmoji: {
-    fontSize: 24,
+  categoryDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     marginRight: 12,
   },
   categoryName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  categoryCount: {
-    fontSize: 12,
+    fontSize: 15,
+    color: '#111827',
     fontWeight: '500',
   },
   categoryRight: {
@@ -625,41 +868,84 @@ const styles = StyleSheet.create({
   categoryAmount: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 2,
+    color: '#111827',
   },
   categoryPercentage: {
     fontSize: 12,
     fontWeight: '600',
+    marginTop: 2,
   },
-  insightCard: {
+  sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    alignItems: 'center',
+    marginVertical: 16,
   },
-  insightIcon: {
-    fontSize: 24,
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginLeft: 12,
+  },
+  topPayerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  topPayerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rankBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
-  insightContent: {
-    flex: 1,
+  rankBadgeGold: {
+    backgroundColor: '#FCD34D',
   },
-  insightTitle: {
-    fontSize: 16,
+  rankText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  topPayerGroup: {
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
+    color: '#111827',
   },
-  insightDescription: {
-    fontSize: 14,
-    lineHeight: 20,
+  topPayerName: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  topPayerPercentage: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#B0004F',
   },
   groupCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
     padding: 16,
-    borderRadius: 12,
     marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: { elevation: 3 },
+    }),
   },
-  groupHeader: {
+  groupCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
@@ -678,32 +964,82 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 2,
+    color: '#111827',
   },
   groupMembers: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
   },
-  groupStats: {
+  groupStatsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   groupStat: {
+    flex: 1,
     alignItems: 'center',
+  },
+  groupStatDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E5E7EB',
   },
   groupStatLabel: {
     fontSize: 12,
-    fontWeight: '500',
+    color: '#6B7280',
     marginBottom: 4,
   },
   groupStatValue: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#111827',
+  },
+  settlementRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  settlementLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 12,
+  },
+  settlementName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  settlementRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settlementDays: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginRight: 8,
   },
   friendCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
     padding: 16,
-    borderRadius: 12,
     marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: { elevation: 3 },
+    }),
   },
   friendHeader: {
     flexDirection: 'row',
@@ -711,12 +1047,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   friendAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#B0004F',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  friendInitial: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
   },
   friendInfo: {
     flex: 1,
@@ -724,60 +1066,128 @@ const styles = StyleSheet.create({
   friendName: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 2,
+    color: '#111827',
   },
   friendExpenses: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
   },
-  friendStats: {
+  friendStatsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   friendStat: {
+    flex: 1,
     alignItems: 'center',
+  },
+  friendStatDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E5E7EB',
   },
   friendStatLabel: {
     fontSize: 12,
-    fontWeight: '500',
+    color: '#6B7280',
     marginBottom: 4,
   },
   friendStatValue: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#111827',
   },
-  trendCard: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  trendHeader: {
+  trendComparisonChart: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 200,
     marginBottom: 16,
   },
-  trendMonth: {
+  trendComparisonBar: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  barPair: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  barSpent: {
+    width: 16,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    minHeight: 20,
+  },
+  barSettled: {
+    width: 16,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    minHeight: 20,
+  },
+  trendComparisonMonth: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 8,
+  },
+  trendLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  legendText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  trendDetailCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  trendDetailMonth: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
   },
-  trendIcons: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  trendStats: {
+  trendDetailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  trendStat: {
+  trendDetailItem: {
     alignItems: 'center',
   },
-  trendStatLabel: {
+  trendDetailLabel: {
     fontSize: 12,
-    fontWeight: '500',
+    color: '#6B7280',
     marginBottom: 4,
   },
-  trendStatValue: {
+  trendDetailValue: {
     fontSize: 16,
     fontWeight: 'bold',
   },

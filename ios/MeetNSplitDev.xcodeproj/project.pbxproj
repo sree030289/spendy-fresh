@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		5545A9562E8EAB950096F357 /* SpendyStoreKit.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 5545A9552E8EAB920096F357 /* SpendyStoreKit.storekit */; };
 		56A13C1929E8404E9B686F5B /* notification_sound.wav in Resources */ = {isa = PBXBuildFile; fileRef = 512B344580E440D4AD3A69D9 /* notification_sound.wav */; };
 		6172275A4D32B0DCEBDB29CD /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9CE0B1F6440C74A6E0E200 /* ExpoModulesProvider.swift */; };
 		8C24DA40BE29FA32E9120033 /* libPods-MeetNSplitDev.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5778D156B8C004B986887DBC /* libPods-MeetNSplitDev.a */; };
@@ -21,13 +22,14 @@
 		13B07F961A680F5B00A75B9A /* MeetNSplitDev.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetNSplitDev.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = MeetNSplitDev/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = MeetNSplitDev/Info.plist; sourceTree = "<group>"; };
-		512B344580E440D4AD3A69D9 /* notification_sound.wav */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = notification_sound.wav; path = MeetNSplitDev/notification_sound.wav; sourceTree = "<group>"; };
+		512B344580E440D4AD3A69D9 /* notification_sound.wav */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = notification_sound.wav; path = MeetNSplitDev/notification_sound.wav; sourceTree = "<group>"; };
+		5545A9552E8EAB920096F357 /* SpendyStoreKit.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = SpendyStoreKit.storekit; sourceTree = "<group>"; };
 		5778D156B8C004B986887DBC /* libPods-MeetNSplitDev.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-MeetNSplitDev.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = MeetNSplitDev/SplashScreen.storyboard; sourceTree = "<group>"; };
 		AA9CE0B1F6440C74A6E0E200 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-MeetNSplitDev/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		D248625168BDF8BEE7C8F428 /* Pods-MeetNSplitDev.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MeetNSplitDev.release.xcconfig"; path = "Target Support Files/Pods-MeetNSplitDev/Pods-MeetNSplitDev.release.xcconfig"; sourceTree = "<group>"; };
-		D522CC0A6FAF98067A3AC30F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = MeetNSplitDev/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		D522CC0A6FAF98067A3AC30F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = MeetNSplitDev/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E0ECDB657DB0F29D411E0512 /* Pods-MeetNSplitDev.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MeetNSplitDev.debug.xcconfig"; path = "Target Support Files/Pods-MeetNSplitDev/Pods-MeetNSplitDev.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = MeetNSplitDev/AppDelegate.swift; sourceTree = "<group>"; };
@@ -84,7 +86,6 @@
 				E0ECDB657DB0F29D411E0512 /* Pods-MeetNSplitDev.debug.xcconfig */,
 				D248625168BDF8BEE7C8F428 /* Pods-MeetNSplitDev.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -106,6 +107,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				5545A9552E8EAB920096F357 /* SpendyStoreKit.storekit */,
 				13B07FAE1A68108700A75B9A /* MeetNSplitDev */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -198,6 +200,7 @@
 			files = (
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				5545A9562E8EAB950096F357 /* SpendyStoreKit.storekit in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				56A13C1929E8404E9B686F5B /* notification_sound.wav in Resources */,
 				E1898FE02647E9EEB01E7B31 /* PrivacyInfo.xcprivacy in Resources */,
@@ -362,6 +365,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = MeetNSplitDev/MeetNSplitDev.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GPQZV337FJ;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -380,7 +384,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = com.svaag.spendy.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.svaag.meetnsplit.dev;
 				PRODUCT_NAME = MeetNSplitDev;
 				SWIFT_OBJC_BRIDGING_HEADER = "MeetNSplitDev/MeetNSplitDev-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -398,6 +402,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = MeetNSplitDev/MeetNSplitDev.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GPQZV337FJ;
 				INFOPLIST_FILE = MeetNSplitDev/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -411,7 +416,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.svaag.spendy.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.svaag.meetnsplit.dev;
 				PRODUCT_NAME = MeetNSplitDev;
 				SWIFT_OBJC_BRIDGING_HEADER = "MeetNSplitDev/MeetNSplitDev-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

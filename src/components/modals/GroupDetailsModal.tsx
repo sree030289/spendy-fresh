@@ -982,8 +982,8 @@ export default function GroupDetailsModal({
                   Settled
                 </Text>
               </>
-            ) : calculatedBalance > 0 ? (
-              // Positive balance: this member owes the current user
+            ) : calculatedBalance < 0 ? (
+              // Negative balance from calculation: this member owes the current user
               <>
                 <Text style={[styles.balanceAmount, styles.balancePositive]}>
                   +{getCurrencySymbol(user?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
@@ -993,7 +993,7 @@ export default function GroupDetailsModal({
                 </Text>
               </>
             ) : (
-              // Negative balance: current user owes this member
+              // Positive balance from calculation: current user owes this member
               <>
                 <Text style={[styles.balanceAmount, styles.balanceNegative]}>
                   {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}

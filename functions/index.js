@@ -2521,6 +2521,196 @@ meetnsplitApp.post('/groups/:groupId/members', authenticateJWT, async (req, res)
   }
 });
 
+// Join Group by Invite Code with Auto-Friend Creation
+meetnsplitApp.post('/groups/join/:inviteCode', authenticateJWT, async (req, res) => {
+  try {
+    const { inviteCode } = req.params;
+    const userId = req.body.userId || req.user.id;
+
+    console.log(`👥 User ${userId} attempting to join group with code: ${inviteCode}`);
+
+    // Find group by invite code
+    const groupsSnapshot = await db.collection(COLLECTIONS.GROUPS)
+      .where('inviteCode', '==', inviteCode.toUpperCase())
+      .where('isActive', '==', true)
+      .limit(1)
+      .get();
+
+    if (groupsSnapshot.empty) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid invite code. Please check the code and try again.',
+        error: 'GROUP_NOT_FOUND'
+      });
+    }
+
+    const groupDoc = groupsSnapshot.docs[0];
+    const groupData = groupDoc.data();
+    const groupId = groupDoc.id;
+
+    console.log(`📋 Found group: ${groupData.name} (${groupId})`);
+
+    // Check if user is already a member
+    const isAlreadyMember = groupData.members && groupData.members.some(member =>
+      member.userId === userId && member.isActive
+    );
+
+    if (isAlreadyMember) {
+      return res.status(400).json({
+        success: false,
+        message: 'You are already a member of this group',
+        error: 'ALREADY_MEMBER'
+      });
+    }
+
+    // Get new member's user data
+    const newMemberDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    if (!newMemberDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    const newMemberData = newMemberDoc.data();
+
+    // Add user to group
+    const newMember = {
+      userId: userId,
+      userData: {
+        fullName: newMemberData.fullName || newMemberData.name || 'Unknown User',
+        email: newMemberData.email || 'unknown@email.com',
+        avatar: newMemberData.profileImage || newMemberData.profilePicture || ''
+      },
+      role: 'member',
+      joinedAt: new Date(),
+      balance: 0,
+      isActive: true
+    };
+
+    await groupDoc.ref.update({
+      members: admin.firestore.FieldValue.arrayUnion(newMember),
+      updatedAt: new Date()
+    });
+
+    console.log(`✅ Added ${userId} to group ${groupId}`);
+
+    // AUTO-CREATE FRIENDSHIPS WITH ALL EXISTING MEMBERS
+    const existingMembers = groupData.members || [];
+    let friendshipsCreated = 0;
+
+    console.log(`👥 Starting auto-friend creation for ${userId} with ${existingMembers.length} existing members`);
+
+    for (const existingMember of existingMembers) {
+      console.log(`🔍 Checking member: ${existingMember.userId}, isActive: ${existingMember.isActive}`);
+
+      if (existingMember.userId === userId || !existingMember.isActive) {
+        console.log(`⏭️  Skipping ${existingMember.userId} (self or inactive)`);
+        continue; // Skip self and inactive members
+      }
+
+      try {
+        // Check if friendship already exists using the correct schema (user1Id/user2Id, status: 'active')
+        console.log(`🔎 Checking if friendship exists: ${userId} <-> ${existingMember.userId}`);
+        const existingFriendship1 = await db.collection(COLLECTIONS.FRIENDS)
+          .where('user1Id', '==', userId)
+          .where('user2Id', '==', existingMember.userId)
+          .where('status', '==', 'active')
+          .limit(1)
+          .get();
+
+        const existingFriendship2 = await db.collection(COLLECTIONS.FRIENDS)
+          .where('user1Id', '==', existingMember.userId)
+          .where('user2Id', '==', userId)
+          .where('status', '==', 'active')
+          .limit(1)
+          .get();
+
+        console.log(`📊 Friendship check results: exists1=${!existingFriendship1.empty}, exists2=${!existingFriendship2.empty}`);
+
+        if (existingFriendship1.empty && existingFriendship2.empty) {
+          // Create friendship using the correct schema that matches existing friendships
+          const friendshipData = {
+            user1Id: userId,
+            user2Id: existingMember.userId,
+            status: 'active',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+
+          // Create single friendship document (not bidirectional - the GET endpoint queries both directions)
+          await db.collection(COLLECTIONS.FRIENDS).add(friendshipData);
+
+          friendshipsCreated++;
+          console.log(`🤝 Created auto-friendship: ${userId} <-> ${existingMember.userId}`);
+        } else {
+          console.log(`ℹ️  Friendship already exists between ${userId} <-> ${existingMember.userId}`);
+        }
+      } catch (friendError) {
+        console.error(`Failed to create friendship with ${existingMember.userId}:`, friendError);
+        // Continue with other members even if one fails
+      }
+    }
+
+    console.log(`✅ Successfully joined group. Created ${friendshipsCreated} new friendships.`);
+
+    // SEND WELCOME NOTIFICATIONS TO ALL GROUP MEMBERS
+    try {
+      const notificationPromises = existingMembers.map(async (existingMember) => {
+        if (existingMember.userId === userId || !existingMember.isActive) {
+          return; // Skip self and inactive members
+        }
+
+        // Create notification for each existing member
+        const notification = {
+          userId: existingMember.userId,
+          type: 'group_member_joined',
+          title: `${newMemberData.fullName || 'Someone'} joined ${groupData.name}`,
+          message: `${newMemberData.fullName || 'A new member'} has joined "${groupData.name}" and has been added to your friends list. Welcome them!`,
+          data: {
+            groupId: groupId,
+            groupName: groupData.name,
+            newMemberId: userId,
+            newMemberName: newMemberData.fullName || 'Unknown User',
+            newMemberEmail: newMemberData.email
+          },
+          isRead: false,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+        };
+
+        await db.collection(COLLECTIONS.NOTIFICATIONS).add(notification);
+        console.log(`📬 Sent join notification to ${existingMember.userId}`);
+      });
+
+      await Promise.all(notificationPromises);
+      console.log(`✅ Sent ${existingMembers.length - 1} welcome notifications`);
+    } catch (notifError) {
+      console.error('Failed to send notifications:', notifError);
+      // Don't fail the join operation if notifications fail
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully joined "${groupData.name}"! You're now friends with ${friendshipsCreated} group members.`,
+      data: {
+        groupId: groupId,
+        groupName: groupData.name,
+        friendshipsCreated: friendshipsCreated
+      }
+    });
+
+  } catch (error) {
+    console.error('Join group by invite code error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to join group',
+      error: 'JOIN_GROUP_ERROR'
+    });
+  }
+});
+
 // Get User Groups
 meetnsplitApp.get('/groups', authenticateJWT, async (req, res) => {
   try {

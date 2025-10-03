@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,12 @@ export default function RegisterScreen() {
   const [selectedCountry, setSelectedCountry] = useState<Country>(
     findCountryByCode('AU') || findCountryByCode('US')!
   );
+
+  // Refs for text inputs
+  const fullNameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const mobileRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -518,26 +524,25 @@ export default function RegisterScreen() {
       />
 
       {/* White Content Area */}
-      <View style={styles.whiteContent}>
+      <KeyboardAvoidingView
+        style={styles.whiteContent}
+        behavior={Platform.select({ ios: 'padding', android: undefined, web: 'height' })}
+        keyboardVerticalOffset={Platform.select({ ios: 0, android: 0, default: 0 })}
+      >
         <TouchableWithoutFeedback onPress={Platform.OS !== 'web' ? dismissKeyboard : undefined}>
-          <KeyboardAvoidingView 
-            behavior={Platform.select({ ios: 'padding', android: 'height', web: 'height' })}
-            style={[styles.keyboardView, Platform.OS === 'web' && { flex: 1 }]}
-            enabled={true}
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              Platform.OS === 'web' && { minHeight: '100%' }
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            bounces={Platform.OS !== 'web'}
+            {...(Platform.OS === 'web' && {
+              scrollEnabled: true,
+              nestedScrollEnabled: true,
+            })}
           >
-            <ScrollView 
-              contentContainerStyle={[
-                styles.scrollContent,
-                Platform.OS === 'web' && { minHeight: '100%' }
-              ]} 
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              bounces={Platform.OS !== 'web'}
-              {...(Platform.OS === 'web' && {
-                scrollEnabled: true,
-                nestedScrollEnabled: true,
-              })}
-            >
               <View style={styles.header}>
                 <Text style={styles.title}>Let's get started</Text>
                 <Text style={styles.subtitle}>
@@ -548,12 +553,13 @@ export default function RegisterScreen() {
             <View style={styles.form}>
               <View style={styles.inputContainer}>
                 <TextInput
+                  ref={fullNameRef}
                   style={[
                     styles.input,
-                    { 
+                    {
                       backgroundColor: theme.colors.surface,
                       borderColor: errors.fullName ? theme.colors.error : theme.colors.border,
-                      color: theme.colors.text 
+                      color: theme.colors.text
                     }
                   ]}
                   placeholder="Full Name"
@@ -565,6 +571,7 @@ export default function RegisterScreen() {
                   }}
                   returnKeyType="next"
                   blurOnSubmit={false}
+                  onSubmitEditing={() => emailRef.current?.focus()}
                   {...(Platform.OS === 'web' && {
                     autoComplete: 'name',
                     inputMode: 'text' as any,
@@ -579,12 +586,13 @@ export default function RegisterScreen() {
 
               <View style={styles.inputContainer}>
                 <TextInput
+                  ref={emailRef}
                   style={[
                     styles.input,
-                    { 
+                    {
                       backgroundColor: theme.colors.surface,
                       borderColor: errors.email ? theme.colors.error : theme.colors.border,
-                      color: theme.colors.text 
+                      color: theme.colors.text
                     }
                   ]}
                   placeholder="Email"
@@ -599,6 +607,11 @@ export default function RegisterScreen() {
                   autoCorrect={false}
                   returnKeyType="next"
                   blurOnSubmit={false}
+                  onSubmitEditing={() => {
+                    // Dismiss keyboard to allow country picker interaction if needed
+                    // User can manually focus mobile field after selecting country
+                    Keyboard.dismiss();
+                  }}
                   {...(Platform.OS === 'web' && {
                     autoComplete: 'email',
                     inputMode: 'email' as any,
@@ -611,9 +624,9 @@ export default function RegisterScreen() {
                 ) : null}
               </View>
 
-              <View style={[styles.countryPickerContainer, { 
+              <View style={[styles.countryPickerContainer, {
                 backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border 
+                borderColor: theme.colors.border
               }]}>
                 <Icon name="flag-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
                 <CountryCodePicker
@@ -622,13 +635,14 @@ export default function RegisterScreen() {
                     setSelectedCountry(country);
                     // Find matching country in constants to get currency
                     const constantsCountry = COUNTRIES.find(c => c.phoneCode === country.dialCode && c.code === country.code);
-                    setFormData({ 
-                      ...formData, 
+                    setFormData({
+                      ...formData,
                       country: country.code,
                       currency: constantsCountry?.currency || formData.currency
                     });
                   }}
                   style={styles.countryPickerWrapper}
+                  displayMode="name"
                 />
               </View>
 
@@ -643,12 +657,13 @@ export default function RegisterScreen() {
                 </View>
                 <View style={styles.phoneInputContainer}>
                   <TextInput
+                    ref={mobileRef}
                     style={[
-                      styles.phoneInput, 
-                      { 
+                      styles.phoneInput,
+                      {
                         backgroundColor: theme.colors.surface,
                         borderColor: errors.mobile ? theme.colors.error : theme.colors.border,
-                        color: theme.colors.text 
+                        color: theme.colors.text
                       }
                     ]}
                     placeholder="Mobile Number (10 digits)"
@@ -659,11 +674,17 @@ export default function RegisterScreen() {
                       const numericText = text.replace(/[^0-9]/g, '');
                       setFormData({ ...formData, mobile: numericText });
                       if (errors.mobile) validateMobile(numericText);
+
+                      // Auto-dismiss keyboard and move to next field when 10 digits entered
+                      if (numericText.length === 10) {
+                        passwordRef.current?.focus();
+                      }
                     }}
                     keyboardType="phone-pad"
-                    returnKeyType="next"
+                    returnKeyType="done"
                     maxLength={10}
                     blurOnSubmit={false}
+                    onSubmitEditing={() => passwordRef.current?.focus()}
                     {...(Platform.OS === 'web' && {
                       // Web-specific props
                       autoComplete: 'tel',
@@ -695,13 +716,14 @@ export default function RegisterScreen() {
 
               <View style={styles.inputContainer}>
                 <TextInput
+                  ref={passwordRef}
                   style={[
-                    styles.input, 
-                    styles.passwordInput, 
-                    { 
+                    styles.input,
+                    styles.passwordInput,
+                    {
                       backgroundColor: theme.colors.surface,
                       borderColor: errors.password ? theme.colors.error : theme.colors.border,
-                      color: theme.colors.text 
+                      color: theme.colors.text
                     }
                   ]}
                   placeholder="Password (min. 6 characters)"
@@ -761,9 +783,8 @@ export default function RegisterScreen() {
                 </Text>
               </TouchableOpacity>
             </ScrollView>
-          </KeyboardAvoidingView>
         </TouchableWithoutFeedback>
-      </View>
+      </KeyboardAvoidingView>
 
       <CurrencyPicker />
       <BiometricPrompt />
@@ -806,9 +827,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderTopRightRadius: 25,
     paddingTop: 30,
     width: '100%',
-  },
-  keyboardView: {
-    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,

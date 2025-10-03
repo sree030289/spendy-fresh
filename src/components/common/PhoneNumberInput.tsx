@@ -21,6 +21,7 @@ interface PhoneNumberInputProps {
   style?: ViewStyle;
   inputStyle?: TextStyle;
   autoFocus?: boolean;
+  showValidation?: boolean; // Only show validation UI when explicitly enabled
 }
 
 export default function PhoneNumberInput({
@@ -33,6 +34,7 @@ export default function PhoneNumberInput({
   style,
   inputStyle,
   autoFocus = false,
+  showValidation = false,
 }: PhoneNumberInputProps) {
   const { theme } = useTheme();
   const [selectedCountry, setSelectedCountry] = useState<Country>(getDefaultCountry());
@@ -45,38 +47,43 @@ export default function PhoneNumberInput({
       try {
         const formatted = PhoneNumberService.formatAsYouType(value, selectedCountry.code as any);
         setFormattedValue(formatted);
-        
-        // Only validate if value has reasonable length (prevent premature validation)
-        if (value.length >= 8) {
+
+        // Only validate if showValidation is enabled
+        if (showValidation && value.length >= 8) {
           const isValidNumber = PhoneNumberService.validate(value, selectedCountry.code as any);
           setIsValid(isValidNumber);
         } else {
-          setIsValid(true); // Don't show error for short inputs
+          setIsValid(true);
         }
-      } catch {
+      } catch (err) {
+        // Silently handle formatting errors - just show the raw value
         setFormattedValue(value);
-        setIsValid(value.length < 8); // Only show error for longer invalid inputs
+        setIsValid(true);
       }
     } else {
       setFormattedValue('');
       setIsValid(true);
     }
-  }, [value, selectedCountry]);
+  }, [value, selectedCountry, showValidation]);
 
   const handleCountryChange = (country: Country) => {
     setSelectedCountry(country);
     onCountryChange?.(country);
-    
+
     // If user has entered a number, try to reformat it for the new country
     if (value) {
       try {
         const formatted = PhoneNumberService.formatAsYouType(value, country.code as any);
         setFormattedValue(formatted);
-        
-        const isValidNumber = PhoneNumberService.validate(value, country.code as any);
-        setIsValid(isValidNumber);
+
+        // Only validate if showValidation is enabled
+        if (showValidation) {
+          const isValidNumber = PhoneNumberService.validate(value, country.code as any);
+          setIsValid(isValidNumber);
+        }
       } catch {
         // Keep the current value if reformatting fails
+        setFormattedValue(value);
       }
     }
   };
@@ -144,13 +151,9 @@ export default function PhoneNumberInput({
         <Text style={[styles.errorText, { color: theme.colors.error }]}>
           {error}
         </Text>
-      ) : !isValid && value.length > 0 ? (
+      ) : showValidation && !isValid && value.length > 0 ? (
         <Text style={[styles.warningText, { color: theme.colors.warning }]}>
           Invalid phone number format
-        </Text>
-      ) : value.length > 0 ? (
-        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>
-          {PhoneNumberService.format(value, selectedCountry.code as any) || 'Formatting...'}
         </Text>
       ) : null}
     </View>

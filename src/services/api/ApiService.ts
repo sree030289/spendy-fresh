@@ -523,6 +523,12 @@ class ApiService {
 
   async joinGroupByInviteCode(inviteCode: string, userId?: string): Promise<string> {
     const response = await this.request('POST', `/groups/join/${inviteCode}`, { userId });
+    // request() method returns response.data when success is true
+    // Backend returns: { success: true, data: { groupId, groupName, friendshipsCreated } }
+    if (!response || !response.groupId) {
+      console.error('❌ Invalid response from join group:', response);
+      throw new Error('Failed to get group ID from response');
+    }
     return response.groupId;
   }
 
