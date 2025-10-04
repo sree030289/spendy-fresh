@@ -18,6 +18,7 @@ import { useBalances, UnifiedSettlementService } from '@/hooks/useBalances';
 import { useSharedBalances } from '@/hooks/useSharedBalances';
 import { getCurrencySymbol } from '@/utils/currency';
 import { ApiService } from '@/services/api/ApiService';
+import { GroupChatService } from '@/services/firebase/GroupChatService';
 
 // Helper function to get active member count
 const getActiveMemberCount = (members: any[]): number => {
@@ -415,9 +416,26 @@ export default function UnifiedSettlementScreen({
                   groupId: suggestion.groupId,
                   note: `Settlement payment: ${suggestion.fromUserName} → ${suggestion.toUserName}`
                 });
-                
+
                 console.log('✅ Settlement payment recorded successfully');
-                
+
+                // Create chat system message for settlement in groups
+                if (suggestion.groupId && user) {
+                  try {
+                    console.log('💬 Creating settlement chat message...');
+                    await GroupChatService.sendGroupMessage({
+                      groupId: suggestion.groupId,
+                      userId: user.id,
+                      userName: 'System',
+                      message: `${suggestion.fromUserName} paid ${getCurrencySymbol(user?.currency || 'USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}`,
+                      type: 'system'
+                    });
+                    console.log('✅ Settlement chat message created');
+                  } catch (chatError) {
+                    console.error('❌ Failed to create settlement chat message:', chatError);
+                  }
+                }
+
                 // CRITICAL: Clear balance cache and force refresh to reflect settlement
                 console.log('🧹 Clearing balance cache after settlement...');
                 UnifiedSettlementService.clearBalanceCache();

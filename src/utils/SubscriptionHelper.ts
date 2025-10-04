@@ -127,17 +127,31 @@ export class SubscriptionHelper {
   // Check if user can create a transaction AND increment count (for actual expense submission)
   async checkTransactionLimit(userId: string): Promise<boolean> {
     try {
+      // SOFT PAYWALL: Check if bypass flag is set (user waited through countdown)
+      const shouldBypass = (global as any).bypassTransactionLimitOnce;
+      if (shouldBypass) {
+        console.log('🎯 BYPASSING transaction limit check (flag set after countdown)');
+        // Clear the bypass flag immediately
+        (global as any).bypassTransactionLimitOnce = false;
+
+        // Still increment usage count even when bypassing
+        const subscriptionService = SubscriptionService.getInstance();
+        await subscriptionService.incrementTransactionUsage(userId);
+        console.log('✅ Transaction bypassed and usage incremented');
+        return true;
+      }
+
       console.log('🔍 CHECKING TRANSACTION LIMIT AND INCREMENTING for user:', userId);
       const subscriptionService = SubscriptionService.getInstance();
       const result = await subscriptionService.canCreateTransaction(userId);
-      
+
       console.log('📊 Transaction limit check result:', {
         allowed: result.allowed,
         currentCount: result.currentCount,
         limit: result.limit,
         userId
       });
-      
+
       if (!result.allowed) {
         console.log('🚫 DAILY TRANSACTION LIMIT REACHED - SHOWING MODAL:', {
           currentCount: result.currentCount,
@@ -147,7 +161,7 @@ export class SubscriptionHelper {
           canClose: false,
           autoCloseAfter: 10
         });
-        
+
         // For transactions, allow closing after 10 seconds
         this.showSubscriptionModal?.(
           'transactionLimit',
@@ -155,10 +169,10 @@ export class SubscriptionHelper {
           false,
           10
         );
-        
+
         return false;
       }
-      
+
       console.log('✅ Transaction allowed, incrementing usage...');
       // Increment transaction count if allowed
       await subscriptionService.incrementTransactionUsage(userId);

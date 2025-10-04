@@ -128,14 +128,19 @@ export default function GroupChatModal({ visible, onClose, group, currentUser, o
     };
   }, [visible, group?.id]);
 
-  // Auto-scroll to bottom when modal opens
+  // Auto-scroll to bottom when modal opens and mark messages as read
   useEffect(() => {
     if (visible && messages.length > 0) {
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: false });
       }, 300);
     }
-  }, [visible]);
+
+    // Mark messages as read when modal is opened
+    if (visible && group?.id && currentUser?.id) {
+      GroupChatService.markMessagesAsRead(group.id, currentUser.id);
+    }
+  }, [visible, group?.id, currentUser?.id, messages.length]);
 
   const sendMessage = async () => {
     const messageText = newMessage.trim();
@@ -220,7 +225,7 @@ const renderMessage = (message: ChatMessage, index: number) => {
 
   if (message.type === 'expense') {
     // Check if this is an edited expense
-    const isEditedExpense = (message as any).isEdit === true;
+    const isEditedExpense = message.expenseData?.isEdit === true;
     
     return (
       <View key={message.id} style={[
@@ -264,9 +269,19 @@ const renderMessage = (message: ChatMessage, index: number) => {
   }
 
     if (isSystem) {
+      // Determine system message color based on content
+      const isJoinMessage = message.message.toLowerCase().includes('joined');
+      const isSettlementMessage = message.message.toLowerCase().includes('settled') || message.message.toLowerCase().includes('payment');
+
+      const bgColor = isJoinMessage
+        ? theme.colors.primary + '15'  // Blue tint for joins
+        : isSettlementMessage
+        ? theme.colors.success + '15'  // Green tint for settlements
+        : theme.colors.surface;        // Default gray
+
       return (
-        <View key={message.id} style={[styles.systemMessage, { backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.systemMessageText, { color: theme.colors.textSecondary }]}>
+        <View key={message.id} style={[styles.systemMessage, { backgroundColor: bgColor }]}>
+          <Text style={[styles.systemMessageText, { color: theme.colors.text }]}>
             {message.message}
           </Text>
           <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>

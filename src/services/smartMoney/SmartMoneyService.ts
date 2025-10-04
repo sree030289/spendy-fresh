@@ -16,8 +16,7 @@ import {
   writeBatch,
   Timestamp
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase/config';
+import { db } from '../firebase/config';
 import { AIService } from '../ai/AIService';
 import { BankingService } from '../banking/BankingService';
 import { ApiService } from '../api/ApiService';
@@ -581,41 +580,14 @@ export class SmartMoneyService {
     }
   }
 
+  // NOTE: Receipt and profile picture uploads are handled by the API backend
+  // Firebase Storage is not compatible with React Native
   static async uploadReceiptImage(imageUri: string, userId: string): Promise<string> {
-    try {
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
-      const filename = `receipts/${userId}/${Date.now()}_receipt.jpg`;
-      const storageRef = ref(storage, filename);
-      
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-      return downloadURL;
-    } catch (error) {
-      console.error('Upload receipt error:', error);
-      throw error;
-    }
+    throw new Error('Receipt upload should be handled via API backend, not client-side Firebase Storage');
   }
 
   static async uploadProfilePicture(imageUri: string, userId: string): Promise<string> {
-    try {
-      console.log('📤 Uploading profile picture to Firebase Storage...');
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
-      const filename = `profiles/${userId}/profile_picture.jpg`;
-      const storageRef = ref(storage, filename);
-      
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-      
-      console.log('✅ Profile picture uploaded successfully:', downloadURL);
-      return downloadURL;
-    } catch (error) {
-      console.error('❌ Upload profile picture error:', error);
-      throw error;
-    }
+    throw new Error('Profile picture upload should be handled via API backend, not client-side Firebase Storage');
   }
 
   // BANK INTEGRATION HELPERS

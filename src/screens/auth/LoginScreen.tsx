@@ -511,9 +511,10 @@ export default function LoginScreen() {
       {/* White Content Area */}
       <View style={styles.whiteContent}>
         <TouchableWithoutFeedback onPress={Platform.OS !== 'web' ? dismissKeyboard : undefined}>
-          <KeyboardAvoidingView 
-            behavior={Platform.select({ ios: 'padding', android: 'height', web: 'height' })}
+          <KeyboardAvoidingView
+            behavior={Platform.select({ ios: 'padding', android: 'padding', web: 'height' })}
             style={[styles.keyboardView, Platform.OS === 'web' && { flex: 1 }]}
+            keyboardVerticalOffset={Platform.select({ ios: 0, android: 20 })}
             enabled={true}
           >
             <ScrollView 

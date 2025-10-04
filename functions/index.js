@@ -3844,6 +3844,233 @@ meetnsplitApp.post('/expenses', authenticateJWT, async (req, res) => {
   }
 });
 
+// Upload Receipt Image (Premium Feature)
+meetnsplitApp.post('/receipts/upload', authenticateJWT, async (req, res) => {
+  try {
+    const { imageData, expenseId } = req.body;
+    const userId = req.user.id;
+
+    console.log('📤 Receipt upload started for user:', userId);
+    console.log('📤 Request body keys:', Object.keys(req.body));
+    console.log('📤 Image data present:', !!imageData);
+    console.log('📤 Image data length:', imageData ? imageData.length : 0);
+
+    if (!imageData) {
+      console.error('❌ No image data provided');
+      return res.status(400).json({
+        success: false,
+        message: 'Image data is required',
+        error: 'NO_IMAGE_DATA'
+      });
+    }
+
+    // Validate image data format
+    if (typeof imageData !== 'string') {
+      console.error('❌ Image data is not a string:', typeof imageData);
+      return res.status(400).json({
+        success: false,
+        message: 'Image data must be a base64 string',
+        error: 'INVALID_IMAGE_FORMAT'
+      });
+    }
+
+    console.log('📤 Processing base64 image...');
+
+    // Decode base64 image
+    let base64Data;
+    try {
+      // Handle different base64 formats
+      if (imageData.startsWith('data:image/')) {
+        base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+      } else {
+        base64Data = imageData;
+      }
+      
+      if (!base64Data) {
+        throw new Error('Empty base64 data after processing');
+      }
+      
+      console.log('📤 Base64 data extracted, length:', base64Data.length);
+    } catch (parseError) {
+      console.error('❌ Failed to parse base64 data:', parseError);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid base64 image data',
+        error: 'INVALID_BASE64'
+      });
+    }
+
+    let imageBuffer;
+    try {
+      imageBuffer = Buffer.from(base64Data, 'base64');
+      console.log('📤 Image buffer created, size:', imageBuffer.length, 'bytes');
+      
+      if (imageBuffer.length === 0) {
+        throw new Error('Empty image buffer');
+      }
+    } catch (bufferError) {
+      console.error('❌ Failed to create buffer from base64:', bufferError);
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to process image data',
+        error: 'BUFFER_CREATION_FAILED'
+      });
+    }
+
+    // Create unique filename with hash
+    console.log('📤 Generating filename...');
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update(imageBuffer).digest('hex').substring(0, 16);
+    const timestamp = Date.now();
+    const filename = `receipts/${userId}/${timestamp}_${hash}.jpg`;
+    console.log('📤 Generated filename:', filename);
+
+    // Upload to Firebase Storage
+    console.log("📤 Initializing Firebase Storage...");
+    let bucket;
+    try {
+      // Try different bucket name formats in order of preference
+      const bucketNames = [
+        `${process.env.GCLOUD_PROJECT}.firebasestorage.app`, // New format
+        `${process.env.GCLOUD_PROJECT}.appspot.com`, // Legacy format
+      ];
+      
+      let bucketFound = false;
+      for (const bucketName of bucketNames) {
+        try {
+          bucket = admin.storage().bucket(bucketName);
+          const [exists] = await bucket.exists();
+          if (exists) {
+            console.log("📤 Storage bucket found:", bucketName);
+            bucketFound = true;
+            break;
+          } else {
+            console.log("📤 Bucket does not exist:", bucketName);
+          }
+        } catch (bucketError) {
+          console.log("📤 Failed to check bucket:", bucketName,
+              bucketError.message);
+        }
+      }
+      
+      // Fallback to default bucket if none found
+      if (!bucketFound) {
+        console.log("📤 Using default bucket as fallback...");
+        bucket = admin.storage().bucket();
+        console.log("📤 Default bucket name:", bucket.name);
+      }
+      
+      console.log("📤 Storage initialization complete");
+    } catch (storageError) {
+      console.error("❌ Failed to initialize storage bucket:", storageError);
+      return res.status(500).json({
+        success: false,
+        message: "Storage service unavailable. Please enable Firebase Storage.",
+        error: "STORAGE_NOT_ENABLED",
+        details: "Go to Firebase Console > Storage > Get Started",
+      });
+    }
+
+    const file = bucket.file(filename);
+    console.log("📤 File object created, starting upload...");
+
+    try {
+      await file.save(imageBuffer, {
+        metadata: {
+          contentType: "image/jpeg",
+          metadata: {
+            uploadedBy: userId,
+            expenseId: expenseId || "none",
+            uploadTimestamp: timestamp.toString(),
+          },
+        },
+      });
+      console.log("📤 File uploaded successfully to storage");
+    } catch (uploadError) {
+      console.error("❌ Failed to upload file to storage:", uploadError);
+      
+      // Handle specific bucket not found error
+      if (uploadError.message &&
+          uploadError.message.includes("bucket does not exist")) {
+        return res.status(500).json({
+          success: false,
+          message: "Firebase Storage not enabled",
+          error: "STORAGE_NOT_ENABLED",
+          details: "Please enable Firebase Storage in the Firebase Console",
+          setupUrl: `https://console.firebase.google.com/project/${process.env.GCLOUD_PROJECT}/storage`,
+        });
+      }
+      
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload to storage",
+        error: "STORAGE_UPLOAD_FAILED",
+        details: uploadError.message,
+      });
+    }
+
+    // Make file publicly accessible
+    console.log('📤 Making file public...');
+    try {
+      await file.makePublic();
+      console.log('📤 File made public successfully');
+    } catch (publicError) {
+      console.error('❌ Failed to make file public:', publicError);
+      // Continue anyway - file might still be accessible
+      console.log('⚠️ Continuing despite public access error...');
+    }
+
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
+    console.log('📤 Generated public URL:', publicUrl);
+
+    // Store receipt metadata in Firestore
+    console.log('📤 Storing receipt metadata in Firestore...');
+    let receiptDoc;
+    try {
+      receiptDoc = await db.collection('receipts').add({
+        userId,
+        expenseId: expenseId || null,
+        imageUrl: publicUrl,
+        filename,
+        hash,
+        uploadedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp()
+      });
+      console.log('📤 Receipt metadata stored with ID:', receiptDoc.id);
+    } catch (firestoreError) {
+      console.error('❌ Failed to store receipt metadata:', firestoreError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to store receipt metadata',
+        error: 'FIRESTORE_ERROR',
+        details: firestoreError.message
+      });
+    }
+
+    console.log('✅ Receipt uploaded successfully:', publicUrl);
+
+    res.json({
+      success: true,
+      message: 'Receipt uploaded successfully',
+      data: {
+        receiptId: receiptDoc.id,
+        receiptUrl: publicUrl,
+        filename
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Receipt upload error (outer catch):', error);
+    console.error('❌ Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload receipt',
+      error: 'INTERNAL_SERVER_ERROR',
+      details: error.message
+    });
+  }
+});
+
 // Get User by ID
 meetnsplitApp.get('/users/:userId', authenticateJWT, async (req, res) => {
   try {
@@ -4704,30 +4931,35 @@ meetnsplitApp.get('/settlements/group/:groupId', authenticateJWT, async (req, re
       const amount = expense.amount || 0;
       const paidBy = expense.paidBy;
       const splitType = expense.splitType || 'equal';
-      
+
       if (amount > 0) {
         // Add amount to payer's balance
         if (memberBalances.hasOwnProperty(paidBy)) {
           memberBalances[paidBy] += amount;
         }
-        
-        // Subtract splits from each member based on split type
-        if (splitType === 'equal') {
-          const activeMemberCount = Object.keys(memberBalances).length;
-          const splitAmount = amount / activeMemberCount;
-          
-          Object.keys(memberBalances).forEach(memberId => {
-            memberBalances[memberId] -= splitAmount;
-          });
-        } else if (splitType === 'custom' && expense.splitDetails) {
-          // Handle custom splits
-          expense.splitDetails.forEach(split => {
+
+        // CRITICAL FIX: ALWAYS use explicit splitDetails/splits if available
+        // This prevents new members from being charged for old expenses
+        const splits = expense.splits || expense.splitDetails || [];
+
+        if (splits && splits.length > 0) {
+          // Use EXPLICIT splits from the expense (includes only actual participants)
+          splits.forEach(split => {
             if (memberBalances.hasOwnProperty(split.userId)) {
               memberBalances[split.userId] -= split.amount;
             }
           });
+        } else if (splitType === 'equal') {
+          // FALLBACK: Only for old expenses without splitDetails
+          // WARNING: This assumes all CURRENT members were involved - may be incorrect for new members!
+          const activeMemberCount = Object.keys(memberBalances).length;
+          const splitAmount = amount / activeMemberCount;
+
+          Object.keys(memberBalances).forEach(memberId => {
+            memberBalances[memberId] -= splitAmount;
+          });
         } else if (splitType === 'percentage' && expense.splitDetails) {
-          // Handle percentage splits
+          // Handle percentage splits (legacy path - should be covered by splits check above)
           expense.splitDetails.forEach(split => {
             if (memberBalances.hasOwnProperty(split.userId)) {
               const splitAmount = (amount * split.percentage) / 100;
@@ -5732,6 +5964,62 @@ meetnsplitApp.get('/health', (req, res) => {
     version: '1.0.0',
     platform: 'Firebase Functions'
   });
+});
+
+// Test bucket configuration
+meetnsplitApp.get("/test/bucket", async (req, res) => {
+  try {
+    console.log("🧪 Testing bucket configuration...");
+    
+    const bucket = admin.storage().bucket();
+    console.log("Default bucket:", bucket.name);
+    
+    // Try different bucket names
+    const bucketNames = [
+      "spendy-97913.appspot.com",
+      "spendy-97913",
+      bucket.name,
+      process.env.FIREBASE_STORAGE_BUCKET,
+    ].filter(Boolean);
+    
+    const bucketTests = [];
+    
+    for (const bucketName of bucketNames) {
+      try {
+        const testBucket = admin.storage().bucket(bucketName);
+        const [exists] = await testBucket.exists();
+        bucketTests.push({
+          name: bucketName,
+          exists: exists,
+          status: exists ? "available" : "not found",
+        });
+        console.log(`Bucket ${bucketName}: ${exists ? "EXISTS" : "NOT FOUND"}`);
+      } catch (error) {
+        bucketTests.push({
+          name: bucketName,
+          exists: false,
+          status: "error",
+          error: error.message,
+        });
+        console.log(`Bucket ${bucketName}: ERROR - ${error.message}`);
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: "Bucket configuration test completed",
+      defaultBucket: bucket.name,
+      environment: process.env.FIREBASE_STORAGE_BUCKET,
+      bucketTests: bucketTests,
+    });
+  } catch (error) {
+    console.error("Bucket test error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Bucket test failed",
+      error: error.message,
+    });
+  }
 });
 
 // ===== GMAIL INTEGRATION ROUTES =====

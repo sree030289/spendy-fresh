@@ -78,11 +78,13 @@ const AppNavigator = () => {
     reason: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature';
     featureName: string;
     canClose: boolean;
+    autoCloseAfter?: number;
   }>({
     visible: false,
     reason: 'firstTime',
     featureName: '',
-    canClose: true
+    canClose: true,
+    autoCloseAfter: undefined
   });
 
   // Add app ready state and modal sequencing
@@ -505,51 +507,61 @@ const AppNavigator = () => {
     autoCloseAfter?: number
   ) => {
     console.log('🎯 Showing subscription modal for reason:', reason, 'feature:', feature, 'canClose:', canClose, 'autoCloseAfter:', autoCloseAfter);
-    
+
     setSubscriptionModal({
       visible: true,
       reason,
       featureName: feature || '',
-      canClose
+      canClose,
+      autoCloseAfter
     });
   };
 
   // Handle modal close with tour trigger
   const handleSubscriptionModalClose = () => {
     console.log('🔄 DEBUG: Closing subscription modal, reason:', subscriptionModal.reason);
-    
+
     const wasTransactionLimit = subscriptionModal.reason === 'transactionLimit';
+    const hadAutoClose = subscriptionModal.autoCloseAfter !== undefined && subscriptionModal.autoCloseAfter > 0;
+
     setSubscriptionModal(prev => ({ ...prev, visible: false, canClose: true }));
-    
-    // If this was a transaction limit modal that auto-closed, open Add Expense modal
-    if (wasTransactionLimit) {
-      console.log('💰 Opening Add Expense modal after transaction limit countdown');
+
+    // SOFT PAYWALL: After countdown, allow user to proceed with expense creation
+    // Free users can add expenses after 3/day, but must wait 10 seconds each time
+    if (wasTransactionLimit && hadAutoClose) {
+      console.log('✅ Transaction limit countdown completed - allowing expense creation with bypass');
+
+      // Small delay to let modal close animation finish
       setTimeout(() => {
-        // Open the Add Expense modal
+        console.log('💰 Opening Add Expense modal after transaction limit countdown');
+
+        // Set a flag to bypass the transaction limit check ONCE for the next expense
+        (global as any).bypassTransactionLimitOnce = true;
+
         if ((global as any).openAddExpenseModal) {
-          console.log('🎯 Calling global openAddExpenseModal function');
+          console.log('🎯 Calling global openAddExpenseModal function (with bypass flag set)');
           (global as any).openAddExpenseModal();
         } else {
           console.log('❌ Global openAddExpenseModal function not available');
         }
       }, 600); // Small delay after modal close animation
     }
-    
+
     // Check if there's pending expense data to process after the countdown
     if ((window as any).pendingExpenseData && wasTransactionLimit) {
       const { expenseData, fromGroupDetails } = (window as any).pendingExpenseData;
       console.log('📋 Processing pending expense after countdown:', expenseData);
-      
+
       // Clear the pending data
       (window as any).pendingExpenseData = null;
-      
+
       // Process the expense - we need to call the proceedWithExpenseCreation function
       // This should be handled by the RealSplittingScreen component
       if ((window as any).processPendingExpense) {
         (window as any).processPendingExpense(expenseData, fromGroupDetails);
       }
     }
-    
+
 
   };
 
@@ -664,7 +676,7 @@ const AppNavigator = () => {
           reason={subscriptionModal.reason}
           featureName={subscriptionModal.featureName}
           canClose={subscriptionModal.canClose}
-          autoCloseAfter={subscriptionModal.canClose ? undefined : (subscriptionModal.reason === 'transactionLimit' ? 10 : 5)}
+          autoCloseAfter={subscriptionModal.autoCloseAfter}
           onCountdownComplete={handleSubscriptionCountdownComplete}
           autoCloseOnComplete={subscriptionModal.reason === 'transactionLimit'}
         />

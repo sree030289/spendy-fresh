@@ -354,28 +354,28 @@ export default function ExpenseDetailModal({
         onRequestClose={() => setImageViewerVisible(false)}
       >
         <View style={styles.imageViewerContainer}>
+          {/* Close Button at Top */}
+          <TouchableOpacity
+            style={[styles.closeButtonTop, { backgroundColor: theme.colors.primary }]}
+            onPress={() => setImageViewerVisible(false)}
+          >
+            <Icon name="close" size={28} color="white" />
+          </TouchableOpacity>
+
+          {/* Image Content */}
           <TouchableOpacity
             style={styles.imageViewerBackdrop}
             activeOpacity={1}
             onPress={() => setImageViewerVisible(false)}
           >
-            <View style={styles.imageViewerContent}>
-              <Image
-                source={{ uri: expense.receiptUrl! }}
-                style={[styles.fullImage, { 
-                  maxWidth: screenWidth - 40, 
-                  maxHeight: screenHeight - 120 
-                }]}
-                resizeMode="contain"
-              />
-              
-              <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => setImageViewerVisible(false)}
-              >
-                <Icon name="close" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
+            <Image
+              source={{ uri: expense.receiptUrl! }}
+              style={{
+                width: screenWidth - 40,
+                height: screenHeight - 120,
+              }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         </View>
       </Modal>
@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
   // Full-size image viewer styles
   imageViewerContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -549,23 +549,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageViewerContent: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fullImage: {
-    borderRadius: 8,
-  },
-  closeButton: {
+  closeButtonTop: {
     position: 'absolute',
-    top: -50,
-    right: -20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    top: 50,
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

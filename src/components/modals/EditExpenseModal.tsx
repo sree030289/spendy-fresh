@@ -90,7 +90,10 @@ export default function EditExpenseModal({
   
   // Local input states to prevent clearing while typing
   const [localSplitInputs, setLocalSplitInputs] = useState<{[key: string]: string}>({});
-  
+
+  // Track which fields have been manually edited (for smart auto-adjustment)
+  const [editedFields, setEditedFields] = useState<Set<string>>(new Set());
+
   // Errors
   const [errors, setErrors] = useState<any>({});
 
@@ -197,6 +200,8 @@ export default function EditExpenseModal({
     setErrors({});
     setActiveStep('details');
     setShowSuccessMessage(false);
+    setLocalSplitInputs({}); // Clear local inputs
+    setEditedFields(new Set()); // Clear edited fields tracking
     isInitialized.current = false;
     currentExpenseId.current = null;
   };
@@ -465,17 +470,71 @@ const updateSplitAmount = (userId: string, newAmount: number) => {
     });
   };
 
-  // Handle text input for custom amounts
+  // Handle text input for custom amounts with smart auto-adjustment
   const handleCustomAmountInput = (userId: string, text: string) => {
     // Update local input state immediately for smooth typing
     setLocalSplitInputs(prev => ({
       ...prev,
       [userId]: text
     }));
-    
-    // Update split data with parsed number
+
+    // Mark this field as edited
+    setEditedFields(prev => new Set(prev).add(userId));
+
+    const totalAmount = parseFloat(amount);
     const newAmount = parseFloat(text) || 0;
-    updateSplitAmount(userId, newAmount);
+
+    if (totalAmount <= 0) {
+      updateSplitAmount(userId, newAmount);
+      return;
+    }
+
+    // Update the edited field
+    setSplitData(prev => {
+      const updated = prev.map(split =>
+        split.userId === userId
+          ? {
+              ...split,
+              amount: newAmount,
+              percentage: totalAmount > 0 ? (newAmount / totalAmount) * 100 : 0
+            }
+          : split
+      );
+
+      // Calculate how much has been allocated to edited fields (including this one)
+      const editedTotal = updated.reduce((sum, split) => {
+        if (editedFields.has(split.userId) || split.userId === userId) {
+          return sum + (split.isIncluded ? split.amount : 0);
+        }
+        return sum;
+      }, 0);
+
+      // Get non-edited included members
+      const nonEditedIncludedMembers = updated.filter(
+        split => split.isIncluded && !editedFields.has(split.userId) && split.userId !== userId
+      );
+
+      // Calculate remaining amount to distribute
+      const remainingAmount = totalAmount - editedTotal;
+
+      // Distribute remaining amount equally among non-edited fields
+      if (nonEditedIncludedMembers.length > 0 && remainingAmount >= 0) {
+        const amountPerNonEdited = remainingAmount / nonEditedIncludedMembers.length;
+
+        return updated.map(split => {
+          if (split.isIncluded && !editedFields.has(split.userId) && split.userId !== userId) {
+            return {
+              ...split,
+              amount: amountPerNonEdited,
+              percentage: totalAmount > 0 ? (amountPerNonEdited / totalAmount) * 100 : 0
+            };
+          }
+          return split;
+        });
+      }
+
+      return updated;
+    });
   };
 
   // Handle text input for percentage amounts
@@ -907,7 +966,18 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
   );
 
   const renderSplitStep = () => (
-    <ScrollView contentContainerStyle={styles.stepContent}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 200 : 0}
+      enabled
+    >
+      <ScrollView
+        contentContainerStyle={styles.stepContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={true}
+      >
       {/* Split Type */}
       <View style={styles.inputContainer}>
         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>How to split?</Text>
@@ -920,6 +990,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
             onPress={() => {
               setSplitType('equal');
               setLocalSplitInputs({}); // Clear local inputs
+              setEditedFields(new Set()); // Clear edited fields tracking
               recalculateEqual();
             }}
           >
@@ -943,6 +1014,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
             onPress={() => {
               setSplitType('custom');
               setLocalSplitInputs({}); // Clear local inputs
+              setEditedFields(new Set()); // Clear edited fields tracking
             }}
           >
             <Icon name="calculator"
@@ -965,6 +1037,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
             onPress={() => {
               setSplitType('percentage');
               setLocalSplitInputs({}); // Clear local inputs
+              setEditedFields(new Set()); // Clear edited fields tracking
             }}
           >
             <Icon
@@ -1133,6 +1206,7 @@ const updateSplitPercentage = (userId: string, percentage: number) => {
         </View>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 
   const renderReviewStep = () => (

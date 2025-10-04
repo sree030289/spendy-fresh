@@ -1,16 +1,18 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
   onSnapshot,
   serverTimestamp,
-  getDoc
+  getDoc,
+  setDoc,
+  increment
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -190,25 +192,188 @@ export class GroupChatService {
   // Listen to group messages in real-time
   static onGroupMessages(groupId: string, callback: (messages: ChatMessage[]) => void): () => void {
     console.log('👂 GroupChatService: Setting up real-time listener for group:', groupId);
-    
+
     const messagesQuery = query(
       collection(db, 'groupMessages'),
       where('groupId', '==', groupId),
       orderBy('timestamp', 'asc'),
       limit(100)
     );
-    
+
     return onSnapshot(messagesQuery, (snapshot) => {
       const messages = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         timestamp: doc.data().timestamp?.toDate() || new Date(),
       })) as ChatMessage[];
-      
+
       console.log(`🔄 GroupChatService: Real-time update - ${messages.length} messages`);
       callback(messages);
     }, (error) => {
       console.error('❌ GroupChatService: Message listener error:', error);
     });
+  }
+
+  // Get unread message count for a user in a group
+  static async getUnreadMessageCount(groupId: string, userId: string): Promise<number> {
+    try {
+      const userReadDoc = await getDoc(doc(db, 'groupMessageReads', `${groupId}_${userId}`));
+      if (!userReadDoc.exists()) {
+        // No read timestamp, count all messages from others
+        const allMessagesQuery = query(
+          collection(db, 'groupMessages'),
+          where('groupId', '==', groupId)
+        );
+        const snapshot = await getDocs(allMessagesQuery);
+        // Filter out own messages client-side
+        return snapshot.docs.filter(d => d.data().userId !== userId).length;
+      }
+
+      const lastReadTimestamp = userReadDoc.data()?.lastReadTimestamp?.toDate() || new Date(0);
+
+      // Query messages after last read (without userId filter to avoid composite index)
+      const unreadQuery = query(
+        collection(db, 'groupMessages'),
+        where('groupId', '==', groupId),
+        where('timestamp', '>', lastReadTimestamp)
+      );
+
+      const snapshot = await getDocs(unreadQuery);
+      // Filter out own messages client-side
+      return snapshot.docs.filter(d => d.data().userId !== userId).length;
+    } catch (error) {
+      console.error('❌ GroupChatService: Get unread count error:', error);
+      return 0;
+    }
+  }
+
+  // Mark messages as read for a user in a group
+  static async markMessagesAsRead(groupId: string, userId: string): Promise<void> {
+    try {
+      await setDoc(doc(db, 'groupMessageReads', `${groupId}_${userId}`), {
+        groupId,
+        userId,
+        lastReadTimestamp: serverTimestamp()
+      }, { merge: true });
+      console.log('✅ GroupChatService: Messages marked as read');
+    } catch (error) {
+      console.error('❌ GroupChatService: Mark as read error:', error);
+    }
+  }
+
+  // Listen to unread count for a user in a group
+  static onUnreadCount(groupId: string, userId: string, callback: (count: number) => void): () => void {
+    console.log('👂 GroupChatService: Setting up unread count listener');
+
+    return onSnapshot(doc(db, 'groupMessageReads', `${groupId}_${userId}`), async () => {
+      const count = await this.getUnreadMessageCount(groupId, userId);
+      callback(count);
+    }, (error) => {
+      console.error('❌ GroupChatService: Unread count listener error:', error);
+    });
+  }
+
+  // Create system message for expense addition
+  static async createExpenseAddedMessage(
+    groupId: string,
+    userId: string,
+    userName: string,
+    expenseData: {
+      id: string;
+      description: string;
+      amount: number;
+      currency: string;
+      splitType: 'equal' | 'custom';
+      expenseDate?: Date;
+    }
+  ): Promise<void> {
+    try {
+      await this.sendGroupMessage({
+        groupId,
+        userId,
+        userName,
+        message: `Added expense: ${expenseData.description}`,
+        type: 'expense',
+        expenseData: {
+          ...expenseData,
+          expenseDate: expenseData.expenseDate ? expenseData.expenseDate.toISOString() : undefined,
+          isEdit: false
+        }
+      });
+    } catch (error) {
+      console.error('❌ GroupChatService: Create expense added message error:', error);
+    }
+  }
+
+  // Create system message for expense edit
+  static async createExpenseEditedMessage(
+    groupId: string,
+    userId: string,
+    userName: string,
+    expenseData: {
+      id: string;
+      description: string;
+      amount: number;
+      currency: string;
+      splitType: 'equal' | 'custom';
+      expenseDate?: Date;
+    }
+  ): Promise<void> {
+    try {
+      await this.sendGroupMessage({
+        groupId,
+        userId,
+        userName,
+        message: `Edited expense: ${expenseData.description}`,
+        type: 'expense',
+        expenseData: {
+          ...expenseData,
+          expenseDate: expenseData.expenseDate ? expenseData.expenseDate.toISOString() : undefined,
+          isEdit: true
+        }
+      });
+    } catch (error) {
+      console.error('❌ GroupChatService: Create expense edited message error:', error);
+    }
+  }
+
+  // Create system message for user added to group
+  static async createUserAddedMessage(
+    groupId: string,
+    addedByUserId: string,
+    addedByUserName: string,
+    addedUserId: string,
+    addedUserName: string
+  ): Promise<void> {
+    try {
+      await this.sendGroupMessage({
+        groupId,
+        userId: addedByUserId,
+        userName: 'System',
+        message: `${addedByUserName} added ${addedUserName} to the group`,
+        type: 'system'
+      });
+    } catch (error) {
+      console.error('❌ GroupChatService: Create user added message error:', error);
+    }
+  }
+
+  // Create system message for user joining via invite code
+  static async createUserJoinedMessage(
+    groupId: string,
+    userId: string,
+    userName: string
+  ): Promise<void> {
+    try {
+      await this.sendGroupMessage({
+        groupId,
+        userId,
+        userName: 'System',
+        message: `${userName} joined the group`,
+        type: 'system'
+      });
+    } catch (error) {
+      console.error('❌ GroupChatService: Create user joined message error:', error);
+    }
   }
 }

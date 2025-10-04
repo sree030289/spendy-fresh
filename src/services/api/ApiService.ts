@@ -1206,6 +1206,67 @@ class ApiService {
     });
     return response;
   }
+
+  // Upload receipt image (Premium feature)
+  async uploadReceiptImage(imageUri: string, expenseId?: string): Promise<{ receiptUrl: string; receiptId: string }> {
+    try {
+      console.log('📤 ApiService: Uploading receipt image...');
+
+      // Compress and convert image to base64
+      const base64Image = await this.compressAndConvertImage(imageUri);
+      console.log('📊 Base64 image length:', base64Image.length, 'characters');
+
+      const response = await this.request('POST', '/receipts/upload', {
+        imageData: base64Image,
+        expenseId: expenseId || null
+      });
+
+      console.log('✅ ApiService: Receipt uploaded successfully', response);
+      return {
+        receiptUrl: response.receiptUrl,
+        receiptId: response.receiptId
+      };
+    } catch (error) {
+      console.error('❌ ApiService: Receipt upload failed:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to compress and convert image to base64
+  private async compressAndConvertImage(imageUri: string): Promise<string> {
+    try {
+      // Use expo-image-manipulator to compress the image
+      const ImageManipulator = require('expo-image-manipulator');
+
+      console.log('🔄 Compressing image...');
+      const manipResult = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [{ resize: { width: 1024 } }], // Resize to max width 1024px
+        {
+          compress: 0.7, // 70% quality
+          format: ImageManipulator.SaveFormat.JPEG
+        }
+      );
+
+      console.log('✅ Image compressed, converting to base64...');
+      const response = await fetch(manipResult.uri);
+      const blob = await response.blob();
+
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          console.log('✅ Base64 conversion complete, size:', Math.round(base64data.length / 1024), 'KB');
+          resolve(base64data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error compressing/converting image:', error);
+      throw new Error('Failed to process image');
+    }
+  }
 }
 
 export default ApiService;

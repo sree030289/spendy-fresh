@@ -43,17 +43,31 @@ export class ExportService {
   static async exportGroupData(group: Group, format: 'csv' | 'pdf'): Promise<void> {
     try {
       console.log(`📤 Exporting group ${group.name} as ${format.toUpperCase()}`);
-      
-      // Get all expenses for the group
+
+      // Get all expenses and settlements for the group
       const apiService = ApiService.getInstance();
-      const expenses = await apiService.getGroupExpenses(group.id);
-      
+      const [expenses, settlements] = await Promise.all([
+        apiService.getGroupExpenses(group.id),
+        apiService.getGroupSettlements(group.id)
+      ]);
+
+      console.log('📊 Fetched settlements for export:', settlements);
+
+      // Update group members with accurate settlement balances
+      const updatedGroup = {
+        ...group,
+        members: group.members.map(member => ({
+          ...member,
+          balance: settlements.memberBalances?.[member.userId] || 0
+        }))
+      };
+
       if (format === 'csv') {
-        await this.exportAsCSV(group, expenses);
+        await this.exportAsCSV(updatedGroup, expenses);
       } else {
-        await this.exportAsPDF(group, expenses);
+        await this.exportAsPDF(updatedGroup, expenses);
       }
-      
+
       console.log('✅ Export completed successfully');
     } catch (error) {
       console.error('❌ Export failed:', error);

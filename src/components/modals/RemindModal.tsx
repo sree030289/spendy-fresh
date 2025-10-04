@@ -55,18 +55,24 @@ export default function RemindModal({
   onSuccess,
 }: RemindModalProps) {
   const { theme } = useTheme();
-  const [customMessage, setCustomMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  if (!friend) return null;
-
+  // Calculate values before early return
   const isOwedByFriend = balance > 0;
   const amount = Math.abs(balance);
   const currencySymbol = getCurrencySymbol(currency);
 
-  const defaultMessage = isOwedByFriend
-    ? `Hi ${friend.friendData.fullName}! Just a friendly reminder that you owe me ${currencySymbol}${amount.toFixed(2)} for our shared expenses. When you get a chance, could you settle up? Thanks! 😊`
-    : `Hi ${friend.friendData.fullName}! I haven't forgotten that I owe you ${currencySymbol}${amount.toFixed(2)}. I'll settle up soon. Thanks for your patience! 😊`;
+  const defaultMessage = friend
+    ? (isOwedByFriend
+        ? `Hi ${friend.friendData.fullName}! Just a friendly reminder that you owe me ${currencySymbol}${amount.toFixed(2)} for our shared expenses. When you get a chance, could you settle up? Thanks! 😊`
+        : `Hi ${friend.friendData.fullName}! I haven't forgotten that I owe you ${currencySymbol}${amount.toFixed(2)}. I'll settle up soon. Thanks for your patience! 😊`)
+    : '';
+
+  // Initialize with default message so it's editable
+  const [customMessage, setCustomMessage] = useState(defaultMessage);
+
+  // Early return AFTER all hooks
+  if (!friend) return null;
 
   const handleSendReminder = async (method: 'sms' | 'whatsapp' | 'app') => {
     try {
@@ -76,8 +82,8 @@ export default function RemindModal({
       if (method === 'sms') {
         // Send SMS
         const phoneNumber = friend.friendData.mobile;
-        if (!phoneNumber) {
-          Alert.alert('Error', 'No phone number available for this friend');
+        if (!phoneNumber || phoneNumber.trim() === '' || phoneNumber === 'undefined') {
+          Alert.alert('Error', 'This friend doesn\'t have a valid phone number. Please ask them to add their phone number in their profile.');
           return;
         }
         
@@ -185,15 +191,15 @@ export default function RemindModal({
         {/* Message Input */}
         <View style={styles.messageSection}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Customize Message (Optional)
+            Message (Editable)
           </Text>
           <TextInput
-            style={[styles.messageInput, { 
+            style={[styles.messageInput, {
               backgroundColor: theme.colors.surface,
               color: theme.colors.text,
               borderColor: theme.colors.border
             }]}
-            placeholder={defaultMessage}
+            placeholder="Enter your custom message..."
             placeholderTextColor={theme.colors.textSecondary}
             value={customMessage}
             onChangeText={setCustomMessage}
@@ -201,6 +207,9 @@ export default function RemindModal({
             numberOfLines={4}
             textAlignVertical="top"
           />
+          <Text style={[styles.messageHint, { color: theme.colors.textSecondary }]}>
+            Edit the message above to customize your reminder
+          </Text>
         </View>
 
         {/* Reminder Options */}
@@ -311,6 +320,11 @@ const styles = StyleSheet.create({
     padding: 12,
     height: 100,
     fontSize: 14,
+  },
+  messageHint: {
+    fontSize: 12,
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   optionsSection: {
     marginHorizontal: 20,

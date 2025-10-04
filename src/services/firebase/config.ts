@@ -14,9 +14,9 @@ interface FirebaseServices {
   app: FirebaseApp;
   auth: Auth;
   firestore: Firestore;
-  storage: FirebaseStorage;
   database: Database;
   functions: Functions;
+  storage: FirebaseStorage;
   messaging?: any;
 }
 
@@ -86,23 +86,23 @@ class FirebaseConfig {
     }
 
     // Initialize other services
-    const storage = getStorage(app);
     const database = getDatabase(app);
     const functions = getFunctions(app);
+    const storage = getStorage(app);
     const messaging = Platform.OS === 'web' ? getMessaging(app) : null;
 
     // Connect to emulators if in local environment
     if (ENV.isLocal() && ENV.firebase.useEmulator) {
-      await this.connectEmulators(auth, firestore, storage, database, functions);
+      await this.connectEmulators(auth, firestore, database, functions, storage);
     }
 
     this.services = {
       app,
       auth,
       firestore,
-      storage,
       database,
       functions,
+      storage,
       messaging,
     };
 
@@ -123,12 +123,12 @@ class FirebaseConfig {
   private async connectEmulators(
     auth: Auth,
     firestore: Firestore,
-    storage: FirebaseStorage,
     database: Database,
-    functions: Functions
+    functions: Functions,
+    storage: FirebaseStorage
   ): Promise<void> {
     const emulators = ENV.getEmulatorConfig();
-    
+
     if (!emulators) {
       console.warn('⚠️ No emulator configuration found');
       return;
@@ -143,8 +143,10 @@ class FirebaseConfig {
       // Note: Firestore emulator connection is handled during initialization
 
       // Connect Storage Emulator
-      connectStorageEmulator(storage, emulators.storage.host, emulators.storage.port);
-      console.log(`📁 Connected to Storage emulator: ${emulators.storage.host}:${emulators.storage.port}`);
+      if (emulators.storage) {
+        connectStorageEmulator(storage, emulators.storage.host, emulators.storage.port);
+        console.log(`🗄️ Connected to Storage emulator: ${emulators.storage.host}:${emulators.storage.port}`);
+      }
 
       // Connect Database Emulator
       if (emulators.database) {
@@ -200,18 +202,18 @@ const initializeGlobalServices = async () => {
 export const getFirebaseApp = async () => (await initializeGlobalServices()).app;
 export const getFirebaseAuth = async () => (await initializeGlobalServices()).auth;
 export const getFirebaseFirestore = async () => (await initializeGlobalServices()).firestore;
-export const getFirebaseStorage = async () => (await initializeGlobalServices()).storage;
 export const getFirebaseDatabase = async () => (await initializeGlobalServices()).database;
 export const getFirebaseFunctions = async () => (await initializeGlobalServices()).functions;
+export const getFirebaseStorage = async () => (await initializeGlobalServices()).storage;
 
 // Legacy synchronous exports (for backward compatibility)
 let legacyInitialized = false;
 export let app: FirebaseApp;
-export let auth: Auth;  
+export let auth: Auth;
 export let db: Firestore;
-export let storage: FirebaseStorage;
 export let database: Database;
 export let functions: Functions;
+export let storage: FirebaseStorage;
 export let messaging: any;
 
 // Auto-initialize legacy exports
@@ -222,9 +224,9 @@ const initializeLegacyExports = async () => {
       app = services.app;
       auth = services.auth;
       db = services.firestore;
-      storage = services.storage;
       database = services.database;
       functions = services.functions;
+      storage = services.storage;
       messaging = services.messaging;
       legacyInitialized = true;
       

@@ -25,9 +25,11 @@ import SubscriptionModal from '@/components/modals/SubscriptionModal';
 import { TermsPrivacyModal } from '@/components/modals/TermsPrivacyModal';
 
 import { SubscriptionService, UserSubscription, SubscriptionPlan } from '@/services/SubscriptionService';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/services/firebase/config';
+// Firebase Storage not supported in React Native - use API backend for uploads
+// import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+// import { storage } from '@/services/firebase/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
@@ -80,16 +82,26 @@ export default function ProfileScreen() {
   // Load cached profile picture
   useEffect(() => {
     const loadCachedProfilePicture = async () => {
+      console.log('🔄 Loading cached profile picture...', {
+        hasUserId: !!user?.id,
+        hasProfilePicture: !!user?.profilePicture,
+        userId: user?.id,
+        profilePicture: user?.profilePicture?.substring(0, 50) + '...'
+      });
+
       if (!user?.id || !user.profilePicture) {
+        console.log('🚫 No user ID or profile picture, clearing cached picture');
         setCachedProfilePicture(null);
         return;
       }
 
       try {
         const cachedUri = await getCachedProfilePicture(user.profilePicture, user.id);
+        console.log('✅ Setting cached profile picture:', cachedUri?.substring(0, 50) + '...');
         setCachedProfilePicture(cachedUri);
       } catch (error) {
-        console.error('Error loading cached profile picture:', error);
+        console.error('❌ Error loading cached profile picture:', error);
+        console.log('🔄 Falling back to remote URL');
         setCachedProfilePicture(user.profilePicture); // Fallback to remote URL
       }
     };
@@ -256,18 +268,30 @@ export default function ProfileScreen() {
   // Get cached profile picture or fallback to remote URL
   const getCachedProfilePicture = async (remoteUri: string, userId: string): Promise<string> => {
     try {
-      if (!userId) return remoteUri;
+      console.log('🔍 Getting cached profile picture for:', { userId, remoteUri: remoteUri?.substring(0, 50) + '...' });
+      
+      if (!userId) {
+        console.log('🚫 No userId provided, returning remote URI');
+        return remoteUri;
+      }
 
       // Check if we have a cached version
       const cachedPath = await AsyncStorage.getItem(`@cached_profile_${userId}`);
+      console.log('📋 Cached path from AsyncStorage:', cachedPath);
       
       if (cachedPath) {
         // Verify the cached file still exists
         const fileInfo = await FileSystem.getInfoAsync(cachedPath);
+        console.log('📁 File info for cached path:', { 
+          exists: fileInfo.exists, 
+          size: fileInfo.exists ? (fileInfo as any).size : 'N/A' 
+        });
+        
         if (fileInfo.exists) {
-          console.log('💾 Using cached profile picture:', cachedPath);
+          console.log('✅ Using cached profile picture:', cachedPath);
           return cachedPath;
         } else {
+          console.log('🧹 Cached file doesn\'t exist, clearing cache entry');
           // Clear invalid cache entry
           await AsyncStorage.removeItem(`@cached_profile_${userId}`);
         }
@@ -275,12 +299,14 @@ export default function ProfileScreen() {
 
       // No cache or invalid cache, use remote URL and cache it
       if (remoteUri) {
+        console.log('🌐 No valid cache, using remote URL and caching in background');
         // Cache in background without blocking UI
         cacheProfilePicture(remoteUri, userId).catch(err => 
-          console.warn('Background caching failed:', err)
+          console.warn('⚠️ Background caching failed:', err)
         );
       }
 
+      console.log('📤 Returning remote URI:', remoteUri?.substring(0, 50) + '...');
       return remoteUri;
     } catch (error) {
       console.error('❌ Error getting cached profile picture:', error);
@@ -434,140 +460,54 @@ export default function ProfileScreen() {
     }
   };
 
-  // iOS-safe Firebase Storage upload function
+  // Profile picture upload to Firebase Storage
   const uploadProfilePictureToFirebase = async (imageUri: string, userId: string): Promise<string> => {
     try {
-      console.log('📤 Starting Firebase Storage upload for iOS...');
-      console.log('📤 Image URI:', imageUri);
+      console.log('☁️ Starting Firebase Storage upload for profile picture...');
       
-      // iOS-specific URI handling with more robust approach
-      let processedUri = imageUri;
-      if (Platform.OS === 'ios') {
-        // Handle different URI formats on iOS
-        if (imageUri.startsWith('ph://')) {
-          // iOS Photos framework URI - keep as is, expo-image-picker handles conversion
-          processedUri = imageUri;
-        } else if (!imageUri.startsWith('http') && !imageUri.startsWith('file://')) {
-          processedUri = `file://${imageUri}`;
-        }
-        console.log('📤 Processed iOS URI:', processedUri);
+      // Get Firebase Storage instance
+      const { getFirebaseStorage } = await import('@/services/firebase/config');
+      const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+      
+      const storage = await getFirebaseStorage();
+      console.log('✅ Firebase Storage instance obtained');
+      
+      // Convert image URI to blob
+      console.log('🔄 Converting image to blob...');
+      const response = await fetch(imageUri);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
       }
       
-      // Create a unique filename with timestamp
+      const blob = await response.blob();
+      console.log('✅ Image converted to blob:', { size: blob.size, type: blob.type });
+      
+      // Create storage reference with timestamp for uniqueness
       const timestamp = Date.now();
-      const filename = `profiles/${userId}/profile_picture_${timestamp}.jpg`;
+      const filename = `profile-pictures/${userId}/${timestamp}.jpg`;
       const storageRef = ref(storage, filename);
+      console.log('📁 Storage reference created:', filename);
       
-      console.log('🔄 Creating upload task for iOS...');
-      
-      // Try different upload methods for iOS compatibility
-      let uploadResult;
-      
-      if (Platform.OS === 'ios') {
-        // Method 1: Try direct URI upload (works better with expo-image-picker on iOS)
-        try {
-          console.log('🍎 Attempting iOS-optimized upload method...');
-          
-          // For iOS, we'll use a different approach to handle the image
-          const response = await fetch(processedUri);
-          
-          if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-          }
-          
-          // Get the ArrayBuffer instead of blob for iOS compatibility
-          console.log('🔄 Converting to ArrayBuffer for iOS...');
-          const arrayBuffer = await response.arrayBuffer();
-          
-          if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-            throw new Error('Invalid or empty image data');
-          }
-          
-          console.log('📊 ArrayBuffer details:', {
-            size: arrayBuffer.byteLength,
-            sizeKB: Math.round(arrayBuffer.byteLength / 1024),
-            sizeMB: Math.round(arrayBuffer.byteLength / (1024 * 1024))
-          });
-          
-          // Convert ArrayBuffer to Uint8Array for Firebase
-          const uint8Array = new Uint8Array(arrayBuffer);
-          
-          console.log('☁️ Uploading ArrayBuffer to Firebase Storage...');
-          uploadResult = await uploadBytes(storageRef, uint8Array, {
-            contentType: 'image/jpeg',
-            customMetadata: {
-              'uploaded-by': 'ios-app',
-              'upload-timestamp': timestamp.toString(),
-              'user-id': userId
-            }
-          });
-          
-        } catch (iosError: any) {
-          console.warn('⚠️ iOS-optimized method failed, trying fallback:', iosError?.message);
-          
-          // Fallback: Try with blob method
-          const response = await fetch(processedUri);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-          }
-          
-          const blob = await response.blob();
-          if (!blob || blob.size === 0) {
-            throw new Error('Invalid or empty image blob');
-          }
-          
-          console.log('☁️ Fallback: Uploading blob to Firebase Storage...');
-          uploadResult = await uploadBytes(storageRef, blob, {
-            contentType: 'image/jpeg'
-          });
+      // Upload the blob
+      console.log('📤 Uploading to Firebase Storage...');
+      const uploadResult = await uploadBytes(storageRef, blob, {
+        contentType: 'image/jpeg',
+        customMetadata: {
+          uploadedBy: userId,
+          uploadedAt: new Date().toISOString(),
         }
-      } else {
-        // Standard method for other platforms
-        const response = await fetch(processedUri);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-        }
-        
-        const blob = await response.blob();
-        uploadResult = await uploadBytes(storageRef, blob);
-      }
-      
+      });
       console.log('✅ Upload completed:', uploadResult.metadata.name);
       
+      // Get download URL
       console.log('🔗 Getting download URL...');
       const downloadURL = await getDownloadURL(storageRef);
+      console.log('✅ Download URL obtained:', downloadURL.substring(0, 50) + '...');
       
-      if (!downloadURL || typeof downloadURL !== 'string') {
-        throw new Error('Failed to get valid download URL');
-      }
-      
-      console.log('✅ Profile picture uploaded successfully:', downloadURL);
       return downloadURL;
-      
     } catch (error: any) {
-      console.error('❌ Firebase upload error details:', {
-        error: error?.toString(),
-        message: error?.message,
-        name: error?.name,
-        platform: Platform.OS,
-        imageUri: imageUri?.substring(0, 100) + '...' // Truncate for logging
-      });
-      
-      // Provide iOS-specific error messages
-      if (Platform.OS === 'ios') {
-        if (error?.message?.includes('fetch') || error?.message?.includes('network')) {
-          throw new Error('Network error. Please check your internet connection and try again.');
-        } else if (error?.message?.includes('ArrayBuffer') || error?.message?.includes('blob')) {
-          throw new Error('Failed to process image. Please try selecting a different photo.');
-        } else if (error?.message?.includes('storage') || error?.message?.includes('Firebase')) {
-          throw new Error('Upload service is currently unavailable. Please try again later.');
-        } else if (error?.message?.includes('timeout')) {
-          throw new Error('Upload timed out. Please try again with a smaller image.');
-        }
-      }
-      
-      // Generic fallback error
-      throw new Error('Failed to upload profile picture. Please try again.');
+      console.error('❌ Firebase Storage upload failed:', error);
+      throw new Error(`Failed to upload profile picture: ${error.message}`);
     }
   };
 
@@ -714,25 +654,23 @@ export default function ProfileScreen() {
 
       console.log('✅ Profile picture uploaded successfully:', profilePictureUrl);
       
-      // For direct Firebase method, we also need to update the API
-      if (!uploadProfilePicture || typeof uploadProfilePicture !== 'function') {
-        console.log('🔄 Updating user profile via API...');
-        
-        // Import ApiService and get instance with timeout
-        const { ApiService } = await import('@/services/api/ApiService');
-        const apiService = ApiService.getInstance();
-        
-        // Update profile picture via API with timeout
-        const apiPromise = apiService.updateUserProfile({
-          profilePicture: profilePictureUrl
-        });
-        const apiTimeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('API timeout - please try again')), 15000);
-        });
-        
-        await Promise.race([apiPromise, apiTimeoutPromise]);
-        console.log('📥 API updated user profile successfully');
-      }
+      // Update the profile picture URL in the backend API
+      console.log('🔄 Updating user profile via API with Firebase Storage URL...');
+      
+      // Import ApiService and get instance with timeout
+      const { ApiService } = await import('@/services/api/ApiService');
+      const apiService = ApiService.getInstance();
+      
+      // Update profile picture via API with timeout
+      const apiPromise = apiService.updateUserProfile({
+        profilePicture: profilePictureUrl
+      });
+      const apiTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('API timeout - please try again')), 15000);
+      });
+      
+      await Promise.race([apiPromise, apiTimeoutPromise]);
+      console.log('📥 API updated user profile with Firebase Storage URL successfully');
       
       // Update local AsyncStorage and auth context
       const updatedUser = { 
@@ -757,10 +695,15 @@ export default function ProfileScreen() {
         console.log('💾 Profile picture cached for offline viewing:', cachedImagePath);
         
         // Update cached profile picture state for immediate UI update
+        console.log('🎯 Setting cached profile picture state:', cachedImagePath);
         setCachedProfilePicture(cachedImagePath);
+        
+        // Force a re-render by updating the key or triggering state change
+        console.log('🔄 Profile picture state updated, UI should refresh now');
       } catch (cacheError) {
         console.warn('⚠️ Failed to cache profile picture:', cacheError);
         // Still update UI with remote URL if caching fails
+        console.log('🔄 Setting profile picture to remote URL as fallback:', profilePictureUrl);
         setCachedProfilePicture(profilePictureUrl);
       }
       
@@ -984,6 +927,15 @@ export default function ProfileScreen() {
 
   if (!user) return null;
 
+  // Debug current state
+  console.log('🎨 ProfileScreen render - Current state:', {
+    cachedProfilePicture: cachedProfilePicture?.substring(0, 50) + '...',
+    userProfilePicture: user.profilePicture?.substring(0, 50) + '...',
+    userProfileImage: user.profileImage?.substring(0, 50) + '...',
+    hasImage: !!(cachedProfilePicture || user.profilePicture),
+    userId: user.id
+  });
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -1003,7 +955,19 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <TouchableOpacity onPress={handleImagePicker} style={styles.profileImageContainer}>
             {(cachedProfilePicture || user.profilePicture) ? (
-              <Image source={{ uri: cachedProfilePicture || user.profilePicture }} style={styles.profileImage} />
+              <Image 
+                source={{ uri: cachedProfilePicture || user.profilePicture }} 
+                style={styles.profileImage}
+                onLoad={() => {
+                  console.log('🖼️ Profile image loaded successfully:', cachedProfilePicture || user.profilePicture);
+                }}
+                onError={(error) => {
+                  console.error('❌ Profile image failed to load:', error.nativeEvent.error);
+                  console.log('🔄 Falling back to initials for URI:', cachedProfilePicture || user.profilePicture);
+                  // Force fallback to initials by clearing the cached picture
+                  setCachedProfilePicture(null);
+                }}
+              />
             ) : (
               <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.colors.primary }]}>
                 <Text style={styles.profileImageText}>
@@ -1041,19 +1005,20 @@ export default function ProfileScreen() {
                 Currency
               </Text>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.statItem, styles.mobileStatItem, { backgroundColor: theme.colors.surface }]}
               onPress={() => {
                 if (user.mobile && user.mobile.trim()) {
-                  Alert.alert('Mobile Number', user.mobile);
+                  const formattedNumber = PhoneNumberService.format(user.mobile);
+                  Alert.alert('Mobile Number', formattedNumber);
                 } else {
                   Alert.alert(
                     'Mobile Number',
                     'No mobile number set. You can update your mobile number by contacting support.',
                     [
                       { text: 'OK', style: 'cancel' },
-                      { 
-                        text: 'Contact Support', 
+                      {
+                        text: 'Contact Support',
                         onPress: () => Alert.alert('Contact', 'Email: admin@meetnsplit.com\nPhone: +1-800-MEETNSPLIT')
                       }
                     ]
@@ -1062,7 +1027,7 @@ export default function ProfileScreen() {
               }}
             >
               <Text style={[styles.statValue, { color: user.mobile && user.mobile.trim() ? theme.colors.text : theme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="middle">
-                {user.mobile && user.mobile.trim() ? user.mobile : 'Not set'}
+                {user.mobile && user.mobile.trim() ? PhoneNumberService.format(user.mobile) : 'Not set'}
               </Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
                 Mobile (tap to view)

@@ -119,15 +119,19 @@ function MainTabNavigatorComponent() {
       // Process receipt upload if present
       let processedData = { ...expenseData };
       if (expenseData.receipt && expenseData.receipt.imageUri) {
-        console.log('🔍 Processing receipt upload for expense...');
+        console.log('🔍 Processing receipt upload for expense via API...');
         try {
-          const { SmartMoneyService } = await import('@/services/smartMoney/SmartMoneyService');
-          const receiptUrl = await SmartMoneyService.uploadReceiptImage(expenseData.receipt.imageUri, user.id);
-          processedData.receiptUrl = receiptUrl;
-          console.log('✅ Receipt uploaded successfully:', receiptUrl);
+          const uploadResult = await apiService.uploadReceiptImage(expenseData.receipt.imageUri);
+          processedData.receiptUrl = uploadResult.receiptUrl;
+          console.log('✅ Receipt uploaded successfully:', uploadResult.receiptUrl);
         } catch (receiptError) {
           console.error('❌ Receipt upload failed:', receiptError);
           // Continue without receipt URL
+          Alert.alert(
+            'Receipt Upload Failed',
+            'The expense was created but the receipt could not be uploaded.',
+            [{ text: 'OK' }]
+          );
         }
         // Remove the receipt object as it's processed
         delete processedData.receipt;

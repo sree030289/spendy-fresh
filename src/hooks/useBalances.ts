@@ -426,14 +426,31 @@ static async calculateGroupPairwiseBalanceFrontend(
     ]);
     
     console.log(`👥 Group has ${group.members.length} members`);
-    
+
+    // CRITICAL FIX: Get member join dates to filter expenses
+    const user1Member = group.members.find((m: any) => m.userId === userId1);
+    const user2Member = group.members.find((m: any) => m.userId === userId2);
+
+    const user1JoinDate = user1Member?.joinedAt ? new Date(user1Member.joinedAt) : null;
+    const user2JoinDate = user2Member?.joinedAt ? new Date(user2Member.joinedAt) : null;
+
+    // Use the LATER join date - only expenses after this date should be included
+    const relevantJoinDate = user1JoinDate && user2JoinDate
+      ? (user1JoinDate > user2JoinDate ? user1JoinDate : user2JoinDate)
+      : null;
+
+    console.log(`📅 User1 joined: ${user1JoinDate?.toISOString() || 'Unknown'}`);
+    console.log(`📅 User2 joined: ${user2JoinDate?.toISOString() || 'Unknown'}`);
+    console.log(`📅 Only counting expenses after: ${relevantJoinDate?.toISOString() || 'No filter (original members)'}`);
+
     if (expenses.length === 0) {
       console.log(`✅ No expenses found - balance should be 0`);
       return 0;
     }
-    
+
     let balance = 0;
     let expenseCount = 0;
+    let skippedBeforeJoinCount = 0;
 
     expenses.forEach((expense, index) => {
       console.log(`\n🔍 RAW EXPENSE ${index + 1} DATA:`, {
@@ -458,11 +475,22 @@ static async calculateGroupPairwiseBalanceFrontend(
         return;
       }
 
+      // CRITICAL FIX: Skip expenses created before the member joined
+      if (relevantJoinDate) {
+        const expenseDate = expense.createdAt ? new Date(expense.createdAt) : new Date(expense.date);
+        if (expenseDate < relevantJoinDate) {
+          skippedBeforeJoinCount++;
+          console.log(`⏭️  Expense ${index + 1}: SKIPPED (created before member joined) - ${expense.description}`);
+          console.log(`   📅 Expense: ${expenseDate.toISOString()}, Join: ${relevantJoinDate.toISOString()}`);
+          return;
+        }
+      }
+
       expenseCount++;
       console.log(`\n💰 Expense ${expenseCount}: "${expense.description}"`);
       console.log(`💵 Amount: ${expense.amount}`);
       console.log(`💳 Paid by: ${expense.paidBy}`);
-      
+
       // Handle both splitData and splitDetails property names for compatibility
       // Prioritize 'splits' first since that's what Firebase functions store
       const splits = (expense as any).splits || expense.splitDetails || expense.splitData || [];
@@ -482,81 +510,14 @@ static async calculateGroupPairwiseBalanceFrontend(
         actualSplitsLength: splits?.length || 0
       });
       
-      // Handle expenses without split details - need to determine actual participants
+      // CRITICAL FIX: Handle expenses without split details
+      // When there's no explicit split data, we CANNOT determine who was actually involved
+      // Using current group.members.length would incorrectly include NEW members in OLD expenses!
       if (!splits || !Array.isArray(splits) || splits.length === 0) {
-        console.log(`⚠️  Expense has no split data - determining participants: ${expense.description}`);
-        
-        // For equal split expenses without split data, we need to determine who was actually involved
-        if (expense.splitType === 'equal' || !expense.splitType) {
-          console.log(`🎯 Equal split expense without split details: ${expense.description}`);
-          
-          // For equal split without splitData, use the current group member count
-          // This assumes all current members were involved in the expense
-          let actualParticipantCount = group.members.length;
-          console.log(`👥 Using group member count for participant count: ${actualParticipantCount}`);
-          
-          const shareAmount = parseFloat((expense.amount / actualParticipantCount).toFixed(2));
-          
-          let expenseBalance = 0;
-          
-          if (expense.paidBy === userId1) {
-            // User1 paid - User2 owes their share
-            console.log(`➕ User2 owes User1 (equal split ${actualParticipantCount}-way): ${shareAmount}`);
-            expenseBalance += shareAmount;
-          } else if (expense.paidBy === userId2) {
-            // User2 paid - User1 owes their share
-            console.log(`➖ User1 owes User2 (equal split ${actualParticipantCount}-way): ${shareAmount}`);
-            expenseBalance -= shareAmount;
-          } else {
-            // Someone else paid - both users owe their share to that person
-            // In pairwise calculation, this doesn't affect User1 vs User2 balance
-            console.log(`👥 Third party paid - no net impact on User1 vs User2 balance`);
-            expenseBalance = 0;
-          }
-          
-          balance += expenseBalance;
-          console.log(`📊 Equal split expense balance: ${expenseBalance}`);
-          console.log(`📊 Running total: ${balance}`);
-          return; // Continue to next expense
-          
-        } else if (expense.splitType === 'custom') {
-          console.log(`🎯 Custom split expense without split details: ${expense.description}`);
-          
-          // For custom split without split details, treat as equal split
-          // This is a reasonable fallback assumption
-          console.log(`💡 Treating custom split as equal split due to missing splitData`);
-          
-          let actualParticipantCount = group.members.length;
-          console.log(`👥 Using group member count for participant count: ${actualParticipantCount}`);
-          
-          const shareAmount = parseFloat((expense.amount / actualParticipantCount).toFixed(2));
-          
-          let expenseBalance = 0;
-          
-          if (expense.paidBy === userId1) {
-            // User1 paid - User2 owes their share
-            console.log(`➕ User2 owes User1 (custom→equal split ${actualParticipantCount}-way): ${shareAmount}`);
-            expenseBalance += shareAmount;
-          } else if (expense.paidBy === userId2) {
-            // User2 paid - User1 owes their share
-            console.log(`➖ User1 owes User2 (custom→equal split ${actualParticipantCount}-way): ${shareAmount}`);
-            expenseBalance -= shareAmount;
-          } else {
-            // Someone else paid - both users owe their share to that person
-            // In pairwise calculation, this doesn't affect User1 vs User2 balance
-            console.log(`👥 Third party paid - no net impact on User1 vs User2 balance`);
-            expenseBalance = 0;
-          }
-          
-          balance += expenseBalance;
-          console.log(`📊 Custom split expense balance: ${expenseBalance}`);
-          console.log(`📊 Running total: ${balance}`);
-          return;
-          
-        } else {
-          console.log(`⚠️  Unknown split type: ${expense.splitType} - skipping expense`);
-          return; // Skip unknown split types
-        }
+        console.log(`⚠️  Expense has no split data - SKIPPING to prevent incorrect balance: ${expense.description}`);
+        console.log(`💡 IMPORTANT: Cannot attribute expenses without explicit splits to users`);
+        console.log(`⏭️  This prevents new members from being charged for old expenses they weren't part of`);
+        return; // Skip this expense - cannot determine actual participants
       }
       
       console.log(`📊 Split data:`, splits.map((s: any) => `${s.userId}: ${s.amount} (paid: ${s.isPaid || s.isSettled || false})`));
@@ -606,9 +567,11 @@ static async calculateGroupPairwiseBalanceFrontend(
     const finalBalance = parseFloat(balance.toFixed(2));
     console.log(`\n✅ === FINAL RESULT ===`);
     console.log(`🔢 Final balance: ${finalBalance}`);
+    console.log(`📊 Expenses processed: ${expenseCount}`);
+    console.log(`⏭️  Expenses skipped (before join): ${skippedBeforeJoinCount}`);
     console.log(`💭 Interpretation: ${finalBalance > 0 ? 'User2 owes User1' : finalBalance < 0 ? 'User1 owes User2' : 'No balance'}`);
     console.log(`===============================\n`);
-    
+
     return finalBalance;
   } catch (error) {
     console.error('❌ Calculate group pairwise balance error:', error);

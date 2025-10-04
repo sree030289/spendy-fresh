@@ -18,6 +18,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import { ApiService } from '@/services/api/ApiService';
+import { GroupChatService } from '@/services/firebase/GroupChatService';
+import { useAuth } from '@/hooks/useAuth';
 
 interface JoinGroupModalProps {
   visible: boolean;
@@ -33,6 +35,7 @@ export default function JoinGroupModal({
   userId
 }: JoinGroupModalProps) {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -52,6 +55,20 @@ export default function JoinGroupModal({
     try {
       // Join the group using the invite code
       const groupId = await apiService.joinGroupByInviteCode(inviteCode.trim().toUpperCase(), userId);
+
+      // Create system message in group chat
+      if (user && groupId) {
+        try {
+          await GroupChatService.createUserJoinedMessage(
+            groupId,
+            user.id,
+            user.fullName
+          );
+        } catch (chatError) {
+          console.error('Failed to create join message in chat:', chatError);
+          // Don't fail the join if chat message fails
+        }
+      }
 
       Alert.alert(
         'Success! 🎉',

@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { Expense, ExpenseSplit } from '@/services/firebase/splitting-disabled';
 import { ApiService } from '@/services/api/ApiService';
+import { GroupChatService } from '@/services/firebase/GroupChatService';
 import { getCurrencySymbol } from '@/utils/currency';
 import { User } from '@/types';
 import FullscreenModal from '@/components/common/FullscreenModal';
@@ -151,6 +152,23 @@ export default function ExpenseSettlementModal({
         isSettled: isFullySettled,
         lastSettlementDate: new Date()
       });
+
+      // Create chat system message for settlements in groups
+      if (expense.groupId && currentUser) {
+        try {
+          const settledNames = settledItems.map(item => item.userName).join(', ');
+          const totalSettled = settledItems.reduce((sum, item) => sum + item.amountToPay, 0);
+          await GroupChatService.sendGroupMessage({
+            groupId: expense.groupId,
+            userId: currentUser.id,
+            userName: 'System',
+            message: `${settledNames} marked payment as settled: ${getCurrencySymbol(expense.currency || 'USD')}${totalSettled.toFixed(2)} for "${expense.description}"`,
+            type: 'system'
+          });
+        } catch (chatError) {
+          console.error('❌ Failed to create settlement chat message:', chatError);
+        }
+      }
 
       // Create settlement notifications
       for (const item of settledItems) {

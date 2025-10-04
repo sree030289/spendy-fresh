@@ -23,6 +23,7 @@ import { Group, Expense, Friend } from '@/services/firebase/splitting-disabled';
 import ExpenseRefreshService from '@/services/expenseRefreshService';
 import * as Contacts from 'expo-contacts';
 import { ApiService } from '@/services/api/ApiService';
+import { GroupChatService } from '@/services/firebase/GroupChatService';
 import QRCodeModal from './QRCodeModal';
 import EditExpenseModal from './EditExpenseModal';
 import ExpenseModal from './ExpenseModal';
@@ -845,11 +846,34 @@ export default function GroupDetailsModal({
   const handleExpenseUpdated = async (expenseData: any) => {
     try {
       console.log('🔄 Updating expense from GroupDetailsModal:', expenseData);
-      
+
       // Actually call the API to update the expense
       await ApiService.getInstance().updateExpense(expenseData.id, expenseData);
       console.log('✅ Expense updated successfully from GroupDetailsModal');
-      
+
+      // Create chat system message for expense edit
+      if (expenseData.groupId && currentUser) {
+        try {
+          console.log('💬 Creating expense edit chat message...');
+          await GroupChatService.createExpenseEditedMessage(
+            expenseData.groupId,
+            currentUser.id,
+            currentUser.fullName,
+            {
+              id: expenseData.id,
+              description: expenseData.description,
+              amount: expenseData.amount,
+              currency: expenseData.currency || 'USD',
+              splitType: expenseData.splitType || 'equal',
+              expenseDate: expenseData.expenseDate || expenseData.date || new Date()
+            }
+          );
+          console.log('✅ Expense edit chat message created');
+        } catch (chatError) {
+          console.error('❌ Failed to create expense edit chat message:', chatError);
+        }
+      }
+
       // Close modal and refresh data
       setShowEditExpense(false);
       setSelectedExpense(null);
