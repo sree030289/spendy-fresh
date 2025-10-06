@@ -40,6 +40,7 @@ export default function ProfileScreen() {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showTermsPrivacyModal, setShowTermsPrivacyModal] = useState(false);
   const [cachedProfilePicture, setCachedProfilePicture] = useState<string | null>(null);
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
 
 
   // Subscription states
@@ -672,7 +673,7 @@ export default function ProfileScreen() {
       await Promise.race([apiPromise, apiTimeoutPromise]);
       console.log('📥 API updated user profile with Firebase Storage URL successfully');
       
-      // Update local AsyncStorage and auth context
+      // Update local AsyncStorage
       const updatedUser = { 
         ...user, 
         profilePicture: profilePictureUrl, // Ensure we use the Firebase URL
@@ -684,8 +685,13 @@ export default function ProfileScreen() {
       console.log('📱 Updated local user data with new profile picture');
       
       // Update auth context state immediately to show the image in UI
+      // Pass only the updated fields (Partial<User>)
       if (updateUser && typeof updateUser === 'function') {
-        await updateUser(updatedUser);
+        await updateUser({
+          profilePicture: profilePictureUrl,
+          profileImage: profilePictureUrl,
+          updatedAt: new Date()
+        });
         console.log('🔄 Updated auth context with new profile picture');
       }
 
@@ -700,13 +706,19 @@ export default function ProfileScreen() {
         
         // Force a re-render by updating the key or triggering state change
         console.log('🔄 Profile picture state updated, UI should refresh now');
+
+        // Force image re-render by incrementing refresh key
+        setImageRefreshKey(prev => prev + 1);
       } catch (cacheError) {
         console.warn('⚠️ Failed to cache profile picture:', cacheError);
         // Still update UI with remote URL if caching fails
         console.log('🔄 Setting profile picture to remote URL as fallback:', profilePictureUrl);
         setCachedProfilePicture(profilePictureUrl);
+
+        // Force image re-render even on cache failure
+        setImageRefreshKey(prev => prev + 1);
       }
-      
+
       console.log('✅ Profile picture updated successfully!');
       Alert.alert('Success', 'Profile picture updated successfully!');
     } catch (error: any) {
@@ -793,14 +805,25 @@ export default function ProfileScreen() {
 
     try {
       const newBiometricState = !user.biometricEnabled;
+
+      // Show loading state
+      setLoading(true);
+
       await updateUser({ biometricEnabled: newBiometricState });
-      
+
+      // Wait a bit for state to update
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      setLoading(false);
+
+      // Now show the alert after state has updated
       Alert.alert(
         'Biometric Authentication',
         `Biometric login has been ${newBiometricState ? 'enabled' : 'disabled'}.`,
         [{ text: 'OK' }]
       );
     } catch (error) {
+      setLoading(false);
       Alert.alert('Error', 'Failed to update biometric setting');
     }
   };
@@ -812,22 +835,33 @@ export default function ProfileScreen() {
         return;
       }
 
-      const subscriptionService = SubscriptionService.getInstance();
-      const result = await subscriptionService.processSubscription(user.id, plan, promoCode);
+      // Use RealPaymentService instead of SubscriptionService for actual purchases
+      const RealPaymentService = (await import('@/services/RealPaymentService')).default;
+      const paymentService = RealPaymentService.getInstance();
+      await paymentService.initialize(user.id);
+
+      const result = await paymentService.purchaseSubscription(plan, promoCode);
 
       if (result.success) {
+        // Update global user state via auth context
+        if (updateUser) {
+          await updateUser({
+            isPremium: true,
+            subscriptionStatus: 'premium'
+          });
+        }
+
         setShowSubscriptionModal(false);
-        Alert.alert('Success! 🎉', result.message, [
+        Alert.alert('Success! 🎉', 'Welcome to Premium!', [
           {
             text: 'Awesome!',
             onPress: () => {
-              // Reload subscription data
               loadSubscriptionData();
             }
           }
         ]);
-      } else {
-        Alert.alert('Error', result.message);
+      } else if (!result.userCancelled) {
+        Alert.alert('Purchase Failed', result.error || 'Please try again.');
       }
     } catch (error) {
       console.error('Subscription purchase error:', error);
@@ -955,8 +989,9 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <TouchableOpacity onPress={handleImagePicker} style={styles.profileImageContainer}>
             {(cachedProfilePicture || user.profilePicture) ? (
-              <Image 
-                source={{ uri: cachedProfilePicture || user.profilePicture }} 
+              <Image
+                key={`profile-${imageRefreshKey}`}
+                source={{ uri: cachedProfilePicture || user.profilePicture }}
                 style={styles.profileImage}
                 onLoad={() => {
                   console.log('🖼️ Profile image loaded successfully:', cachedProfilePicture || user.profilePicture);

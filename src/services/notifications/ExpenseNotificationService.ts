@@ -13,6 +13,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { ENV } from '@/config/environment';
 
 export interface Expense {
   id: string;
@@ -397,7 +398,7 @@ export class ExpenseNotificationService {
     try {
       console.log('↩️ Undoing expense deletion:', expenseId);
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/expenses/${expenseId}/undo`, {
+      const response = await fetch(`${ENV.api.baseURL}/expenses/${expenseId}/undo`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

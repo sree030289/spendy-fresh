@@ -1,5 +1,5 @@
 // src/components/modals/RemindModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -71,6 +71,16 @@ export default function RemindModal({
   // Initialize with default message so it's editable
   const [customMessage, setCustomMessage] = useState(defaultMessage);
 
+  // Update custom message when friend or balance changes
+  useEffect(() => {
+    if (visible && friend) {
+      const newDefaultMessage = isOwedByFriend
+        ? `Hi ${friend.friendData.fullName}! Just a friendly reminder that you owe me ${currencySymbol}${amount.toFixed(2)} for our shared expenses. When you get a chance, could you settle up? Thanks! 😊`
+        : `Hi ${friend.friendData.fullName}! I haven't forgotten that I owe you ${currencySymbol}${amount.toFixed(2)}. I'll settle up soon. Thanks for your patience! 😊`;
+      setCustomMessage(newDefaultMessage);
+    }
+  }, [visible, friend, balance]);
+
   // Early return AFTER all hooks
   if (!friend) return null;
 
@@ -80,8 +90,12 @@ export default function RemindModal({
       const message = customMessage.trim() || defaultMessage;
       
       if (method === 'sms') {
-        // Send SMS
-        const phoneNumber = friend.friendData.mobile;
+        // Send SMS - check multiple possible phone number fields
+        const phoneNumber = (friend.friendData as any).mobile ||
+                           (friend.friendData as any).phone ||
+                           (friend.friendData as any).phoneNumber ||
+                           (friend.friendData as any).normalizedMobile;
+
         if (!phoneNumber || phoneNumber.trim() === '' || phoneNumber === 'undefined') {
           Alert.alert('Error', 'This friend doesn\'t have a valid phone number. Please ask them to add their phone number in their profile.');
           return;

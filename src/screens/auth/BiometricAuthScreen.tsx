@@ -39,18 +39,8 @@ export default function BiometricAuthScreen({
     initializeBiometric();
   }, []);
 
-  useEffect(() => {
-    // Clear fail count when screen first loads (for testing)
-    const clearFailCountOnStart = async () => {
-      try {
-        await BiometricAuthService.clearFailCount();
-        console.log('🧹 Cleared biometric fail count on screen load');
-      } catch (error) {
-        console.error('Error clearing fail count:', error);
-      }
-    };
-    clearFailCountOnStart();
-  }, []);
+  // REMOVED: Auto-clearing fail count allows unlimited retries
+  // Fail count should persist to prevent abuse
 
   useEffect(() => {
     // Pulse animation for biometric icon
@@ -86,11 +76,9 @@ export default function BiometricAuthScreen({
       
       const currentFailCount = await BiometricAuthService.getFailCount();
       setFailCount(currentFailCount);
-      
-      // Auto-trigger biometric authentication
-      setTimeout(() => {
-        handleBiometricAuth();
-      }, 1000);
+
+      // REMOVED: Auto-trigger removed - user will tap "Authenticate" button to start
+      // This prevents unwanted double authentication prompts
     } catch (error) {
       console.error('Error initializing biometric screen:', error);
       onFallbackToLogin();
@@ -130,6 +118,9 @@ export default function BiometricAuthScreen({
         // Biometric authentication successful
         console.log('✅ Biometric authentication successful');
         
+        // Prevent multiple calls by immediately clearing the authenticating flag
+        setIsAuthenticating(false);
+        
         // In a real implementation, you would have stored encrypted credentials
         // For now, we'll simulate auto-login with stored session
         try {
@@ -141,9 +132,13 @@ export default function BiometricAuthScreen({
           await BiometricAuthService.extendSession();
           console.log('✅ Session extended after biometric success');
           
-          // Call success callback
-          console.log('🔄 Calling onBiometricSuccess callback');
+          // Clear fail count on successful authentication
+          await BiometricAuthService.clearFailCount();
+          
+          // Call success callback - this will navigate to dashboard
+          console.log('🔄 Calling onBiometricSuccess callback - navigating to dashboard');
           onBiometricSuccess();
+          return; // Early return to prevent further execution
           
         } catch (loginError) {
           console.error('❌ Auto-login failed after biometric success:', loginError);
@@ -157,6 +152,7 @@ export default function BiometricAuthScreen({
               }
             ]
           );
+          return; // Early return
         }
       } else {
         // Biometric authentication failed
@@ -259,9 +255,9 @@ export default function BiometricAuthScreen({
     }
   };
 
-  const getBiometricIcon = () => {
+  const getBiometricIcon = (): any => {
     // You could check supported types here and return appropriate icon
-    return 'user'; // Default to user icon, replace with face/fingerprint icon based on supported type
+    return 'person'; // Default to person icon, replace with face/fingerprint icon based on supported type
   };
 
   const { width, height } = Dimensions.get('window');

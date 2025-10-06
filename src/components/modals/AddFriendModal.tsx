@@ -411,7 +411,8 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
               phoneNumber: contact.phoneNumber,
               message: `Hi ${contact.name}! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
               countryCode: selectedCountry.code as any,
-              senderName: user?.fullName || 'Your friend'
+              senderName: user?.fullName || 'Your friend',
+              contactName: contact.name // Pass contact name
             });
 
             if (result.success) {
@@ -434,17 +435,18 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           if (resultMessage) resultMessage += '\n\n';
           resultMessage += `Failed to send to: ${failedInvites.join(', ')}`;
         }
-        
-        Alert.alert(
-          successfulInvites.length > 0 ? 'Invitations Sent!' : 'Some Invitations Failed',
-          resultMessage,
-          [{ text: 'OK' }]
-        );
 
         if (successfulInvites.length > 0) {
-          // Reset and close
+          // Show full-screen success animation
+          setSuccessTitle('SMS Invitations Sent! 📱');
+          setSuccessMessage(resultMessage);
+          setShowSuccessModal(true);
+
+          // Reset selected contacts
           setSelectedContacts([]);
-          onClose();
+        } else {
+          // Only show Alert for complete failures
+          Alert.alert('Some Invitations Failed', resultMessage, [{ text: 'OK' }]);
         }
       } catch (error) {
         console.error('SMS batch invite error:', error);
@@ -764,7 +766,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   return (
     <>
       <FullscreenModal
-      visible={visible}
+      visible={visible && !showSuccessModal}
       onClose={() => {
         resetFormState();
         onClose();

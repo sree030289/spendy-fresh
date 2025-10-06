@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Icon } from '../../components/common/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
@@ -28,6 +29,7 @@ export default function LoginScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { login, user } = useAuth();
+  const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +40,7 @@ export default function LoginScreen() {
   const [passwordError, setPasswordError] = useState('');
   const [lastUserEmail, setLastUserEmail] = useState<string | null>(null);
   const [lastUserBiometric, setLastUserBiometric] = useState(false);
+  const [hasShownBiometricPrompt, setHasShownBiometricPrompt] = useState(false);
   const apiService = ApiService.getInstance();
 
   useEffect(() => {
@@ -69,8 +72,12 @@ export default function LoginScreen() {
         setEmail(lastEmail);
       }
 
-      // Auto-prompt biometric if available and was enabled for last user
-      if (available && lastBiometric && lastEmail) {
+      // ONLY show biometric prompt if we haven't shown it yet and user didn't just come from biometric screen
+      // Check if we came from biometric failure by checking async storage flag
+      const biometricJustFailed = await AsyncStorage.getItem('@spendy_biometric_failed');
+      
+      if (available && lastBiometric && lastEmail && !hasShownBiometricPrompt && !biometricJustFailed) {
+        setHasShownBiometricPrompt(true); // Prevent showing again
         setTimeout(() => {
           Alert.alert(
             'Quick Login',
@@ -92,7 +99,7 @@ export default function LoginScreen() {
             ]
           );
         }, 500);
-      } else if (lastEmail) {
+      } else if (lastEmail && !biometricJustFailed) {
         // Show option for different user if there's a stored email
         setTimeout(() => {
           Alert.alert(
@@ -110,6 +117,11 @@ export default function LoginScreen() {
             ]
           );
         }, 500);
+      }
+      
+      // Clear the biometric failed flag after checking
+      if (biometricJustFailed) {
+        await AsyncStorage.removeItem('@spendy_biometric_failed');
       }
     } catch (error) {
       console.log('Screen initialization failed:', error);
@@ -554,6 +566,7 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   returnKeyType="next"
                   blurOnSubmit={false}
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                   {...(Platform.OS === 'web' && {
                     autoComplete: 'email',
                     inputMode: 'email' as any,
@@ -568,8 +581,9 @@ export default function LoginScreen() {
 
               <View style={styles.inputContainer}>
                 <TextInput
+                  ref={passwordRef}
                   style={[
-                    styles.input, 
+                    styles.input,
                     styles.passwordInput,
                     passwordError && { borderColor: '#EF4444' }
                   ]}
@@ -582,7 +596,10 @@ export default function LoginScreen() {
                   }}
                   secureTextEntry={!showPassword}
                   returnKeyType="done"
-                  onSubmitEditing={handleLogin}
+                  onSubmitEditing={() => {
+                    Keyboard.dismiss();
+                    handleLogin();
+                  }}
                   blurOnSubmit={true}
                   {...(Platform.OS === 'web' && {
                     autoComplete: 'current-password',

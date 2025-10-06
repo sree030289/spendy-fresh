@@ -16,6 +16,7 @@ export interface SMSInviteRequest {
   message?: string;
   countryCode?: CountryCode;
   senderName?: string;
+  contactName?: string; // NEW: Add contact name from phone book
 }
 
 /**
@@ -68,7 +69,8 @@ export class SMSInviteService {
         apiResponse = await this.apiService.sendSMSFriendRequest(
           request.phoneNumber,
           request.message,
-          request.countryCode
+          request.countryCode,
+          request.contactName // Pass contact name to API
         );
         console.log('📱 API response received:', apiResponse);
       } catch (apiError) {

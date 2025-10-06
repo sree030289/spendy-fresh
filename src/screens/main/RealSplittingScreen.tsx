@@ -439,7 +439,14 @@ export default function RealSplittingScreen() {
           console.log('✅ Opening AddExpenseModal via global function');
           setShowAddExpense(true);
         } else {
-          console.log('🚫 Transaction limit reached - subscription modal should be showing');
+          console.log('🚫 Transaction limit reached - subscription modal showing for 10 seconds');
+          // FIXED: After showing subscription modal (which has 10 sec countdown),
+          // still open AddExpenseModal to allow user to submit
+          // The modal will auto-close after 10 seconds and then open expense modal
+          setTimeout(() => {
+            console.log('⏰ Auto-opening AddExpenseModal after subscription modal countdown');
+            setShowAddExpense(true);
+          }, 10500); // Slightly longer than 10 sec countdown to ensure modal closes first
         }
       } catch (error) {
         console.error('❌ Error checking subscription for global expense modal:', error);
@@ -3130,9 +3137,37 @@ export default function RealSplittingScreen() {
                 >
                   {/* Left: Friend Avatar */}
                   <View style={[styles.friendIconContainer, { backgroundColor: theme.colors.primary }]}>
-                    <Text style={styles.friendIconText}>
-                      {(detail.name || 'Unknown').charAt(0).toUpperCase()}
-                    </Text>
+                    {(() => {
+                      const avatarUri = detail.friend?.friendData?.profilePicture || 
+                                       detail.friend?.friendData?.profileImage || 
+                                       detail.friend?.friendData?.avatar;
+                      
+                      const hasValidAvatar = avatarUri && 
+                        avatarUri.trim() !== '' && 
+                        !avatarUri.startsWith('file://') && 
+                        (avatarUri.startsWith('http') || 
+                         avatarUri.startsWith('https://') ||
+                         avatarUri.includes('firebasestorage.googleapis.com'));
+                      
+                      if (hasValidAvatar) {
+                        return (
+                          <Image 
+                            source={{ uri: avatarUri }} 
+                            style={styles.friendIconImage}
+                            resizeMode="cover"
+                            onError={() => {
+                              console.log('❌ Overview friend avatar failed to load for:', detail.name);
+                            }}
+                          />
+                        );
+                      } else {
+                        return (
+                          <Text style={styles.friendIconText}>
+                            {(detail.name || 'Unknown').charAt(0).toUpperCase()}
+                          </Text>
+                        );
+                      }
+                    })()}
                     {detail.source === 'group' && (
                       <View style={[styles.groupIndicator, { backgroundColor: theme.colors.primary + '20' }]}>
                         <Icon name="people" size={10} color={theme.colors.primary}  />
@@ -3502,7 +3537,7 @@ export default function RealSplittingScreen() {
                                       }}
                                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     >
-                                      <Icon name="information-circle-outline" size={16} color={theme.colors.textSecondary} />
+                                      <Icon name="information" size={16} color={theme.colors.textSecondary} />
                                     </TouchableOpacity>
                                   );
                                 } else {
@@ -3608,17 +3643,33 @@ export default function RealSplittingScreen() {
                     <View style={[styles.friendIconContainer, { 
                       backgroundColor: isReceivedRequest ? theme.colors.success : theme.colors.warning 
                     }]}>
-                      {(friend.friendData?.avatar || friend.friendData?.profilePicture || friend.friendData?.profileImage) ? (
-                        <Image 
-                          source={{ uri: friend.friendData.avatar || friend.friendData.profilePicture || friend.friendData.profileImage }} 
-                          style={styles.friendIconImage}
-                          onError={() => {
-                            console.log('Friend avatar failed to load, showing initials');
-                          }}
-                        />
-                      ) : (
-                        <Text style={styles.friendIconText}>{friendInitial}</Text>
-                      )}
+                      {(() => {
+                        const avatarUri = friend.friendData?.avatar || friend.friendData?.profilePicture || friend.friendData?.profileImage;
+                        
+                        const hasValidAvatar = avatarUri && 
+                          avatarUri.trim() !== '' && 
+                          !avatarUri.startsWith('file://') && 
+                          (avatarUri.startsWith('http') || 
+                           avatarUri.startsWith('https://') ||
+                           avatarUri.includes('firebasestorage.googleapis.com'));
+                        
+                        if (hasValidAvatar) {
+                          return (
+                            <Image 
+                              source={{ uri: avatarUri }} 
+                              style={styles.friendIconImage}
+                              resizeMode="cover"
+                              onError={() => {
+                                console.log('❌ Pending friend avatar failed to load for:', friendName);
+                              }}
+                            />
+                          );
+                        } else {
+                          return (
+                            <Text style={styles.friendIconText}>{friendInitial}</Text>
+                          );
+                        }
+                      })()}
                     </View>
 
                     {/* Center: Friend Details */}
@@ -3854,7 +3905,7 @@ export default function RealSplittingScreen() {
                   style={[styles.actionButton, { backgroundColor: theme.colors.primary + '20' }]}
                 >
                   <View>
-                    <Icon name="mail" size={16} color={theme.colors.primary} />
+                    <Icon name="chatbubble" size={16} color={theme.colors.primary} />
                     {groupUnreadCounts[group.id] > 0 && (
                       <View style={styles.chatBadge}>
                         <Text style={styles.chatBadgeText}>

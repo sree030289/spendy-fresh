@@ -31,6 +31,16 @@ export interface EnvironmentConfig {
   qrService: {
     secret: string;
   };
+  revenueCat: {
+    apiKeys: {
+      apple: string;
+      google: string;
+    };
+    appIds: {
+      apple: string;
+      google: string;
+    };
+  };
   external: {
     expoProjectId?: string;
     sentryDsn?: string;
@@ -54,26 +64,39 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     environment = 'local';
   }
 
-  // Fallback configuration if extra is not available (development mode)
+  // Log configuration loading for debugging
+  console.log('🔧 Loading environment configuration:', {
+    hasExtra: !!extra,
+    hasFirebase: !!extra.firebase,
+    hasApi: !!extra.api,
+    environment,
+    projectId: extra.firebase?.projectId || 'MISSING'
+  });
+
+  // Fallback configuration for production (not localhost!)
   const fallbackConfig = {
     firebase: {
-      projectId: 'spendy-develop',
+      projectId: 'spendy-97913',
       apiKey: 'AIzaSyA3PwHVfgqpxizujlimha-xTjsh_-5Tsc0',
-      authDomain: 'spendy-develop.firebaseapp.com',
-      databaseURL: 'https://spendy-develop-default-rtdb.firebaseio.com',
-      storageBucket: 'spendy-develop.appspot.com',
-      messagingSenderId: '827143652568',
-      appId: '1:827143652568:web:a8b9c0d1e2f3g4h5i6j7k8',
+      authDomain: 'spendy-97913.firebaseapp.com',
+      databaseURL: 'https://spendy-97913-default-rtdb.firebaseio.com',
+      storageBucket: 'spendy-97913.firebasestorage.app',
+      messagingSenderId: '576826934856',
+      appId: '1:576826934856:web:7a74ac9644f9bfc7da7a7d',
+      measurementId: 'G-ZHGC7PM0HZ'
     },
     api: {
-      baseURL: 'http://192.168.0.144:5001/spendy-develop/us-central1/meetnsplitApi',
-      jwtSecret: 'dev-jwt-secret-for-development',
+      baseURL: 'https://us-central1-spendy-97913.cloudfunctions.net/meetnsplitApi',
+      jwtSecret: 'production-jwt-secret-change-me',
+    },
+    qrService: {
+      secret: '5cb8663848fad3a60b2afb79c5ad47787c64c9c7a1a56bbf8ccd3c14131b14e8',
     },
   };
 
   return {
     firebase: {
-      projectId: extra.firebase?.projectId || fallbackConfig.firebase.projectId,  
+      projectId: extra.firebase?.projectId || fallbackConfig.firebase.projectId,
       apiKey: extra.firebase?.apiKey || fallbackConfig.firebase.apiKey,
       authDomain: extra.firebase?.authDomain || fallbackConfig.firebase.authDomain,
       databaseURL: extra.firebase?.databaseURL || fallbackConfig.firebase.databaseURL,
@@ -95,7 +118,17 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
       clientSecret: extra.google?.clientSecret,
     },
     qrService: {
-      secret: extra.qrService?.secret || 'dev-qr-secret',
+      secret: extra.qrService?.secret || fallbackConfig.qrService.secret,
+    },
+    revenueCat: {
+      apiKeys: {
+        apple: extra.revenueCat?.apiKeys?.apple || 'appl_ixikjWzYxdenhqByADKWioLGGFE',
+        google: extra.revenueCat?.apiKeys?.google || 'goog_mQiNRXHKgAdxqTCsVRGjShjPzrg',
+      },
+      appIds: {
+        apple: extra.revenueCat?.appIds?.apple || 'app893f790c95',
+        google: extra.revenueCat?.appIds?.google || 'appa291f8b62a',
+      },
     },
     external: {
       expoProjectId: extra.external?.expoProjectId || extra.eas?.projectId,
@@ -146,7 +179,7 @@ export const validateEnvironmentConfig = (): void => {
       throw new Error('Production JWT_SECRET must be properly configured');
     }
     
-    if (config.qrService.secret === 'dev-qr-secret') {
+    if (!config.qrService.secret || config.qrService.secret === 'dev-qr-secret') {
       throw new Error('Production QR_SERVICE_SECRET must be properly configured');
     }
   }

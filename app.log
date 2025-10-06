@@ -1,0 +1,798 @@
+default	18:07:39.962238+1100	lsd	[FBSSystemService][0x5872] Sending request to open "com.meetnsplit.app.dev"
+default	18:07:39.964010+1100	SpringBoard	[FBSystemService][0x5872] Received request to open "com.meetnsplit.app.dev" from lsd:123.
+default	18:07:39.965652+1100	SpringBoard	Received trusted open application request for "com.meetnsplit.app.dev" from <FBProcess: 0xd7810cd80; osservice<com.apple.lsd>:123(v138)>.
+default	18:07:39.996692+1100	misagent	Sending E4246468-C3CA-4C36-89AB-AC72A6341A77 - *[expo] com.meetnsplit.app.dev AppStore 2025-10-05T11:01:11.866Z
+default	18:07:40.003230+1100	SpringBoard	Executing request: <SBMainWorkspaceTransitionRequest: 0xd6a05eb20; eventLabel: OpenApplication(sceneID:com.meetnsplit.app.dev-default)ForRequester(lsd.123); display: Main; source: FBSystemService>
+default	18:07:40.008173+1100	misagent	Sending E4246468-C3CA-4C36-89AB-AC72A6341A77 - *[expo] com.meetnsplit.app.dev AppStore 2025-10-05T11:01:11.866Z
+default	18:07:40.010217+1100	SpringBoard	[FBWorkspaceEvent] Executing: <FBWorkspaceEvent: 0xd72ed91a0; OpenApplication(sceneID:com.meetnsplit.app.dev-default)ForRequester(lsd.123)>
+default	18:07:40.013848+1100	SpringBoard	[SwitcherOrientation] outSwitcherOrientation: portrait (1), outElementsOrientations: {
+    "sceneID:com.meetnsplit.app.dev-default" = 1;
+}
+default	18:07:40.015716+1100	SpringBoard	Generating initialization context on main thread for: com.meetnsplit.app.dev
+default	18:07:40.021316+1100	SpringBoard	Asked to bootstrap a new process with identity: app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>
+default	18:07:40.021343+1100	SpringBoard	Creating process (sync=true) with identity: app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>
+default	18:07:40.021413+1100	SpringBoard	Created <FBWorkspace: 0xd6a05d360; <FBApplicationProcess: 0xd77a2cc00; app<com.meetnsplit.app.dev>:<invalid>>>
+default	18:07:40.021419+1100	SpringBoard	Bootstrapping app<com.meetnsplit.app.dev> with intent foreground-interactive
+default	18:07:40.021887+1100	SpringBoard	Prewarming for launch of com.meetnsplit.app.dev
+default	18:07:40.022186+1100	runningboardd	Acquiring assertion targeting app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)> from originator [osservice<com.apple.SpringBoard>:35] with description <RBSAssertionDescriptor| "FBApplicationProcess" ID:34-35-465871 target:app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)> attributes:[
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"SuspendableLPRunReason-Resume" sourceEnvironment:"(null)">,
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"Visibility" sourceEnvironment:"(null)">,
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"SuspendableRole-UIFocal" sourceEnvironment:"(null)">,
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"SuspendableJetsamPriority-Foreground" sourceEnvironment:"(null)">,
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"SuspendableBootstrapping" sourceEnvironment:"(null)">
+	]>
+default	18:07:40.022352+1100	runningboardd	Assertion 34-35-465871 (target:app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>) will be created as active
+default	18:07:40.023639+1100	runningboardd	Creating and launching job for: app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>
+default	18:07:40.023653+1100	runningboardd	_mutateContextIfNeeded called for com.meetnsplit.app.dev
+default	18:07:40.024768+1100	runningboardd	app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>: -[RBPersonaManager personaForIdentity:context:personaUID:personaUniqueString:] required 0.003934 ms (wallclock); resolved to {1000, 6CCF4E76-D6C7-48BE-9882-59B6346331A7}
+default	18:07:40.024797+1100	runningboardd	'app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>' Skipping container path lookup because containerization was prevented (<RBSLaunchContext: 0xb632ee300>)
+default	18:07:40.033138+1100	runningboardd	[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] Memory Limits: active 2098 inactive 2098
+ <private>
+default	18:07:40.033149+1100	runningboardd	[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] This process will be managed.
+default	18:07:40.033189+1100	runningboardd	Now tracking process: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.033360+1100	runningboardd	Calculated state for app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>: running-active (role: UserInteractiveFocal) (endowments: <private>)
+default	18:07:40.033602+1100	runningboardd	Using default underlying assertion for app: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.033643+1100	runningboardd	Acquiring assertion targeting [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] from originator [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] with description <RBSAssertionDescriptor| "RB Underlying Assertion" ID:34-34-465872 target:75725 attributes:[
+	<RBSDomainAttribute| domain:"com.apple.underlying" name:"defaultUnderlyingAppAssertion" sourceEnvironment:"(null)">,
+	<RBSAcquisitionCompletionAttribute| policy:AfterApplication>
+	]>
+default	18:07:40.035058+1100	runningboardd	Assertion 34-34-465872 (target:[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]) will be created as active
+default	18:07:40.035249+1100	runningboardd	[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] Set jetsam priority to 100 [0] flag[1]
+default	18:07:40.035255+1100	runningboardd	[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] Resuming task.
+default	18:07:40.035293+1100	runningboardd	[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] Set darwin role to: UserInteractiveFocal
+default	18:07:40.035332+1100	runningboardd	[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] reported to RB as running
+default	18:07:40.035343+1100	CommCenter	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.035486+1100	CommCenter	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.035511+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Bootstrap success!
+default	18:07:40.035517+1100	SpringBoard	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.035526+1100	SpringBoard	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.035537+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Setting process task state to: Running
+default	18:07:40.035542+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Setting process visibility to: Foreground
+default	18:07:40.035559+1100	kernel	/private/var/containers/Bundle/Application/FF79BE25-A772-4BDA-B6BB-8CACB4E0E3A1/MeetNSplitDev.app/MeetNSplitDev[75725] ==> container
+default	18:07:40.035607+1100	runningboardd	[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] set Memory Limits to Default Inactive (2098)
+default	18:07:40.035614+1100	runningboardd	[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] Set Carplay mode to: 0
+error	18:07:40.035621+1100	kernel	Sandbox: MeetNSplitDev(75725) deny(1) sysctl-read kern.bootargs
+default	18:07:40.035665+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Registering event dispatcher after bootstrap
+default	18:07:40.035676+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Initial launch state: FV-Focal[100].
+default	18:07:40.035701+1100	SpringBoard	Adding: <FBApplicationProcess: 0xd77a2cc00; app<com.meetnsplit.app.dev>:75725(v32F93)>
+default	18:07:40.035722+1100	runningboardd	[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] visiblity is yes
+default	18:07:40.035743+1100	runningboardd	Calculated state for app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>: running-active (role: UserInteractiveFocal) (endowments: <private>)
+default	18:07:40.035832+1100	runningboardd	Successfully acquired underlying assertion for [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.036123+1100	powerd	Process runningboardd.34 Created SystemIsActive "app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>34-35-465871:FBApplicationProcess" age:00:00:00  id:51539642017 [System: PrevIdle SysAct]
+default	18:07:40.036259+1100	audiomxd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.036302+1100	audiomxd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.037523+1100	dasd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.037580+1100	gamepolicyd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.037669+1100	gamepolicyd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-NotVisible
+default	18:07:40.037879+1100	dasd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.038163+1100	watchdogd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.038275+1100	watchdogd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.039604+1100	useractivityd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.040242+1100	PerfPowerServices	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.041363+1100	useractivityd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.041883+1100	PerfPowerServices	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.043895+1100	WirelessRadioManagerd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.043946+1100	WirelessRadioManagerd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.044689+1100	callservicesd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.044794+1100	callservicesd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.045459+1100	backboardd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.045541+1100	backboardd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.046526+1100	wifid	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.046680+1100	wifid	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.047020+1100	symptomsd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.047099+1100	symptomsd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.047691+1100	locationd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.047744+1100	locationd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.048352+1100	locationd	{"msg":"RBS #AppMonitor process monitor update handler invoked", "pid":75725, "bundleID":"com.meetnsplit.app.dev", "state":"RunningScheduled"}
+default	18:07:40.048393+1100	locationd	{"msg":"RBS #AppMonitor Post Application State Change Notification", "notification":"ForegroundRunning", "pid":75725, "bundleId":"com.meetnsplit.app.dev"}
+default	18:07:40.048850+1100	locationd	{"msg":"#Warning #ClientResolution the passed keyPath is not registered. Resolving to #nullCKP", "InputCKP":"icom.meetnsplit.app.dev:"}
+default	18:07:40.048979+1100	SpringBoard	<SBFullScreenSwitcherLiveContentOverlayCoordinator: 0xd713cdb00> Adding SwitcherScene overlay for: <SBAppLayout: 0xd6a05c500; primary: com.meetnsplit.app.dev:default; environment: main>, animated: YES
+default	18:07:40.049196+1100	locationd	{"msg":"#CLIUA AppMonitor notification", "notification":"ForegroundRunning", "pid":75725, "bundleId":"com.meetnsplit.app.dev", "ClientKey":"icom.meetnsplit.app.dev:"}
+default	18:07:40.049225+1100	locationd	{"msg":"#CLIUA Marking change", "clientKey":"icom.meetnsplit.app.dev:", "reason":"Process state from RunningBoard", "AssertionLevel":"kCLClientInUseLevelDirectUserEngagement", "coming":1}
+default	18:07:40.049249+1100	locationd	{"msg":"#CLIUA updating AssertionRecord", "ClientKey":"icom.meetnsplit.app.dev:", "AssertionLevel":"kCLClientInUseLevelNotInUse"}
+default	18:07:40.049269+1100	locationd	{"msg":"#CLIUA AssertionRecord updated", "ClientKey":"icom.meetnsplit.app.dev:", "AssertionLevel":"kCLClientInUseLevelDirectUserEngagement"}
+default	18:07:40.049283+1100	locationd	{"msg":"#CLIUA in-use level changed for client", "ClientKey":"icom.meetnsplit.app.dev:"}
+default	18:07:40.049298+1100	locationd	{"msg":"#Warning #ClientResolution the passed keyPath is not registered. Resolving to #nullCKP", "InputCKP":"icom.meetnsplit.app.dev:"}
+default	18:07:40.049866+1100	accessoryd	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.049937+1100	accessoryd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.050364+1100	accessoryd	Posting application state change {
+    ACCPlatformApplicationStateDisplayIDKey = "com.meetnsplit.app.dev";
+    ACCPlatformApplicationStateKey = 8;
+    ACCPlatformApplicationStateProcessIDKey = 75725;
+}
+default	18:07:40.050467+1100	accessoryd	handling app state change notification {
+    ACCPlatformApplicationStateDisplayIDKey = "com.meetnsplit.app.dev";
+    ACCPlatformApplicationStateKey = 8;
+    ACCPlatformApplicationStateProcessIDKey = 75725;
+}
+default	18:07:40.051192+1100	UserEventAgent	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.051353+1100	UserEventAgent	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.054018+1100	misagent	Sending E4246468-C3CA-4C36-89AB-AC72A6341A77 - *[expo] com.meetnsplit.app.dev AppStore 2025-10-05T11:01:11.866Z
+default	18:07:40.054075+1100	SpringBoard	_updatePreferences <Switcher>: {
+    associatedSceneIdentifiersToSuppressInSystemAperture: (
+        sceneID:com.meetnsplit.app.dev-default
+    );
+    associatedBundleIdentifiersToSuppressInSystemAperture: (
+        com.meetnsplit.app.dev
+    );
+}
+default	18:07:40.054651+1100	SpringBoard	modifying scene setting userInterfaceStyle to Light displayIdentity: Main forSceneManagers: Main <SBDeviceApplicationSceneHandle: 0xd775e3100; sceneID: sceneID:com.meetnsplit.app.dev-default; scenePointer: 0x0>
+default	18:07:40.068006+1100	SpringBoard	Returning cached initialization context for com.meetnsplit.app.dev
+default	18:07:40.068339+1100	lsd	[FBSSystemService][0x5872] Request successful: <BSProcessHandle: 0x68b3a8f90; MeetNSplitDev:75725; valid: YES>
+default	18:07:40.068454+1100	SpringBoard	[0xd77b34c00:(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] Initialized with connection: 0xd6a4b3960.
+default	18:07:40.068465+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Registered new scene: <FBUIApplicationWorkspaceScene: 0xd77b34c00; (FBSceneManager):sceneID:com.meetnsplit.app.dev-default> (fromRemnant = 0)
+default	18:07:40.068473+1100	SpringBoard	[(FBSceneManager):sceneID:com.meetnsplit.app.dev-default][1] Scene activated.
+default	18:07:40.068480+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Workspace interruption policy did change: reconnect
+default	18:07:40.068520+1100	SpringBoard	<StateMachine:0xd79c346c0> Created with presentation environment: <0xd6c5d8bd0:<_UISceneKeyboardProxyLayerForwardingPresentationScene: 0xd6c5d8bd0> Tracking scene: <FBScene: 0xd76c21b00; FBSceneManager:sceneID:com.meetnsplit.app.dev-default>>
+default	18:07:40.068526+1100	SpringBoard	<BSCompoundAssertion:0xd791eb500> (SBApplicationAppProtectionAssistant: 0xd743b8d40 - com.meetnsplit.app.dev) acquire for reason:NULL scene acq:0xd6ba25440 count:1
+default	18:07:40.068557+1100	SpringBoard	scene will become FG visible for <APApplication: com.meetnsplit.app.dev>
+default	18:07:40.068588+1100	SpringBoard	auth result for <APApplication: com.meetnsplit.app.dev>: true (null)
+default	18:07:40.068723+1100	runningboardd	Acquiring assertion targeting [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] from originator [osservice<com.apple.SpringBoard>:35] with description <RBSAssertionDescriptor| "com.apple.frontboard.after-life.interrupted" ID:34-35-465873 target:75725 attributes:[
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"AfterLife-Interrupted" sourceEnvironment:"(null)">
+	]>
+default	18:07:40.068732+1100	runningboardd	Assertion 34-35-465873 (target:[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]) will be created as inactive as originator process has not exited
+default	18:07:40.069006+1100	SpringBoard	[com.apple.springboard] didAddExternalForegroundApplicationSceneHandle pid:75725 scene:com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default now:<recentPIDs: [75725]; recentSceneIdentityTokensByPID: {75725: [com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default]}>
+default	18:07:40.069108+1100	SpringBoard	[coordinator] didAddExternalForegroundApplicationSceneHandle pid:75725 scene:com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default now:<recentPIDs: [75725]; recentSceneIdentityTokensByPID: {75725: [com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default]}>
+default	18:07:40.069129+1100	SpringBoard	Now tracking: <FBScene: 0xd76c21b00; FBSceneManager:sceneID:com.meetnsplit.app.dev-default>
+default	18:07:40.069211+1100	SpringBoard	[sceneID:com.meetnsplit.app.dev-default] Setting deactivation reasons to: 'systemAnimation' for reason: scene settings update - settings are eligible for deactivation reasons.
+default	18:07:40.069242+1100	SpringBoard	[(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] scene content state changed: preparing
+default	18:07:40.069715+1100	SpringBoard	[0xd77b34c00:(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] Scene lifecycle state did change: Foreground
+default	18:07:40.069760+1100	SpringBoard	[0xd77b34c00:(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] Scene state did change: FV-Focal[100].
+default	18:07:40.070061+1100	runningboardd	Acquiring assertion targeting [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] from originator [osservice<com.apple.SpringBoard>:35] with description <RBSAssertionDescriptor| "FBWorkspace (FV-Focal[100])" ID:34-35-465874 target:75725 attributes:[
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"SuspendableLPRunReason-Resume" sourceEnvironment:"(null)">,
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"Visibility" sourceEnvironment:"(null)">,
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"SuspendableRole-UIFocal" sourceEnvironment:"(null)">,
+	<RBSDomainAttribute| domain:"com.apple.frontboard" name:"SuspendableJetsamPriority-Foreground" sourceEnvironment:"(null)">
+	]>
+default	18:07:40.070089+1100	runningboardd	Assertion 34-35-465874 (target:[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]) will be created as active
+default	18:07:40.070480+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Workspace state did change: XX-None[0] --> FV-Focal[100] (assertion acquired).
+default	18:07:40.071110+1100	runningboardd	Calculated state for app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>: running-active (role: UserInteractiveFocal) (endowments: <private>)
+default	18:07:40.071260+1100	SpringBoard	[Main (EmbeddedDisplay)] dispatch event:
+<SBTransitionSwitcherModifierEvent: 0xd7d373800; type: MainTransition; transitionID: AE2DB408-8BCF-492C-BA58-4FDA48F5CD22; phase: Prepare; animated: YES; fromAppLayout: <SBAppLayout: 0xd711a5400; primary: com.apple.TestFlight:default; environment: main>; toAppLayout: <SBAppLayout: 0xd6a05c500; primary: com.meetnsplit.app.dev:default; environment: main>; pendingTermination: {(
+)}; morphingPIPLayoutRole: undefined; previousDesktopItems: {(
+)}>
+default	18:07:40.071329+1100	cameracaptured	<<<< FigCaptureDisplayLayoutMonitor >>>> -[FigCaptureDisplayLayoutMonitor _parseFBSDisplayLayout:]: <FigCaptureDisplayLayoutMonitor: 0xc96cb0d20 Main Display> <FBSDisplayLayout: 0xc97828e80; displayIdentity: Main> {    bounds = {{0, 0}, {390, 844}};    interfaceOrientation = "portrait (1)";    backlightLevel = 100;    backlightState = 2;    elements = {        <SBSDisplayLayoutElement: 0xc99f64c40; sceneID:com.meetnsplit.app.dev-default; bundleID: com.meetnsplit.app.dev; frame: {{0, 0}, {390, 844}}; level: 1; role: primary>;    }    timestamp = 6 October 2025 at 6:07:40 pm AEDT;}
+default	18:07:40.071336+1100	cameracaptured	<<<< FigCaptureDisplayLayoutMonitor >>>> -[FigCaptureDisplayLayoutMonitor _updateObserversWithLayout:]: <FigCaptureDisplayLayoutMonitor: 0xc96cb0d20 Main Display> <FigCaptureDisplayLayout: 0xc9782aa40 10-06-2025 18:07:40, Main Display, foreground:[com.meetnsplit.app.dev]>
+default	18:07:40.071634+1100	gamepolicyd	Identified game com.meetnsplit.app.dev GM:false DPS:false SEM:Unsupported MMA:true
+default	18:07:40.079077+1100	SpringBoard	nw_path_evaluator_start [B1739A9A-ED79-4057-ACBC-6134EDF14525 <NULL> generic, bundle id: com.meetnsplit.app.dev, pid: 75725, attribution: developer]
+	path: <private>
+default	18:07:40.079360+1100	wifid	-[WiFiUserInteractionMonitor setApplicationRunningState:foregroundState:andNetworkingState:forBundleId:]: com.meetnsplit.app.dev entered foreground
+default	18:07:40.079516+1100	SpringBoard	[Main (EmbeddedDisplay)] dispatch event:
+<SBTransitionSwitcherModifierEvent: 0xd7d373800; type: MainTransition; transitionID: AE2DB408-8BCF-492C-BA58-4FDA48F5CD22; phase: Animate; animated: YES; fromAppLayout: <SBAppLayout: 0xd711a5400; primary: com.apple.TestFlight:default; environment: main>; toAppLayout: <SBAppLayout: 0xd6a05c500; primary: com.meetnsplit.app.dev:default; environment: main>; pendingTermination: {(
+)}; morphingPIPLayoutRole: undefined; previousDesktopItems: {(
+)}>
+default	18:07:40.079575+1100	wifid	WiFiDeviceManagerCatsSetLowLatencyApp: CATSUpdate en0: fgApp:com.meetnsplit.app.dev b=0x0 rc=0
+default	18:07:40.079593+1100	wifid	WiFiDeviceManagerCatsSetForegroundApp: CATSUpdate en0: fgApp:com.meetnsplit.app.dev hs=1 t=1 rc=0
+default	18:07:40.086210+1100	SpringBoard	Application process state changed for com.meetnsplit.app.dev: <SBApplicationProcessState: 0xd70b820a0; pid: 75725; taskState: Running; visibility: Foreground>
+default	18:07:40.086688+1100	SpringBoard	Returning cached initialization context for com.meetnsplit.app.dev
+default	18:07:40.089839+1100	MeetNSplitDev	[0x1047617b0] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon.system
+default	18:07:40.089848+1100	MeetNSplitDev	[0x1050a0000] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon
+default	18:07:40.092005+1100	MeetNSplitDev	[com.meetnsplit.app.dev] Creating a user notification center
+default	18:07:40.097199+1100	MeetNSplitDev	[C:1] Alloc com.apple.frontboard.systemappservices
+default	18:07:40.097664+1100	MeetNSplitDev	[0x1050a0140] activating connection: mach=false listener=false peer=false name=(anonymous)
+default	18:07:40.098289+1100	MeetNSplitDev	Creating new assertion because there is no existing background assertion.
+default	18:07:40.098295+1100	MeetNSplitDev	Creating new background assertion
+default	18:07:40.098458+1100	MeetNSplitDev	Created new background assertion <BKSProcessAssertion: 0x10476d120>
+default	18:07:40.098464+1100	MeetNSplitDev	Initializing connection
+default	18:07:40.098503+1100	MeetNSplitDev	Removing all cached process handles
+default	18:07:40.098674+1100	MeetNSplitDev	Creating connection to com.apple.runningboard
+default	18:07:40.098707+1100	MeetNSplitDev	[0x1050a0280] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+default	18:07:40.099193+1100	MeetNSplitDev	Sending handshake request attempt #1 to server
+default	18:07:40.099334+1100	runningboardd	Setting client for [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] as ready
+default	18:07:40.099354+1100	SpringBoard	Fetching initialization context for: com.meetnsplit.app.dev
+default	18:07:40.099359+1100	SpringBoard	Returning cached initialization context for com.meetnsplit.app.dev
+default	18:07:40.099366+1100	SpringBoard	Returning cached initialization context for com.meetnsplit.app.dev
+default	18:07:40.100167+1100	MeetNSplitDev	Handshake succeeded
+default	18:07:40.100220+1100	MeetNSplitDev	Identity resolved as app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>
+default	18:07:40.100261+1100	runningboardd	Acquiring assertion targeting [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] from originator [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] with description <RBSAssertionDescriptor| "Shared Background Assertion 0 for com.meetnsplit.app.dev" ID:34-75725-465876 target:75725 attributes:[
+	<RBSLegacyAttribute| requestedReason:FinishTask reason:FinishTask flags:( PreventTaskSuspend )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+default	18:07:40.100310+1100	runningboardd	Assertion 34-75725-465876 (target:[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]) will be created as inactive as start-time-defining assertions exist
+default	18:07:40.101002+1100	MeetNSplitDev	Incrementing reference count for background assertion <private>
+default	18:07:40.101008+1100	MeetNSplitDev	Created background task <private>.
+default	18:07:40.101021+1100	MeetNSplitDev	Realizing settings extension _UIApplicationSceneKeyboardSettings on FBSSceneSettings
+default	18:07:40.101249+1100	MeetNSplitDev	Cache loaded with 6210 pre-cached in CacheData and 78 items in CacheExtra.
+default	18:07:40.101255+1100	MeetNSplitDev	Realizing settings extension <_UISceneOcclusionSettings> on FBSSceneSettings
+default	18:07:40.101717+1100	MeetNSplitDev	Realizing settings extension <_UISceneInterfaceProtectionSettings> on FBSSceneSettings
+default	18:07:40.101758+1100	MeetNSplitDev	Realizing settings extension _UISceneLayoutPreferencesHostSettingsExtension on FBSSceneSettings
+default	18:07:40.102335+1100	MeetNSplitDev	Deactivation reason added: 10; deactivation reasons: 0 -> 1024; animating application lifecycle event: 0
+default	18:07:40.102344+1100	MeetNSplitDev	activating monitor for service com.apple.frontboard.open
+default	18:07:40.102350+1100	backboardd	Connection added: IOHIDEventSystemConnection uuid:3B612CA0-333C-43DF-95F1-1E0F3706C54D pid:75725 process:MeetNSplitDev type:Passive entitlements:0x0 caller:BackBoardServices: <redacted> + 280 attributes:{
+    HighFrequency = 1;
+    bundleID = "com.meetnsplit.app.dev";
+    pid = 75725;
+} state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+default	18:07:40.102361+1100	MeetNSplitDev	activating monitor for service com.apple.frontboard.workspace-service
+default	18:07:40.102376+1100	MeetNSplitDev	FBSWorkspace registering source: <private>
+default	18:07:40.102400+1100	backboardd	Adding client connection: <BKHIDClientConnection: 0xaecbdf4c0; IOHIDEventSystemConnectionRef: 0xaf1b97a00; vpid: 75725(v32F93); taskPort: 0xAEA83; bundleID: com.meetnsplit.app.dev> for client: IOHIDEventSystemConnection uuid:3B612CA0-333C-43DF-95F1-1E0F3706C54D pid:75725 process:MeetNSplitDev type:Passive entitlements:0x0 caller:BackBoardServices: <redacted> + 280 attributes:{
+    HighFrequency = 1;
+    bundleID = "com.meetnsplit.app.dev";
+    pid = 75725;
+} state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+default	18:07:40.102525+1100	MeetNSplitDev	Realizing settings extension _UISceneSafeAreaSettingsExtension on FBSSceneSettings
+default	18:07:40.102562+1100	backboardd	Layout ID: sceneID:com.meetnsplit.app.dev-default Bundle ID: com.meetnsplit.app.dev Role: 1
+default	18:07:40.103780+1100	MeetNSplitDev	Realizing settings extension _UISceneLayoutPreferenceClientSettingsExtension on FBSSceneClientSettings
+default	18:07:40.103786+1100	MeetNSplitDev	FBSWorkspace connected to endpoint : <private>
+default	18:07:40.103794+1100	MeetNSplitDev	<FBSWorkspaceScenesClient:0x10509c6e0 <private>> attempting immediate handshake from activate
+default	18:07:40.103806+1100	MeetNSplitDev	<FBSWorkspaceScenesClient:0x10509c6e0 <private>> sent handshake
+default	18:07:40.104449+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Connection established.
+default	18:07:40.104468+1100	MeetNSplitDev	Added observer for process assertions expiration warning: <_RBSExpirationWarningClient: 0x1050ea760>
+default	18:07:40.104481+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] created proxy of <BSXPCServiceConnectionProxy<FBSWorkspaceServiceServerInterface>: 0xd6d939b20>
+default	18:07:40.104837+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Connection to remote process established!
+default	18:07:40.105093+1100	SpringBoard	[0xd77b34c00:(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] Sending scene action [Logical Activate][0xac57] to process 0xd77a2cc00 (watchdog: 19.93s)
+default	18:07:40.105113+1100	SpringBoard	[0xd77b34c00:(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] Sending scene create.
+default	18:07:40.105856+1100	MeetNSplitDev	Evaluated capturing state as 0 on <UIScreen: 0x1050a08c0> for initial
+default	18:07:40.105874+1100	MeetNSplitDev	Realizing settings extension <_UIHomeAffordanceHostSceneSettings> on FBSSceneSettings
+default	18:07:40.106002+1100	SpringBoard	Application process state changed for com.meetnsplit.app.dev: <SBApplicationProcessState: 0xd70c3ede0; pid: 75725; taskState: Running; visibility: Foreground>
+default	18:07:40.106030+1100	MeetNSplitDev	Realizing settings extension _UISystemShellSceneHostingEnvironmentSettings on FBSSceneSettings
+default	18:07:40.106069+1100	MeetNSplitDev	Realizing settings extension _UISceneRenderingEnvironmentSettings on FBSSceneSettings
+default	18:07:40.106157+1100	MeetNSplitDev	Realizing settings extension <_UISceneRenderingEnvironmentClientSettings> on FBSSceneClientSettings
+default	18:07:40.106250+1100	SpringBoard	SceneWorkspaceDelegate[0xd72ffc2c0-com.apple.SpringBoard.SceneWorkspace.PrototypeTools] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106260+1100	MeetNSplitDev	Realizing settings extension <_UISceneTransitioningHostSettings> on FBSSceneSettings
+default	18:07:40.106268+1100	SpringBoard	SceneWorkspaceDelegate[0xd72fc2320-com.apple.SpringBoard.SceneWorkspace.DruidUI] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106282+1100	SpringBoard	SceneWorkspaceDelegate[0xd72fc28c0-com.apple.SpringBoard.SceneWorkspace.FullKeyboardAccessUI] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106293+1100	MeetNSplitDev	Realizing settings extension <_UISceneFocusSystemSettings> on FBSSceneSettings
+default	18:07:40.106300+1100	SpringBoard	SceneWorkspaceDelegate[0xd72ffc160-com.apple.SpringBoard.SceneWorkspace.AudioHUD] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106311+1100	SpringBoard	SceneWorkspaceDelegate[0xd72f5f9c0-com.apple.SpringBoard.SceneWorkspace.PerfPowerHUD] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106323+1100	SpringBoard	SceneWorkspaceDelegate[0xd72fc25e0-com.apple.SpringBoard.SceneWorkspace.InputUI] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106328+1100	SpringBoard	SceneWorkspaceDelegate[0xd72fc3e40-com.apple.SpringBoard.SceneWorkspace.AssistiveTouchUI] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106334+1100	SpringBoard	SceneWorkspaceDelegate[0xd72fc2480-com.apple.SpringBoard.SceneWorkspace.OverlayUI] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106340+1100	SpringBoard	SceneWorkspaceDelegate[0xd72fc2dc0-com.apple.SpringBoard.SceneWorkspace.VoiceControlUI] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106369+1100	SpringBoard	SceneWorkspaceDelegate[0xd72f5fd60-com.apple.SpringBoard.SceneWorkspace.EyedropperUI] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106379+1100	SpringBoard	SceneWorkspaceDelegate[0xd72ffc000-com.apple.SpringBoard.SceneWorkspace.InternalPerfPowerHUD] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106425+1100	MeetNSplitDev	Realizing settings extension <_UISceneMainMenuSettings> on FBSSceneSettings
+default	18:07:40.106435+1100	SpringBoard	SceneWorkspaceDelegate[0xd72f5c560-com.apple.SpringBoard.SceneWorkspace.Moments] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106484+1100	SpringBoard	SceneWorkspaceDelegate[0xd72fc3fa0-com.apple.SpringBoard.SceneWorkspace.AccessibilityUIServerUI] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106503+1100	SpringBoard	SceneWorkspaceDelegate[0xd72fc3660-com.apple.SpringBoard.SceneWorkspace.LiveTranscriptionUI] client did connect with handshake: <FBSceneClientHandshake:0xd6f6db1e0; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] remnants=0>
+default	18:07:40.106517+1100	MeetNSplitDev	Realizing settings extension _UISceneOrientationSettingsExtension on FBSSceneSettings
+default	18:07:40.106539+1100	MeetNSplitDev	Realizing settings extension _UISceneOrientationClientSettingsExtension on FBSSceneClientSettings
+default	18:07:40.106559+1100	MeetNSplitDev	Realizing settings extension _UISceneWindowingControlClientSettings on FBSSceneClientSettings
+default	18:07:40.106580+1100	MeetNSplitDev	Realizing settings extension <_UISceneHostingContentSizePreferenceClientSettings> on FBSSceneClientSettings
+default	18:07:40.106595+1100	MeetNSplitDev	Realizing settings extension _UISceneHostingTraitCollectionPropagationSettings on FBSSceneSettings
+default	18:07:40.106626+1100	MeetNSplitDev	Realizing settings extension <_UISceneHostingSheetPresentationSettings> on FBSSceneSettings
+default	18:07:40.106652+1100	MeetNSplitDev	Realizing settings extension <_UISceneHostingSheetPresentationClientSettings> on FBSSceneClientSettings
+default	18:07:40.106717+1100	MeetNSplitDev	Realizing settings extension <_UISceneHostingEventDeferringSettings> on FBSSceneSettings
+default	18:07:40.106803+1100	MeetNSplitDev	Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneSettings
+default	18:07:40.106823+1100	MeetNSplitDev	Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneClientSettings
+default	18:07:40.106841+1100	MeetNSplitDev	Realizing settings extension <_UISceneHostingViewControllerPreferencePropagationClientSettings> on FBSSceneClientSettings
+default	18:07:40.106879+1100	MeetNSplitDev	Realizing settings extension <_UISceneZoomTransitionSettings> on FBSSceneSettings
+default	18:07:40.106895+1100	MeetNSplitDev	Realizing settings extension FBSSceneSettingsCore on FBSSceneSettings
+default	18:07:40.108108+1100	MeetNSplitDev	Realizing settings extension FBSSceneClientSettingsCore on FBSSceneClientSettings
+default	18:07:40.108524+1100	MeetNSplitDev	UIMutableApplicationSceneSettings setting counterpart class: UIApplicationSceneSettings
+default	18:07:40.108541+1100	MeetNSplitDev	UIMutableApplicationSceneClientSettings setting counterpart class: UIApplicationSceneClientSettings
+default	18:07:40.108643+1100	MeetNSplitDev	Realizing settings extension FBSSceneTransitionContextCore on FBSSceneTransitionContext
+default	18:07:40.111238+1100	bluetoothd	SystemUI unknown identifier: 'sceneID:com.meetnsplit.app.dev-default' / 'com.meetnsplit.app.dev'
+default	18:07:40.111429+1100	SpringBoard	MRNowPlayingAudioFormatController foreground bundle id changed: com.meetnsplit.app.dev
+default	18:07:40.114310+1100	MeetNSplitDev	Evaluated capturing state as 0 on <UIScreen: 0x1050a08c0> for CADisplay KVO
+default	18:07:40.114507+1100	MeetNSplitDev	Read CategoryName: per-app = 1, category name = (null)
+default	18:07:40.114597+1100	MeetNSplitDev	Read CategoryName: per-app = 0, category name = (null)
+default	18:07:40.119836+1100	SpringBoard	[com.meetnsplit.app.dev] Foreground app will not request ephemeral notifications isAppClip: NO wantsEphemeral notifications: NO
+default	18:07:40.120971+1100	SpringBoard	[com.meetnsplit.app.dev] com.meetnsplit.app.dev application state changed to <RBSProcessState| task:running-active debug:none endowmentNamespace:[
+	com.apple.frontboard.visibility
+	]>
+default	18:07:40.121094+1100	SpringBoard	Move topics from NonWaking to Enabled: (
+    "com.meetnsplit.app.dev"
+)
+default	18:07:40.127327+1100	symptomsd	com.meetnsplit.app.dev: Foreground: true
+default	18:07:40.141228+1100	SpringBoard	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.141272+1100	CommCenter	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.141314+1100	audiomxd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.141736+1100	dasd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.142112+1100	gamepolicyd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-NotVisible
+default	18:07:40.142647+1100	watchdogd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.142836+1100	useractivityd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.143074+1100	WirelessRadioManagerd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.143234+1100	PerfPowerServices	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.143493+1100	callservicesd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.143671+1100	wifid	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.143865+1100	backboardd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.144038+1100	locationd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.144162+1100	accessoryd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.144326+1100	symptomsd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.144494+1100	UserEventAgent	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.164304+1100	MeetNSplitDev	[FBSDisplaySource 1-1] silently connecting raw configuration: <FBSDisplayConfiguration: 0x1050a4000; Main; mode: "390x844@3x 60Hz p3 SDR">
+default	18:07:40.164762+1100	MeetNSplitDev	Display settings after update from FB configuration: AXMDisplay<0x1052312d0>: Backing:FrontBoardServices (dynamic) Name:LCD scale:3 size:[1170.00 2532.00] orientation:0 (AXMPhysicalDisplayOrientationPortrait) refBounds:[0.00 0.00 390.00 844.00] deepColor:1
+default	18:07:40.164782+1100	MeetNSplitDev	Display settings after update from CADisplay.mainDisplay: AXMDisplay<0x105230d90>: Backing:CoreAnimation Name:LCD scale:3 size:[1170.00 2532.00] orientation:0 (AXMPhysicalDisplayOrientationPortrait) refBounds:[0.00 0.00 390.00 844.00] deepColor:0
+default	18:07:40.176280+1100	MeetNSplitDev	Registering for test daemon availability notify post.
+default	18:07:40.176414+1100	MeetNSplitDev	notify_get_state check indicated test daemon not ready.
+default	18:07:40.176460+1100	MeetNSplitDev	notify_get_state check indicated test daemon not ready.
+default	18:07:40.176523+1100	MeetNSplitDev	notify_get_state check indicated test daemon not ready.
+default	18:07:40.176700+1100	MeetNSplitDev	Selected display: name=LCD (primary), id=1
+default	18:07:40.194567+1100	MeetNSplitDev	Will add backgroundTask with taskName: <private>, expirationHandler: <__NSGlobalBlock__: 0x20a8ad990>
+default	18:07:40.195060+1100	MeetNSplitDev	Reusing background assertion <BKSProcessAssertion: 0x10476d120>
+default	18:07:40.195070+1100	MeetNSplitDev	Incrementing reference count for background assertion <private>
+default	18:07:40.195072+1100	MeetNSplitDev	Created background task <private>.
+default	18:07:40.195076+1100	MeetNSplitDev	Deactivation reason added: 5; deactivation reasons: 1024 -> 1056; animating application lifecycle event: 1
+default	18:07:40.195158+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.195171+1100	MeetNSplitDev	Should send trait collection or coordinate space update, interface style 1 -> 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.195513+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.196072+1100	MeetNSplitDev	Initializing: <_UIHomeAffordanceSceneNotifier: 0x1053a7e90>; with scene: <UIWindowScene: 0x1047775f0>
+default	18:07:40.196113+1100	MeetNSplitDev	0x1053becd0 setDelegate:<0x1053bed90 _UIBacklightEnvironment> hasDelegate:YES for environment:sceneID:com.meetnsplit.app.dev-default
+default	18:07:40.196183+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.196229+1100	MeetNSplitDev	[0x1053a7e20] Initialized with scene: <UIWindowScene: 0x1047775f0>; behavior: <_UIEventDeferringBehavior_iOS: 0x10533ad20>; availableForProcess: 1, systemShellManagesKeyboardFocus: 1
+default	18:07:40.196439+1100	MeetNSplitDev	[C:2] Alloc com.apple.backboard.hid-services.xpc
+default	18:07:40.196453+1100	MeetNSplitDev	[0x1050a0dc0] activating connection: mach=false listener=false peer=false name=(anonymous)
+default	18:07:40.197226+1100	MeetNSplitDev	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x10505f000; process scope; status: none> was:none
+default	18:07:40.197246+1100	MeetNSplitDev	Setting default evaluation strategy for UIUserInterfaceIdiomPhone to LastOneWins
+default	18:07:40.197274+1100	MeetNSplitDev	BKSHIDEventObserver - connection activation
+default	18:07:40.197593+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.197777+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+fault	18:07:40.197967+1100	MeetNSplitDev	`UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+default	18:07:40.198070+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.198184+1100	MeetNSplitDev	sceneOfRecord: sceneID: sceneID:com.meetnsplit.app.dev-default  persistentID: F5131C3A-BB3D-4F39-A03F-990BF03197E2
+default	18:07:40.198317+1100	MeetNSplitDev	Ignoring already applied deactivation reason: 5; deactivation reasons: 1056
+default	18:07:40.198328+1100	MeetNSplitDev	Deactivation reason added: 11; deactivation reasons: 1056 -> 3104; animating application lifecycle event: 1
+default	18:07:40.198333+1100	MeetNSplitDev	startConnection
+default	18:07:40.198889+1100	MeetNSplitDev	[0x1050a1f40] activating connection: mach=true listener=false peer=false name=com.apple.UIKit.KeyboardManagement.hosted
+default	18:07:40.199172+1100	MeetNSplitDev	You've implemented -[<UIApplicationDelegate> application:didReceiveRemoteNotification:fetchCompletionHandler:], but you still need to add "remote-notification" to the list of your supported UIBackgroundModes in your Info.plist.
+default	18:07:40.199995+1100	SpringBoard	RX com.meetnsplit.app.dev(75725) startArbitration
+    expectedState:(null)
+    focusContext:<private>
+    hostingPIDs:<private> usingFence:Y withSuppression:0
+default	18:07:40.200349+1100	SpringBoard	set focusRequestedHandle:<com.meetnsplit.app.dev focus:(null) run:Y hosting:() level:0 active:N wantedState:Disabled #suppr:0 iavHeight:0 onScreen:N>
+default	18:07:40.200577+1100	SpringBoard	[coordinator] using MRU target <com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default pid:75725>
+default	18:07:40.200583+1100	SpringBoard	[coordinator] informing scene controller 'com.apple.springboard' of focusTarget: <com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default pid:75725>
+default	18:07:40.200855+1100	SpringBoard	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.200880+1100	SpringBoard	[com.apple.springboard] coalition says I have focus; enforcing policy: {
+    keyboardFocusTarget: <com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default pid:75725>;
+    selectionPolicy: KeyboardArbiter;
+    shouldSuppressRemoteDeferring: 0;
+}
+default	18:07:40.201004+1100	SpringBoard	rules: (keyboardFocus) outbound target changed from:(null) to <com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default pid:75725>
+default	18:07:40.201035+1100	SpringBoard	rules: (keyboardFocus) defer (<com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard pid:35>) -> <com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default pid:75725>
+default	18:07:40.201746+1100	SpringBoard	[coordinator] new enforced policy: {
+    keyboardFocusTarget: <com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default pid:75725>;
+    selectionPolicy: KeyboardArbiter;
+    shouldSuppressRemoteDeferring: 0;
+}
+default	18:07:40.201960+1100	SpringBoard	[coordinator] keyboard arbiter suggested <nothing> and we replied <com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default pid:75725>
+default	18:07:40.202404+1100	SpringBoard	rules: (scene setting) ADDED keyboardFocus environment to scene: sceneID:com.meetnsplit.app.dev-default
+default	18:07:40.202482+1100	backboardd	new deferring rules for pid:35: [
+    [35-21D8]; <keyboardFocus; builtin; …board.systemappservices/FBSceneManager:com.apple.springboard>; () -> <token: 0xA2BDB617; pid: 35>; reason: …gin event deferring in keyboardFocus for window: 0xd713e0800,
+    [35-2]; <system; builtin; SBMainSystemGestures>; () -> <token: 0xC614579B; pid: 35>; reason: systemGestureSymbol-Main,
+    [35-1]; <system; builtin>; () -> <token: 0xC614579B; pid: 35>; reason: systemGestures-Main,
+    [35-21DE]; <keyboardFocus; …board.systemappservices/FBSceneManager:com.apple.springboard>; () -> <token: …ices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default; pid: 75725>; reason: SpringBoard<com.apple.springboard>: enforcing outbound,
+    [35-4]; <keyboardFocus; SBKeyboardFocus>; () -> <token: …board.systemappservices/FBSceneManager:com.apple.springboard; pid: 35>; reason: SB incoming to root scene (symbol),
+    [35-5]; <systemKeyCommandOverlay>; () -> <token: 0xA9EE47F2; pid: 35>; reason: systemKeyCommandOverlayEnvironment to root scene,
+    [35-
+default	18:07:40.202529+1100	backboardd	[keyboardFocus 0xaf1838690] setRules:forPID(35): [
+    [35-21D8]; <keyboardFocus; builtin; com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard>; () -> <token: 0xA2BDB617; pid: 35>; reason: SBWindowScene: 0xd731b1180: Begin event deferring in keyboardFocus for window: 0xd713e0800,
+    [35-21DE]; <keyboardFocus; com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard>; () -> <token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default; pid: 75725>; reason: SpringBoard<com.apple.springboard>: enforcing outbound,
+    [35-4]; <keyboardFocus; SBKeyboardFocus>; () -> <token: com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard; pid: 35>; reason: SB incoming to root scene (symbol),
+    [35-3]; <keyboardFocus>; () -> <token: com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard; pid: 35>; reason: SB incoming to root scene
+]
+default	18:07:40.202986+1100	backboardd	[keyboardFocus 0xaf18386e0] setRules:forPID(35): [
+    [35-21D8]; <keyboardFocus; builtin; com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard>; () -> <token: 0xA2BDB617; pid: 35>; reason: SBWindowScene: 0xd731b1180: Begin event deferring in keyboardFocus for window: 0xd713e0800,
+    [35-21DE]; <keyboardFocus; com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard>; () -> <token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default; pid: 75725>; reason: SpringBoard<com.apple.springboard>: enforcing outbound,
+    [35-4]; <keyboardFocus; SBKeyboardFocus>; () -> <token: com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard; pid: 35>; reason: SB incoming to root scene (symbol),
+    [35-3]; <keyboardFocus>; () -> <token: com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard; pid: 35>; reason: SB incoming to root scene
+]
+default	18:07:40.204782+1100	backboardd	chain did update (setDeferringRules) <keyboardFocus; display: null> containsEndOfChain: YES; [
+    <token: com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard; pid: 35>,
+    <token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default; pid: 75725>
+]
+default	18:07:40.205363+1100	backboardd	chain did update (setDeferringRules) <keyboardFocus; display: builtin> containsEndOfChain: YES; [
+    <token: com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard; pid: 35>,
+    <token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default; pid: 75725>
+]
+default	18:07:40.205653+1100	MeetNSplitDev	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x10505f000; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default; status: target> was:none
+default	18:07:40.238765+1100	MeetNSplitDev	networkd_settings_read_from_file initialized networkd settings by reading plist directly
+default	18:07:40.238909+1100	MeetNSplitDev	networkd_settings_read_from_file initialized networkd settings by reading plist directly
+default	18:07:40.251302+1100	MeetNSplitDev	Realizing settings extension <_UIApplicationSceneDisplaySettings> on FBSSceneSettings
+default	18:07:40.255703+1100	MeetNSplitDev	<UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2) Scene updated orientation preferences: none -> ( Pu )
+default	18:07:40.255752+1100	MeetNSplitDev	Key window API is scene-level: YES
+default	18:07:40.255836+1100	MeetNSplitDev	UIWindowScene: 0x1047775f0: Window became key in scene: UIWindow: 0x1050d8000; contextId: 0xBD00122D: reason: UIWindowScene: 0x1047775f0: Window requested to become key in scene: 0x1050d8000
+default	18:07:40.255852+1100	MeetNSplitDev	Key window needs update: 1; currentKeyWindowScene: 0x0; evaluatedKeyWindowScene: 0x1047775f0; currentApplicationKeyWindow: 0x0; evaluatedApplicationKeyWindow: 0x1050d8000; reason: UIWindowScene: 0x1047775f0: Window requested to become key in scene: 0x1050d8000
+default	18:07:40.255871+1100	MeetNSplitDev	Window did become application key: UIWindow: 0x1050d8000; contextId: 0xBD00122D; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default
+default	18:07:40.255878+1100	MeetNSplitDev	[0x1053a7e20] Begin local event deferring requested for token: 0x10505e640; environments: 1; reason: UIWindowScene: 0x1047775f0: Begin event deferring in keyboardFocus for window: 0x1050d8000
+default	18:07:40.256320+1100	MeetNSplitDev	BKSHIDEventDeliveryManager - connection activation
+default	18:07:40.256356+1100	MeetNSplitDev	Deactivation reason removed: 10; deactivation reasons: 3104 -> 2080; animating application lifecycle event: 1
+default	18:07:40.256470+1100	SpringBoard	RX com.meetnsplit.app.dev(75725) setClientFocusContext
+    focusContext:<contextID:3170898477 sceneID:com.meetnsplit.app.dev-default>
+default	18:07:40.256541+1100	MeetNSplitDev	Deactivation reason added: 12; deactivation reasons: 2080 -> 6176; animating application lifecycle event: 1
+default	18:07:40.256568+1100	SpringBoard	[coordinator] gen:7662 handling new keyboard arbiter request pid: 75725 sceneIdentity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default
+default	18:07:40.256576+1100	SpringBoard	arbiter: arbiter requested pid 75725 / com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default
+default	18:07:40.256587+1100	SpringBoard	[coordinator] using arbiter suggested pid 75725 + scene: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default
+default	18:07:40.256593+1100	MeetNSplitDev	Deactivation reason removed: 11; deactivation reasons: 6176 -> 4128; animating application lifecycle event: 1
+default	18:07:40.256599+1100	SpringBoard	[coordinator] informing scene controller 'com.apple.springboard' of focusTarget: <com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default pid:75725>
+default	18:07:40.256613+1100	MeetNSplitDev	Realizing settings extension <_UISceneIntelligenceSupportSettings> on FBSSceneSettings
+default	18:07:40.256719+1100	SpringBoard	[coordinator] keyboard arbiter suggested <pid: 75725; sceneIdentity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default> and we replied <com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default pid:75725>
+default	18:07:40.258086+1100	SpringBoard	set currentFocus PID:75725 sceneIdentity:com.meetnsplit.app.dev-default
+default	18:07:40.258219+1100	backboardd	new deferring rules for pid:75725: [[75725-1]; <keyboardFocus; builtin; …ices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default>; () -> <token: 0xBD00122D; pid: 75725>; reason: …gin event deferring in keyboardFocus for window: 0x1050d8000]
+default	18:07:40.258363+1100	backboardd	[keyboardFocus 0xaf1838690] setRules:forPID(75725): [[75725-1]; <keyboardFocus; builtin; com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default>; () -> <token: 0xBD00122D; pid: 75725>; reason: UIWindowScene: 0x1047775f0: Begin event deferring in keyboardFocus for window: 0x1050d8000]
+default	18:07:40.258548+1100	MeetNSplitDev	establishing connection to agent
+default	18:07:40.258554+1100	MeetNSplitDev	[0x1053dc280] Session created.
+default	18:07:40.258562+1100	MeetNSplitDev	[0x1053dc280] Session created from connection [0x107c94b40]
+default	18:07:40.258569+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.258732+1100	MeetNSplitDev	[0x107c94b40] activating connection: mach=true listener=false peer=false name=com.apple.uiintelligencesupport.agent
+default	18:07:40.258887+1100	MeetNSplitDev	[0x1053dc280] Session activated
+default	18:07:40.258989+1100	backboardd	[keyboardFocus 0xaf18386e0] setRules:forPID(75725): [[75725-1]; <keyboardFocus; builtin; com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default>; () -> <token: 0xBD00122D; pid: 75725>; reason: UIWindowScene: 0x1047775f0: Begin event deferring in keyboardFocus for window: 0x1050d8000]
+default	18:07:40.259188+1100	SpringBoard	[0xd77b34c00:(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] Scene action [Logical Activate][0xac57] completed with success: 1
+default	18:07:40.259485+1100	MeetNSplitDev	Create activity from XPC object <nw_activity 50:1 [6BC902E6-7E41-45C0-BF30-7D52EF730947] (reporting strategy default)>
+default	18:07:40.259545+1100	MeetNSplitDev	Create activity from XPC object <nw_activity 50:2 [C3D91C1E-0D07-4598-8EA8-C116BE581E92] (reporting strategy default)>
+default	18:07:40.259557+1100	MeetNSplitDev	Set activity <nw_activity 50:1 [6BC902E6-7E41-45C0-BF30-7D52EF730947] (reporting strategy default)> as the global parent
+default	18:07:40.259568+1100	backboardd	new scene host settings: contextID:BD00122D <sceneID:com.meetnsplit.app.dev-default> unspecified -> foreground
+default	18:07:40.259691+1100	MeetNSplitDev	AggregateDictionary is deprecated and has been removed. Please migrate to Core Analytics.
+default	18:07:40.259701+1100	MeetNSplitDev	Ending background task with UIBackgroundTaskIdentifier: 1
+default	18:07:40.259717+1100	MeetNSplitDev	Ending task with identifier 1 and description: <private>, _expireHandler: (null)
+default	18:07:40.259731+1100	MeetNSplitDev	Decrementing reference count for assertion <private> (used by background task with identifier 1: <private>)
+default	18:07:40.260198+1100	MeetNSplitDev	Event Timing Profile for Touch: ok, path="/System/Library/EventTimingProfiles/D17.Touch.plist"
+default	18:07:40.260205+1100	MeetNSplitDev	Event Timing Profile for Pencil: not found, path="/System/Library/EventTimingProfiles/D17.Pencil.plist"
+default	18:07:40.260210+1100	MeetNSplitDev	Target list changed: <CADisplay:LCD primary>
+default	18:07:40.260230+1100	MeetNSplitDev	sceneOfRecord: sceneID: sceneID:com.meetnsplit.app.dev-default  persistentID: F5131C3A-BB3D-4F39-A03F-990BF03197E2
+default	18:07:40.260253+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.261394+1100	SpringBoard	[(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] scene content state changed: ready
+default	18:07:40.261400+1100	backboardd	chain did update (setDeferringRules) <keyboardFocus; display: null; compatibilityDisplay: builtin> containsEndOfChain: YES; [
+    <token: com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard; pid: 35>,
+    <token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default; pid: 75725>,
+    <token: 0xBD00122D; pid: 75725>
+]
+default	18:07:40.261406+1100	backboardd	chain did update (setDeferringRules) <keyboardFocus; display: builtin> containsEndOfChain: YES; [
+    <token: com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard; pid: 35>,
+    <token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default; pid: 75725>,
+    <token: 0xBD00122D; pid: 75725>
+]
+default	18:07:40.261426+1100	SpringBoard	[(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] Setting parent scene: (FBSceneManager):com.apple.springboard
+default	18:07:40.261455+1100	SpringBoard	[(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] propagating 5 settings from (FBSceneManager):com.apple.springboard
+default	18:07:40.261814+1100	MeetNSplitDev	policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x10505f000; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default; status: ancestor> was:target
+default	18:07:40.262943+1100	runningboardd	Acquiring assertion targeting [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725](UIScene:com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default) from originator [osservice<com.apple.SpringBoard>:35] with description <RBSAssertionDescriptor| "injecting  inherited from 'UIScene:com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard'" ID:34-35-465878 target:75725<UIScene:com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default> attributes:[
+	<RBSHereditaryGrant| endowmentNamespace:com.apple.boardservices.endpoint-injection UIScene:com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard>,
+	<RBSHereditaryGrant| endowmentNamespace:com.apple.frontboard.visibility UIScene:com.apple.frontboard.systemappservices/FBSceneManager:com.apple.springboard>
+	]>
+default	18:07:40.263663+1100	runningboardd	Assertion 34-35-465878 (target:[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725](UIScene:com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default)) will be created as active
+default	18:07:40.264015+1100	runningboardd	Calculated state for app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>: running-active (role: UserInteractiveFocal) (endowments: <private>)
+default	18:07:40.264072+1100	runningboardd	Inheritance changeset: <RBSInheritanceChangeSet| gained:{(
+    <RBSInheritance| environment:UIScene:com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default name:com.apple.frontboard.visibility origID:34-35-465878 payload 787277310668334110>
+)} lost:{(
+)}>
+default	18:07:40.264166+1100	SpringBoard	[(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] Removing parent scene.
+default	18:07:40.264199+1100	SpringBoard	[(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] Setting parent scene: (FBSceneManager):com.apple.springboard
+default	18:07:40.264322+1100	SpringBoard	[(FBSceneManager):sceneID:com.meetnsplit.app.dev-default] propagating 5 settings from (FBSceneManager):com.apple.springboard
+default	18:07:40.264518+1100	CommCenter	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.264563+1100	audiomxd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.264569+1100	SpringBoard	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.264755+1100	MeetNSplitDev	Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x1047775f0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default
+default	18:07:40.264781+1100	MeetNSplitDev	[0x1053a7e20] Scene target of event deferring environments did update: scene: 0x1047775f0; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+default	18:07:40.264789+1100	MeetNSplitDev	Scene became target of keyboard event deferring environment: UIWindowScene: 0x1047775f0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default
+default	18:07:40.264796+1100	MeetNSplitDev	Stack[KeyWindow] 0x1053bf630: Migrate scenes from LastOneWins -> SystemShellManaged
+default	18:07:40.264801+1100	MeetNSplitDev	Setting default evaluation strategy for UIUserInterfaceIdiomPhone to SystemShellManaged
+default	18:07:40.265135+1100	SpringBoard	[Main (EmbeddedDisplay)] dispatch event:
+<SBSceneReadySwitcherModifierEvent: 0xd6d3d97a0; type: SceneReady; appLayout: <SBAppLayout: 0xd6a05c500; primary: com.meetnsplit.app.dev:default; environment: main> {
+    configuration = full;
+    environment = main;
+    centerConfiguration = undefined;
+    preferredDisplayOrdinal = 0;
+    continuousExposeIdentifier = com.meetnsplit.app.dev;
+    layoutItems = {
+        primary = <SBDisplayItem: 0xd776e88c0; type: App; bundleIdentifier: com.meetnsplit.app.dev; uniqueIdentifier: sceneID:com.meetnsplit.app.dev-default>;
+    }
+}>
+default	18:07:40.268259+1100	MeetNSplitDev	sceneOfRecord: sceneID: sceneID:com.meetnsplit.app.dev-default  persistentID: F5131C3A-BB3D-4F39-A03F-990BF03197E2
+default	18:07:40.268347+1100	callservicesd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.268573+1100	MeetNSplitDev	Realizing settings extension SBUISecureRenderingSettingsExtension on FBSSceneSettings
+default	18:07:40.268743+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.268913+1100	MeetNSplitDev	sceneOfRecord: sceneID: sceneID:com.meetnsplit.app.dev-default  persistentID: F5131C3A-BB3D-4F39-A03F-990BF03197E2
+default	18:07:40.269181+1100	MeetNSplitDev	[0x1053a7e20] Scene target of event deferring environments did update: scene: 0x1047775f0; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+default	18:07:40.269243+1100	MeetNSplitDev	Scene became target of keyboard event deferring environment: UIWindowScene: 0x1047775f0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default
+default	18:07:40.269433+1100	MeetNSplitDev	startConnection
+default	18:07:40.269484+1100	MeetNSplitDev	handleKeyboardChange: set currentKeyboard:N (wasKeyboard:N)
+default	18:07:40.269974+1100	MeetNSplitDev	forceReloadInputViews
+default	18:07:40.270243+1100	MeetNSplitDev	Reloading input views for key-window scene responder: <(null): 0x0; > force:Y
+default	18:07:40.270256+1100	MeetNSplitDev	isWritingToolsHandlingKeyboardTracking:Y (WT ready:Y, Arbiter ready:Y)
+default	18:07:40.272969+1100	gamepolicyd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-NotVisible
+default	18:07:40.274806+1100	dasd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.275286+1100	watchdogd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.278486+1100	WirelessRadioManagerd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.279429+1100	MeetNSplitDev	[0x107c94000] activating connection: mach=true listener=false peer=false name=com.apple.distributed_notifications@1v3
+default	18:07:40.279516+1100	MeetNSplitDev	[0x107c94640] activating connection: mach=true listener=false peer=false name=com.apple.distributed_notifications@1v3
+default	18:07:40.279562+1100	backboardd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.279680+1100	wifid	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.280195+1100	MeetNSplitDev	[0x107c94780] activating connection: mach=true listener=false peer=false name=com.apple.contactsd
+default	18:07:40.280363+1100	MeetNSplitDev	[0x107c943c0] activating connection: mach=true listener=false peer=false name=com.apple.tccd
+default	18:07:40.280431+1100	locationd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.280735+1100	tccd	AUTHREQ_ATTRIBUTION: msgID=75725.1, attribution={requesting={TCCDProcess: identifier=com.meetnsplit.app.dev, pid=75725, auid=501, euid=501, binary_path=/private/var/containers/Bundle/Application/FF79BE25-A772-4BDA-B6BB-8CACB4E0E3A1/MeetNSplitDev.app/MeetNSplitDev}, },
+default	18:07:40.280843+1100	PerfPowerServices	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.280875+1100	symptomsd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.281038+1100	useractivityd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.281128+1100	accessoryd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.281353+1100	tccd	AUTHREQ_SUBJECT: msgID=75725.1, subject=com.meetnsplit.app.dev,
+default	18:07:40.281493+1100	UserEventAgent	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.282757+1100	MeetNSplitDev	[0x107c943c0] invalidated after the last release of the connection object
+default	18:07:40.286084+1100	MeetNSplitDev	[0x107c943c0] activating connection: mach=true listener=false peer=false name=com.apple.fontservicesd
+default	18:07:40.339744+1100	MeetNSplitDev	Not internal release, disabling SIRL
+default	18:07:40.339751+1100	MeetNSplitDev	SecSecurityClientGet new thread!
+default	18:07:40.339828+1100	MeetNSplitDev	System Keychain Always Supported set via feature flag to disabled
+default	18:07:40.339853+1100	MeetNSplitDev	[0x107c94c80] activating connection: mach=true listener=false peer=false name=com.apple.securityd
+error	18:07:40.340197+1100	MeetNSplitDev	'❌ Environment validation failed:', [Error: Production QR_SERVICE_SECRET must be properly configured]
+error	18:07:40.342897+1100	MeetNSplitDev	[runtime not ready]: Error: Production QR_SERVICE_SECRET must be properly configured, js engine: hermes
+error	18:07:40.342989+1100	MeetNSplitDev	Unhandled JS Exception: [runtime not ready]: Error: Production QR_SERVICE_SECRET must be properly configured, js engine: hermes
+error	18:07:40.344120+1100	MeetNSplitDev	[runtime not ready]: Error: Production QR_SERVICE_SECRET must be properly configured, js engine: hermes
+default	18:07:40.344381+1100	MeetNSplitDev	[0x1053fcc00] activating connection: mach=true listener=false peer=false name=com.apple.usernotifications.remotenotificationservice
+default	18:07:40.347146+1100	SpringBoard	[com.meetnsplit.app.dev] Request per-app token with token identifier 843FC560-71B3-406F-AE8A-975249C6FA2E
+default	18:07:40.349349+1100	SpringBoard	Received same per-app token [32] for topic com.meetnsplit.app.dev
+default	18:07:40.349355+1100	SpringBoard	Send per-app token [32] to client for topic com.meetnsplit.app.dev
+default	18:07:40.349371+1100	SpringBoard	[com.meetnsplit.app.dev] Sending received device token to 0 connections
+default	18:07:40.349390+1100	SpringBoard	[com.meetnsplit.app.dev] Sending received device token to 1 connections
+default	18:07:40.349837+1100	MeetNSplitDev	SecSecurityClientGet new thread!
+default	18:07:40.351489+1100	MeetNSplitDev	Initializing NSHTTPCookieStorage singleton
+default	18:07:40.351881+1100	MeetNSplitDev	Initializing CFHTTPCookieStorage singleton
+default	18:07:40.351931+1100	MeetNSplitDev	Creating default cookie storage with default identifier
+default	18:07:40.352350+1100	MeetNSplitDev	Requesting container lookup; class = 13, identifier = <private>, group_identifier = <private>, create = 1, temp = 0, euid = 501, uid = 501
+default	18:07:40.354021+1100	MeetNSplitDev	_container_query_get_result_at_index: success
+default	18:07:40.354203+1100	MeetNSplitDev	container_system_group_path_for_identifier: success
+default	18:07:40.358160+1100	MeetNSplitDev	Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> resuming, timeouts(0.0, 604800.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+default	18:07:40.359006+1100	MeetNSplitDev	Task <D0E534ED-1200-42E1-A600-08F7F01F5B7B>.<2> resuming, timeouts(0.0, 604800.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+default	18:07:40.359085+1100	MeetNSplitDev	-[SOConfigurationClient init]  on <private>
+default	18:07:40.359189+1100	MeetNSplitDev	[0x107c94dc0] activating connection: mach=true listener=false peer=false name=com.apple.AppSSO.service-xpc
+default	18:07:40.359230+1100	MeetNSplitDev	<SOServiceConnection: 0x107eec460>: new XPC connection
+default	18:07:40.359328+1100	MeetNSplitDev	-[SOConfigurationVersion checkVersion] config version changed from from 0x0000000000000000 to 0x00000199AA66189D on <private>
+default	18:07:40.359342+1100	MeetNSplitDev	-[SOConfigurationClient _reloadConfig]  on <private>
+default	18:07:40.359380+1100	MeetNSplitDev	-[SOClient configurationWithCompletion:]  on <private>
+default	18:07:40.360369+1100	MeetNSplitDev	configurationWithCompletion: success = YES, error = (null)
+default	18:07:40.365813+1100	runningboardd	Acquiring assertion targeting [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] from originator [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] with description <RBSAssertionDescriptor| "com.apple.CFNetwork.StorageDB" ID:34-75725-465881 target:75725 attributes:[
+	<RBSDomainAttribute| domain:"com.apple.common" name:"FinishTaskUninterruptable" sourceEnvironment:"(null)">,
+	<RBSAcquisitionCompletionAttribute| policy:AfterApplication>
+	]>
+default	18:07:40.365942+1100	runningboardd	Assertion 34-75725-465881 (target:[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]) will be created as inactive as start-time-defining assertions exist
+default	18:07:40.375741+1100	MeetNSplitDev	<nw_activity 50:1 [6BC902E6-7E41-45C0-BF30-7D52EF730947] (global parent) (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 360ms
+default	18:07:40.375900+1100	MeetNSplitDev	<nw_activity 50:2 [C3D91C1E-0D07-4598-8EA8-C116BE581E92] (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 360ms
+default	18:07:40.375941+1100	MeetNSplitDev	Unsetting the global parent activity <nw_activity 50:1 [6BC902E6-7E41-45C0-BF30-7D52EF730947] (global parent) (reporting strategy default) complete (reason success)>
+default	18:07:40.375946+1100	MeetNSplitDev	Unset the global parent activity
+default	18:07:40.402054+1100	MeetNSplitDev	Initializing AlternativeServices Storage singleton
+default	18:07:40.403918+1100	MeetNSplitDev	kExcludedFromBackupXattrName set on path: <private>
+default	18:07:40.427239+1100	MeetNSplitDev	Garbage collection for alternative services
+default	18:07:40.427406+1100	MeetNSplitDev	Connection 0: creating secure tcp or quic connection
+default	18:07:40.428195+1100	MeetNSplitDev	Task <D0E534ED-1200-42E1-A600-08F7F01F5B7B>.<2> waiting for setup of Connection 1
+default	18:07:40.428204+1100	MeetNSplitDev	Connection 1: enabling TLS
+default	18:07:40.428211+1100	MeetNSplitDev	Connection 1: starting, TC(0x0)
+default	18:07:40.428251+1100	MeetNSplitDev	[C1 EAB4676E-EEEF-4E91-B0D7-D14727578930 Hostname#9319c23d:443 quic-connection, url hash: d1a9ccae, definite, attribution: developer, context: com.apple.CFNetwork.NSURLSession.{74A8B128-97DA-4EA2-8C38-AE02B6268E2E}{(null)}{Y}{2}{0x0} (private), proc: 4E05AEE0-6A23-358B-A086-7EC739EB49E2, delegated upid: 0] start
+default	18:07:40.428302+1100	MeetNSplitDev	[C1 Hostname#9319c23d:443 initial parent-flow ((null))] event: path:start @0.000s
+default	18:07:40.428572+1100	MeetNSplitDev	[C1 Hostname#9319c23d:443 waiting parent-flow (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:satisfied @0.000s, uuid: 540E4808-E9D8-47D8-B9A4-5DB31B0B0A6D
+default	18:07:40.428678+1100	MeetNSplitDev	[C1 Hostname#9319c23d:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:start_connect @0.000s
+default	18:07:40.428692+1100	MeetNSplitDev	nw_connection_report_state_with_handler_on_nw_queue [C1] reporting state preparing
+default	18:07:40.428729+1100	MeetNSplitDev	[C1 Hostname#9319c23d:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:start_child @0.000s
+default	18:07:40.428762+1100	MeetNSplitDev	[C1.1 Hostname#9319c23d:443 initial path ((null))] event: path:start @0.000s
+default	18:07:40.428869+1100	MeetNSplitDev	[C1.1 Hostname#9319c23d:443 waiting path (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:satisfied @0.000s, uuid: 540E4808-E9D8-47D8-B9A4-5DB31B0B0A6D
+default	18:07:40.428898+1100	MeetNSplitDev	[C1.1 Hostname#9319c23d:443 in_progress transform (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: transform:start @0.000s
+default	18:07:40.429096+1100	MeetNSplitDev	[C1.1.1 Hostname#9319c23d:443 initial path ((null))] event: path:start @0.000s
+default	18:07:40.429486+1100	MeetNSplitDev	[C1.1.1 Hostname#9319c23d:443 waiting path (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:satisfied @0.001s, uuid: E3159EFA-977C-477F-8132-38DA811CF930
+default	18:07:40.429519+1100	MeetNSplitDev	[C1.1.1 Hostname#9319c23d:443 in_progress resolver (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: resolver:start_dns @0.001s
+default	18:07:40.429585+1100	MeetNSplitDev	[0x107c957c0] activating connection: mach=true listener=false peer=false name=com.apple.dnssd.service
+default	18:07:40.429661+1100	mDNSResponder	[R181079] getaddrinfo start -- flags: 0xC000D000, ifindex: 0, protocols: 0, hostname: <mask.hash: '0KzxFSx9lZqEc5rQG4vNvw=='>, options: 0x8 {use-failover}, client pid: 75725 (MeetNSplitDev)
+default	18:07:40.429742+1100	MeetNSplitDev	Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> setting up Connection 1
+default	18:07:40.430138+1100	mDNSResponder	[R181079] getaddrinfo stop -- hostname: <mask.hash: '0KzxFSx9lZqEc5rQG4vNvw=='>, client pid: 75725 (MeetNSplitDev)
+default	18:07:40.430422+1100	MeetNSplitDev	nw_endpoint_resolver_update [C1.1.1 Hostname#9319c23d:443 in_progress resolver (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] Adding endpoint handler for IPv4#669ad1ef:443
+default	18:07:40.430465+1100	MeetNSplitDev	[C1.1.1 Hostname#9319c23d:443 in_progress resolver (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: resolver:receive_dns @0.002s
+default	18:07:40.430526+1100	MeetNSplitDev	[C1.1.1.1 IPv4#669ad1ef:443 initial path ((null))] event: path:start @0.002s
+default	18:07:40.430751+1100	MeetNSplitDev	[C1.1.1.1 IPv4#669ad1ef:443 waiting path (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:satisfied @0.002s, uuid: 22FAFC6B-3D61-46C2-BFAA-FADC4B25CC3B
+default	18:07:40.430792+1100	MeetNSplitDev	[C1.1.1.1 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:start_nexus @0.002s
+default	18:07:40.430820+1100	kernel	SK[5]: flow_entry_alloc               fe "0 proc MeetNSplitDev(75725) nx_port 16 flow_uuid EC2F7A78-3D54-48B8-9AF3-EB8C2BDCC0C8 flags 0x130<TRACK,CONNECTED,QOS_MARKING> ipver=4,src=<IPv4-redacted>.64129,dst=<IPv4-redacted>.443,proto=0x17 mask=0x0000003f,hash=0x2b270200 tp_proto=0x253"
+default	18:07:40.430947+1100	MeetNSplitDev	[C1.1.1.1 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:receive_nexus @0.002s
+default	18:07:40.432380+1100	MeetNSplitDev	quic_conn_initialize_inner [C1.1.1.1:2] [-46dc9cce1b5aa5cc] created QUIC connection (spin bit enabled)
+default	18:07:40.432755+1100	kernel	SK[5]: __channel_open                 MeetNSplitDev(75725) nx_port 16 fd 10 fsw_en0[16]_MeetNSplitDev.75725
+default	18:07:40.432847+1100	MeetNSplitDev	[C1.1.1.1 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:start_connect @0.004s
+default	18:07:40.433135+1100	MeetNSplitDev	quic_crypto_new_flow [C1.1.1.1:2] [-46dc9cce1b5aa5cc] TLS stream is: [C2]
+default	18:07:40.433141+1100	MeetNSplitDev	[C2 5C159C9E-32A6-4506-829D-86F059453467 IPv4#669ad1ef:443 quic-connection, url hash: d1a9ccae, tls, definite, attribution: developer, context: com.apple.CFNetwork.NSURLSession.{74A8B128-97DA-4EA2-8C38-AE02B6268E2E}{(null)}{Y}{2}{0x0} (private), proc: 4E05AEE0-6A23-358B-A086-7EC739EB49E2, delegated upid: 0] start
+default	18:07:40.433162+1100	MeetNSplitDev	[C2 IPv4#669ad1ef:443 initial socket-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:start @0.000s
+default	18:07:40.433181+1100	MeetNSplitDev	[C2 IPv4#669ad1ef:443 waiting socket-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:satisfied @0.000s, uuid: 22FAFC6B-3D61-46C2-BFAA-FADC4B25CC3B
+default	18:07:40.433209+1100	MeetNSplitDev	[C2 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:start_connect @0.000s
+default	18:07:40.433216+1100	MeetNSplitDev	nw_connection_report_state_with_handler_on_nw_queue [C2] reporting state preparing
+default	18:07:40.433470+1100	MeetNSplitDev	nw_flow_connected [C2 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] Transport protocol connected (quic-connection)
+default	18:07:40.433480+1100	MeetNSplitDev	[C2 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:finish_transport @0.000s
+default	18:07:40.433592+1100	MeetNSplitDev	boringssl_session_apply_protocol_options_for_transport_block_invoke_2(2280) [C2:1][0x107e9f4e0] TLS configured [min_version(0x0304) max_version(0x0304) name(redacted) tickets(false) false_start(false) enforce_ev(false) enforce_ats(false) ats_non_pfs_ciphersuite_allowed(false) ech(false) pqtls(true), pake(false)]
+default	18:07:40.433613+1100	MeetNSplitDev	boringssl_context_info_handler(2377) [C2:1][0x107e9f4e0] Client handshake started
+default	18:07:40.433722+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS client enter_early_data
+default	18:07:40.433837+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS client read_server_hello
+default	18:07:40.446281+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client read_hello_retry_request
+default	18:07:40.446299+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client read_server_hello
+default	18:07:40.446432+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client read_encrypted_extensions
+default	18:07:40.446477+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client read_certificate_request
+default	18:07:40.448301+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client read_server_certificate
+default	18:07:40.448314+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client read_server_certificate_verify
+default	18:07:40.448398+1100	MeetNSplitDev	boringssl_context_evaluate_trust_async(1820) [C2:1][0x107e9f4e0] Performing external trust evaluation
+default	18:07:40.448409+1100	MeetNSplitDev	boringssl_context_evaluate_trust_async_external(1805) [C2:1][0x107e9f4e0] Asyncing for external verify block
+default	18:07:40.448442+1100	MeetNSplitDev	Connection 1: asked to evaluate TLS Trust
+default	18:07:40.448601+1100	MeetNSplitDev	Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> auth completion disp=1 cred=0x0
+default	18:07:40.448734+1100	MeetNSplitDev	(Trust 0x109c07c00) No pending evals, starting
+default	18:07:40.448766+1100	MeetNSplitDev	[0x107c95b80] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+default	18:07:40.448854+1100	MeetNSplitDev	[0x107c95cc0] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+default	18:07:40.448934+1100	MeetNSplitDev	(Trust 0x109c07c00) Completed async eval kickoff
+default	18:07:40.451286+1100	MeetNSplitDev	(Trust 0x109c07c00) trustd returned 4
+default	18:07:40.451333+1100	MeetNSplitDev	System Trust Evaluation yielded status(0)
+default	18:07:40.451344+1100	MeetNSplitDev	(Trust 0x109c07780) No pending evals, starting
+default	18:07:40.451386+1100	MeetNSplitDev	[0x107c95e00] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+default	18:07:40.451539+1100	MeetNSplitDev	(Trust 0x109c07780) Completed async eval kickoff
+default	18:07:40.451561+1100	MeetNSplitDev	[0x107c95cc0] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+default	18:07:40.452863+1100	MeetNSplitDev	(Trust 0x109c07780) trustd returned 4
+default	18:07:40.452888+1100	MeetNSplitDev	Connection 1: TLS Trust result 0
+default	18:07:40.452913+1100	MeetNSplitDev	boringssl_context_evaluate_trust_async_external_block_invoke_3(1760) [C2:1][0x107e9f4e0] Returning from external verify block with result: true
+default	18:07:40.452965+1100	MeetNSplitDev	boringssl_context_certificate_verify_callback(2001) [C2:1][0x107e9f4e0] Certificate verification result: OK
+default	18:07:40.452977+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client read_server_finished
+default	18:07:40.452994+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client send_end_of_early_data
+default	18:07:40.453002+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client send_client_encrypted_extensions
+default	18:07:40.453022+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client send_client_certificate
+default	18:07:40.453032+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client complete_second_flight
+default	18:07:40.453147+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS 1.3 client done
+default	18:07:40.453155+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS client finish_client_handshake
+default	18:07:40.453167+1100	MeetNSplitDev	boringssl_context_info_handler(2394) [C2:1][0x107e9f4e0] Client handshake state: TLS client done
+default	18:07:40.453176+1100	MeetNSplitDev	boringssl_context_info_handler(2383) [C2:1][0x107e9f4e0] Client handshake done
+default	18:07:40.453336+1100	MeetNSplitDev	nw_protocol_boringssl_signal_connected(778) [C2:1][0x107e9f4e0] TLS connected [server(0) version(0x0304) ciphersuite(TLS_AES_256_GCM_SHA384) group(0x001d) signature_alg(0x0804) alpn(h3) resumed(0) offered_ticket(0) in_early_data(0) early_data_accepted(0) false_started(0) ocsp_received(0) sct_received(0) connect_time(20ms) flight_time(13ms) rtt(13ms) write_stalls(0) read_stalls(5) pake(0x0000)]
+default	18:07:40.453368+1100	MeetNSplitDev	nw_flow_connected [C2 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] Output protocol connected (tls)
+default	18:07:40.453413+1100	MeetNSplitDev	[C2 IPv4#669ad1ef:443 ready channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:finish_connect @0.020s
+default	18:07:40.453493+1100	MeetNSplitDev	nw_connection_report_state_with_handler_on_nw_queue [C2] reporting state ready
+default	18:07:40.453501+1100	MeetNSplitDev	[C2 IPv4#669ad1ef:443 ready channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:changed_viability @0.020s
+default	18:07:40.453514+1100	MeetNSplitDev	[0x107c95e00] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+default	18:07:40.453874+1100	MeetNSplitDev	quic_pmtud_restart [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] PMTUD enabled, max PMTU: 1500, header size: 28, current PMTU 1228
+default	18:07:40.453898+1100	MeetNSplitDev	quic_crypto_tls_ready_inner [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] QUIC connection established in 20.988 ms, RTT 10.887 ms
+default	18:07:40.453907+1100	MeetNSplitDev	nw_flow_connected [C1.1.1.1 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] Transport protocol connected (quic-connection)
+default	18:07:40.453947+1100	MeetNSplitDev	[C1.1.1.1 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:finish_transport @0.025s
+default	18:07:40.453982+1100	MeetNSplitDev	nw_flow_connected [C1.1.1.1 IPv4#669ad1ef:443 in_progress channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] Output protocol connected (CFNetworkConnection-1676285662)
+default	18:07:40.454145+1100	MeetNSplitDev	[C1.1.1.1 IPv4#669ad1ef:443 ready channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:child_finish_connect @0.025s
+default	18:07:40.454206+1100	MeetNSplitDev	[C1.1.1 Hostname#9319c23d:443 ready resolver (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:child_finish_connect @0.025s
+default	18:07:40.454224+1100	MeetNSplitDev	[C1.1 Hostname#9319c23d:443 ready transform (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:child_finish_connect @0.025s
+default	18:07:40.454303+1100	MeetNSplitDev	[C1.1.1.1 IPv4#669ad1ef:443 ready channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:changed_viability @0.025s
+default	18:07:40.454336+1100	MeetNSplitDev	[C1.1.1 Hostname#9319c23d:443 ready resolver (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:changed_viability @0.025s
+default	18:07:40.454355+1100	MeetNSplitDev	[C1.1 Hostname#9319c23d:443 ready transform (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:changed_viability @0.025s
+default	18:07:40.454364+1100	MeetNSplitDev	nw_flow_connected [C1 IPv4#669ad1ef:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] Output protocol connected (endpoint_flow)
+default	18:07:40.454389+1100	MeetNSplitDev	[C1 IPv4#669ad1ef:443 ready parent-flow (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:finish_connect @0.026s
+default	18:07:40.454456+1100	MeetNSplitDev	nw_connection_report_state_with_handler_on_nw_queue [C1] reporting state ready
+default	18:07:40.454468+1100	MeetNSplitDev	[C1 IPv4#669ad1ef:443 ready parent-flow (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: flow:changed_viability @0.026s
+default	18:07:40.454474+1100	MeetNSplitDev	nw_connection_send_viability_changed_on_nw_queue [C1] viability_changed_handler(true)
+default	18:07:40.454559+1100	MeetNSplitDev	quic_migration_path_event_block_invoke [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] path 61fc28b51c3f48d8 over en0 received event established
+default	18:07:40.454627+1100	MeetNSplitDev	quic_migration_evaluate_primary [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] promoted path 0x109d44a80 over en0 to primary
+default	18:07:40.454641+1100	MeetNSplitDev	nw_protocol_instance_report_ready [C1.1.1.1:2] Calling notify with interface <private> for flow_registration <private>
+default	18:07:40.454718+1100	MeetNSplitDev	[C1.1.1.1 IPv4#669ad1ef:443 ready channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:migrated @0.026s, uuid: 22FAFC6B-3D61-46C2-BFAA-FADC4B25CC3B
+default	18:07:40.454750+1100	MeetNSplitDev	[C1.1.1 Hostname#9319c23d:443 ready resolver (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:migrated @0.026s, uuid: E3159EFA-977C-477F-8132-38DA811CF930
+default	18:07:40.454804+1100	MeetNSplitDev	[C1.1 Hostname#9319c23d:443 ready transform (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:migrated @0.026s, uuid: 540E4808-E9D8-47D8-B9A4-5DB31B0B0A6D
+default	18:07:40.454814+1100	MeetNSplitDev	[C1 IPv4#669ad1ef:443 ready parent-flow (satisfied (Path is satisfied), interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] event: path:migrated @0.026s, uuid: 540E4808-E9D8-47D8-B9A4-5DB31B0B0A6D
+default	18:07:40.454829+1100	MeetNSplitDev	quic_stream_create_inbound [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] creating inbound stream 3
+default	18:07:40.455159+1100	MeetNSplitDev	quic_migration_evaluate [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] evaluating path migration
+default	18:07:40.455252+1100	MeetNSplitDev	quic_migration_evaluate_block_invoke [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] path 61fc28b51c3f48d8 state validated (0), ifname en0, primary? 1, initial? 1, fallback? 0, preferred? 0 lossy? 0
+default	18:07:40.455270+1100	MeetNSplitDev	quic_migration_evaluate [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] current path is usable, no strong fallback or we are probing
+default	18:07:40.455280+1100	MeetNSplitDev	Connection 1: connected successfully
+default	18:07:40.455287+1100	MeetNSplitDev	Connection 1: TLS handshake complete
+default	18:07:40.455507+1100	MeetNSplitDev	Connection 1: ready C(N) E(N)
+default	18:07:40.455874+1100	MeetNSplitDev	[C1] event: client:connection_reused @0.027s
+default	18:07:40.456015+1100	MeetNSplitDev	Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> now using Connection 1
+default	18:07:40.456267+1100	MeetNSplitDev	Task <D0E534ED-1200-42E1-A600-08F7F01F5B7B>.<2> now using Connection 1
+default	18:07:40.456475+1100	MeetNSplitDev	Connection 1: received viability advisory(Y)
+default	18:07:40.456720+1100	MeetNSplitDev	0x109d45898 ID=0 Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> sent request, body S 199
+default	18:07:40.456727+1100	MeetNSplitDev	0x109d45a58 ID=4 Task <D0E534ED-1200-42E1-A600-08F7F01F5B7B>.<2> sent request, body S 199
+default	18:07:40.459146+1100	MeetNSplitDev	boringssl_context_new_session_handler(1520) [C2:1][0x107e9f4e0] Asyncing for session update block
+default	18:07:40.459178+1100	MeetNSplitDev	boringssl_context_new_session_handler(1520) [C2:1][0x107e9f4e0] Asyncing for session update block
+default	18:07:40.459254+1100	MeetNSplitDev	nw_protocol_boringssl_signal_connected(778) [C2:1][0x107e9f4e0] TLS connected [server(0) version(0x0304) ciphersuite(TLS_AES_256_GCM_SHA384) group(0x001d) signature_alg(0x0804) alpn(h3) resumed(0) offered_ticket(0) in_early_data(0) early_data_accepted(0) false_started(0) ocsp_received(0) sct_received(0) connect_time(20ms) flight_time(13ms) rtt(13ms) write_stalls(0) read_stalls(5) pake(0x0000)]
+default	18:07:40.459279+1100	MeetNSplitDev	nw_flow_connected [C2 IPv4#669ad1ef:443 ready channel-flow (satisfied (Path is satisfied), viable, interface: en0[802.11], ipv4, dns, uses wifi, LQM: good)] Output protocol connected (tls)
+default	18:07:40.459826+1100	MeetNSplitDev	boringssl_context_new_session_handler_block_invoke(1523) [C2:1][0x107e9f4e0] Returning from session update block
+default	18:07:40.459964+1100	MeetNSplitDev	boringssl_context_new_session_handler_block_invoke(1523) [C2:1][0x107e9f4e0] Returning from session update block
+default	18:07:40.470954+1100	symptomsd	Data Usage for com.meetnsplit.app.dev on flow 627047 - WiFi in/out: 109792/75660, WiFi delta_in/delta_out: 7559/6559, Cell in/out: 0/0, Cell delta_in/delta_out: 0/0, RNF: 0, subscriber tag: 10, total duration: 0.040
+default	18:07:40.508095+1100	SpringBoard	[sceneID:com.meetnsplit.app.dev-default] Setting deactivation reasons to: '(none)' for reason: updateAllScenesForBand - Assertion removed.
+default	18:07:40.509076+1100	MeetNSplitDev	Not push traits update to screen for new style 1, <UIWindowScene: 0x1047775f0> (F5131C3A-BB3D-4F39-A03F-990BF03197E2)
+default	18:07:40.509104+1100	MeetNSplitDev	sceneOfRecord: sceneID: sceneID:com.meetnsplit.app.dev-default  persistentID: F5131C3A-BB3D-4F39-A03F-990BF03197E2
+default	18:07:40.509171+1100	MeetNSplitDev	Deactivation reason removed: 12; deactivation reasons: 4128 -> 32; animating application lifecycle event: 1
+default	18:07:40.509183+1100	MeetNSplitDev	Send setDeactivating: N (-DeactivationReason:SuspendedEventsOnly)
+default	18:07:40.509530+1100	MeetNSplitDev	Deactivation reason removed: 5; deactivation reasons: 32 -> 0; animating application lifecycle event: 0
+default	18:07:40.509541+1100	MeetNSplitDev	Creating hang event with BundleID: com.meetnsplit.app.dev
+default	18:07:40.509551+1100	MeetNSplitDev	Updating event->rollingFGTimestamp from INVALID_FOREGROUND_TIMESTAMP to 8302235480227
+default	18:07:40.509566+1100	MeetNSplitDev	Updating configuration of monitor M75725-1
+default	18:07:40.509973+1100	MeetNSplitDev	[0x107c966c0] activating connection: mach=true listener=false peer=false name=com.apple.hangtracermonitor
+default	18:07:40.510402+1100	MeetNSplitDev	Skip setting user action callback for 3rd party apps
+default	18:07:40.510723+1100	MeetNSplitDev	Creating side-channel connection to com.apple.runningboard
+default	18:07:40.510756+1100	MeetNSplitDev	[0x107c96940] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+default	18:07:40.510776+1100	MeetNSplitDev	[0x107c966c0] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+default	18:07:40.510808+1100	MeetNSplitDev	CNTCCVersion2, app is coming into the foreground. reprompt? 0
+default	18:07:40.510813+1100	MeetNSplitDev	CNTCCVersion2, app is coming into the foreground. reprompt? 1
+default	18:07:40.511571+1100	SpringBoard	Received RB Notification for CPU Role change of process(75725) 'com.meetnsplit.app.dev'. Changed from (unknown) to UserInteractiveFocal at Mon Oct  6 18:07:40 2025
+default	18:07:40.511696+1100	MeetNSplitDev	Hit the server for a process handle 18c5b240000127cd that resolved to: [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.512094+1100	MeetNSplitDev	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, unknown-NotVisible
+default	18:07:40.512418+1100	SpringBoard	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.513792+1100	SpringBoard	Received RB Notification for CPU Role change of process(75725) 'com.meetnsplit.app.dev'. Changed from (unknown) to UserInteractiveFocal at Mon Oct  6 18:07:40 2025
+default	18:07:40.527153+1100	MeetNSplitDev	[0x107c94280] activating connection: mach=true listener=false peer=false name=com.apple.hangtracerd
+default	18:07:40.527491+1100	hangtracerd	Initialization complete now watching hangs for MeetNSplitDev(75725) | UIKit-runloop
+default	18:07:40.617218+1100	MeetNSplitDev	Smart invert app status cached: (null)
+default	18:07:40.638483+1100	MeetNSplitDev	[FBSDisplaySource 1-7] silently connecting raw configuration: <FBSDisplayConfiguration: 0x1050a6d00; Main; mode: "390x844@3x 60Hz p3 SDR">
+default	18:07:40.692643+1100	MeetNSplitDev	quic_stream_create_inbound [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] creating inbound stream 7 (out of order)
+default	18:07:40.693093+1100	MeetNSplitDev	quic_stream_create_inbound [C1.1.1.1:2] [-e6dc9cce1b5aa5cc] creating inbound stream 11
+default	18:07:40.697623+1100	MeetNSplitDev	0x109d45a58 ID=4 Task <D0E534ED-1200-42E1-A600-08F7F01F5B7B>.<2> received response, status 200 content K
+default	18:07:40.698193+1100	MeetNSplitDev	[0x107c96440] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+default	18:07:40.702992+1100	MeetNSplitDev	[0x107c96440] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+default	18:07:40.703476+1100	MeetNSplitDev	Task <D0E534ED-1200-42E1-A600-08F7F01F5B7B>.<2> response ended
+default	18:07:40.703823+1100	MeetNSplitDev	Task <D0E534ED-1200-42E1-A600-08F7F01F5B7B>.<2> done using Connection 1
+default	18:07:40.704157+1100	MeetNSplitDev	Task <D0E534ED-1200-42E1-A600-08F7F01F5B7B>.<2> summary for task success {transaction_duration_ms=331, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=83, request_duration_ms=0, response_start_ms=320, response_duration_ms=10, request_bytes=116, request_throughput_kbps=2199, response_bytes=229, response_throughput_kbps=173, cache_hit=true}
+default	18:07:40.704363+1100	MeetNSplitDev	0x109d45898 ID=0 Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> received response, status 200 content K
+default	18:07:40.704394+1100	MeetNSplitDev	[0x107c96440] activating connection: mach=true listener=false peer=false name=com.apple.analyticsd
+default	18:07:40.704603+1100	MeetNSplitDev	Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> response ended
+default	18:07:40.704664+1100	MeetNSplitDev	[C1] event: client:connection_idle @0.276s
+default	18:07:40.704703+1100	MeetNSplitDev	Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> done using Connection 1
+default	18:07:40.705291+1100	MeetNSplitDev	Task <D0E534ED-1200-42E1-A600-08F7F01F5B7B>.<2> finished successfully
+default	18:07:40.705440+1100	MeetNSplitDev	Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> summary for task success {transaction_duration_ms=340, response_status=200, connection=1, protocol="h3", domain_lookup_duration_ms=1, connect_duration_ms=22, secure_connection_duration_ms=20, private_relay=false, request_start_ms=91, request_duration_ms=0, response_start_ms=339, response_duration_ms=0, request_bytes=116, request_throughput_kbps=1229, response_bytes=20, response_throughput_kbps=245, cache_hit=true}
+default	18:07:40.706888+1100	MeetNSplitDev	Task <0FB72FEA-2B24-4893-8039-F428E77DE45E>.<1> finished successfully
+default	18:07:40.708194+1100	MeetNSplitDev	Ending background task with UIBackgroundTaskIdentifier: 2
+default	18:07:40.708209+1100	MeetNSplitDev	Ending task with identifier 2 and description: <private>, _expireHandler: <__NSGlobalBlock__: 0x20a8ad990>
+default	18:07:40.708271+1100	MeetNSplitDev	Decrementing reference count for assertion <private> (used by background task with identifier 2: <private>)
+default	18:07:40.708292+1100	MeetNSplitDev	Will invalidate assertion: <BKSProcessAssertion: 0x10476d120> for task identifier: 2
+default	18:07:40.708595+1100	runningboardd	Invalidating assertion 34-75725-465876 (target:[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]) from originator [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:40.709132+1100	MeetNSplitDev	[0x107c95180] activating connection: mach=true listener=false peer=false name=com.apple.lsd.mapdb
+default	18:07:40.830600+1100	SpringBoard	[Main (EmbeddedDisplay)] dispatch event:
+<SBTransitionSwitcherModifierEvent: 0xd7881b480; type: MainTransition; transitionID: AE2DB408-8BCF-492C-BA58-4FDA48F5CD22; phase: Complete; animated: YES; fromAppLayout: <SBAppLayout: 0xd711a5400; primary: com.apple.TestFlight:default; environment: main>; toAppLayout: <SBAppLayout: 0xd6a05c500; primary: com.meetnsplit.app.dev:default; environment: main>; pendingTermination: {(
+)}; morphingPIPLayoutRole: undefined; previousDesktopItems: {(
+)}>
+default	18:07:40.839777+1100	SpringBoard	Front display did change: <SBApplication: 0xd75327c00; com.meetnsplit.app.dev>
+default	18:07:40.842489+1100	appstored	[3B3D243C] getLaunchInfoForBundleID: com.meetnsplit.app.dev for client: com.apple.springboard
+default	18:07:40.850756+1100	SpringBoard	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:40.872221+1100	cameracaptured	<<<< FigCaptureDisplayLayoutMonitor >>>> -[FigCaptureDisplayLayoutMonitor _parseFBSDisplayLayout:]: <FigCaptureDisplayLayoutMonitor: 0xc96cb0d20 Main Display> <FBSDisplayLayout: 0xc975f1900; displayIdentity: Main> {    bounds = {{0, 0}, {390, 844}};    interfaceOrientation = "portrait (1)";    backlightLevel = 100;    backlightState = 2;    elements = {        <SBSDisplayLayoutElement: 0xc99f64e70; sceneID:com.meetnsplit.app.dev-default; bundleID: com.meetnsplit.app.dev; frame: {{0, 0}, {390, 844}}; level: 1; hasKeyboardFocus; role: primary>;    }    timestamp = 6 October 2025 at 6:07:40 pm AEDT;}
+default	18:07:40.872240+1100	cameracaptured	<<<< FigCaptureDisplayLayoutMonitor >>>> -[FigCaptureDisplayLayoutMonitor _updateObserversWithLayout:]: <FigCaptureDisplayLayoutMonitor: 0xc96cb0d20 Main Display> <FigCaptureDisplayLayout: 0xc975f0b40 10-06-2025 18:07:40, Main Display, foreground:[com.meetnsplit.app.dev]>
+default	18:07:40.875330+1100	bluetoothd	SystemUI unknown identifier: 'sceneID:com.meetnsplit.app.dev-default' / 'com.meetnsplit.app.dev'
+default	18:07:40.876287+1100	backboardd	Layout ID: sceneID:com.meetnsplit.app.dev-default Bundle ID: com.meetnsplit.app.dev Role: 1
+default	18:07:41.148814+1100	SpringBoard	[app<com.meetnsplit.app.dev>:75725] Dropping launch assertion.
+default	18:07:41.148914+1100	runningboardd	Invalidating assertion 34-35-465871 (target:app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>) from originator [osservice<com.apple.SpringBoard>:35]
+default	18:07:41.242728+1100	powerd	Process runningboardd.34 Released SystemIsActive "app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>34-35-465871:FBApplicationProcess" age:00:00:01  id:51539642017 [System: PrevIdle SysAct]
+default	18:07:41.242902+1100	runningboardd	Calculated state for app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>: running-active (role: UserInteractiveFocal) (endowments: <private>)
+default	18:07:41.266504+1100	SpringBoard	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.266710+1100	audiomxd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.266752+1100	CommCenter	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.269304+1100	callservicesd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.279835+1100	wifid	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.279896+1100	locationd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.280509+1100	dasd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.281797+1100	MeetNSplitDev	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, unknown-NotVisible
+default	18:07:41.282010+1100	accessoryd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.283442+1100	PerfPowerServices	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.284045+1100	UserEventAgent	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.284866+1100	WirelessRadioManagerd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.284955+1100	useractivityd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.285864+1100	symptomsd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.285958+1100	runningboardd	Acquiring assertion targeting [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] from originator [osservice<com.apple.dasd>:60757] with description <RBSAssertionDescriptor| "DAS: Application is docked." ID:34-60757-465893 target:75725 attributes:[
+	<RBSDomainAttribute| domain:"com.apple.dasd" name:"DockApp" sourceEnvironment:"(null)">
+	]>
+default	18:07:41.286211+1100	runningboardd	Assertion 34-60757-465893 (target:[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]) will be created as active
+default	18:07:41.286669+1100	backboardd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.287177+1100	watchdogd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.287408+1100	runningboardd	Calculated state for app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>: running-active (role: UserInteractiveFocal) (endowments: <private>)
+default	18:07:41.287492+1100	gamepolicyd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-NotVisible
+default	18:07:41.350069+1100	SpringBoard	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.350172+1100	CommCenter	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.350243+1100	audiomxd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.350483+1100	gamepolicyd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-NotVisible
+default	18:07:41.350536+1100	dasd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.351047+1100	watchdogd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.351222+1100	useractivityd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.351392+1100	PerfPowerServices	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.351649+1100	WirelessRadioManagerd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.351661+1100	callservicesd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.351872+1100	backboardd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.352072+1100	wifid	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.352221+1100	locationd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.352338+1100	symptomsd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.352541+1100	MeetNSplitDev	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, unknown-NotVisible
+default	18:07:41.352552+1100	accessoryd	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.352792+1100	UserEventAgent	Received state update for 75725 (app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>, running-active-Visible
+default	18:07:41.377193+1100	runningboardd	Invalidating assertion 34-75725-465881 (target:[app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]) from originator [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725]
+default	18:07:42.397022+1100	SpringBoard	[SwitcherOrientation] outSwitcherOrientation: portrait (1), outElementsOrientations: {
+    "sceneID:com.meetnsplit.app.dev-default" = 1;
+}
+default	18:07:42.413409+1100	symptomsd	Data Usage for com.meetnsplit.app.dev on flow 627047 - WiFi in/out: 110363/75817, WiFi delta_in/delta_out: 571/157, Cell in/out: 0/0, Cell delta_in/delta_out: 0/0, RNF: 0, subscriber tag: 10, total duration: 1.977
+error	18:07:45.270607+1100	SpringBoard	[<_UIKeyboardArbiterClientHandle: 0xd7140fd40; [app<com.meetnsplit.app.dev(6CCF4E76-D6C7-48BE-9882-59B6346331A7)>:75725] <<UIKBArbiterClientFocusContext: 0xd6c5f4580; contextID = bd00122d; sceneIdentity = com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.meetnsplit.app.dev-default >>; hosting PIDs {(
+)}; level 0.000000; active NO [wants NO]; suppression 0; iav 0.000000; on screen NO; isAcquiringFocus: YES>] Acquiring focus timer elapsed, clearing acquiring focus state
+default	18:07:47.958331+1100	backboardd	touchstats 100000965-<main> events starting 14.2083s ago: [
+    down: 4,
+    up: 4,
+    rangeIn: 4,
+    rangeOut: 4,
+    soft cancel: 1,
+    fromEdge: 1,
+    pathsSeen: 2 4 5 6,
+    destinations: {
+        TestFlight.75583 contextID 7897B89B: {
+            touchIDs: D2D6;
+        };
+        MeetNSplitDev.75722 contextID B64B80B1: {
+            touchIDs: D2D3;
+        };
+        SpringBoard.35 contextID A2BDB617: {
+            touchIDs: D2D4-D2D5;
+        };
+    },
+    averageProcessingTime (µs): 755.16
+]
+default	18:07:52.430150+1100	MeetNSplitDev	sceneOfRecord: sceneID: sceneID:com.meetnsplit.app.dev-default  persistentID: F5131C3A-BB3D-4F39-A03F-990BF03197E2

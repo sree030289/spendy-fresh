@@ -17,6 +17,7 @@ import {
 import { db } from '../firebase/config';
 import * as Notifications from 'expo-notifications';
 import * as Linking from 'expo-linking';
+import { ENV } from '@/config/environment';
 
 // Enhanced notification interface
 export interface AppNotification {
@@ -279,7 +280,7 @@ export class AppNotificationService {
     try {
       console.log('🤝 Accepting friend request:', friendRequestId);
       // Call your API to accept friend request
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/friends/requests/${friendRequestId}/accept`, {
+      const response = await fetch(`${ENV.api.baseURL}/friends/requests/${friendRequestId}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -297,7 +298,7 @@ export class AppNotificationService {
     try {
       console.log('❌ Declining friend request:', friendRequestId);
       // Call your API to decline friend request
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/friends/requests/${friendRequestId}/decline`, {
+      const response = await fetch(`${ENV.api.baseURL}/friends/requests/${friendRequestId}/decline`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -317,7 +318,7 @@ export class AppNotificationService {
       
       if (data.expenseId && data.canUndo) {
         // Call undo API based on the original action
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/expenses/${data.expenseId}/undo`, {
+        const response = await fetch(`${ENV.api.baseURL}/expenses/${data.expenseId}/undo`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });

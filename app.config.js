@@ -18,8 +18,8 @@ const getAppConfig = () => {
   return {
     name: isProduction ? "Meet-n-Split" : "Meet-n-Split Dev",
     slug: isProduction ? "meetnsplit" : "meetnsplit-dev",
-    bundleIdentifier: isProduction ? "com.svaag.meetnsplit" : "com.svaag.meetnsplit.dev",
-    package: isProduction ? "com.svaag.meetnsplit" : "com.svaag.meetnsplit.dev",
+    bundleIdentifier: isProduction ? "com.meetnsplit.app" : "com.meetnsplit.app.dev",
+    package: isProduction ? "com.meetnsplit.app" : "com.meetnsplit.app.dev",
     
     // Google Services files - use production files for production env
     googleServicesFile: isProduction ? "./GoogleService-Info-prod.plist" : "./GoogleService-Info.plist",
@@ -53,12 +53,12 @@ const appConfig = getAppConfig();
 export default {
   expo: {
     name: appConfig.name,
-    slug: appConfig.slug,
+    slug: "spendy",
     version: "1.0.0",
     orientation: "portrait",
     scheme: "meetnsplit",
     userInterfaceStyle: "automatic",
-    projectId: appConfig.firebase.projectId,
+    projectId: "8ba655ab-7839-4196-9893-2a71413248ed",
     icon: "./assets/icon.png",
     splash: {
       image: "./assets/splash-icon.png",
@@ -186,7 +186,7 @@ export default {
         sentryDsn: process.env.SENTRY_DSN,
       },
       eas: {
-        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || process.env.EXPO_PROJECT_ID || "8ba655ab-7839-4196-9893-2a71413248ed"
+        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || process.env.EXPO_PROJECT_ID
       }
     },
     owner: "sree030289"

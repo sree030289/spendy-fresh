@@ -52,7 +52,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.svaag.meetnsplit.dev.Monthly",
+          "productID" : "com.meetnsplit.app.dev.Monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Premium Monthly Dev",
           "subscriptionGroupID" : "21481258",
@@ -80,7 +80,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.svaag.meetnsplit.dev.Annual",
+          "productID" : "com.meetnsplit.app.dev.Annual",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Premium Yearly Dev",
           "subscriptionGroupID" : "21481258",
@@ -108,7 +108,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.svaag.meetnsplit.dev.Lifetime",
+          "productID" : "com.meetnsplit.app.dev.Lifetime",
           "recurringSubscriptionPeriod" : "P99Y",
           "referenceName" : "Premium Lifetime Dev",
           "subscriptionGroupID" : "21481258",

@@ -12,6 +12,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { ENV } from '@/config/environment';
 
 export interface FriendRequest {
   id?: string;
@@ -217,7 +218,7 @@ export class FriendNotificationService {
       };
 
       // Call your email/SMS service API
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/invites/send`, {
+      const response = await fetch(`${ENV.api.baseURL}/invites/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(inviteData)
@@ -289,7 +290,7 @@ export class FriendNotificationService {
     try {
       console.log('✅ Accepting friend request:', friendRequestId);
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/friends/requests/${friendRequestId}/accept`, {
+      const response = await fetch(`${ENV.api.baseURL}/friends/requests/${friendRequestId}/accept`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -316,7 +317,7 @@ export class FriendNotificationService {
     try {
       console.log('❌ Declining friend request:', friendRequestId);
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/friends/requests/${friendRequestId}/decline`, {
+      const response = await fetch(`${ENV.api.baseURL}/friends/requests/${friendRequestId}/decline`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

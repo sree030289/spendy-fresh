@@ -702,7 +702,8 @@ class ApiService {
   async sendSMSFriendRequest(
     recipientPhone: string, 
     message?: string, 
-    countryCode?: string
+    countryCode?: string,
+    contactName?: string // NEW: Add contact name parameter
   ): Promise<{ 
     success: boolean; 
     isRegistered?: boolean; 
@@ -714,7 +715,7 @@ class ApiService {
       smsMessage: string;
     }
   }> {
-    console.log('📱 Sending SMS friend request:', { recipientPhone, countryCode, message });
+    console.log('📱 Sending SMS friend request:', { recipientPhone, countryCode, message, contactName });
     
     if (!recipientPhone?.trim()) {
       throw new Error('Recipient phone number is required for SMS friend request');
@@ -723,7 +724,8 @@ class ApiService {
     const response = await this.request('POST', '/friends/requests/send-sms', {
       recipientPhone: recipientPhone.trim(),
       message: message || 'Sent via SMS',
-      countryCode: countryCode || 'US'
+      countryCode: countryCode || 'US',
+      contactName: contactName // Pass contact name to backend
     });
     
     console.log('📱 SMS friend request response:', response);

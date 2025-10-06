@@ -214,7 +214,7 @@ const AppNavigator = () => {
     };
 
     checkAuthenticationFlow();
-  }, [user, isLoading, authFlowState, biometricFailed, showSplash]);
+  }, [user, isLoading, biometricFailed, showSplash]);
 
   // Subscription check with proper premium user verification
   useEffect(() => {
@@ -406,20 +406,50 @@ const AppNavigator = () => {
   // Handle subscription purchase
   const handleSubscriptionPurchase = async (plan: 'monthly' | 'yearly', promoCode?: string) => {
     try {
-      console.log('🔄 DEBUG: Mock subscription purchase:', { plan, promoCode });
-      
-      setSubscriptionModal(prev => ({ ...prev, visible: false, canClose: true }));
-      
-      CrossPlatformAlert.alert('Success! 🎉', 'Mock subscription completed', [
-        {
-          text: 'Awesome!',
-          onPress: () => {
-            console.log('✅ Mock subscription purchase completed');
-            
+      console.log('🛒 Starting subscription purchase:', { plan, promoCode });
 
-          }
+      // Initialize RealPaymentService
+      const RealPaymentService = (await import('@/services/RealPaymentService')).default;
+      const paymentService = RealPaymentService.getInstance();
+      await paymentService.initialize(user?.id);
+
+      // Attempt purchase through RevenueCat
+      const result = await paymentService.purchaseSubscription(plan, promoCode);
+
+      if (result.success) {
+        // Update user state to reflect premium status
+        if (user && updateUser) {
+          await updateUser({
+            isPremium: true,
+            subscriptionStatus: 'premium'
+          });
         }
-      ]);
+
+        setSubscriptionModal(prev => ({ ...prev, visible: false, canClose: true }));
+
+        CrossPlatformAlert.alert(
+          'Success! 🎉',
+          'Welcome to Premium! You now have unlimited access to all features.',
+          [
+            {
+              text: 'Awesome!',
+              onPress: () => {
+                // Refresh app state to reflect new subscription
+                console.log('✅ Subscription purchase completed successfully');
+              }
+            }
+          ]
+        );
+      } else if (result.userCancelled) {
+        // User cancelled - do nothing, keep modal open
+        console.log('User cancelled subscription purchase');
+      } else {
+        // Purchase failed
+        CrossPlatformAlert.alert(
+          'Purchase Failed',
+          result.error || 'Unable to complete purchase. Please try again.'
+        );
+      }
     } catch (error) {
       console.error('Subscription purchase error:', error);
       CrossPlatformAlert.alert('Error', 'Failed to process subscription. Please try again.');
@@ -446,13 +476,18 @@ const AppNavigator = () => {
         });
         
         const apiService = ApiService.getInstance();
-        
+
+        // Create a new session timestamp since logout cleared it
+        const sessionTimestamp = Date.now();
+        await AsyncStorage.setItem('@spendy_session_timestamp', sessionTimestamp.toString());
+        console.log('✅ Created new session timestamp for biometric restore');
+
         // Extend session and mark as authenticated
         await apiService.extendUserSession();
         await BiometricAuthService.extendSession();
-        
+
         console.log('🔍 Sessions extended, now calling restoreSessionFromBiometric...');
-        
+
         // Restore the user session from stored data FIRST
         await restoreSessionFromBiometric();
         
@@ -493,9 +528,17 @@ const AppNavigator = () => {
   };
 
   // Handle biometric authentication fallback to login
-  const handleBiometricFallback = () => {
-    console.log('⬇️ Falling back to login screen');
+  const handleBiometricFallback = async () => {
+    console.log('⬇️ Falling back to login screen from biometric');
     setBiometricFailed(true); // Mark biometric as failed
+    
+    // Set a flag so LoginScreen knows not to show biometric prompt again
+    try {
+      await AsyncStorage.setItem('@spendy_biometric_failed', 'true');
+    } catch (error) {
+      console.error('Error setting biometric failed flag:', error);
+    }
+    
     setAuthFlowState('login');
   };
 
@@ -686,6 +729,41 @@ const AppNavigator = () => {
 };
 
 export default function App() {
+  const [error, setError] = React.useState<Error | null>(null);
+
+  React.useEffect(() => {
+    // Log app initialization
+    console.log('🚀 App initializing...', {
+      platform: Platform.OS,
+      version: '1.0.0',
+      timestamp: new Date().toISOString()
+    });
+
+    // Check environment config
+    try {
+      const { ENV } = require('./src/config/environment');
+      console.log('✅ Environment loaded:', {
+        environment: ENV.environment,
+        firebase: ENV.firebase?.projectId,
+        api: ENV.api?.baseURL
+      });
+    } catch (err) {
+      console.error('❌ Failed to load environment:', err);
+      setError(err as Error);
+    }
+  }, []);
+
+  if (error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={{ color: 'red', padding: 20, textAlign: 'center' }}>
+          Failed to initialize app:{'\n\n'}
+          {error.message}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <ThemeProvider>

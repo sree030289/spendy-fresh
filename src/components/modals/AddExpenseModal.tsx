@@ -284,23 +284,34 @@ const initializeSplitData = () => {
     const subscriptionHelper = SubscriptionHelper.getInstance();
     
     setLoading(true);
-    
-    try {
-      // Check if user can create this transaction (this will show subscription modal if needed)
-      const canCreate = await subscriptionHelper.checkTransactionLimit(user.id);
-      
-      if (!canCreate) {
-        console.log('🚫 Subscription limit reached - expense submission blocked');
+
+    // FIXED: Check if we should bypass limit check (user already saw subscription modal)
+    const shouldBypass = (global as any).bypassTransactionLimitOnce;
+
+    if (!shouldBypass) {
+      try {
+        // Check if user can create this transaction (this will show subscription modal if needed)
+        // FIXED: Use canCreateTransaction instead of checkTransactionLimit to avoid double-counting
+        // The transaction count should ONLY be incremented on the backend when expense is actually created
+        const canCreate = await subscriptionHelper.canCreateTransaction(user.id);
+
+        if (!canCreate) {
+          console.log('🚫 Subscription limit reached - expense submission blocked');
+          setLoading(false);
+          return; // Don't continue with submission
+        }
+
+        console.log('✅ Subscription check passed, proceeding with expense submission...');
+      } catch (error) {
+        console.error('❌ Error checking subscription limits:', error);
         setLoading(false);
-        return; // Don't continue with submission
+        Alert.alert('Error', 'Failed to check subscription limits. Please try again.');
+        return;
       }
-      
-      console.log('✅ Subscription check passed, proceeding with expense submission...');
-    } catch (error) {
-      console.error('❌ Error checking subscription limits:', error);
-      setLoading(false);
-      Alert.alert('Error', 'Failed to check subscription limits. Please try again.');
-      return;
+    } else {
+      console.log('🎯 BYPASSING transaction limit check during submission (user already saw modal)');
+      // Clear the bypass flag after using it
+      (global as any).bypassTransactionLimitOnce = false;
     }
 
     console.log('🔍 SUBMITTING EXPENSE');
@@ -551,12 +562,34 @@ const initializeSplitData = () => {
       return;
     }
 
-    // Check if user has access to premium receipt scanning
+    // Check if user has access to premium receipt scanning BEFORE camera permissions
     const subscriptionHelper = SubscriptionHelper.getInstance();
     const hasAccess = await subscriptionHelper.checkReceiptScanningAccess(user.id);
-    
+
     if (!hasAccess) {
-      return; // Subscription modal will be shown by the helper
+      // Close AddExpenseModal first to show subscription modal properly
+      Alert.alert(
+        'Premium Feature',
+        'Receipt scanning is a premium feature. Upgrade to use this feature.',
+        [
+          {
+            text: 'Maybe Later',
+            style: 'cancel'
+          },
+          {
+            text: 'Upgrade Now',
+            onPress: () => {
+              // Close the expense modal first
+              onClose();
+              // Then show subscription modal (with small delay to ensure clean transition)
+              setTimeout(() => {
+                subscriptionHelper.showPremiumFeatureAlert('Receipt Scanning');
+              }, 300);
+            }
+          }
+        ]
+      );
+      return;
     }
 
     // Request camera permissions

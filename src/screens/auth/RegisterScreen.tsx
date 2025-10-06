@@ -735,7 +735,10 @@ export default function RegisterScreen() {
                   }}
                   secureTextEntry={!showPassword}
                   returnKeyType="done"
-                  onSubmitEditing={handleRegister}
+                  onSubmitEditing={() => {
+                    Keyboard.dismiss();
+                    handleRegister();
+                  }}
                   blurOnSubmit={true}
                   {...(Platform.OS === 'web' && {
                     // Web-specific props

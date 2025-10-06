@@ -24,7 +24,17 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: any) {
     // Log the error details
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error('❌ ErrorBoundary caught an error:', error, errorInfo);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    
+    // Try to log to a remote service if available
+    try {
+      // You could send this to Sentry, LogRocket, etc.
+      console.log('📡 Attempting to log error to remote service...');
+    } catch (loggingError) {
+      console.error('Failed to log error remotely:', loggingError);
+    }
     
     // Log specifically for view state errors
     if (error.message.includes('view state') || error.message.includes('surface')) {
@@ -32,6 +42,14 @@ class ErrorBoundary extends Component<Props, State> {
         message: error.message,
         stack: error.stack,
         componentStack: errorInfo.componentStack
+      });
+    }
+
+    // Log environment configuration errors
+    if (error.message.includes('FIREBASE') || error.message.includes('API') || error.message.includes('environment')) {
+      console.error('❌ ENVIRONMENT ERROR:', {
+        message: error.message,
+        stack: error.stack,
       });
     }
   }
@@ -61,6 +79,11 @@ class ErrorBoundary extends Component<Props, State> {
           <Text style={styles.message}>
             {this.state.error?.message || 'An unexpected error occurred'}
           </Text>
+          {this.state.error?.stack && (
+            <Text style={styles.stackTrace} numberOfLines={10}>
+              {this.state.error.stack}
+            </Text>
+          )}
           <TouchableOpacity style={styles.button} onPress={this.handleRetry}>
             <Text style={styles.buttonText}>Try Again</Text>
           </TouchableOpacity>
@@ -92,6 +115,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#666',
     lineHeight: 22,
+  },
+  stackTrace: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: '#999',
+    marginBottom: 20,
+    paddingHorizontal: 10,
+    maxWidth: '100%',
   },
   button: {
     backgroundColor: '#007AFF',

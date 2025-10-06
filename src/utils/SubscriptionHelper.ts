@@ -39,13 +39,15 @@ export class SubscriptionHelper {
       
       if (!result.allowed) {
         console.log('🚫 Group creation limit reached:', result);
-        
+
+        // SOFT PAYWALL: Allow closing after 10 seconds, similar to transaction limit
         this.showSubscriptionModal?.(
           'groupLimit',
           'Unlimited Groups',
-          false
+          false,
+          10  // Allow closing after 10 seconds
         );
-        
+
         return false;
       }
       
@@ -64,13 +66,15 @@ export class SubscriptionHelper {
       
       if (!result.allowed) {
         console.log('🚫 Group member limit reached:', result);
-        
+
+        // SOFT PAYWALL: Allow closing after 10 seconds
         this.showSubscriptionModal?.(
           'memberLimit',
           'Unlimited Group Members',
-          false
+          false,
+          10  // Allow closing after 10 seconds
         );
-        
+
         return false;
       }
       

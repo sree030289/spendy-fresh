@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.svaag.meetnsplit.dev'
+    namespace 'com.meetnsplit.app.dev'
     defaultConfig {
-        applicationId 'com.svaag.meetnsplit.dev'
+        applicationId 'com.meetnsplit.app.dev'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

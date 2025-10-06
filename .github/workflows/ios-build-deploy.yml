@@ -1,0 +1,105 @@
+name: iOS Build and Deploy to App Store
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - 'src/**'
+      - 'app.json'
+      - 'package.json'
+      - 'ios/**'
+  workflow_dispatch:
+    inputs:
+      submit_to_appstore:
+        description: 'Submit to App Store after build'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  build-and-deploy-ios:
+    name: Build and Deploy iOS App
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🏗 Check out repository
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🚀 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📱 Build iOS app
+        run: |
+          eas build --platform ios --profile production --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: ⏳ Wait for build to complete
+        run: |
+          echo "Waiting for build to complete..."
+          sleep 60
+          # Get the latest build ID
+          BUILD_ID=$(eas build:list --platform ios --status finished --limit 1 --json | jq -r '.[0].id')
+          echo "Latest build ID: $BUILD_ID"
+          echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+
+      - name: 📤 Submit to App Store
+        if: ${{ github.event.inputs.submit_to_appstore == 'true' || github.event_name == 'push' }}
+        run: |
+          eas submit --platform ios --latest --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: ✅ Build Summary
+        run: |
+          echo "### 🎉 iOS Build Complete! ###"
+          echo "Platform: iOS"
+          echo "Profile: production"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          if [ "${{ github.event.inputs.submit_to_appstore }}" == "true" ] || [ "${{ github.event_name }}" == "push" ]; then
+            echo "Submitted to: App Store"
+            echo "Check TestFlight: https://appstoreconnect.apple.com"
+          fi
+
+      - name: 📝 Create GitHub Release
+        if: github.event_name == 'push'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ios-v${{ github.run_number }}
+          release_name: iOS Build v${{ github.run_number }}
+          body: |
+            ## iOS Build Deployed to App Store
+            
+            **Branch:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+            **Build Number:** Incremented automatically
+            
+            ### Changes
+            ${{ github.event.head_commit.message }}
+            
+            ### 📱 TestFlight
+            Check [App Store Connect](https://appstoreconnect.apple.com) for the new build.
+          draft: false
+          prerelease: false
+
+      - name: 💬 Notify on Failure
+        if: failure()
+        run: |
+          echo "::error::iOS build or submission failed! Check the logs above for details."

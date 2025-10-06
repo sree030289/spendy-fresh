@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>spendy</string>
-          <string>com.svaag.meetnsplit.dev</string>
+          <string>com.meetnsplit.app.dev</string>
         </array>
       </dict>
       <dict>
@@ -100,6 +100,8 @@
     <key>UIUserInterfaceStyle</key>
     <string>Automatic</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
   </dict>
 </plist>

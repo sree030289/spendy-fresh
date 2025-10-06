@@ -21,10 +21,16 @@
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "SPENDY_ENV": "development"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "SPENDY_ENV": "production"
+      }
     }
   },
   "submit": {

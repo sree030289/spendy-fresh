@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:827143652568:android:009110b8f4776b93b843ad",
         "android_client_info": {
-          "package_name": "com.svaag.meetnsplit"
+          "package_name": "com.meetnsplit.app"
         }
       },
       "oauth_client": [
@@ -34,7 +34,7 @@
               "client_id": "827143652568-dtet8a1ok8edvu42kscekgovu0htf6d2.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.svaag.meetnsplit"
+                "bundle_id": "com.meetnsplit.app"
               }
             }
           ]

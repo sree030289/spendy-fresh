@@ -214,51 +214,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Store user data
       await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
-      
+
       // Store user session info
       await apiService.storeUserSession(user);
-      
-      // Register push token with backend for notifications
-      try {
-        const { RealNotificationService } = await import('@/services/notifications/RealNotificationService');
-        await RealNotificationService.registerTokenWithBackend(user.id);
-        console.log('✅ Push token registered with backend after registration');
-      } catch (error) {
-        console.error('⚠️ Failed to register push token:', error);
-        // Don't fail registration if push token registration fails
-      }
-      
+
+      // Set user immediately to allow navigation to dashboard
       setUser(user);
-      
-      // Check for pending invites after successful registration
-      try {
-        console.log('🔍 Checking for pending invites after registration...');
-        const inviteCheckResponse = await apiService.checkPendingInvitesOnRegistration({
-          userId: user.id,
-          phoneNumber: userData.mobile,
-          email: userData.email,
-          countryCode: userData.country // Pass the country code from registration data
-        });
-        
-        console.log('📋 Invite check response:', inviteCheckResponse);
-        
-        if (inviteCheckResponse?.hasPendingInvites && inviteCheckResponse?.autoAcceptedCount > 0) {
-          console.log('🎉 Auto-accepted pending invites:', {
-            count: inviteCheckResponse.autoAcceptedCount,
-            newFriendships: inviteCheckResponse.newFriendships
-          });
-          
-          // You can show a welcome modal or notification here
-          // For now, just log the success
-        } else {
-          console.log('✅ No pending invites to process');
-        }
-      } catch (inviteError) {
-        console.error('⚠️ Failed to check pending invites:', inviteError);
-        // Don't fail registration if invite check fails
-      }
-      
-      setIsLoading(false); 
+      setIsLoading(false);
+
+      // Register push token and check invites in background (non-blocking)
+      // These operations run after user is already navigated to dashboard
+      Promise.all([
+        // Register push token with backend for notifications
+        (async () => {
+          try {
+            const { RealNotificationService } = await import('@/services/notifications/RealNotificationService');
+            await RealNotificationService.registerTokenWithBackend(user.id);
+            console.log('✅ Push token registered with backend after registration');
+          } catch (error) {
+            console.error('⚠️ Failed to register push token:', error);
+          }
+        })(),
+
+        // Check for pending invites after successful registration
+        (async () => {
+          try {
+            console.log('🔍 Checking for pending invites after registration...');
+            const inviteCheckResponse = await apiService.checkPendingInvitesOnRegistration({
+              userId: user.id,
+              phoneNumber: userData.mobile,
+              email: userData.email,
+              countryCode: userData.country
+            });
+
+            console.log('📋 Invite check response:', inviteCheckResponse);
+
+            if (inviteCheckResponse?.hasPendingInvites && inviteCheckResponse?.autoAcceptedCount > 0) {
+              console.log('🎉 Auto-accepted pending invites:', {
+                count: inviteCheckResponse.autoAcceptedCount,
+                newFriendships: inviteCheckResponse.newFriendships
+              });
+            } else {
+              console.log('✅ No pending invites to process');
+            }
+          } catch (inviteError) {
+            console.error('⚠️ Failed to check pending invites:', inviteError);
+          }
+        })()
+      ]).catch(error => {
+        console.error('⚠️ Background post-registration tasks failed:', error);
+        // Silently fail - user is already logged in
+      }); 
       console.log('Registration successful');
     } catch (error) {
       console.error('Registration error:', error);
@@ -361,8 +367,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         
         // Update the session data with new biometric preference
-        await apiService.storeUserSession(user);
-        
+        // Use the UPDATED user object with new biometric setting
+        const updatedUserWithBiometric = { ...user, biometricEnabled: updates.biometricEnabled };
+        await apiService.storeUserSession(updatedUserWithBiometric);
+
         console.log('✅ Biometric preference updated successfully');
       }
       
@@ -466,8 +474,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const sessionData = await apiService.getLastUserSession();
         if (sessionData && sessionData.email) {
           console.log('🔍 Found last user session, requiring manual login for:', sessionData.email);
-          // Clear the biometric preference temporarily to prevent infinite loop
-          await AsyncStorage.removeItem('@spendy_biometric_enabled');
+          // DO NOT clear biometric preference - it should persist across logins
+          // The biometric preference should only be cleared when user explicitly disables it
           throw new Error('MANUAL_LOGIN_REQUIRED');
         } else {
           console.error('❌ No session data found');

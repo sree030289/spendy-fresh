@@ -1305,8 +1305,18 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
     const targetUserDoc = targetUserSnapshot.docs[0];
     const targetUserId = targetUserDoc.id;
     const fromUserId = req.user.id;
+    const targetUserData = targetUserDoc.data();
 
-    // Check if already friends (only active friendships)
+    // 1. VALIDATION: Prevent self-invitation
+    if (targetUserId === fromUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot send a friend request to yourself',
+        error: 'SELF_INVITATION'
+      });
+    }
+
+    // 2. VALIDATION: Check if already friends (only active friendships)
     const existingFriendship = await db.collection(COLLECTIONS.FRIENDS)
       .where('user1Id', 'in', [fromUserId, targetUserId])
       .where('user2Id', 'in', [fromUserId, targetUserId])
@@ -1315,13 +1325,15 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
       .get();
 
     if (!existingFriendship.empty) {
-      return res.json({
+      const friendName = targetUserData.fullName || "this user";
+      return res.status(409).json({
         success: false,
-        message: 'You are already friends with this person'
+        message: `You're already friends with ${friendName}`,
+        error: "ALREADY_FRIENDS",
       });
     }
 
-    // Check if friend request already exists in either direction
+    // 3. VALIDATION: Check if friend request already exists in either direction
     const [existingRequestFromTo, existingRequestToFrom] = await Promise.all([
       db.collection(COLLECTIONS.FRIEND_REQUESTS)
         .where('fromUserId', '==', fromUserId)
@@ -1462,7 +1474,7 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
 // Send SMS Friend Request Endpoint
 meetnsplitApp.post('/friends/requests/send-sms', authenticateJWT, async (req, res) => {
   try {
-    const { recipientPhone, message, countryCode } = req.body;
+    const { recipientPhone, message, countryCode, contactName } = req.body;
     
     if (!recipientPhone) {
       return res.status(400).json({
@@ -1503,8 +1515,19 @@ meetnsplitApp.post('/friends/requests/send-sms', authenticateJWT, async (req, re
     }
     const senderData = senderDoc.data();
 
+    // VALIDATION: Prevent self-invitation via phone
+    if (senderData.normalizedMobile === normalizedPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot send a friend request to yourself',
+        error: 'SELF_INVITATION'
+      });
+    }
+
     if (targetUserSnapshot.empty) {
       // Unregistered user - create pending SMS invite
+      const displayName = contactName ||
+        `SMS Contact ${normalizedPhone.slice(-4)}`;
       const newUserInvite = {
         fromUserId: req.user.id,
         toUserId: null, // No user ID for new users
@@ -1512,14 +1535,14 @@ meetnsplitApp.post('/friends/requests/send-sms', authenticateJWT, async (req, re
         toUserData: {
           phone: normalizedPhone,
           isNewUser: true,
-          fullName: `SMS Contact ${normalizedPhone.slice(-4)}` // Temporary name
+          fullName: displayName,
         },
         message: message || '',
         status: 'pending',
         type: 'sms_invite',
         inviteMethod: 'sms',
         createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       };
 
       const friendRequestRef = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
@@ -1892,23 +1915,35 @@ meetnsplitApp.get('/friends/requests', authenticateJWT, async (req, res) => {
     for (const doc of outgoingRequestsSnapshot.docs) {
       const request = doc.data();
       console.log('📤 Processing outgoing request:', doc.id, request);
-      
+
       // Handle new user invites (toUserId is null)
-      if (!request.toUserId && request.toUser) {
+      // FIXED: Check for both toUser AND toUserData (SMS invites use toUserData)
+      if (!request.toUserId && (request.toUser || request.toUserData)) {
+        // Use toUserData if available (SMS invites), otherwise toUser (email invites)
+        const userData = request.toUserData || request.toUser;
+
         outgoingRequests.push({
           id: doc.id,
           toUserId: null,
-          toUser: request.toUser, // Use the stored toUser data for new users
+          toUser: {
+            fullName: userData.fullName || userData.phone || 'Unknown',
+            email: userData.email || null,
+            phone: userData.phone || request.toPhone || null,
+            profileImage: userData.profileImage || null,
+            isNewUser: userData.isNewUser || false
+          },
           message: request.message || '',
           createdAt: request.createdAt,
           status: request.status,
-          type: request.type || 'email_invite'
+          type: request.type || 'email_invite',
+          inviteMethod: request.inviteMethod || 'email',
+          toPhone: request.toPhone || null  // Include phone for SMS invites
         });
       }
       // Handle existing users
       else if (request.toUserId) {
         const toUserDoc = await db.collection(COLLECTIONS.USERS).doc(request.toUserId).get();
-        
+
         if (toUserDoc.exists) {
           const toUserData = toUserDoc.data();
           outgoingRequests.push({
@@ -1922,7 +1957,10 @@ meetnsplitApp.get('/friends/requests', authenticateJWT, async (req, res) => {
             },
             message: request.message || '',
             createdAt: request.createdAt,
-            status: request.status
+            status: request.status,
+            type: request.type || 'friend_request',
+            inviteMethod: request.inviteMethod || 'push',
+            toPhone: request.toPhone || toUserData.normalizedMobile || null
           });
         }
       }

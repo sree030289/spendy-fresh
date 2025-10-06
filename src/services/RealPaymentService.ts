@@ -54,23 +54,23 @@ class RealPaymentService {
 
   // RevenueCat Configuration
   private readonly REVENUECAT_API_KEY = Platform.select({
-    ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY || 'appl_YOUR_PUBLIC_IOS_KEY_HERE', // Use PUBLIC key (starts with appl_)
-    android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY || 'goog_YOUR_PUBLIC_ANDROID_KEY_HERE', // Use PUBLIC key (starts with goog_)
+    ios: ENV.revenueCat.apiKeys.apple,
+    android: ENV.revenueCat.apiKeys.google,
   }) || '';
 
   // Product identifiers for App Store and Play Store
   // IMPORTANT: These must match EXACTLY what's configured in RevenueCat dashboard and StoreKit configuration
   private readonly PRODUCT_IDS = {
     monthly: Platform.select({
-      ios: ENV.isProduction ? 'com.svaag.meetnsplit.Monthly' : 'com.svaag.meetnsplit.dev.Monthly',
+      ios: ENV.isProduction ? 'com.meetnsplit.app.Monthly' : 'com.meetnsplit.app.dev.Monthly',
       android: 'meetnsplit_monthly_subscription',
     }) || '',
     yearly: Platform.select({
-      ios: ENV.isProduction ? 'com.svaag.meetnsplit.Annual' : 'com.svaag.meetnsplit.dev.Annual',
+      ios: ENV.isProduction ? 'com.meetnsplit.app.Annual' : 'com.meetnsplit.app.dev.Annual',
       android: 'meetnsplit_yearly_subscription',
     }) || '',
     lifetime: Platform.select({
-      ios: ENV.isProduction ? 'com.svaag.meetnsplit.Lifetime' : 'com.svaag.meetnsplit.dev.Lifetime',
+      ios: ENV.isProduction ? 'com.meetnsplit.app.Lifetime' : 'com.meetnsplit.app.dev.Lifetime',
       android: 'meetnsplit_lifetime_subscription',
     }) || '',
   };

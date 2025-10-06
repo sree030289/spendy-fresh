@@ -340,18 +340,25 @@ export default function SubscriptionModal({
             console.log('✅ Countdown finished, enabling close button');
             setCanCloseModal(true);
             clearInterval(timer);
-            
+
+            // FIXED: Set bypass flag for transaction limits to prevent loop
+            // This allows user to submit expense after seeing subscription modal
+            if (reason === 'transactionLimit') {
+              console.log('🎯 Setting bypass flag for transaction limit');
+              (global as any).bypassTransactionLimitOnce = true;
+            }
+
             // Call completion callback and auto-close in next tick to avoid setState during render
             setTimeout(() => {
               onCountdownComplete?.();
-              
+
               // Auto-close modal if requested
               if (autoCloseOnComplete) {
                 console.log('🚪 Auto-closing modal after countdown');
                 setTimeout(() => onClose(), 500); // Small delay for smooth UX
               }
             }, 0);
-            
+
             return 0;
           }
           return prev - 1;

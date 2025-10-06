@@ -12,6 +12,7 @@ import {
   Linking,
   Dimensions,
   Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../common/Icon';
@@ -967,13 +968,24 @@ export default function GroupDetailsModal({
       >
         <View style={styles.memberRow}>
           <View style={[styles.memberAvatar, { backgroundColor: theme.colors.primary }]}>
-            <Text style={styles.memberAvatarText}>
-              {(() => {
-                const name = member.userData?.fullName || member.userData?.email || 'U';
-                console.log('🔤 Member avatar name:', name, 'for member:', member.userId);
-                return name.charAt(0).toUpperCase();
-              })()}
-            </Text>
+            {member.userData?.profilePicture || member.userData?.profileImage || member.userData?.avatar ? (
+              <Image
+                source={{ uri: member.userData.profilePicture || member.userData.profileImage || member.userData.avatar }}
+                style={styles.memberAvatarImage}
+                resizeMode="cover"
+                onError={() => {
+                  console.log('❌ Member avatar failed to load for:', member.userData?.fullName);
+                }}
+              />
+            ) : (
+              <Text style={styles.memberAvatarText}>
+                {(() => {
+                  const name = member.userData?.fullName || member.userData?.email || 'U';
+                  console.log('🔤 Member avatar name:', name, 'for member:', member.userId);
+                  return name.charAt(0).toUpperCase();
+                })()}
+              </Text>
+            )}
           </View>
           <View style={styles.memberInfo}>
             <Text style={[styles.memberName, { color: theme.colors.text }]}>
@@ -2080,7 +2092,7 @@ const styles = StyleSheet.create({
   memberAvatar: {
     width: 48,
     height: 48,
-    borderRadius: 14,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -2091,6 +2103,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 4,
+    overflow: 'hidden', // Ensure image respects border radius
+  },
+  memberAvatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   memberAvatarText: {
     color: 'white',

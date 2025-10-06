@@ -1,4 +1,4 @@
-package com.svaag.meetnsplit.dev
+package com.meetnsplit.app.dev
 
 import android.os.Build
 import android.os.Bundle

@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.svaag.meetnsplit",
+      "bundleIdentifier": "com.meetnsplit.app",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera for QR code scanning to quickly add expenses and split bills.",
@@ -35,7 +35,7 @@
         "foregroundImage": "./assets/adaptive-icon-meetnsplit.png",
         "backgroundColor": "#D6001C"
       },
-      "package": "com.svaag.meetnsplit",
+      "package": "com.meetnsplit.app",
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
@@ -54,7 +54,7 @@
           "action": "VIEW",
           "data": [
             {
-              "scheme": "com.svaag.meetnsplit"
+              "scheme": "com.meetnsplit.app"
             }
           ],
           "category": [
