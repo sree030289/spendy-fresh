@@ -45,11 +45,11 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Install root dependencies
-        run: npm ci
+        run: npm install --force
 
       - name: 📦 Install Firebase Functions dependencies
         working-directory: ./functions
-        run: npm ci
+        run: npm install -- force
 
       - name: 🔍 Lint Firebase Functions
         working-directory: ./functions
