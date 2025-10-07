@@ -265,33 +265,58 @@ export default function LoginScreen() {
   const handleBiometricLogin = async () => {
     setBiometricLoading(true);
     try {
+      // Step 1: Perform biometric authentication first
       const result = await BiometricService.authenticate();
-      if (result.success) {
-        console.log('✅ Biometric authentication successful, restoring session');
-
-        // Extend session first
-        await BiometricAuthService.extendSession();
-        await apiService.extendUserSession();
-
-        // Create new session timestamp
-        await AsyncStorage.setItem('@spendy_session_timestamp', Date.now().toString());
-
-        // Use the proper session restoration from useAuth
-        await restoreSessionFromBiometric();
-
-        console.log('✅ Session restored successfully via biometric login');
-        // Navigation will happen automatically via useAuth state change
-      } else {
+      if (!result.success) {
         console.log('❌ Biometric authentication failed:', result.error);
         if (result.error && result.error !== 'User cancelled') {
           Alert.alert('Authentication Failed', result.error);
         }
+        return;
       }
+
+      console.log('✅ Biometric authentication successful');
+
+      // Step 2: Validate Firebase session and get fresh token
+      const isSessionValid = await BiometricAuthService.validateFirebaseSession();
+      if (!isSessionValid) {
+        console.log('⚠️ Firebase session invalid, requiring manual login');
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please login with your password.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Step 3: Restore session with fresh Firebase token
+      console.log('🔄 Restoring session with fresh Firebase token...');
+      await restoreSessionFromBiometric();
+
+      console.log('✅ Session restored successfully via biometric login');
+      // Navigation will happen automatically via useAuth state change
     } catch (error: any) {
       console.error('❌ Biometric login error:', error);
-      // Only show alert for non-manual-login-required errors
-      if (error?.message !== 'MANUAL_LOGIN_REQUIRED') {
-        Alert.alert('Error', 'Failed to restore session. Please login with your password.');
+      
+      // Show single, clear error message based on error type
+      if (error?.message === 'MANUAL_LOGIN_REQUIRED') {
+        Alert.alert(
+          'Login Required',
+          'Please login with your email and password.',
+          [{ text: 'OK' }]
+        );
+      } else if (error?.message?.includes('Session expired')) {
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please login again.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Login Failed',
+          'Unable to restore your session. Please login with your password.',
+          [{ text: 'OK' }]
+        );
       }
     } finally {
       setBiometricLoading(false);

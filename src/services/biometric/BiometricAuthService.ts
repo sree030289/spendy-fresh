@@ -1,6 +1,8 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { authService } from '@/services/auth';
+import { ApiService } from '@/services/api/ApiService';
 
 export interface BiometricResult {
   success: boolean;
@@ -131,6 +133,67 @@ export class BiometricAuthService {
       await AsyncStorage.removeItem(this.STORAGE_KEYS.BIOMETRIC_FAIL_COUNT);
     } catch (error) {
       console.error('Error clearing fail count:', error);
+    }
+  }
+
+  /**
+   * Validate Firebase session before biometric login
+   * This ensures we have a valid Firebase session and can get fresh tokens
+   */
+  static async validateFirebaseSession(): Promise<boolean> {
+    try {
+      console.log('🔍 Validating Firebase session for biometric login...');
+      
+      // Check if Firebase user exists
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) {
+        console.log('❌ No Firebase user found');
+        return false;
+      }
+      
+      console.log('✅ Firebase user exists:', currentUser.email);
+      
+      // Validate API service token
+      const apiService = ApiService.getInstance();
+      const isTokenValid = await apiService.validateStoredToken();
+      
+      if (!isTokenValid) {
+        console.log('❌ Stored token is invalid');
+        return false;
+      }
+      
+      console.log('✅ Firebase session is valid');
+      return true;
+    } catch (error) {
+      console.error('❌ Error validating Firebase session:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get fresh Firebase token for biometric authentication
+   * This ensures we use a current token instead of expired AsyncStorage token
+   */
+  static async getFreshToken(): Promise<string | null> {
+    try {
+      console.log('🔄 Getting fresh Firebase token...');
+      
+      // Get fresh token from Firebase (auto-refreshes if needed)
+      const token = await authService.getIdToken(true);
+      
+      if (token) {
+        console.log('✅ Fresh token obtained from Firebase');
+        // Update ApiService with fresh token
+        const apiService = ApiService.getInstance();
+        await apiService.restoreAuthToken(token);
+        return token;
+      } else {
+        console.log('❌ Could not get fresh token');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error getting fresh token:', error);
+      return null;
     }
   }
 

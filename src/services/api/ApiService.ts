@@ -5,6 +5,9 @@ import { convertApiTimestamps } from '../../utils/timestamp';
 // OPTIMIZATION: Environment-based API URL for cost management
 import { ENV } from '@/config/environment';
 
+// Firebase Auth integration for proper token management
+import { authService } from '@/services/auth';
+
 // Function to determine the correct API base URL
 const getApiBaseUrl = (): string => {
   console.log('🔧 Using API URL from environment config:', ENV.api.baseURL);
@@ -100,6 +103,95 @@ class ApiService {
       await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
     } catch (error) {
       console.error('Error clearing auth token:', error);
+    }
+  }
+
+  /**
+   * Refresh Firebase ID token to get a fresh token
+   * This is critical for biometric login to avoid using expired tokens
+   */
+  async refreshToken(): Promise<string | null> {
+    try {
+      console.log('🔄 Refreshing Firebase ID token...');
+      
+      // Get fresh token from Firebase Auth with force refresh
+      const freshToken = await authService.getIdToken(true);
+      
+      if (freshToken) {
+        console.log('✅ Fresh Firebase token obtained');
+        await this.setAuthToken(freshToken);
+        return freshToken;
+      } else {
+        console.log('❌ No Firebase user found, cannot refresh token');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Validate if stored token is still valid by checking Firebase session
+   * Returns true if Firebase user exists and token is valid
+   */
+  async validateStoredToken(): Promise<boolean> {
+    try {
+      console.log('🔍 Validating stored token...');
+      
+      // Check if Firebase user exists
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) {
+        console.log('❌ No Firebase user found, token invalid');
+        return false;
+      }
+      
+      // Try to get a fresh token (this will fail if session expired)
+      const token = await authService.getIdToken(false);
+      if (!token) {
+        console.log('❌ Could not get Firebase token, session invalid');
+        return false;
+      }
+      
+      console.log('✅ Token is valid');
+      return true;
+    } catch (error) {
+      console.error('❌ Error validating token:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Make request with automatic token refresh on 401 errors
+   */
+  private async makeRequestWithRetry<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    retryCount: number = 0
+  ): Promise<ApiResponse<T>> {
+    try {
+      return await this.makeRequest<T>(endpoint, options);
+    } catch (error: any) {
+      // If we get a 401 error and haven't retried yet, try refreshing token
+      if (error.message?.includes('401') && retryCount === 0) {
+        console.log('🔄 Got 401 error, attempting token refresh...');
+        
+        const freshToken = await this.refreshToken();
+        if (freshToken) {
+          console.log('✅ Token refreshed, retrying request...');
+          // Update options with new token
+          const newOptions = {
+            ...options,
+            headers: {
+              ...options.headers,
+              Authorization: `Bearer ${freshToken}`,
+            },
+          };
+          // Retry once with new token
+          return await this.makeRequest<T>(endpoint, newOptions);
+        }
+      }
+      throw error;
     }
   }
 
