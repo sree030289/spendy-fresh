@@ -49,7 +49,7 @@ jobs:
 
       - name: 📦 Install Firebase Functions dependencies
         working-directory: ./functions
-        run: npm install -- force
+        run: npm install --force
 
       - name: 🔍 Lint Firebase Functions
         working-directory: ./functions
@@ -62,40 +62,43 @@ jobs:
 
       - name: 🔥 Deploy Cloud Functions
         if: ${{ github.event.inputs.deploy_functions != 'false' }}
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPENDY }}'
-          projectId: spendy-97913
-          channelId: live
+        run: |
+          npx firebase-tools@latest deploy --only functions --project spendy-97913
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPENDY }}
 
       - name: 🔥 Deploy Firestore Rules
         if: ${{ github.event.inputs.deploy_firestore != 'false' }}
         run: |
-          npm install -g firebase-tools
-          firebase deploy --only firestore:rules --project spendy-c01cc --token "${{ secrets.FIREBASE_TOKEN }}"
+          npx firebase-tools@latest deploy --only firestore:rules --project spendy-97913
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPENDY }}
 
       - name: 🔥 Deploy Firestore Indexes
         if: ${{ github.event.inputs.deploy_firestore != 'false' }}
         run: |
-          firebase deploy --only firestore:indexes --project spendy-c01cc --token "${{ secrets.FIREBASE_TOKEN }}"
+          npx firebase-tools@latest deploy --only firestore:indexes --project spendy-97913
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPENDY }}
 
       - name: 🔥 Deploy Storage Rules
         if: ${{ github.event.inputs.deploy_storage != 'false' }}
         run: |
-          firebase deploy --only storage --project spendy-c01cc --token "${{ secrets.FIREBASE_TOKEN }}"
+          npx firebase-tools@latest deploy --only storage --project spendy-97913
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPENDY }}
 
       - name: 🔥 Deploy All Firebase Services
         if: ${{ github.event.inputs.deploy_functions == '' && github.event.inputs.deploy_firestore == '' && github.event.inputs.deploy_storage == '' }}
         run: |
-          npm install -g firebase-tools
-          cd functions
-          firebase deploy --project spendy-c01cc --token "${{ secrets.FIREBASE_TOKEN }}"
+          npx firebase-tools@latest deploy --project spendy-97913
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPENDY }}
 
       - name: ✅ Deployment Summary
         run: |
           echo "### 🎉 Firebase Deployment Complete! ###"
-          echo "Project: spendy-c01cc (Production)"
+          echo "Project: spendy-97913 (Production)"
           echo "Branch: ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
           echo ""
@@ -110,43 +113,14 @@ jobs:
             echo "  ✓ Storage Rules"
           fi
           echo ""
-          echo "Firebase Console: https://console.firebase.google.com/project/spendy-c01cc"
-
-      - name: 📝 Create Deployment Record
-        if: github.event_name == 'push'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: firebase-v${{ github.run_number }}
-          release_name: Firebase Deployment v${{ github.run_number }}
-          body: |
-            ## Firebase Production Deployment
-            
-            **Project:** spendy-c01cc
-            **Branch:** ${{ github.ref_name }}
-            **Commit:** ${{ github.sha }}
-            
-            ### Changes
-            ${{ github.event.head_commit.message }}
-            
-            ### 🔥 Services Deployed
-            - Cloud Functions
-            - Firestore Rules & Indexes
-            - Storage Rules
-            
-            ### 📊 Firebase Console
-            [View Project](https://console.firebase.google.com/project/spendy-c01cc)
-          draft: false
-          prerelease: false
+          echo "Firebase Console: https://console.firebase.google.com/project/spendy-97913"
 
       - name: 💬 Notify on Failure
         if: failure()
         run: |
           echo "::error::Firebase deployment failed! Check the logs above for details."
 
-      - name: 🔔 Send Slack Notification (Optional)
+      - name: 🔔 Send Deployment Status
         if: always()
         run: |
           echo "Deployment status: ${{ job.status }}"
-          # Add Slack webhook integration here if needed
