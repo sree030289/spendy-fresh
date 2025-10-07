@@ -202,7 +202,16 @@ class RealPaymentService {
       }
 
       if (!this.currentOfferings) {
-        throw new Error('No offerings available');
+        const errorMsg = 'No subscription offerings available from RevenueCat. This usually means:\n\n' +
+                        '1. Products are not configured in RevenueCat dashboard\n' +
+                        '2. Products are in "Missing Metadata" status in App Store Connect\n' +
+                        '3. Offering ID in RevenueCat doesn\'t match\n\n' +
+                        'Expected Product IDs:\n' +
+                        `- Monthly: ${this.PRODUCT_IDS.monthly}\n` +
+                        `- Yearly: ${this.PRODUCT_IDS.yearly}\n` +
+                        `- Lifetime: ${this.PRODUCT_IDS.lifetime}`;
+        console.error('❌ ' + errorMsg);
+        throw new Error(errorMsg);
       }
 
       const products: PaymentProduct[] = [];

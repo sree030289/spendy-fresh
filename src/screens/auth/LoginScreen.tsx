@@ -28,7 +28,7 @@ import { BrandHeader } from '@/components/common/BrandHeader';
 export default function LoginScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { login, user } = useAuth();
+  const { login, user, restoreSessionFromBiometric } = useAuth();
   const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -267,33 +267,32 @@ export default function LoginScreen() {
     try {
       const result = await BiometricService.authenticate();
       if (result.success) {
-        if (lastUserEmail) {
-          // In production, you'd have stored encrypted credentials
-          // For demo, we'll show success and let user enter password
-          Alert.alert(
-            'Biometric Authentication Successful',
-            'Biometric verification completed successfully!\n\nIn production, this would automatically log you in with stored secure credentials.',
-            [
-              {
-                text: 'Continue with Password',
-                onPress: () => {
-                  setEmail(lastUserEmail);
-                  // Focus on password field
-                }
-              }
-            ]
-          );
-        } else {
-          Alert.alert(
-            'Biometric Success', 
-            'Biometric authentication successful! Please enter your credentials to continue.',
-          );
-        }
+        console.log('✅ Biometric authentication successful, restoring session');
+
+        // Extend session first
+        await BiometricAuthService.extendSession();
+        await apiService.extendUserSession();
+
+        // Create new session timestamp
+        await AsyncStorage.setItem('@spendy_session_timestamp', Date.now().toString());
+
+        // Use the proper session restoration from useAuth
+        await restoreSessionFromBiometric();
+
+        console.log('✅ Session restored successfully via biometric login');
+        // Navigation will happen automatically via useAuth state change
       } else {
-        Alert.alert('Authentication Failed', result.error || 'Biometric authentication failed');
+        console.log('❌ Biometric authentication failed:', result.error);
+        if (result.error && result.error !== 'User cancelled') {
+          Alert.alert('Authentication Failed', result.error);
+        }
       }
     } catch (error: any) {
-      Alert.alert('Error', 'Biometric authentication error');
+      console.error('❌ Biometric login error:', error);
+      // Only show alert for non-manual-login-required errors
+      if (error?.message !== 'MANUAL_LOGIN_REQUIRED') {
+        Alert.alert('Error', 'Failed to restore session. Please login with your password.');
+      }
     } finally {
       setBiometricLoading(false);
     }

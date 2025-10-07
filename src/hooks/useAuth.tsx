@@ -277,35 +277,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setIsLoading(true);
       console.log('Attempting logout...');
-      
+
       // Save user info and biometric preference before clearing everything
       const currentUser = user;
       const userEmail = currentUser?.email;
       const userBiometricEnabled = currentUser?.biometricEnabled;
-      
-      await apiService.logout();
-      await clearAuthData();
-      
-      // Clear session timestamp but preserve user email and biometric preference for next login
-      if (userEmail) {
-        console.log('💾 Preserving user preferences for next login:', userEmail);
-        await AsyncStorage.setItem('@spendy_last_email', userEmail);
-        await AsyncStorage.setItem('@spendy_biometric_enabled', JSON.stringify(userBiometricEnabled || false));
-        
-        // Also preserve in the new BiometricAuthService format if user ID is available
-        if (currentUser?.id && userBiometricEnabled) {
-          await AsyncStorage.setItem(`@spendy_biometric_enabled_${currentUser.id}`, 'true');
-          console.log('✅ Biometric preference preserved for user:', currentUser.id);
+
+      // Create timeout wrapper to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Logout timeout')), 5000)
+      );
+
+      const logoutPromise = (async () => {
+        await apiService.logout();
+        await clearAuthData();
+
+        // Clear session timestamp but preserve user email and biometric preference for next login
+        if (userEmail) {
+          console.log('💾 Preserving user preferences for next login:', userEmail);
+          await AsyncStorage.setItem('@spendy_last_email', userEmail);
+          await AsyncStorage.setItem('@spendy_biometric_enabled', JSON.stringify(userBiometricEnabled || false));
+
+          // Also preserve in the new BiometricAuthService format if user ID is available
+          if (currentUser?.id && userBiometricEnabled) {
+            await AsyncStorage.setItem(`@spendy_biometric_enabled_${currentUser.id}`, 'true');
+            console.log('✅ Biometric preference preserved for user:', currentUser.id);
+          }
         }
-      }
-      
-      // Clear session timestamp to invalidate session but keep user preferences
-      await AsyncStorage.removeItem('@spendy_session_timestamp');
-      
+
+        // Clear session timestamp to invalidate session but keep user preferences
+        await AsyncStorage.removeItem('@spendy_session_timestamp');
+      })();
+
+      // Race between logout and timeout
+      await Promise.race([logoutPromise, timeoutPromise]);
+
       console.log('Logout successful');
     } catch (error) {
       console.error('Logout error:', error);
-      throw error;
+      // Force logout even on error by clearing user state
+      setUser(null);
+      console.log('Force logout completed despite error');
     } finally {
       setIsLoading(false);
     }

@@ -73,12 +73,14 @@ export default function BiometricAuthScreen({
     try {
       const message = await BiometricAuthService.getAuthenticationPromptMessage();
       setPromptMessage(message);
-      
+
       const currentFailCount = await BiometricAuthService.getFailCount();
       setFailCount(currentFailCount);
 
-      // REMOVED: Auto-trigger removed - user will tap "Authenticate" button to start
-      // This prevents unwanted double authentication prompts
+      // Auto-trigger biometric prompt on screen load
+      setTimeout(() => {
+        handleBiometricAuth();
+      }, 500);
     } catch (error) {
       console.error('Error initializing biometric screen:', error);
       onFallbackToLogin();
@@ -117,41 +119,26 @@ export default function BiometricAuthScreen({
       if (result.success) {
         // Biometric authentication successful
         console.log('✅ Biometric authentication successful');
-        
+
         // Prevent multiple calls by immediately clearing the authenticating flag
         setIsAuthenticating(false);
-        
-        // In a real implementation, you would have stored encrypted credentials
-        // For now, we'll simulate auto-login with stored session
+
         try {
-          // Try to restore session from stored credentials
-          // This is where you'd decrypt and use stored credentials in production
-          console.log('🔄 Attempting auto-login for user:', userEmail);
-          
           // Extend the session since biometric was successful
           await BiometricAuthService.extendSession();
           console.log('✅ Session extended after biometric success');
-          
+
           // Clear fail count on successful authentication
           await BiometricAuthService.clearFailCount();
-          
+
           // Call success callback - this will navigate to dashboard
           console.log('🔄 Calling onBiometricSuccess callback - navigating to dashboard');
           onBiometricSuccess();
           return; // Early return to prevent further execution
-          
+
         } catch (loginError) {
           console.error('❌ Auto-login failed after biometric success:', loginError);
-          Alert.alert(
-            'Login Required',
-            'Biometric authentication successful, but automatic login failed. Please enter your password.',
-            [
-              {
-                text: 'Enter Password',
-                onPress: onFallbackToLogin
-              }
-            ]
-          );
+          onFallbackToLogin();
           return; // Early return
         }
       } else {
@@ -162,28 +149,9 @@ export default function BiometricAuthScreen({
         console.log('📊 Updated fail count:', newFailCount);
         
         if (result.errorCode === 'USER_CANCELLED') {
-          console.log('🚫 User cancelled biometric authentication');
-          // User cancelled, show options
-          Alert.alert(
-            'Authentication Cancelled',
-            'Would you like to try again or use your email and password?',
-            [
-              {
-                text: 'Try Again',
-                onPress: () => {
-                  console.log('🔄 User chose to try biometric again');
-                  setTimeout(() => handleBiometricAuth(), 500);
-                }
-              },
-              {
-                text: 'Use Password',
-                onPress: () => {
-                  console.log('🔑 User chose to use password instead');
-                  onFallbackToLogin();
-                }
-              }
-            ]
-          );
+          console.log('🚫 User cancelled biometric authentication - waiting for retry');
+          // User cancelled - just wait for them to press "Try Again" button
+          // No alert needed, they can see the button
         } else if (result.errorCode === 'MAX_ATTEMPTS_EXCEEDED') {
           console.log('🚫 Max biometric attempts exceeded');
           Alert.alert(

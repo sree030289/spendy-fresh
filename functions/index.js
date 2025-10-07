@@ -1018,7 +1018,7 @@ meetnsplitApp.get('/friends', authenticateJWT, async (req, res) => {
     for (const doc of friendships1.docs) {
       const friendship = doc.data();
       const friendId = friendship.user2Id;
-      
+
       const friendDoc = await db.collection(COLLECTIONS.USERS).doc(friendId).get();
       if (friendDoc.exists) {
         const friendData = friendDoc.data();
@@ -1026,6 +1026,7 @@ meetnsplitApp.get('/friends', authenticateJWT, async (req, res) => {
           id: friendDoc.id,
           fullName: friendData.fullName,
           email: friendData.email,
+          mobile: friendData.mobile || friendData.phone || friendData.phoneNumber,
           profileImage: friendData.profileImage,
           friendshipId: doc.id,
           friendsSince: friendship.createdAt,
@@ -1033,12 +1034,12 @@ meetnsplitApp.get('/friends', authenticateJWT, async (req, res) => {
         });
       }
     }
-    
+
     // Process friendships where user is user2
     for (const doc of friendships2.docs) {
       const friendship = doc.data();
       const friendId = friendship.user1Id;
-      
+
       const friendDoc = await db.collection(COLLECTIONS.USERS).doc(friendId).get();
       if (friendDoc.exists) {
         const friendData = friendDoc.data();
@@ -1046,6 +1047,7 @@ meetnsplitApp.get('/friends', authenticateJWT, async (req, res) => {
           id: friendDoc.id,
           fullName: friendData.fullName,
           email: friendData.email,
+          mobile: friendData.mobile || friendData.phone || friendData.phoneNumber,
           profileImage: friendData.profileImage,
           friendshipId: doc.id,
           friendsSince: friendship.createdAt,

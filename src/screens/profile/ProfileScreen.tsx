@@ -720,6 +720,20 @@ export default function ProfileScreen() {
       }
 
       console.log('✅ Profile picture updated successfully!');
+
+      // Clear loading state before showing alert to prevent blank screen
+      setLoading(false);
+
+      // Trigger global refresh for friends/groups to show updated profile picture
+      try {
+        // Notify other components that profile was updated
+        if ((global as any).refreshFriendsData) {
+          (global as any).refreshFriendsData();
+        }
+      } catch (refreshError) {
+        console.warn('⚠️ Failed to trigger friends refresh:', refreshError);
+      }
+
       Alert.alert('Success', 'Profile picture updated successfully!');
     } catch (error: any) {
       console.error('❌ Failed to process image result:', {
@@ -806,25 +820,18 @@ export default function ProfileScreen() {
     try {
       const newBiometricState = !user.biometricEnabled;
 
-      // Show loading state
-      setLoading(true);
-
+      // Update user setting without showing global loading
       await updateUser({ biometricEnabled: newBiometricState });
 
-      // Wait a bit for state to update
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      setLoading(false);
-
-      // Now show the alert after state has updated
+      // Show success alert
       Alert.alert(
         'Biometric Authentication',
         `Biometric login has been ${newBiometricState ? 'enabled' : 'disabled'}.`,
         [{ text: 'OK' }]
       );
     } catch (error) {
-      setLoading(false);
-      Alert.alert('Error', 'Failed to update biometric setting');
+      console.error('Error updating biometric setting:', error);
+      Alert.alert('Error', 'Failed to update biometric setting. Please try again.');
     }
   };
 

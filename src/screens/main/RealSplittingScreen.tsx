@@ -56,8 +56,9 @@ interface Friend {
   friendId: string;
   friendData: {
     id: string;
-    fullName: string; 
+    fullName: string;
     email: string;
+    mobile?: string;
     avatar?: string;
     profilePicture?: string;
     profileImage?: string;
@@ -411,7 +412,13 @@ export default function RealSplittingScreen() {
   // Set up subscription helper when component mounts
   useEffect(() => {
     // Removed local subscription modal handler - using global App.tsx handler now
-    
+
+    // Set up global function to refresh friends data (called when profile picture is updated)
+    (global as any).refreshFriendsData = () => {
+      console.log('🔄 Global refreshFriendsData called - reloading friends');
+      loadFriendsAndRequests();
+    };
+
     // Set up global function to open Add Expense modal with subscription check
     (global as any).openAddExpenseModal = async () => {
       console.log('🚀 Global openAddExpenseModal called - checking subscription limits');
@@ -515,12 +522,15 @@ export default function RealSplittingScreen() {
   // FIXED: Initialize friends data when user is available
   useEffect(() => {
     if (user?.id) {
-      console.log('🔄 Initializing friends data for user:', user.id);
-      loadFriendsAndRequests().then(() => {
-        console.log('✅ Friends data initialization complete');
-      }).catch((error) => {
-        console.error('❌ Friends data initialization failed:', error);
-      });
+      console.log('🔄 Initializing friends data for user (non-blocking):', user.id);
+      // Load friends in background without blocking UI
+      setTimeout(() => {
+        loadFriendsAndRequests().then(() => {
+          console.log('✅ Friends data initialization complete');
+        }).catch((error) => {
+          console.error('❌ Friends data initialization failed:', error);
+        });
+      }, 100); // Small delay to allow UI to render first
     }
   }, [user?.id]);
 
@@ -1563,6 +1573,7 @@ export default function RealSplittingScreen() {
             id: friendId,
             fullName: displayName,
             email: email,
+            mobile: request.toUser?.phone || request.toPhone || request.mobile || request.phoneNumber || '',
             avatar: request.recipientAvatar || request.recipientProfilePicture || request.recipientProfileImage || '',
             profilePicture: request.recipientProfilePicture || request.recipientProfileImage || request.recipientAvatar || '',
             profileImage: request.recipientProfileImage || request.recipientProfilePicture || request.recipientAvatar || ''
@@ -1575,7 +1586,8 @@ export default function RealSplittingScreen() {
           // Add required fields for reminder functionality
           requestId: request.id, // Use the request ID for reminders
           inviteMethod: request.type || request.inviteMethod || (isNewUserInvite ? 'email' : 'push'), // Determine method from request type
-          isNewUser: isNewUserInvite // Boolean flag for new user invites
+          isNewUser: isNewUserInvite, // Boolean flag for new user invites
+          toPhone: request.toPhone || request.mobile || request.phoneNumber || '' // Store phone for display
         };
       });
       
@@ -1913,29 +1925,13 @@ export default function RealSplittingScreen() {
           console.log('⚠️ Skipping chat message - groupId:', processedData.groupId, 'user:', !!user, 'expenseId:', expenseId);
         }
 
-        // Notify all listeners about the new expense
-        ExpenseRefreshService.getInstance().notifyExpenseAdded();
-        
-        // Force refresh local data and notify balance system
-        await Promise.all([
-          loadGroups(),
-          loadRecentExpenses()
-        ]);
-        
-        // FIXED: Immediate balance refresh without debounce for critical operations
-        console.log('🔄 EXPENSE ADDED: Forcing immediate balance refresh...');
-        UnifiedSettlementService.clearBalanceCache();
-        await sharedBalances.forceRefresh();
-        
-        // Also trigger the regular notification for other components
-        notifyBalanceChange();
-        
+        // Close modal and show success immediately (before data loading)
         setShowAddExpense(false);
         setSelectedGroupForExpense(null);
-        
+
         // Show full-screen success with navigation to group details
         showFullScreenSuccessAnimation(
-          'Expense Added! 🧾', 
+          'Expense Added! 🧾',
           'Expense has been added and split successfully!',
           fromGroupDetails ? `Added to ${fromGroupDetails.name}` : 'Check your groups for updates',
           fromGroupDetails ? 'View Expense' : 'Continue',
@@ -1951,6 +1947,24 @@ export default function RealSplittingScreen() {
             }
           }
         );
+
+        // Notify all listeners about the new expense
+        ExpenseRefreshService.getInstance().notifyExpenseAdded();
+
+        // Run data refresh in background (non-blocking) after showing success
+        Promise.all([
+          loadGroups(),
+          loadRecentExpenses(),
+          // Immediate balance refresh without debounce for critical operations
+          (async () => {
+            console.log('🔄 EXPENSE ADDED: Forcing immediate balance refresh in background...');
+            UnifiedSettlementService.clearBalanceCache();
+            await sharedBalances.forceRefresh();
+            notifyBalanceChange();
+          })()
+        ]).catch(error => {
+          console.error('⚠️ Background data refresh failed:', error);
+        });
       }
       
     } catch (error: any) {
@@ -3630,7 +3644,14 @@ export default function RealSplittingScreen() {
                 // Determine if this is a received friend request or sent invitation
                 const isReceivedRequest = friend.requestType === 'received' && friend.status === 'pending_incoming';
                 const isSentRequest = !isReceivedRequest && (friend.status === 'pending' || friend.status === 'invited');
-                const friendName = friend.friendData?.fullName || friend.friendData?.email || 'Unknown Friend';
+                // Check for name, email, or full phone number
+                const friendName = friend.friendData?.fullName ||
+                                   friend.friendData?.email ||
+                                   (friend.friendData as any)?.mobile ||
+                                   (friend.friendData as any)?.phone ||
+                                   (friend.friendData as any)?.phoneNumber ||
+                                   (friend as any)?.toPhone ||
+                                   'Unknown Friend';
                 const friendInitial = friendName && typeof friendName === 'string' ? friendName.charAt(0).toUpperCase() : '?';
                 
                 return (

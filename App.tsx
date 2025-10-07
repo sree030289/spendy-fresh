@@ -126,11 +126,17 @@ const AppNavigator = () => {
         
         // If user is already authenticated, go to main app
         if (user) {
-          console.log('✅ User already authenticated, extending session');
-          await apiService.extendUserSession();
-          await BiometricAuthService.extendSession();
+          console.log('✅ User already authenticated, extending session in background');
           setBiometricFailed(false); // Reset biometric failed flag on successful auth
           setAuthFlowState('authenticated');
+
+          // Extend session in background (non-blocking)
+          Promise.all([
+            apiService.extendUserSession(),
+            BiometricAuthService.extendSession()
+          ]).catch(error => {
+            console.error('⚠️ Failed to extend session:', error);
+          });
           return;
         }
 
