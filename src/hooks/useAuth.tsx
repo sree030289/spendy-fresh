@@ -467,32 +467,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🔄 Restoring session after biometric authentication');
       setIsLoading(true);
       
-      // Get stored auth data - BOTH are required for proper restoration
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+      // CRITICAL FIX: Get fresh Firebase token instead of using stale AsyncStorage token
+      console.log('🔑 Getting fresh Firebase token...');
+      const { BiometricAuthService } = await import('@/services/biometric/BiometricAuthService');
       
-      console.log('🔍 Session restore - checking stored data:', {
-        hasToken: !!token,
-        hasUserData: !!userData,
-        tokenLength: token ? token.length : 0
-      });
-      
-      // If no token or userData, fallback to manual login
-      if (!token || !userData) {
-        console.log('⚠️ Session restore - missing auth data, falling back to manual login');
-        console.log('🔍 Session restore - checking for stored user session...');
-        
-        // Try to get last user session for email pre-fill
+      // Validate Firebase session first
+      const isFirebaseSessionValid = await BiometricAuthService.validateFirebaseSession();
+      if (!isFirebaseSessionValid) {
+        console.log('⚠️ Firebase session invalid, requiring manual login');
+        // Check for last user email for better UX
         const sessionData = await apiService.getLastUserSession();
         if (sessionData && sessionData.email) {
           console.log('🔍 Found last user session, requiring manual login for:', sessionData.email);
-          // DO NOT clear biometric preference - it should persist across logins
-          // The biometric preference should only be cleared when user explicitly disables it
           throw new Error('MANUAL_LOGIN_REQUIRED');
         } else {
-          console.error('❌ No session data found');
-          throw new Error('Authentication data not found. Please login again.');
+          throw new Error('Session expired. Please login again.');
         }
+      }
+      
+      // Get fresh token from Firebase (not AsyncStorage)
+      const freshToken = await BiometricAuthService.getFreshToken();
+      if (!freshToken) {
+        console.log('❌ Could not get fresh token');
+        throw new Error('MANUAL_LOGIN_REQUIRED');
+      }
+      
+      console.log('✅ Fresh Firebase token obtained');
+      
+      // Get stored user data
+      const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+      if (!userData) {
+        console.log('⚠️ No stored user data found');
+        throw new Error('MANUAL_LOGIN_REQUIRED');
       }
       
       const parsedUser = JSON.parse(userData);
@@ -502,13 +508,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         fullName: parsedUser.fullName
       });
       
-      // CRITICAL: Set the auth token in ApiService instance
-      console.log('🔑 Setting auth token in ApiService instance...');
-      await apiService.restoreAuthToken(token);
-      console.log('✅ Auth token set in ApiService');
-      
-      // Verify the token works by getting fresh profile data
-      console.log('🔍 Session restore - calling API getProfile to verify token...');
+      // Verify the fresh token works by getting profile data
+      console.log('🔍 Session restore - calling API getProfile to verify fresh token...');
       const profileData = await apiService.getProfile();
       console.log('🔍 Session restore - API profile data received:', {
         id: profileData.id,

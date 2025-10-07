@@ -820,6 +820,55 @@ export default function ProfileScreen() {
     try {
       const newBiometricState = !user.biometricEnabled;
 
+      if (newBiometricState) {
+        // Enabling biometric authentication - need to validate hardware and authenticate first
+        const { BiometricAuthService } = await import('@/services/biometric/BiometricAuthService');
+        
+        // Check if hardware is available
+        const isAvailable = await BiometricAuthService.isHardwareAvailable();
+        if (!isAvailable) {
+          Alert.alert(
+            'Biometric Not Available',
+            'Biometric authentication is not available on this device. Please ensure Face ID or Touch ID is set up in your device settings.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        // Validate Firebase session to ensure we can save this preference
+        const isSessionValid = await BiometricAuthService.validateFirebaseSession();
+        if (!isSessionValid) {
+          Alert.alert(
+            'Session Required',
+            'Please log in again to enable biometric authentication.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        // Perform biometric authentication to confirm
+        const { BiometricService } = await import('@/services/biometric');
+        const result = await BiometricService.authenticate();
+        
+        if (!result.success) {
+          if (result.error && result.error !== 'User cancelled') {
+            Alert.alert('Authentication Failed', result.error);
+          }
+          return;
+        }
+
+        // Save biometric preference for this specific user
+        await BiometricAuthService.setBiometricEnabledForUser(user.id, true);
+        
+        // Update global biometric setting
+        await AsyncStorage.setItem('@spendy_biometric_enabled', JSON.stringify(true));
+      } else {
+        // Disabling biometric authentication
+        const { BiometricAuthService } = await import('@/services/biometric/BiometricAuthService');
+        await BiometricAuthService.setBiometricEnabledForUser(user.id, false);
+        await AsyncStorage.setItem('@spendy_biometric_enabled', JSON.stringify(false));
+      }
+
       // Update user setting without showing global loading
       await updateUser({ biometricEnabled: newBiometricState });
 
