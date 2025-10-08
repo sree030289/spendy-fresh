@@ -721,6 +721,28 @@ export default function ProfileScreen() {
 
       console.log('✅ Profile picture updated successfully!');
 
+      // Force immediate refresh of user profile from backend to get latest data
+      try {
+        console.log('🔄 Refreshing user profile from backend to ensure sync...');
+        const profileData = await apiService.getProfile();
+        if (profileData && profileData.profileImage) {
+          console.log('✅ Got updated profile from backend:', profileData.profileImage.substring(0, 50) + '...');
+          // Update auth context with fresh backend data
+          if (updateUser && typeof updateUser === 'function') {
+            await updateUser({
+              profilePicture: profileData.profileImage,
+              profileImage: profileData.profileImage,
+              updatedAt: new Date()
+            });
+          }
+          // Update local cached picture with backend URL
+          setCachedProfilePicture(profileData.profileImage);
+          setImageRefreshKey(prev => prev + 1);
+        }
+      } catch (refreshError) {
+        console.warn('⚠️ Failed to refresh profile from backend, using uploaded URL:', refreshError);
+      }
+
       // Clear loading state before showing alert to prevent blank screen
       setLoading(false);
 
@@ -1047,7 +1069,18 @@ export default function ProfileScreen() {
             {(cachedProfilePicture || user.profilePicture) ? (
               <Image
                 key={`profile-${imageRefreshKey}`}
-                source={{ uri: cachedProfilePicture || user.profilePicture }}
+                source={{ 
+                  uri: (() => {
+                    const baseUri = cachedProfilePicture || user.profilePicture || '';
+                    // Add cache-busting query parameter for remote URLs to force fresh image load
+                    if (baseUri.startsWith('http://') || baseUri.startsWith('https://')) {
+                      const separator = baseUri.includes('?') ? '&' : '?';
+                      return `${baseUri}${separator}t=${imageRefreshKey}`;
+                    }
+                    // Return local file URIs as-is
+                    return baseUri;
+                  })()
+                }}
                 style={styles.profileImage}
                 onLoad={() => {
                   console.log('🖼️ Profile image loaded successfully:', cachedProfilePicture || user.profilePicture);

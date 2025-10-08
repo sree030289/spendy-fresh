@@ -897,37 +897,40 @@ export default function RealSplittingScreen() {
       try {
         setLoading(true);
         
-        // Initialize push notifications first
-        console.log('⏰ Step 0: Initializing push notifications...');
-        try {
-          await SimpleNotificationService.initialize();
-          console.log('✅ Step 0 complete: Push notifications initialized');
-        } catch (notificationError) {
-          console.error('⚠️ Push notification initialization failed:', notificationError);
-          // Don't fail the entire initialization if notifications fail
-        }
+        // PERFORMANCE: Show UI immediately, load all data in background
+        console.log('⚡ OPTIMIZED: Showing UI immediately, loading data in background...');
+        setLoading(false); // Show UI immediately with loading skeletons
         
-        // Load friends and requests FIRST
-        console.log('🚀 Starting data loading - user ID:', user?.id);
-        console.log('⏰ Step 1: Loading friends and requests...');
-        const loadedFriends = await loadFriendsAndRequests();
-        console.log('✅ Step 1 complete: Friends data loaded', loadedFriends.length, 'friends');
+        // Initialize push notifications in background (non-blocking)
+        console.log('⏰ Background: Initializing push notifications...');
+        SimpleNotificationService.initialize().catch(error => {
+          console.error('⚠️ Push notification initialization failed:', error);
+        });
         
-        // Load groups SECOND (needed for user name resolution in expenses)
-        console.log('⏰ Step 2: Loading groups...');
-        const loadedGroups = await loadGroups();
-        console.log('✅ Step 2 complete: Groups data loaded', loadedGroups.length, 'groups');
+        // PARALLEL LOADING: Load all essential data simultaneously for faster initial load
+        console.log('🚀 Starting parallel data loading - user ID:', user?.id);
+        console.log('⏰ Loading friends, groups, and notifications in parallel...');
         
-        // Load notifications in parallel (not needed for expenses)
-        console.log('⏰ Step 3: Loading notifications...');
-        await loadNotifications();
-        console.log('✅ Step 3 complete: Notifications loaded');
+        const [loadedFriends, loadedGroups] = await Promise.all([
+          loadFriendsAndRequests().catch(error => {
+            console.error('❌ Friends loading failed:', error);
+            return [];
+          }),
+          loadGroups().catch(error => {
+            console.error('❌ Groups loading failed:', error);
+            return [];
+          }),
+          loadNotifications().catch(error => {
+            console.error('❌ Notifications loading failed:', error);
+          })
+        ]);
         
-        // PERFORMANCE: Load essential data first, defer expenses for better UX
-        console.log('⏰ Essential data loaded, showing UI immediately');
-        setLoading(false); // Show UI immediately with balance data
+        console.log('✅ Parallel loading complete:', {
+          friends: loadedFriends.length,
+          groups: loadedGroups.length
+        });
         
-        // LAZY LOAD: Load recent expenses in background after UI is shown
+        // LAZY LOAD: Load recent expenses in background after critical data
         console.log('⏰ Background: Starting lazy load of expenses...');
         setTimeout(() => {
           loadRecentExpenses(loadedFriends, loadedGroups).then(() => {
@@ -949,7 +952,6 @@ export default function RealSplittingScreen() {
       } catch (error) {
         console.error('Initialize splitting screen error:', error);
         Alert.alert('Error', 'Failed to load data. Please try again.');
-      } finally {
         setLoading(false);
       }
     };
