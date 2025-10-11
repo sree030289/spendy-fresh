@@ -1,5 +1,5 @@
 // src/components/modals/CreateGroupModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../common/Icon';
@@ -41,6 +42,74 @@ const [selectedFriends, setSelectedFriends] = useState<string[]>([]); // Keep th
   const [inviteMethod, setInviteMethod] = useState<'none' | 'sms' | 'whatsapp' | 'email'>('none');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({ name: '' });
+
+  // Animation for loading spinner
+  const spinValue = useRef(new Animated.Value(0)).current;
+  const pulseValue = useRef(new Animated.Value(1)).current;
+
+  // Animated circular loader
+  const CircularLoader = () => {
+    useEffect(() => {
+      // Spin animation
+      const spinAnimation = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      );
+
+      // Pulse animation
+      const pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseValue, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseValue, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      spinAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        spinAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = spinValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <View style={styles.loaderWrapper}>
+        <Animated.View
+          style={[
+            styles.loaderCircle,
+            {
+              transform: [{ rotate: spin }, { scale: pulseValue }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.loaderCircleInner,
+            {
+              transform: [{ rotate: spin }, { scale: pulseValue }],
+            },
+          ]}
+        />
+      </View>
+    );
+  };
 
   const validateGroupName = (name: string): boolean => {
     if (!name.trim()) {
@@ -343,11 +412,21 @@ const renderInviteMethod = () => (
             <Button
               title="Create Group"
               onPress={handleCreateGroup}
-              loading={loading}
+              loading={false}
               style={styles.footerButton}
             />
           </View>
         </View>
+
+        {/* Loading Overlay */}
+        {loading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContainer}>
+              <CircularLoader />
+              <Text style={styles.loadingText}>Creating Group...</Text>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
     );
 }
@@ -570,4 +649,62 @@ const styles = StyleSheet.create({
   fontWeight: '500',
   marginTop: 2,
 },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    width: 160,
+    height: 160,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  loaderWrapper: {
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderCircle: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 5,
+    borderColor: '#E0E7FF',
+    borderTopColor: '#3B82F6',
+    borderRightColor: '#3B82F6',
+  },
+  loaderCircleInner: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 4,
+    borderColor: 'transparent',
+    borderTopColor: '#818CF8',
+    borderLeftColor: '#818CF8',
+  },
 });

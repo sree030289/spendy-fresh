@@ -62,13 +62,20 @@ interface ChatMessage {
   userAvatar?: string;
   message: string;
   timestamp: Date;
-  type: 'message' | 'expense' | 'system';
+  type: 'message' | 'expense' | 'system' | 'settlement';
   expenseData?: {
     id: string;
     description: string;
     amount: number;
     currency: string;
     expenseDate?: Date;
+    isEdit?: boolean;
+  };
+  settlementData?: {
+    fromUserName: string;
+    toUserName: string;
+    amount: number;
+    currency: string;
   };
 }
 
@@ -259,6 +266,42 @@ const renderMessage = (message: ChatMessage, index: number) => {
           {message.expenseData?.expenseDate && 
             ` • Expense date: ${new Date(message.expenseData.expenseDate).toLocaleDateString()}`
           }
+        </Text>
+        
+        <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
+          {formatMessageTime(message.timestamp)}
+        </Text>
+      </View>
+    );
+  }
+
+  if (message.type === 'settlement') {
+    // Render settlement message with success styling
+    return (
+      <View key={message.id} style={[
+        styles.systemMessage, 
+        { backgroundColor: theme.colors.success + '20' }
+      ]}>
+        <View style={styles.expenseMessageHeader}>
+          <Icon 
+            name="success" 
+            size={18} 
+            color={theme.colors.success} 
+          />
+          <Text style={[
+            styles.expenseMessageTitle, 
+            { color: theme.colors.success }
+          ]}>
+            Payment Completed
+          </Text>
+        </View>
+        
+        <Text style={[styles.expenseMessageText, { color: theme.colors.text }]}>
+          {message.settlementData?.fromUserName} paid {getCurrencySymbol(message.settlementData?.currency || 'USD')}{message.settlementData?.amount.toFixed(2)} to {message.settlementData?.toUserName}
+        </Text>
+        
+        <Text style={[styles.expenseMessageSubtext, { color: theme.colors.textSecondary }]}>
+          Marked by {message.userName}
         </Text>
         
         <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>

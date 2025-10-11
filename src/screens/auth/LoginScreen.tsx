@@ -20,7 +20,6 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
-import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
 import { ApiService } from '@/services/api/ApiService';
 import { MeetNSplitLogo } from '@/components/common/MeetNSplitLogo';
 import { BrandHeader } from '@/components/common/BrandHeader';
@@ -207,16 +206,13 @@ export default function LoginScreen() {
       await login(email.trim().toLowerCase(), password);
       console.log('LoginScreen: Login successful, user should be set');
       
-      // Clear any previous biometric fail counts on successful login
-      await BiometricAuthService.clearFailCount();
-      
       // Check if user doesn't have biometric enabled and device supports it
-      const hasHardware = await BiometricAuthService.isHardwareAvailable();
+      const isAvailable = await BiometricService.isAvailable();
       const userHasBiometric = await apiService.getLastBiometricSetting();
       
-      console.log('🔍 Checking biometric setup:', { hasHardware, userHasBiometric, userId: user?.id });
+      console.log('🔍 Checking biometric setup:', { isAvailable, userHasBiometric, userId: user?.id });
       
-      if (hasHardware && !userHasBiometric && user?.id) {
+      if (isAvailable && !userHasBiometric && user?.id) {
         console.log('🔍 Offering biometric setup for user');
         setTimeout(() => {
           Alert.alert(
@@ -229,7 +225,8 @@ export default function LoginScreen() {
                 onPress: async () => {
                   try {
                     // Save biometric preference for this user
-                    await BiometricAuthService.setBiometricEnabledForUser(user.id, true);
+                    await AsyncStorage.setItem(`@spendy_biometric_enabled_${user.id}`, 'true');
+                    await AsyncStorage.setItem('@spendy_biometric_enabled', 'true');
                     
                     // Update the stored session with biometric enabled
                     if (user) {
@@ -265,58 +262,26 @@ export default function LoginScreen() {
   const handleBiometricLogin = async () => {
     setBiometricLoading(true);
     try {
-      // Step 1: Perform biometric authentication first
       const result = await BiometricService.authenticate();
-      if (!result.success) {
+      if (result.success) {
+        console.log('✅ Biometric authentication successful, restoring session');
+
+        // Use the proper session restoration from useAuth
+        await restoreSessionFromBiometric();
+
+        console.log('✅ Session restored successfully via biometric login');
+        // Navigation will happen automatically via useAuth state change
+      } else {
         console.log('❌ Biometric authentication failed:', result.error);
         if (result.error && result.error !== 'User cancelled') {
           Alert.alert('Authentication Failed', result.error);
         }
-        return;
       }
-
-      console.log('✅ Biometric authentication successful');
-
-      // Step 2: Validate Firebase session and get fresh token
-      const isSessionValid = await BiometricAuthService.validateFirebaseSession();
-      if (!isSessionValid) {
-        console.log('⚠️ Firebase session invalid, requiring manual login');
-        Alert.alert(
-          'Session Expired',
-          'Your session has expired. Please login with your password.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      // Step 3: Restore session with fresh Firebase token
-      console.log('🔄 Restoring session with fresh Firebase token...');
-      await restoreSessionFromBiometric();
-
-      console.log('✅ Session restored successfully via biometric login');
-      // Navigation will happen automatically via useAuth state change
     } catch (error: any) {
       console.error('❌ Biometric login error:', error);
-      
-      // Show single, clear error message based on error type
-      if (error?.message === 'MANUAL_LOGIN_REQUIRED') {
-        Alert.alert(
-          'Login Required',
-          'Please login with your email and password.',
-          [{ text: 'OK' }]
-        );
-      } else if (error?.message?.includes('Session expired')) {
-        Alert.alert(
-          'Session Expired',
-          'Your session has expired. Please login again.',
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert(
-          'Login Failed',
-          'Unable to restore your session. Please login with your password.',
-          [{ text: 'OK' }]
-        );
+      // Only show alert for non-manual-login-required errors
+      if (error?.message !== 'MANUAL_LOGIN_REQUIRED') {
+        Alert.alert('Error', 'Failed to restore session. Please login with your password.');
       }
     } finally {
       setBiometricLoading(false);
@@ -513,26 +478,27 @@ export default function LoginScreen() {
       fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
     },
     registerButton: {
-      backgroundColor: '#F9FAFB',
+      backgroundColor: colors.brand,
       borderRadius: 25,
       paddingVertical: 18,
       alignItems: 'center',
-      marginTop: 8,
+      marginTop: 24,
+      marginBottom: 16,
       borderWidth: 1,
-      borderColor: '#E5E7EB',
-      shadowColor: '#000',
+      borderColor: colors.brand,
+      shadowColor: colors.brand,
       shadowOffset: {
         width: 0,
-        height: 1,
+        height: 4,
       },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
-      elevation: 1,
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
     },
     registerButtonText: {
-      fontSize: 15,
-      color: '#6B7280',
-      fontWeight: '500',
+      fontSize: 16,
+      color: '#FFFFFF',
+      fontWeight: '600',
       fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
     },
   });

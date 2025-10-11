@@ -65,6 +65,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profileData = await apiService.getProfile();
           const parsedUser = JSON.parse(userData);
           
+          // Debug logging for mobile number
+          console.log('🔍 Profile data from API:', {
+            mobile: (profileData as any).mobile,
+            phoneNumber: (profileData as any).phoneNumber,
+            allFields: Object.keys(profileData)
+          });
+          
           // Check for stored biometric preference
           const storedBiometric = await AsyncStorage.getItem('@spendy_biometric_enabled');
           const biometricFromStorage = storedBiometric ? JSON.parse(storedBiometric) : false;
@@ -88,12 +95,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             isPremium: profileData.isPremium,
             biometricEnabled: finalBiometricSetting,
             country: parsedUser.country || 'US',
-            mobile: (profileData as any).mobile || (profileData as any).phoneNumber || '',
-            phoneNumber: (profileData as any).mobile || (profileData as any).phoneNumber || '',
+            mobile: (profileData as any).mobile || (profileData as any).phoneNumber || parsedUser.mobile || '',
+            phoneNumber: (profileData as any).phoneNumber || (profileData as any).mobile || parsedUser.phoneNumber || '',
             subscriptionStatus: profileData.isPremium ? 'premium' : 'expired',
             createdAt: parsedUser.createdAt ? new Date(parsedUser.createdAt) : new Date(),
             updatedAt: new Date(),
           };
+          
+          console.log('✅ User object created with mobile:', user.mobile, 'phoneNumber:', user.phoneNumber);
           
           setUser(user);
           console.log('Auth state restored for user:', user.email);
@@ -125,6 +134,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('Attempting login...');
       const response = await apiService.login(email, password);
       
+      // Debug logging for mobile number
+      console.log('🔍 Login response user data:', {
+        mobile: (response.user as any).mobile,
+        phoneNumber: (response.user as any).phoneNumber,
+        allFields: Object.keys(response.user)
+      });
+      
       // Convert API response to User type
       const user: User = {
         id: response.user.id,
@@ -137,11 +153,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         biometricEnabled: false, // Will be updated from stored preferences
         country: (response.user as any).country || 'US',
         mobile: (response.user as any).mobile || (response.user as any).phoneNumber || '',
-        phoneNumber: (response.user as any).mobile || (response.user as any).phoneNumber || '',
+        phoneNumber: (response.user as any).phoneNumber || (response.user as any).mobile || '',
         subscriptionStatus: response.user.isPremium ? 'premium' : 'expired',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      
+      console.log('✅ User object created with mobile:', user.mobile, 'phoneNumber:', user.phoneNumber);
 
       // Check for stored biometric preference to restore after manual login
       const storedBiometric = await AsyncStorage.getItem('@spendy_biometric_enabled');
@@ -283,9 +301,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const userEmail = currentUser?.email;
       const userBiometricEnabled = currentUser?.biometricEnabled;
 
-      // Create timeout wrapper to prevent hanging
+      // Create timeout wrapper to prevent hanging - reduced to 2 seconds
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Logout timeout')), 5000)
+        setTimeout(() => reject(new Error('Logout timeout')), 2000)
       );
 
       const logoutPromise = (async () => {
@@ -313,13 +331,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await Promise.race([logoutPromise, timeoutPromise]);
 
       console.log('Logout successful');
+      
+      // Clear user FIRST, then clear loading state to prevent stuck overlay
+      setUser(null);
+      setIsLoading(false);
     } catch (error) {
       console.error('Logout error:', error);
       // Force logout even on error by clearing user state
       setUser(null);
-      console.log('Force logout completed despite error');
-    } finally {
       setIsLoading(false);
+      console.log('Force logout completed despite error');
     }
   };
 
@@ -464,40 +485,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const restoreSessionFromBiometric = async () => {
     try {
-      console.log('🔄 Restoring session after biometric authentication');
-      setIsLoading(true);
       
-      // CRITICAL FIX: Get fresh Firebase token instead of using stale AsyncStorage token
-      console.log('🔑 Getting fresh Firebase token...');
-      const { BiometricAuthService } = await import('@/services/biometric/BiometricAuthService');
       
-      // Validate Firebase session first
-      const isFirebaseSessionValid = await BiometricAuthService.validateFirebaseSession();
-      if (!isFirebaseSessionValid) {
-        console.log('⚠️ Firebase session invalid, requiring manual login');
-        // Check for last user email for better UX
-        const sessionData = await apiService.getLastUserSession();
-        if (sessionData && sessionData.email) {
-          console.log('🔍 Found last user session, requiring manual login for:', sessionData.email);
-          throw new Error('MANUAL_LOGIN_REQUIRED');
-        } else {
-          throw new Error('Session expired. Please login again.');
-        }
-      }
-      
-      // Get fresh token from Firebase (not AsyncStorage)
-      const freshToken = await BiometricAuthService.getFreshToken();
-      if (!freshToken) {
-        console.log('❌ Could not get fresh token');
-        throw new Error('MANUAL_LOGIN_REQUIRED');
-      }
-      
-      console.log('✅ Fresh Firebase token obtained');
-      
-      // Get stored user data
+      // Get stored auth token and user data
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
       const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
-      if (!userData) {
-        console.log('⚠️ No stored user data found');
+      
+      console.log('🔍 Session restore - checking stored data:', {
+        hasToken: !!token,
+        hasUserData: !!userData,
+        tokenLength: token ? token.length : 0
+      });
+      
+      // If no token or userData, require manual login
+      if (!token || !userData) {
+        console.log('⚠️ No stored credentials found');
         throw new Error('MANUAL_LOGIN_REQUIRED');
       }
       
@@ -508,8 +510,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         fullName: parsedUser.fullName
       });
       
-      // Verify the fresh token works by getting profile data
-      console.log('🔍 Session restore - calling API getProfile to verify fresh token...');
+      // Set the auth token in ApiService instance
+      console.log('🔑 Setting auth token in ApiService instance...');
+      await apiService.restoreAuthToken(token);
+      console.log('✅ Auth token set in ApiService');
+      
+      // Verify the token works by getting fresh profile data
+      console.log('🔍 Session restore - calling API getProfile to verify token...');
       const profileData = await apiService.getProfile();
       console.log('🔍 Session restore - API profile data received:', {
         id: profileData.id,

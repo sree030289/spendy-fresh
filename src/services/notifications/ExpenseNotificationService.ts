@@ -378,12 +378,19 @@ export class ExpenseNotificationService {
       await Promise.all(memberPromises);
 
       // Send colored system message to group chat
+      // 5. Send group chat message
       await GroupChatService.sendGroupMessage({
         groupId: settlement.groupId,
         userId: settlement.settledBy,
         userName: settlement.settledByUserData.fullName,
-        message: `💸 Settlement marked: ${settlement.fromUserData.fullName} paid ${settlement.currency}${settlement.amount} to ${settlement.toUserData.fullName}`,
-        type: 'system'
+        message: `Settlement marked: ${settlement.fromUserData.fullName} paid ${settlement.currency}${settlement.amount} to ${settlement.toUserData.fullName}`,
+        type: 'settlement',
+        settlementData: {
+          fromUserName: settlement.fromUserData.fullName,
+          toUserName: settlement.toUserData.fullName,
+          amount: settlement.amount,
+          currency: settlement.currency
+        }
       });
 
       console.log('✅ Settlement notifications sent');

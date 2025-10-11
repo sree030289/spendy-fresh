@@ -94,7 +94,9 @@ export default function RemindModal({
         const phoneNumber = (friend.friendData as any).mobile ||
                            (friend.friendData as any).phone ||
                            (friend.friendData as any).phoneNumber ||
-                           (friend.friendData as any).normalizedMobile;
+                           (friend.friendData as any).normalizedMobile ||
+                           (friend as any).mobile ||
+                           (friend as any).phone;
 
         if (!phoneNumber || phoneNumber.trim() === '' || phoneNumber === 'undefined') {
           Alert.alert('Error', 'This friend doesn\'t have a valid phone number. Please ask them to add their phone number in their profile.');
@@ -106,7 +108,11 @@ export default function RemindModal({
         
         if (canOpen) {
           await Linking.openURL(url);
-          await onSendReminder(method, message);
+          
+          // Try to save reminder to backend (non-critical, already logged in parent)
+          onSendReminder(method, message).catch(() => {
+            // Silently ignore - error already logged in parent handler
+          });
           
           // Use animated success instead of Alert
           if (onSuccess) {
@@ -131,7 +137,11 @@ export default function RemindModal({
         
         try {
           await Linking.openURL(url);
-          await onSendReminder(method, message);
+          
+          // Try to save reminder to backend (non-critical, already logged in parent)
+          onSendReminder(method, message).catch(() => {
+            // Silently ignore - error already logged in parent handler
+          });
           
           // Use animated success instead of Alert
           if (onSuccess) {
@@ -144,7 +154,11 @@ export default function RemindModal({
           const webUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
           try {
             await Linking.openURL(webUrl);
-            await onSendReminder(method, message);
+            
+            // Try to save reminder to backend (non-critical, already logged in parent)
+            onSendReminder(method, message).catch(() => {
+              // Silently ignore - error already logged in parent handler
+            });
             
             if (onSuccess) {
               onSuccess('WhatsApp Web Opened! 💚', 'Please send the message to complete the reminder');
@@ -156,14 +170,20 @@ export default function RemindModal({
           }
         }
       } else if (method === 'app') {
-        // Send app notification
-        await onSendReminder(method, message);
-        
-        // Use animated success instead of Alert
-        if (onSuccess) {
-          onSuccess('Reminder Sent! 🔔', 'In-app notification has been sent successfully');
-        } else {
-          Alert.alert('Success', 'In-app reminder sent!');
+        // Send app notification - this one actually needs the backend to work
+        try {
+          await onSendReminder(method, message);
+          
+          // Use animated success instead of Alert
+          if (onSuccess) {
+            onSuccess('Reminder Sent! 🔔', 'In-app notification has been sent successfully');
+          } else {
+            Alert.alert('Success', 'In-app reminder sent!');
+          }
+        } catch (error) {
+          console.error('Failed to send in-app reminder:', error);
+          Alert.alert('Error', 'Failed to send in-app notification. Please try again.');
+          return;
         }
       }
       

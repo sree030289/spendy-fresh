@@ -12,6 +12,7 @@ import {
   Keyboard,
   Image,
   KeyboardAvoidingView,
+  Animated,
 } from 'react-native';
 import { Icon } from '../common/Icon';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -26,6 +27,7 @@ import { getCurrencySymbol } from '@/utils/currency';
 import * as ImagePicker from 'expo-image-picker';
 import { useRobustReceiptScanner } from '@/services/useRobustReceiptScanner';
 import { SubscriptionHelper } from '@/utils/SubscriptionHelper';
+import { SubscriptionService } from '@/services/SubscriptionService';
 
 // Helper function to get active member count
 const getActiveMemberCount = (members: any[]): number => {
@@ -103,6 +105,74 @@ export default function AddExpenseModal({
 
   // Errors
   const [errors, setErrors] = useState<any>({});
+
+  // Animation for loading spinner
+  const spinValue = useRef(new Animated.Value(0)).current;
+  const pulseValue = useRef(new Animated.Value(1)).current;
+
+  // Animated circular loader
+  const CircularLoader = () => {
+    useEffect(() => {
+      // Spin animation
+      const spinAnimation = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      );
+
+      // Pulse animation
+      const pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseValue, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseValue, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      spinAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        spinAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = spinValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <View style={styles.loaderWrapper}>
+        <Animated.View
+          style={[
+            styles.loaderCircle,
+            {
+              transform: [{ rotate: spin }, { scale: pulseValue }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.loaderCircleInner,
+            {
+              transform: [{ rotate: spin }, { scale: pulseValue }],
+            },
+          ]}
+        />
+      </View>
+    );
+  };
 
   useEffect(() => {
     if (visible) {
@@ -562,12 +632,12 @@ const initializeSplitData = () => {
       return;
     }
 
-    // Check if user has access to premium receipt scanning BEFORE camera permissions
-    const subscriptionHelper = SubscriptionHelper.getInstance();
-    const hasAccess = await subscriptionHelper.checkReceiptScanningAccess(user.id);
+    // Check if user is premium WITHOUT showing subscription modal
+    const subscriptionService = SubscriptionService.getInstance();
+    const isPremium = await subscriptionService.isPremiumUser(user.id);
 
-    if (!hasAccess) {
-      // Close AddExpenseModal first to show subscription modal properly
+    if (!isPremium) {
+      // Show alert only - don't trigger subscription modal in background
       Alert.alert(
         'Premium Feature',
         'Receipt scanning is a premium feature. Upgrade to use this feature.',
@@ -583,6 +653,7 @@ const initializeSplitData = () => {
               onClose();
               // Then show subscription modal (with small delay to ensure clean transition)
               setTimeout(() => {
+                const subscriptionHelper = SubscriptionHelper.getInstance();
                 subscriptionHelper.showPremiumFeatureAlert('Receipt Scanning');
               }, 300);
             }
@@ -1722,7 +1793,7 @@ const initializeSplitData = () => {
             <Button
               title="Add Expense"
               onPress={handleSubmit}
-              loading={loading}
+              loading={false}
               style={StyleSheet.flatten([styles.footerButton, activeStep === 'review' && styles.fullWidthButton])}
             />
           ) : (
@@ -1735,6 +1806,26 @@ const initializeSplitData = () => {
           )}
         </View>
       </View>
+
+      {/* Loading Overlay */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <CircularLoader />
+            <Text style={styles.loadingText}>Submitting...</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Receipt Processing Overlay */}
+      {isProcessingReceipt && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <CircularLoader />
+            <Text style={styles.loadingText}>Processing Receipt...</Text>
+          </View>
+        </View>
+      )}
 
     </FullscreenModal>
   );
@@ -2255,5 +2346,63 @@ const styles = StyleSheet.create({
   },
   reviewUploadText: {
     fontSize: 12,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    width: 160,
+    height: 160,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  loaderWrapper: {
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderCircle: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 5,
+    borderColor: '#E0E7FF',
+    borderTopColor: '#3B82F6',
+    borderRightColor: '#3B82F6',
+  },
+  loaderCircleInner: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 4,
+    borderColor: 'transparent',
+    borderTopColor: '#818CF8',
+    borderLeftColor: '#818CF8',
   },
 });

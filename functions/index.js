@@ -523,6 +523,16 @@ meetnsplitApp.get('/auth/profile', authenticateJWT, async (req, res) => {
   try {
     const { password, resetToken, resetTokenExpiry, verificationCode, ...userProfile } = req.user;
 
+    // Ensure mobile/phoneNumber fields are set from normalizedMobile if they're empty
+    if (userProfile.normalizedMobile && (!userProfile.mobile || !userProfile.phoneNumber)) {
+      if (!userProfile.mobile || userProfile.mobile.trim() === '') {
+        userProfile.mobile = userProfile.normalizedMobile;
+      }
+      if (!userProfile.phoneNumber || userProfile.phoneNumber.trim() === '') {
+        userProfile.phoneNumber = userProfile.normalizedMobile;
+      }
+    }
+
     res.json({
       success: true,
       message: 'Profile retrieved successfully',
@@ -1026,7 +1036,7 @@ meetnsplitApp.get('/friends', authenticateJWT, async (req, res) => {
           id: friendDoc.id,
           fullName: friendData.fullName,
           email: friendData.email,
-          mobile: friendData.mobile || friendData.phone || friendData.phoneNumber,
+          mobile: friendData.mobile || friendData.phone || friendData.phoneNumber || friendData.normalizedMobile,
           profileImage: friendData.profileImage,
           friendshipId: doc.id,
           friendsSince: friendship.createdAt,
@@ -1047,7 +1057,7 @@ meetnsplitApp.get('/friends', authenticateJWT, async (req, res) => {
           id: friendDoc.id,
           fullName: friendData.fullName,
           email: friendData.email,
-          mobile: friendData.mobile || friendData.phone || friendData.phoneNumber,
+          mobile: friendData.mobile || friendData.phone || friendData.phoneNumber || friendData.normalizedMobile,
           profileImage: friendData.profileImage,
           friendshipId: doc.id,
           friendsSince: friendship.createdAt,

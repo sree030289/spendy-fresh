@@ -1,5 +1,5 @@
 // src/screens/main/UnifiedSettlementScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   RefreshControl,
   SafeAreaView,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { Icon } from '../../components/common/Icon';
 import { useTheme } from '@/hooks/useTheme';
@@ -110,6 +111,69 @@ export default function UnifiedSettlementScreen({
   const [activeTab, setActiveTab] = useState<'settle' | 'history'>('settle');
   const [settlementHistory, setSettlementHistory] = useState<SettlementTransaction[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false); // Track if history has been loaded
+
+  // Animation refs for loader
+  const spinValue = useRef(new Animated.Value(0)).current;
+  const pulseValue = useRef(new Animated.Value(1)).current;
+
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  // Circular Loader Component
+  const CircularLoader = () => {
+    useEffect(() => {
+      // Spin animation
+      const spinAnimation = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      );
+
+      // Pulse animation
+      const pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseValue, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseValue, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      spinAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        spinAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    return (
+      <View style={styles.loaderWrapper}>
+        <Animated.View
+          style={[
+            styles.loaderCircle,
+            {
+              transform: [{ rotate: spin }, { scale: pulseValue }],
+            },
+          ]}
+        >
+          <View style={styles.loaderCircleInner} />
+        </Animated.View>
+      </View>
+    );
+  };
 
   console.log('🔧 State after initialization:', { 
     mode, 
@@ -348,9 +412,11 @@ export default function UnifiedSettlementScreen({
         setSettlementHistory([]);
         console.log('📜 No settlement history found');
       }
+      setHistoryLoaded(true); // Mark as loaded
     } catch (error) {
       console.error('❌ Failed to load settlement history:', error);
       setSettlementHistory([]);
+      setHistoryLoaded(true); // Mark as loaded even on error
     } finally {
       setHistoryLoading(false);
     }
@@ -371,12 +437,16 @@ export default function UnifiedSettlementScreen({
   const handleGroupSelect = (group: Group) => {
     setSelectedGroupId(group.id);
     setSelectedGroupName(group.name);
+    setHistoryLoaded(false); // Reset history loaded flag when switching groups
+    setActiveTab('settle'); // Reset to settle tab
   };
 
   const handleBackToGroupSelection = () => {
     setSelectedGroupId(null);
     setSelectedGroupName('');
     setSettlementSuggestions([]);
+    setHistoryLoaded(false); // Reset history loaded flag
+    setActiveTab('settle'); // Reset to settle tab
   };
 
   const handleMarkAsPaid = async (suggestion: SettlementSuggestion) => {
@@ -419,23 +489,6 @@ export default function UnifiedSettlementScreen({
 
                 console.log('✅ Settlement payment recorded successfully');
 
-                // Create chat system message for settlement in groups
-                if (suggestion.groupId && user) {
-                  try {
-                    console.log('💬 Creating settlement chat message...');
-                    await GroupChatService.sendGroupMessage({
-                      groupId: suggestion.groupId,
-                      userId: user.id,
-                      userName: 'System',
-                      message: `${suggestion.fromUserName} paid ${getCurrencySymbol(user?.currency || 'USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}`,
-                      type: 'system'
-                    });
-                    console.log('✅ Settlement chat message created');
-                  } catch (chatError) {
-                    console.error('❌ Failed to create settlement chat message:', chatError);
-                  }
-                }
-
                 // CRITICAL: Clear balance cache and force refresh to reflect settlement
                 console.log('🧹 Clearing balance cache after settlement...');
                 UnifiedSettlementService.clearBalanceCache();
@@ -444,22 +497,44 @@ export default function UnifiedSettlementScreen({
                 console.log('🔄 Force refreshing shared balances...');
                 await sharedBalances.forceRefresh();
                 
+                // Refresh the settlements to reflect the updated calculations
+                if (selectedGroupId) {
+                  console.log('🔄 Refreshing settlements after payment recording...');
+                  await loadGroupSettlements(selectedGroupId);
+                  // Force reload settlement history to show the new transaction
+                  setHistoryLoaded(false); // Reset flag to force reload
+                  await loadSettlementHistory(selectedGroupId);
+                }
+                
+                // Clear loading state BEFORE showing the success alert
+                setRecordingPayment(null);
+                
                 CrossPlatformAlert.alert(
                   'Payment Recorded',
                   `Successfully recorded ${suggestion.fromUserName}'s payment of ${getCurrencySymbol(user?.currency || 'USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}.`,
                   [{ text: 'OK' }]
                 );
-                
-                // Refresh the settlements to reflect the updated calculations
-                if (selectedGroupId) {
-                  console.log('🔄 Refreshing settlements after payment recording...');
-                  await loadGroupSettlements(selectedGroupId);
-                  // Also refresh settlement history to show the new transaction
-                  await loadSettlementHistory(selectedGroupId);
+
+                // Create chat system message for settlement in groups IN BACKGROUND (non-blocking)
+                if (suggestion.groupId && user) {
+                  GroupChatService.sendGroupMessage({
+                    groupId: suggestion.groupId,
+                    userId: user.id,
+                    userName: 'System',
+                    message: `${suggestion.fromUserName} paid ${getCurrencySymbol(user?.currency || 'USD')}${suggestion.amount.toFixed(2)} to ${suggestion.toUserName}`,
+                    type: 'system'
+                  }).then(() => {
+                    console.log('✅ Settlement chat message created (background)');
+                  }).catch((chatError) => {
+                    console.error('❌ Failed to create settlement chat message:', chatError);
+                  });
                 }
                 
               } catch (error) {
                 console.error('❌ Record settlement payment error:', error);
+                
+                // Clear loading state before showing error
+                setRecordingPayment(null);
                 
                 // Show specific error message if available
                 const errorMessage = (error as any)?.response?.data?.message || 
@@ -467,8 +542,6 @@ export default function UnifiedSettlementScreen({
                                    'Failed to record payment. Please try again.';
                 
                 CrossPlatformAlert.alert('Error', `Failed to record payment: ${errorMessage}`);
-              } finally {
-                setRecordingPayment(null);
               }
             }
           }
@@ -583,18 +656,13 @@ export default function UnifiedSettlementScreen({
                 style={[
                   styles.settleButton,
                   { backgroundColor: theme.colors.primary },
-                  recordingPayment === `${suggestion.fromUserId}_${suggestion.toUserId}_${suggestion.groupId || 'friend'}` && { opacity: 0.6 }
                 ]}
                 onPress={() => handleMarkAsPaid(suggestion)}
                 disabled={recordingPayment === `${suggestion.fromUserId}_${suggestion.toUserId}_${suggestion.groupId || 'friend'}`}
               >
-                {recordingPayment === `${suggestion.fromUserId}_${suggestion.toUserId}_${suggestion.groupId || 'friend'}` ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.settleButtonText}>
-                    Mark as Paid
-                  </Text>
-                )}
+                <Text style={styles.settleButtonText}>
+                  Mark as Paid
+                </Text>
               </TouchableOpacity>
             </View>
           ))}
@@ -636,7 +704,8 @@ export default function UnifiedSettlementScreen({
         ]}
         onPress={() => {
           setActiveTab('history');
-          if (selectedGroupId) {
+          // Only load history if not already loaded
+          if (selectedGroupId && !historyLoaded) {
             loadSettlementHistory(selectedGroupId);
           }
         }}
@@ -669,7 +738,7 @@ export default function UnifiedSettlementScreen({
       
       {historyLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <CircularLoader />
           <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
             Loading history...
           </Text>
@@ -715,7 +784,7 @@ export default function UnifiedSettlementScreen({
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <CircularLoader />
           <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
             Loading settlements...
           </Text>
@@ -748,6 +817,18 @@ export default function UnifiedSettlementScreen({
 
       {/* Content */}
       {selectedGroupId ? renderSettlementContent() : renderGroupSelection()}
+
+      {/* Loading Overlay */}
+      {recordingPayment && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.overlayContent}>
+            <CircularLoader />
+            <Text style={[styles.overlayText, { color: '#FFFFFF' }]}>
+              Recording Payment...
+            </Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1129,5 +1210,48 @@ const styles = StyleSheet.create({
     paddingTop: 8, // Added padding top
     borderTopWidth: 0.5, // Added subtle separator
     borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+
+  // Loading Overlay Styles
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  overlayContent: {
+    alignItems: 'center',
+  },
+  overlayText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    color: '#FFFFFF',
+  },
+  loaderWrapper: {
+    marginBottom: 20,
+  },
+  loaderCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 4,
+    borderColor: '#3B82F6',
+    borderTopColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderCircleInner: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 4,
+    borderColor: '#818CF8',
+    borderBottomColor: 'transparent',
   },
 });

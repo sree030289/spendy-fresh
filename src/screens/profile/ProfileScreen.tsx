@@ -1,5 +1,5 @@
 // ProfileScreen.tsx - Updated with subscription management
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Image,
   Platform,
   Linking,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../../components/common/Icon';
@@ -41,6 +43,78 @@ export default function ProfileScreen() {
   const [showTermsPrivacyModal, setShowTermsPrivacyModal] = useState(false);
   const [cachedProfilePicture, setCachedProfilePicture] = useState<string | null>(null);
   const [imageRefreshKey, setImageRefreshKey] = useState(0);
+  
+  // Ref to track if we just uploaded an image (prevents useEffect from overwriting)
+  const isUploadingRef = React.useRef(false);
+  const uploadTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Animation for loading spinner
+  const spinValue = useRef(new Animated.Value(0)).current;
+  const pulseValue = useRef(new Animated.Value(1)).current;
+
+  // Animated circular loader
+  const CircularLoader = () => {
+    useEffect(() => {
+      // Spin animation
+      const spinAnimation = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      );
+
+      // Pulse animation
+      const pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseValue, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseValue, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      spinAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        spinAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = spinValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <View style={styles.loaderWrapper}>
+        <Animated.View
+          style={[
+            styles.loaderCircle,
+            {
+              transform: [{ rotate: spin }, { scale: pulseValue }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.loaderCircleInner,
+            {
+              transform: [{ rotate: spin }, { scale: pulseValue }],
+            },
+          ]}
+        />
+      </View>
+    );
+  };
 
 
   // Subscription states
@@ -83,16 +157,32 @@ export default function ProfileScreen() {
   // Load cached profile picture
   useEffect(() => {
     const loadCachedProfilePicture = async () => {
+      // Skip if we're in the middle of an upload to prevent overwriting
+      if (isUploadingRef.current) {
+        console.log('🛡️ Skipping cache load - upload in progress');
+        return;
+      }
+      
       console.log('🔄 Loading cached profile picture...', {
         hasUserId: !!user?.id,
         hasProfilePicture: !!user?.profilePicture,
         userId: user?.id,
-        profilePicture: user?.profilePicture?.substring(0, 50) + '...'
+        profilePicture: user?.profilePicture?.substring(0, 80)
       });
 
       if (!user?.id || !user.profilePicture) {
         console.log('🚫 No user ID or profile picture, clearing cached picture');
-        setCachedProfilePicture(null);
+        console.log('📊 Current cached picture:', cachedProfilePicture?.substring(0, 80));
+        // Only clear if we don't already have a cached picture
+        // This prevents clearing during re-renders after upload
+        setCachedProfilePicture(prev => {
+          if (prev && (prev.startsWith('http') || prev.startsWith('file://'))) {
+            console.log('🛡️ Preserving existing cached picture during re-render:', prev.substring(0, 80));
+            return prev; // Keep existing cached picture
+          }
+          console.log('❌ Clearing cached picture - no valid cached picture exists');
+          return null;
+        });
         return;
       }
 
@@ -485,7 +575,7 @@ export default function ProfileScreen() {
       
       // Create storage reference with timestamp for uniqueness
       const timestamp = Date.now();
-      const filename = `profile-pictures/${userId}/${timestamp}.jpg`;
+      const filename = `profiles/${userId}/${timestamp}.jpg`;
       const storageRef = ref(storage, filename);
       console.log('📁 Storage reference created:', filename);
       
@@ -533,6 +623,19 @@ export default function ProfileScreen() {
       }
 
       setLoading(true);
+      isUploadingRef.current = true; // Prevent useEffect from overwriting during upload
+      
+      // Set 2-minute timeout for upload
+      uploadTimeoutRef.current = setTimeout(() => {
+        setLoading(false);
+        isUploadingRef.current = false;
+        Alert.alert(
+          'Upload Timeout',
+          'The upload is taking too long. Please check your internet connection and try again.',
+          [{ text: 'OK' }]
+        );
+      }, 120000); // 2 minutes = 120000ms
+      
       console.log('📸 Profile picture selected, starting upload process...');
       
       // iOS-specific validation with detailed checks
@@ -624,30 +727,18 @@ export default function ProfileScreen() {
       
       let profilePictureUrl: string;
       
-      if (uploadProfilePicture && typeof uploadProfilePicture === 'function') {
-        // Use auth context method (if available)
-        console.log('📤 Using auth context upload method...');
-        try {
-          profilePictureUrl = await uploadProfilePicture(imageUri);
-        } catch (contextError: any) {
-          console.warn('⚠️ Auth context upload failed, falling back to direct method:', contextError?.message);
-          // Fallback to direct method if context method fails
-          profilePictureUrl = await uploadProfilePictureToFirebase(imageUri, user.id);
-        }
-      } else {
-        // Direct Firebase upload with iOS-optimized timeout
-        console.log('☁️ Using direct Firebase upload...');
-        const timeoutDuration = Platform.OS === 'ios' ? 45000 : 30000; // Longer timeout for iOS
-        
-        const uploadPromise = uploadProfilePictureToFirebase(imageUri, user.id);
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(new Error('Upload is taking too long. Please try again with a smaller image.'));
-          }, timeoutDuration);
-        });
-        
-        profilePictureUrl = await Promise.race([uploadPromise, timeoutPromise]);
-      }
+      // Always use direct Firebase upload (auth context method is not fully implemented)
+      console.log('☁️ Using direct Firebase upload...');
+      const timeoutDuration = Platform.OS === 'ios' ? 45000 : 30000; // Longer timeout for iOS
+      
+      const uploadPromise = uploadProfilePictureToFirebase(imageUri, user.id);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Upload is taking too long. Please try again with a smaller image.'));
+        }, timeoutDuration);
+      });
+      
+      profilePictureUrl = await Promise.race([uploadPromise, timeoutPromise]);
       
       if (!profilePictureUrl || typeof profilePictureUrl !== 'string') {
         throw new Error('Failed to get valid profile picture URL');
@@ -684,79 +775,62 @@ export default function ProfileScreen() {
       await AsyncStorage.setItem('@spendy_user_data', JSON.stringify(updatedUser));
       console.log('📱 Updated local user data with new profile picture');
       
-      // Update auth context state immediately to show the image in UI
-      // Pass only the updated fields (Partial<User>)
-      if (updateUser && typeof updateUser === 'function') {
-        await updateUser({
-          profilePicture: profilePictureUrl,
-          profileImage: profilePictureUrl,
-          updatedAt: new Date()
+      // Update the user object reference to trigger re-render WITHOUT calling updateUser
+      // (updateUser sets isLoading=true which unmounts this screen)
+      console.log('🔄 Manually updating user object to prevent screen unmount');
+      Object.assign(user, updatedUser); // Mutate the user object in place
+      
+      // IMMEDIATE UI UPDATE: Set cached image first for instant visual feedback
+      console.log('🎯 Step 1: Setting cached profile picture for immediate UI update');
+      console.log('🖼️ Profile picture URL:', profilePictureUrl);
+      setCachedProfilePicture(profilePictureUrl);
+      setImageRefreshKey(prev => prev + 1);
+
+      // Cache the profile picture locally for offline viewing (non-blocking)
+      cacheProfilePicture(profilePictureUrl, user.id)
+        .then(cachedPath => {
+          console.log('💾 Profile picture cached for offline viewing:', cachedPath);
+          setCachedProfilePicture(cachedPath);
+          setImageRefreshKey(prev => prev + 1);
+        })
+        .catch(cacheError => {
+          console.warn('⚠️ Failed to cache profile picture:', cacheError);
         });
-        console.log('🔄 Updated auth context with new profile picture');
-      }
 
-      // Cache the profile picture locally and update UI immediately
-      try {
-        const cachedImagePath = await cacheProfilePicture(profilePictureUrl, user.id);
-        console.log('💾 Profile picture cached for offline viewing:', cachedImagePath);
-        
-        // Update cached profile picture state for immediate UI update
-        console.log('🎯 Setting cached profile picture state:', cachedImagePath);
-        setCachedProfilePicture(cachedImagePath);
-        
-        // Force a re-render by updating the key or triggering state change
-        console.log('🔄 Profile picture state updated, UI should refresh now');
-
-        // Force image re-render by incrementing refresh key
-        setImageRefreshKey(prev => prev + 1);
-      } catch (cacheError) {
-        console.warn('⚠️ Failed to cache profile picture:', cacheError);
-        // Still update UI with remote URL if caching fails
-        console.log('🔄 Setting profile picture to remote URL as fallback:', profilePictureUrl);
-        setCachedProfilePicture(profilePictureUrl);
-
-        // Force image re-render even on cache failure
-        setImageRefreshKey(prev => prev + 1);
-      }
+      // Note: We don't call updateUser() here because it sets isLoading=true which unmounts this screen
+      // The user state will be refreshed on next app launch or manual refresh
+      console.log('✅ Profile picture upload complete - skipping updateUser to prevent screen unmount');
 
       console.log('✅ Profile picture updated successfully!');
 
-      // Force immediate refresh of user profile from backend to get latest data
-      try {
-        console.log('🔄 Refreshing user profile from backend to ensure sync...');
-        const profileData = await apiService.getProfile();
-        if (profileData && profileData.profileImage) {
-          console.log('✅ Got updated profile from backend:', profileData.profileImage.substring(0, 50) + '...');
-          // Update auth context with fresh backend data
-          if (updateUser && typeof updateUser === 'function') {
-            await updateUser({
-              profilePicture: profileData.profileImage,
-              profileImage: profileData.profileImage,
-              updatedAt: new Date()
-            });
-          }
-          // Update local cached picture with backend URL
-          setCachedProfilePicture(profileData.profileImage);
-          setImageRefreshKey(prev => prev + 1);
-        }
-      } catch (refreshError) {
-        console.warn('⚠️ Failed to refresh profile from backend, using uploaded URL:', refreshError);
+      // Clear upload timeout
+      if (uploadTimeoutRef.current) {
+        clearTimeout(uploadTimeoutRef.current);
+        uploadTimeoutRef.current = null;
       }
 
       // Clear loading state before showing alert to prevent blank screen
       setLoading(false);
 
-      // Trigger global refresh for friends/groups to show updated profile picture
-      try {
-        // Notify other components that profile was updated
-        if ((global as any).refreshFriendsData) {
-          (global as any).refreshFriendsData();
-        }
-      } catch (refreshError) {
-        console.warn('⚠️ Failed to trigger friends refresh:', refreshError);
-      }
-
-      Alert.alert('Success', 'Profile picture updated successfully!');
+      // Delay showing alert to allow state updates to complete and prevent re-render issues
+      // This prevents the image from reverting to initials when Alert is shown
+      setTimeout(() => {
+        // Re-enable useEffect BEFORE showing alert (in case alert is dismissed without tapping OK)
+        isUploadingRef.current = false;
+        
+        Alert.alert('Success', 'Profile picture updated successfully!');
+        
+        // Trigger global refresh for friends/groups in background (non-blocking)
+        setTimeout(() => {
+          try {
+            if ((global as any).refreshFriendsData) {
+              (global as any).refreshFriendsData();
+            }
+          } catch (refreshError) {
+            console.warn('⚠️ Failed to trigger friends refresh:', refreshError);
+          }
+        }, 500);
+      }, 100);
     } catch (error: any) {
       console.error('❌ Failed to process image result:', {
         error,
@@ -793,7 +867,14 @@ export default function ProfileScreen() {
       }
       
       Alert.alert('Profile Update Error', errorMessage);
+      // Re-enable useEffect after error (success case resets in Alert callback)
+      isUploadingRef.current = false;
     } finally {
+      // Clear upload timeout on any completion (success or error)
+      if (uploadTimeoutRef.current) {
+        clearTimeout(uploadTimeoutRef.current);
+        uploadTimeoutRef.current = null;
+      }
       setLoading(false);
     }
   };
@@ -804,8 +885,14 @@ export default function ProfileScreen() {
       const confirmed = window.confirm('Are you sure you want to logout?');
       if (confirmed) {
         setLoading(true);
-        await logout();
-        setLoading(false);
+        try {
+          await logout();
+        } catch (error) {
+          console.error('Logout error:', error);
+        } finally {
+          // Always clear loading state, even if logout fails
+          setLoading(false);
+        }
       }
     } else {
       // For mobile, use the native Alert
@@ -819,8 +906,14 @@ export default function ProfileScreen() {
             style: 'destructive',
             onPress: async () => {
               setLoading(true);
-              await logout();
-              setLoading(false);
+              try {
+                await logout();
+              } catch (error) {
+                console.error('Logout error:', error);
+              } finally {
+                // Always clear loading state, even if logout fails
+                setLoading(false);
+              }
             }
           },
         ]
@@ -836,75 +929,75 @@ export default function ProfileScreen() {
     await updateUser({ currency: newCurrency });
   };
 
-  const handleBiometricToggle = async () => {
-    if (!user) return;
+  // const handleBiometricToggle = async () => {
+  //   if (!user) return;
 
-    try {
-      const newBiometricState = !user.biometricEnabled;
+  //   try {
+  //     const newBiometricState = !user.biometricEnabled;
 
-      if (newBiometricState) {
-        // Enabling biometric authentication - need to validate hardware and authenticate first
-        const { BiometricAuthService } = await import('@/services/biometric/BiometricAuthService');
+  //     if (newBiometricState) {
+  //       // Enabling biometric authentication - need to validate hardware and authenticate first
+  //       const { BiometricAuthService } = await import('@/services/biometric/BiometricAuthService');
         
-        // Check if hardware is available
-        const isAvailable = await BiometricAuthService.isHardwareAvailable();
-        if (!isAvailable) {
-          Alert.alert(
-            'Biometric Not Available',
-            'Biometric authentication is not available on this device. Please ensure Face ID or Touch ID is set up in your device settings.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
+  //       // Check if hardware is available
+  //       const isAvailable = await BiometricAuthService.isHardwareAvailable();
+  //       if (!isAvailable) {
+  //         Alert.alert(
+  //           'Biometric Not Available',
+  //           'Biometric authentication is not available on this device. Please ensure Face ID or Touch ID is set up in your device settings.',
+  //           [{ text: 'OK' }]
+  //         );
+  //         return;
+  //       }
 
-        // Validate Firebase session to ensure we can save this preference
-        const isSessionValid = await BiometricAuthService.validateFirebaseSession();
-        if (!isSessionValid) {
-          Alert.alert(
-            'Session Required',
-            'Please log in again to enable biometric authentication.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
+  //       // Validate Firebase session to ensure we can save this preference
+  //       const isSessionValid = await BiometricAuthService.validateFirebaseSession();
+  //       if (!isSessionValid) {
+  //         Alert.alert(
+  //           'Session Required',
+  //           'Please log in again to enable biometric authentication.',
+  //           [{ text: 'OK' }]
+  //         );
+  //         return;
+  //       }
 
-        // Perform biometric authentication to confirm
-        const { BiometricService } = await import('@/services/biometric');
-        const result = await BiometricService.authenticate();
+  //       // Perform biometric authentication to confirm
+  //       const { BiometricService } = await import('@/services/biometric');
+  //       const result = await BiometricService.authenticate();
         
-        if (!result.success) {
-          if (result.error && result.error !== 'User cancelled') {
-            Alert.alert('Authentication Failed', result.error);
-          }
-          return;
-        }
+  //       if (!result.success) {
+  //         if (result.error && result.error !== 'User cancelled') {
+  //           Alert.alert('Authentication Failed', result.error);
+  //         }
+  //         return;
+  //       }
 
-        // Save biometric preference for this specific user
-        await BiometricAuthService.setBiometricEnabledForUser(user.id, true);
+  //       // Save biometric preference for this specific user
+  //       await BiometricAuthService.setBiometricEnabledForUser(user.id, true);
         
-        // Update global biometric setting
-        await AsyncStorage.setItem('@spendy_biometric_enabled', JSON.stringify(true));
-      } else {
-        // Disabling biometric authentication
-        const { BiometricAuthService } = await import('@/services/biometric/BiometricAuthService');
-        await BiometricAuthService.setBiometricEnabledForUser(user.id, false);
-        await AsyncStorage.setItem('@spendy_biometric_enabled', JSON.stringify(false));
-      }
+  //       // Update global biometric setting
+  //       await AsyncStorage.setItem('@spendy_biometric_enabled', JSON.stringify(true));
+  //     } else {
+  //       // Disabling biometric authentication
+  //       const { BiometricAuthService } = await import('@/services/biometric/BiometricAuthService');
+  //       await BiometricAuthService.setBiometricEnabledForUser(user.id, false);
+  //       await AsyncStorage.setItem('@spendy_biometric_enabled', JSON.stringify(false));
+  //     }
 
-      // Update user setting without showing global loading
-      await updateUser({ biometricEnabled: newBiometricState });
+  //     // Update user setting without showing global loading
+  //     await updateUser({ biometricEnabled: newBiometricState });
 
-      // Show success alert
-      Alert.alert(
-        'Biometric Authentication',
-        `Biometric login has been ${newBiometricState ? 'enabled' : 'disabled'}.`,
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      console.error('Error updating biometric setting:', error);
-      Alert.alert('Error', 'Failed to update biometric setting. Please try again.');
-    }
-  };
+  //     // Show success alert
+  //     Alert.alert(
+  //       'Biometric Authentication',
+  //       `Biometric login has been ${newBiometricState ? 'enabled' : 'disabled'}.`,
+  //       [{ text: 'OK' }]
+  //     );
+  //   } catch (error) {
+  //     console.error('Error updating biometric setting:', error);
+  //     Alert.alert('Error', 'Failed to update biometric setting. Please try again.');
+  //   }
+  // };
 
   const handleSubscriptionPurchase = async (plan: 'monthly' | 'yearly', promoCode?: string) => {
     try {
@@ -1087,9 +1180,20 @@ export default function ProfileScreen() {
                 }}
                 onError={(error) => {
                   console.error('❌ Profile image failed to load:', error.nativeEvent.error);
-                  console.log('🔄 Falling back to initials for URI:', cachedProfilePicture || user.profilePicture);
-                  // Force fallback to initials by clearing the cached picture
-                  setCachedProfilePicture(null);
+                  console.log('🔄 Image load failed for URI:', cachedProfilePicture || user.profilePicture);
+                  
+                  // Don't immediately clear cached picture - it might be a temporary network issue
+                  // Only clear if we're trying to load a remote URL and it fails
+                  const failedUri = cachedProfilePicture || user.profilePicture || '';
+                  if (failedUri.startsWith('http://') || failedUri.startsWith('https://')) {
+                    console.warn('⚠️ Remote image failed to load, will retry with cache bust');
+                    // Try incrementing refresh key to force reload
+                    setImageRefreshKey(prev => prev + 1);
+                  } else if (cachedProfilePicture && cachedProfilePicture.startsWith('file://')) {
+                    // Local file failed to load, fall back to user.profilePicture
+                    console.warn('⚠️ Local cached image failed, falling back to remote URL');
+                    setCachedProfilePicture(null);
+                  }
                 }}
               />
             ) : (
@@ -1132,8 +1236,10 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={[styles.statItem, styles.mobileStatItem, { backgroundColor: theme.colors.surface }]}
               onPress={() => {
-                if (user.mobile && user.mobile.trim()) {
-                  const formattedNumber = PhoneNumberService.format(user.mobile);
+                // Check both mobile and phoneNumber fields for compatibility
+                const mobileNumber = user.mobile || user.phoneNumber || '';
+                if (mobileNumber && mobileNumber.trim()) {
+                  const formattedNumber = PhoneNumberService.format(mobileNumber);
                   Alert.alert('Mobile Number', formattedNumber);
                 } else {
                   Alert.alert(
@@ -1150,8 +1256,11 @@ export default function ProfileScreen() {
                 }
               }}
             >
-              <Text style={[styles.statValue, { color: user.mobile && user.mobile.trim() ? theme.colors.text : theme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="middle">
-                {user.mobile && user.mobile.trim() ? PhoneNumberService.format(user.mobile) : 'Not set'}
+              <Text style={[styles.statValue, { color: (user.mobile || user.phoneNumber) && (user.mobile || user.phoneNumber || '').trim() ? theme.colors.text : theme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="middle">
+                {(() => {
+                  const mobileNumber = user.mobile || user.phoneNumber || '';
+                  return mobileNumber && mobileNumber.trim() ? PhoneNumberService.format(mobileNumber) : 'Not set';
+                })()}
               </Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
                 Mobile (tap to view)
@@ -1178,7 +1287,7 @@ export default function ProfileScreen() {
               <View style={[
                 styles.subscriptionCard, 
                 { 
-                  backgroundColor: subscription?.plan === 'premium' ? '#667eea' : theme.colors.surface,
+                  backgroundColor: subscription?.plan === 'premium' ? '#ea6866ff' : theme.colors.surface,
                 }
               ]}>
                 <View style={styles.subscriptionHeader}>
@@ -1280,13 +1389,13 @@ export default function ProfileScreen() {
             onPress={handleChangePassword}
           />
           
-          <ProfileItem
+          {/* <ProfileItem
             icon="finger-print-outline"
             title="Biometric Login"
             value={user.biometricEnabled ? 'Enabled' : 'Disabled'}
             onPress={handleBiometricToggle}
             valueColor={user.biometricEnabled ? theme.colors.success : theme.colors.textSecondary}
-          />
+          /> */}
         </View>
 
         {/* App Settings */}
@@ -1393,6 +1502,16 @@ export default function ProfileScreen() {
         visible={showTermsPrivacyModal}
         onClose={() => setShowTermsPrivacyModal(false)}
       />
+
+      {/* Loading Overlay for Profile Picture Upload */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <CircularLoader />
+            <Text style={styles.loadingText}>Uploading...</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1611,5 +1730,63 @@ const styles = StyleSheet.create({
   appVersion: {
     fontSize: 12,
     textAlign: 'center',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Lighter overlay - was 0.7
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    width: 160,
+    height: 160,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  loaderWrapper: {
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderCircle: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 5,
+    borderColor: '#E0E7FF',
+    borderTopColor: '#3B82F6',
+    borderRightColor: '#3B82F6',
+  },
+  loaderCircleInner: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 4,
+    borderColor: 'transparent',
+    borderTopColor: '#818CF8',
+    borderLeftColor: '#818CF8',
   },
 });

@@ -7,7 +7,6 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   RefreshControl,
   TextInput,
   FlatList,
@@ -20,6 +19,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { ApiService } from '@/services/api/ApiService';
 import { getCurrencySymbol } from '@/utils/currency';
+import CircularLoader from '@/components/common/CircularLoader';
 
 // Define types locally since they might differ from the old service
 interface Expense {
@@ -577,8 +577,8 @@ export default function SimpleExpenseListModal({
         {/* Expense List */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+            <CircularLoader size={60} />
+            <Text style={[styles.loadingText, { color: '#3bf6ceff' }]}>
               Loading expenses...
             </Text>
           </View>

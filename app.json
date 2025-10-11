@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#D6001C"
+      "backgroundColor": "#B0004F"
     },
     "ios": {
       "supportsTablet": true,
@@ -33,7 +33,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-meetnsplit.png",
-        "backgroundColor": "#D6001C"
+        "backgroundColor": "#B0004F"
       },
       "package": "com.meetnsplit.app",
       "googleServicesFile": "./google-services.json",

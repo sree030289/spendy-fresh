@@ -9,7 +9,6 @@ import {
   SafeAreaView,
   Platform,
   FlatList,
-  ActivityIndicator,
   Dimensions,
   Image,
 } from 'react-native';
@@ -22,6 +21,7 @@ import { ApiService } from '@/services/api/ApiService';
 // @ts-ignore
 import { SplittingService } from '@/services/firebase/splitting-disabled';
 import { getCurrencySymbol } from '@/utils/currency';
+import CircularLoader from '@/components/common/CircularLoader';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -497,7 +497,10 @@ export default function SplittingAnalyticsModal({ visible, onClose, initialGroup
         {/* Content */}
         {loading && !groupExpenses.length ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={BRAND} />
+            <CircularLoader size={60} />
+            <Text style={{ fontSize: 16, fontWeight: '500', marginTop: 16, color: '#3bf6ceff' }}>
+              Loading analytics...
+            </Text>
           </View>
         ) : (
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>

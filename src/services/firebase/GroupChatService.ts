@@ -25,10 +25,17 @@ export interface ChatMessage {
   userAvatar?: string;
   message: string;
   timestamp: Date;
-  type: 'message' | 'expense' | 'system';
+  type: 'message' | 'expense' | 'system' | 'settlement';
   expenseData?: {
     id: string;
     description: string;
+    amount: number;
+    currency: string;
+    isEdit?: boolean;
+  };
+  settlementData?: {
+    fromUserName: string;
+    toUserName: string;
     amount: number;
     currency: string;
   };
@@ -68,8 +75,9 @@ export class GroupChatService {
     userName: string;
     userAvatar?: string;
     message: string;
-    type: 'message' | 'expense' | 'system';
+    type: 'message' | 'expense' | 'system' | 'settlement';
     expenseData?: any;
+    settlementData?: any;
   }): Promise<string> {
     try {
       console.log('📨 GroupChatService: Sending group message:', messageData.message);

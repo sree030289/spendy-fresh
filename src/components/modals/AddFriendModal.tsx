@@ -16,6 +16,7 @@ import { Icon } from '../common/Icon';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
+import CircularLoader from '@/components/common/CircularLoader';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import { QRCodeService } from '@/services/qr/QRCodeService';
 import { SMSInviteService } from '@/services/invite/SMSInviteService';
@@ -23,6 +24,7 @@ import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
 import PhoneNumberInput, { Country } from '@/components/common/PhoneNumberInput';
 import { getDefaultCountry } from '@/components/common/CountryCodePicker';
 import SuccessAnimationModal from '@/components/modals/SuccessAnimationModal';
+import ContactPickerModal from '@/components/modals/ContactPickerModal';
 import { requestCameraPermissionsAsync } from 'expo-image-picker';
 import * as Contacts from 'expo-contacts';
 
@@ -54,9 +56,9 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successTitle, setSuccessTitle] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showContactPicker, setShowContactPicker] = useState(false);
 
-
-  const MAX_CONTACTS = 5;
+  const MAX_CONTACTS = 10;
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -233,102 +235,12 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   };
 
   const handlePickContact = async () => {
-    try {
-      if (selectedContacts.length >= MAX_CONTACTS) {
-        Alert.alert(
-          'Maximum Contacts Reached',
-          `You can only select up to ${MAX_CONTACTS} contacts at once.`,
-          [{ text: 'OK' }]
-        );
-        return;
-      }
+    setShowContactPicker(true);
+  };
 
-      // Check if contacts API is available before proceeding
-      if (!Contacts.presentContactPickerAsync) {
-        Alert.alert(
-          'Feature Unavailable',
-          'Contact picker is not available on this device. Please add contacts manually.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      setLoading(true);
-      
-      // Request contacts permission
-      const hasPermission = await requestContactsPermission();
-      if (!hasPermission) {
-        Alert.alert(
-          'Permission Required',
-          'We need access to your contacts to help you add friends. Please enable contacts permission in your device settings.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() }
-          ]
-        );
-        return;
-      }
-
-      // Present contact picker
-      const contact = await Contacts.presentContactPickerAsync();
-      
-      if (contact) {
-        console.log('Selected contact:', contact);
-        
-        // Extract phone number
-        let selectedPhone = '';
-        if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
-          // If multiple phone numbers, let user choose
-          if (contact.phoneNumbers.length > 1) {
-            const phoneOptions = contact.phoneNumbers.map(phone => ({
-              text: `${phone.label || 'Phone'}: ${phone.number}`,
-              onPress: () => {
-                addContactToSelection(contact.name || '', phone.number || '');
-              }
-            }));
-            
-            phoneOptions.push({ text: 'Cancel', onPress: () => {} });
-            
-            Alert.alert(
-              'Select Phone Number',
-              `${contact.name} has multiple phone numbers. Which one would you like to use?`,
-              phoneOptions as any
-            );
-          } else {
-            selectedPhone = contact.phoneNumbers[0].number || '';
-          }
-        }
-        
-        // Extract name - ensure we always have a valid name
-        const selectedName = contact.name?.trim() || contact.firstName?.trim() || contact.lastName?.trim() || 'Friend';
-        
-        if (selectedPhone && contact.phoneNumbers?.length === 1) {
-          addContactToSelection(selectedName, selectedPhone);
-        } else if (!selectedPhone) {
-          Alert.alert(
-            'No Phone Number',
-            `${selectedName || 'This contact'} doesn't have a phone number. Please add them manually or select a different contact.`,
-            [{ text: 'OK' }]
-          );
-        }
-      }
-      
-    } catch (error: any) {
-      console.error('Contact picker error:', error);
-      
-      if (error.code === 'E_CONTACT_CANCELLED') {
-        // User cancelled - do nothing
-        return;
-      }
-      
-      Alert.alert(
-        'Contact Picker Error', 
-        'Failed to access contacts. Please enter the contact information manually.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setLoading(false);
-    }
+  const handleContactPickerConfirm = (contacts: Array<{ name: string; phoneNumber: string }>) => {
+    setSelectedContacts(contacts);
+    setShowContactPicker(false);
   };
 
   const handlePhoneNumberChange = (text: string) => {
@@ -371,9 +283,10 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         const smsInviteService = SMSInviteService.getInstance();
         const result = await smsInviteService.sendSMSInvite({
           phoneNumber,
-          message: `Hi! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
+          message: `Hi ${contactName}! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
           countryCode: selectedCountry.code as any,
-          senderName: user?.fullName || 'Your friend'
+          senderName: user?.fullName || 'Your friend',
+          contactName: contactName // Pass contact name for display in pending list
         });
 
         console.log('📱 SMS invite result:', result);
@@ -398,47 +311,40 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         setLoading(false);
       }
     } else if (selectedContacts.length > 0) {
-      // Multiple contacts flow (legacy support)
+      // Multiple contacts flow - Send group SMS
       setLoading(true);
       try {
-        const successfulInvites: string[] = [];
-        const failedInvites: string[] = [];
         const smsInviteService = SMSInviteService.getInstance();
 
-        for (const contact of selectedContacts) {
-          try {
-            const result = await smsInviteService.sendSMSInvite({
-              phoneNumber: contact.phoneNumber,
-              message: `Hi ${contact.name}! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
-              countryCode: selectedCountry.code as any,
-              senderName: user?.fullName || 'Your friend',
-              contactName: contact.name // Pass contact name
-            });
-
-            if (result.success) {
-              successfulInvites.push(contact.name);
-            } else {
-              failedInvites.push(contact.name);
-            }
-          } catch (error) {
-            console.error(`Failed to send SMS to ${contact.name}:`, error);
-            failedInvites.push(contact.name);
+        console.log(`📱 Sending group SMS invite to ${selectedContacts.length} contacts`);
+        
+        const result = await smsInviteService.sendBulkSMSInvites(
+          selectedContacts.map(contact => ({
+            phoneNumber: contact.phoneNumber,
+            name: contact.name
+          })),
+          {
+            message: `Hi! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
+            countryCode: selectedCountry.code as any,
+            senderName: user?.fullName || 'Your friend'
           }
-        }
+        );
+
+        console.log(`📱 Bulk SMS result:`, result);
 
         // Show results
         let resultMessage = '';
-        if (successfulInvites.length > 0) {
-          resultMessage += `SMS invitations sent to: ${successfulInvites.join(', ')}`;
+        if (result.successfulInvites.length > 0) {
+          resultMessage = `Group SMS opened for: ${result.successfulInvites.join(', ')}`;
         }
-        if (failedInvites.length > 0) {
+        if (result.failedInvites.length > 0) {
           if (resultMessage) resultMessage += '\n\n';
-          resultMessage += `Failed to send to: ${failedInvites.join(', ')}`;
+          resultMessage += `Failed to send to: ${result.failedInvites.map(f => `${f.name} (${f.error})`).join(', ')}`;
         }
 
-        if (successfulInvites.length > 0) {
+        if (result.success && result.successfulInvites.length > 0) {
           // Show full-screen success animation
-          setSuccessTitle('SMS Invitations Sent! 📱');
+          setSuccessTitle('Group SMS Invitations Sent! 📱');
           setSuccessMessage(resultMessage);
           setShowSuccessModal(true);
 
@@ -531,7 +437,8 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
       <Button
         title="Send Friend Request"
         onPress={handleSendEmail}
-        loading={loading}
+        loading={false}
+        disabled={loading}
         style={styles.actionButton}
       />
 
@@ -590,17 +497,17 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           styles.contactPickerButton, 
           { 
             backgroundColor: theme.colors.surface,
-            opacity: selectedContacts.length >= MAX_CONTACTS ? 0.5 : 1
           }
         ]}
         onPress={handlePickContact}
-        disabled={loading || selectedContacts.length >= MAX_CONTACTS}
+        disabled={loading}
       >
         <Icon name="people" size={24} color={theme.colors.primary}  />
         <Text style={[styles.contactPickerText, { color: theme.colors.text }]}>
-          {loading ? 'Loading...' : 
-           selectedContacts.length >= MAX_CONTACTS ? `Maximum ${MAX_CONTACTS} contacts selected` :
-           `Pick from Contacts (${selectedContacts.length}/${MAX_CONTACTS})`}
+          {selectedContacts.length > 0 
+            ? `${selectedContacts.length} Contact${selectedContacts.length > 1 ? 's' : ''} Selected - Tap to Change`
+            : 'Select Contacts from Your Phone'
+          }
         </Text>
         <Icon name="forward" size={20} color={theme.colors.textSecondary}  />
       </TouchableOpacity>
@@ -688,16 +595,16 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
             <TouchableOpacity
               style={[
                 styles.addManualButton, 
-                { backgroundColor: (!phoneNumber.trim() || !contactName.trim()) ? theme.colors.disabled : theme.colors.primary }
+                { backgroundColor: (!phoneNumber.trim() || !contactName.trim() || loading) ? theme.colors.disabled : theme.colors.primary }
               ]}
               onPress={handleSendSMS}
               disabled={!phoneNumber.trim() || !contactName.trim() || loading}
             >
               <Text style={[
                 styles.addManualText, 
-                { color: (!phoneNumber.trim() || !contactName.trim()) ? theme.colors.textSecondary : 'white' }
+                { color: (!phoneNumber.trim() || !contactName.trim() || loading) ? theme.colors.textSecondary : 'white' }
               ]}>
-                {loading ? 'Sending...' : 'Send SMS Invite'}
+                Send SMS Invite
               </Text>
             </TouchableOpacity>
           </View>
@@ -710,7 +617,8 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           <Button
             title={`Send SMS (${selectedContacts.length})`}
             onPress={handleSendSMS}
-            loading={loading}
+            loading={false}
+            disabled={loading}
             style={StyleSheet.flatten([styles.phoneButton, { backgroundColor: '#2563EB' }])}
           />
         </View>
@@ -766,7 +674,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
   return (
     <>
       <FullscreenModal
-      visible={visible && !showSuccessModal}
+      visible={visible && !showSuccessModal && !showContactPicker}
       onClose={() => {
         resetFormState();
         onClose();
@@ -848,7 +756,28 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
           {activeMethod === 'phone' && renderPhoneMethod()}
           {activeMethod === 'qr' && renderQRMethod()}
         </ScrollView>
+
+        {/* Center Loading Overlay */}
+        {loading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContainer}>
+              <CircularLoader size={60} />
+              <Text style={styles.loadingText}>
+                Sending invitation...
+              </Text>
+            </View>
+          </View>
+        )}
       </FullscreenModal>
+
+      {/* Contact Picker Modal */}
+      <ContactPickerModal
+        visible={showContactPicker}
+        onClose={() => setShowContactPicker(false)}
+        onConfirm={handleContactPickerConfirm}
+        maxSelection={MAX_CONTACTS}
+        alreadySelected={selectedContacts}
+      />
 
       {/* SMS Success Animation Modal */}
       <SuccessAnimationModal
@@ -1093,5 +1022,27 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 16,
+    color: '#3bf6ceff',
   },
 });

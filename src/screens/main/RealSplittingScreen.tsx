@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Icon } from '../../components/common/Icon';
+import CircularLoader from '@/components/common/CircularLoader';
 import DynamicBanner from '../../components/common/DynamicBanner';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
@@ -1505,6 +1506,7 @@ export default function RealSplittingScreen() {
             id: friend.id, // Use friend.id as the friend's user ID
             fullName: friend.friendName || friend.fullName,
             email: friend.email,
+            mobile: friend.mobile || friend.phone || friend.phoneNumber || friend.normalizedMobile, // 🔧 FIX: Include phone number
             avatar: friend.avatar || friend.profilePicture || friend.profileImage,
             profilePicture: friend.profilePicture || friend.profileImage || friend.avatar,
             profileImage: friend.profileImage || friend.profilePicture || friend.avatar
@@ -1726,8 +1728,8 @@ export default function RealSplittingScreen() {
       console.log(`Reminder sent via ${method} to ${selectedFriendForRemind.friendData.fullName}`);
       
     } catch (error) {
-      console.error('Error sending reminder:', error);
-      throw error;
+      // Don't throw error - backend save is non-critical, SMS/WhatsApp already opened successfully
+      console.warn('⚠️ Backend reminder save failed (non-critical):', error instanceof Error ? error.message : error);
     }
   };
 
@@ -1902,36 +1904,11 @@ export default function RealSplittingScreen() {
 
         console.log('💬 Expense added - ID:', expenseId, 'GroupId:', processedData.groupId, 'User:', user?.fullName);
 
-        // Create chat system message for group expenses
-        if (processedData.groupId && user) {
-          try {
-            console.log('💬 Creating expense chat message...');
-            await GroupChatService.createExpenseAddedMessage(
-              processedData.groupId,
-              user.id,
-              user.fullName,
-              {
-                id: expenseId,
-                description: processedData.description,
-                amount: processedData.amount,
-                currency: processedData.currency || 'USD',
-                splitType: processedData.splitType || 'equal',
-                expenseDate: processedData.date || new Date()
-              }
-            );
-            console.log('✅ Expense chat message created');
-          } catch (chatError) {
-            console.error('❌ Failed to create chat message for expense:', chatError);
-          }
-        } else {
-          console.log('⚠️ Skipping chat message - groupId:', processedData.groupId, 'user:', !!user, 'expenseId:', expenseId);
-        }
-
-        // Close modal and show success immediately (before data loading)
+        // Close modal and show success immediately (before notifications/chat)
         setShowAddExpense(false);
         setSelectedGroupForExpense(null);
 
-        // Show full-screen success with navigation to group details
+        // Show full-screen success immediately
         showFullScreenSuccessAnimation(
           'Expense Added! 🧾',
           'Expense has been added and split successfully!',
@@ -1949,6 +1926,29 @@ export default function RealSplittingScreen() {
             }
           }
         );
+
+        // Create chat system message for group expenses IN BACKGROUND (non-blocking)
+        if (processedData.groupId && user) {
+          GroupChatService.createExpenseAddedMessage(
+            processedData.groupId,
+            user.id,
+            user.fullName,
+            {
+              id: expenseId,
+              description: processedData.description,
+              amount: processedData.amount,
+              currency: processedData.currency || 'USD',
+              splitType: processedData.splitType || 'equal',
+              expenseDate: processedData.date || new Date()
+            }
+          ).then(() => {
+            console.log('✅ Expense chat message created (background)');
+          }).catch((chatError) => {
+            console.error('❌ Failed to create chat message for expense:', chatError);
+          });
+        } else {
+          console.log('⚠️ Skipping chat message - groupId:', processedData.groupId, 'user:', !!user, 'expenseId:', expenseId);
+        }
 
         // Notify all listeners about the new expense
         ExpenseRefreshService.getInstance().notifyExpenseAdded();
@@ -3067,27 +3067,6 @@ export default function RealSplittingScreen() {
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Friends</Text>
             <View style={styles.sectionActions}>
-              <TouchableOpacity onPress={() => sharedBalances.refresh()} style={styles.refreshButton}>
-                <Icon name="refresh" size={16} color={theme.colors.primary}  />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowAddFriend(true)} style={styles.addButton}>
-                <View style={{ position: 'relative' }}>
-                  <Icon name="people" size={16} color={theme.colors.primary} />
-                  <View style={{ 
-                    position: 'absolute', 
-                    top: -4, 
-                    right: -4, 
-                    backgroundColor: theme.colors.primary, 
-                    borderRadius: 6, 
-                    width: 10, 
-                    height: 10, 
-                    alignItems: 'center', 
-                    justifyContent: 'center' 
-                  }}>
-                    <Icon name="add" size={7} color="white" />
-                  </View>
-                </View>
-              </TouchableOpacity>
               <TouchableOpacity onPress={() => handleTabSwitch('friends')} style={styles.viewAllButton}>
                 <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All</Text>
                 <Icon name="forward" size={16} color={theme.colors.primary}  />
@@ -3274,17 +3253,18 @@ export default function RealSplittingScreen() {
     });
 
     return (
-      <ScrollView 
-        contentContainerStyle={styles.tabContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
-      >
+      <>
+        <ScrollView 
+          contentContainerStyle={styles.tabContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: false }
+          )}
+          scrollEventThrottle={16}
+        >
         {/* Simplified header with clean action buttons */}
         <View style={styles.cleanTabHeader}>
           <View style={styles.headerTitleSection}>
@@ -3295,8 +3275,9 @@ export default function RealSplittingScreen() {
           </View>
           <View style={styles.cleanHeaderActions}>
             <TouchableOpacity 
-              onPress={() => sharedBalances.refresh()} 
+              onPress={onRefresh} 
               style={[styles.cleanActionButton, { backgroundColor: theme.colors.surface }]}
+              disabled={refreshing}
             >
               <Icon name="refresh" size={18} color={theme.colors.primary}  />
             </TouchableOpacity>
@@ -3754,6 +3735,19 @@ export default function RealSplittingScreen() {
           )
         )}
       </ScrollView>
+
+      {/* Loading Overlay for Friends Tab Refresh */}
+      {refreshing && (
+        <View style={styles.friendsLoadingOverlay}>
+          <View style={styles.friendsLoadingContainer}>
+            <CircularLoader size={60} />
+            <Text style={styles.friendsLoadingText}>
+              Refreshing friends...
+            </Text>
+          </View>
+        </View>
+      )}
+    </>
     );
   };
   
@@ -6510,5 +6504,27 @@ chatBadgeText: {
   color: 'white',
   fontSize: 10,
   fontWeight: 'bold',
+},
+friendsLoadingOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 9999,
+},
+friendsLoadingContainer: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 30,
+},
+friendsLoadingText: {
+  fontSize: 16,
+  fontWeight: '500',
+  marginTop: 16,
+  color: '#3bf6ceff',
 },
 });

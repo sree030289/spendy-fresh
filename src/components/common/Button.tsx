@@ -6,12 +6,12 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
-  ActivityIndicator,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/useTheme';
 import { GRADIENTS } from '@/constants/theme';
+import CircularLoader from './CircularLoader';
 
 interface ButtonProps {
   title: string;
@@ -163,9 +163,10 @@ export const Button: React.FC<ButtonProps> = ({
   const renderContent = () => (
     <>
       {loading ? (
-        <ActivityIndicator 
-          color={variant === 'primary' || variant === 'gradient' ? theme.colors.textInverse : theme.colors.primary} 
-          size="small"
+        <CircularLoader 
+          size={size === 'sm' ? 20 : size === 'lg' ? 28 : 24}
+          primaryColor={variant === 'primary' || variant === 'gradient' ? theme.colors.textInverse : theme.colors.primary}
+          secondaryColor={variant === 'primary' || variant === 'gradient' ? 'rgba(255, 255, 255, 0.6)' : theme.colors.secondary}
         />
       ) : (
         <>

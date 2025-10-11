@@ -15,6 +15,7 @@ import {
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Icon } from '../../components/common/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
@@ -23,7 +24,6 @@ import { MeetNSplitLogo } from '@/components/common/MeetNSplitLogo';
 import { BrandHeader } from '@/components/common/BrandHeader';
 import { Button } from '@/components/common/Button';
 import { BiometricService } from '@/services/biometric';
-import { BiometricAuthService } from '@/services/biometric/BiometricAuthService';
 import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
 import { COUNTRIES, POPULAR_COUNTRIES, CURRENCIES } from '@/constants/countries';
 import CountryCodePicker, { Country, findCountryByCode, convertToPickerCountry } from '@/components/common/CountryCodePicker';
@@ -252,7 +252,8 @@ export default function RegisterScreen() {
       
       // If registration successful and user has biometric enabled, save the preference
       if (biometricEnabled && user?.id) {
-        await BiometricAuthService.setBiometricEnabledForUser(user.id, true);
+        await AsyncStorage.setItem(`@spendy_biometric_enabled_${user.id}`, 'true');
+        await AsyncStorage.setItem('@spendy_biometric_enabled', 'true');
         console.log('✅ Biometric preference saved for new user');
       }
       
