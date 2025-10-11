@@ -19,7 +19,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
-import { BiometricService } from '@/services/biometric';
 import { ApiService } from '@/services/api/ApiService';
 import { MeetNSplitLogo } from '@/components/common/MeetNSplitLogo';
 import { BrandHeader } from '@/components/common/BrandHeader';
@@ -27,19 +26,15 @@ import { BrandHeader } from '@/components/common/BrandHeader';
 export default function LoginScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { login, user, restoreSessionFromBiometric } = useAuth();
+  const { login, user } = useAuth();
   const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [biometricLoading, setBiometricLoading] = useState(false);
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [lastUserEmail, setLastUserEmail] = useState<string | null>(null);
-  const [lastUserBiometric, setLastUserBiometric] = useState(false);
-  const [hasShownBiometricPrompt, setHasShownBiometricPrompt] = useState(false);
   const apiService = ApiService.getInstance();
 
   useEffect(() => {
@@ -53,52 +48,17 @@ export default function LoginScreen() {
 
   const initializeScreen = async () => {
     try {
-      // Check biometric availability
-      const available = await BiometricService.isAvailable();
-      setBiometricAvailable(available);
-
-      // Get last user's email and biometric setting
+      // Get last user's email
       const lastEmail = await apiService.getLastEmail();
-      const lastBiometric = await apiService.getLastBiometricSetting();
       
-      console.log('🔍 Last user session:', { lastEmail, lastBiometric });
+      console.log('🔍 Last user session:', { lastEmail });
       
       setLastUserEmail(lastEmail);
-      setLastUserBiometric(lastBiometric);
       
       // Pre-fill email if we have it
       if (lastEmail) {
         setEmail(lastEmail);
-      }
-
-      // ONLY show biometric prompt if we haven't shown it yet and user didn't just come from biometric screen
-      // Check if we came from biometric failure by checking async storage flag
-      const biometricJustFailed = await AsyncStorage.getItem('@spendy_biometric_failed');
-      
-      if (available && lastBiometric && lastEmail && !hasShownBiometricPrompt && !biometricJustFailed) {
-        setHasShownBiometricPrompt(true); // Prevent showing again
-        setTimeout(() => {
-          Alert.alert(
-            'Quick Login',
-            `Continue as ${lastEmail}?\n\nUse biometric authentication for faster login?`,
-            [
-              { 
-                text: 'Use Password', 
-                style: 'cancel',
-                onPress: () => setEmail(lastEmail) 
-              },
-              { 
-                text: 'Use Biometric', 
-                onPress: handleBiometricLogin 
-              },
-              {
-                text: 'Different User',
-                onPress: handleClearSession
-              }
-            ]
-          );
-        }, 500);
-      } else if (lastEmail && !biometricJustFailed) {
+        
         // Show option for different user if there's a stored email
         setTimeout(() => {
           Alert.alert(
@@ -117,11 +77,6 @@ export default function LoginScreen() {
           );
         }, 500);
       }
-      
-      // Clear the biometric failed flag after checking
-      if (biometricJustFailed) {
-        await AsyncStorage.removeItem('@spendy_biometric_failed');
-      }
     } catch (error) {
       console.log('Screen initialization failed:', error);
     }
@@ -133,7 +88,6 @@ export default function LoginScreen() {
       await apiService.clearUserSession();
       setEmail('');
       setLastUserEmail(null);
-      setLastUserBiometric(false);
       Alert.alert('Session Cleared', 'You can now login with a different account.');
     } catch (error) {
       console.error('Failed to clear session:', error);
@@ -206,47 +160,6 @@ export default function LoginScreen() {
       await login(email.trim().toLowerCase(), password);
       console.log('LoginScreen: Login successful, user should be set');
       
-      // Check if user doesn't have biometric enabled and device supports it
-      const isAvailable = await BiometricService.isAvailable();
-      const userHasBiometric = await apiService.getLastBiometricSetting();
-      
-      console.log('🔍 Checking biometric setup:', { isAvailable, userHasBiometric, userId: user?.id });
-      
-      if (isAvailable && !userHasBiometric && user?.id) {
-        console.log('🔍 Offering biometric setup for user');
-        setTimeout(() => {
-          Alert.alert(
-            'Enable Biometric Authentication?',
-            'Would you like to enable Face ID/Touch ID for faster login next time?',
-            [
-              { text: 'Not Now', style: 'cancel' },
-              { 
-                text: 'Enable', 
-                onPress: async () => {
-                  try {
-                    // Save biometric preference for this user
-                    await AsyncStorage.setItem(`@spendy_biometric_enabled_${user.id}`, 'true');
-                    await AsyncStorage.setItem('@spendy_biometric_enabled', 'true');
-                    
-                    // Update the stored session with biometric enabled
-                    if (user) {
-                      const updatedUser = { ...user, biometricEnabled: true };
-                      await apiService.storeUserSession(updatedUser);
-                    }
-                    
-                    console.log('✅ Biometric authentication enabled for user');
-                    Alert.alert('Success', 'Biometric authentication has been enabled for your account.');
-                  } catch (error) {
-                    console.error('Error enabling biometric:', error);
-                    Alert.alert('Error', 'Failed to enable biometric authentication.');
-                  }
-                }
-              }
-            ]
-          );
-        }, 1000);
-      }
-      
       // Navigation will happen automatically in App.tsx when user state changes
     } catch (error: any) {
       console.log('LoginScreen: Login error:', error);
@@ -256,35 +169,6 @@ export default function LoginScreen() {
       Alert.alert('Login Failed', errorMessage);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleBiometricLogin = async () => {
-    setBiometricLoading(true);
-    try {
-      const result = await BiometricService.authenticate();
-      if (result.success) {
-        console.log('✅ Biometric authentication successful, restoring session');
-
-        // Use the proper session restoration from useAuth
-        await restoreSessionFromBiometric();
-
-        console.log('✅ Session restored successfully via biometric login');
-        // Navigation will happen automatically via useAuth state change
-      } else {
-        console.log('❌ Biometric authentication failed:', result.error);
-        if (result.error && result.error !== 'User cancelled') {
-          Alert.alert('Authentication Failed', result.error);
-        }
-      }
-    } catch (error: any) {
-      console.error('❌ Biometric login error:', error);
-      // Only show alert for non-manual-login-required errors
-      if (error?.message !== 'MANUAL_LOGIN_REQUIRED') {
-        Alert.alert('Error', 'Failed to restore session. Please login with your password.');
-      }
-    } finally {
-      setBiometricLoading(false);
     }
   };
 
@@ -459,12 +343,6 @@ export default function LoginScreen() {
         transition: 'all 0.2s ease-in-out',
       }),
     },
-    biometricButton: {
-      marginTop: 12,
-      paddingVertical: 10,
-      paddingHorizontal: 20,
-      minHeight: 44,
-    },
     forgotPassword: {
       alignItems: 'center',
       marginTop: 24,
@@ -619,16 +497,6 @@ export default function LoginScreen() {
                 loading={loading}
                 style={styles.loginButton}
               />
-
-              {biometricAvailable && lastUserBiometric && lastUserEmail && (
-                <Button
-                  title="Login with Biometric"
-                  onPress={handleBiometricLogin}
-                  loading={biometricLoading}
-                  variant="outline"
-                  style={styles.biometricButton}
-                />
-              )}
 
               <TouchableOpacity
                 onPress={() => navigation.navigate('ForgotPassword' as never)}

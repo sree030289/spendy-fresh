@@ -163,11 +163,13 @@ export const Button: React.FC<ButtonProps> = ({
   const renderContent = () => (
     <>
       {loading ? (
-        <CircularLoader 
-          size={size === 'sm' ? 20 : size === 'lg' ? 28 : 24}
-          primaryColor={variant === 'primary' || variant === 'gradient' ? theme.colors.textInverse : theme.colors.primary}
-          secondaryColor={variant === 'primary' || variant === 'gradient' ? 'rgba(255, 255, 255, 0.6)' : theme.colors.secondary}
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+          <CircularLoader 
+            size={size === 'sm' ? 18 : size === 'lg' ? 24 : 20}
+            primaryColor={variant === 'primary' || variant === 'gradient' ? theme.colors.textInverse : theme.colors.primary}
+            secondaryColor={variant === 'primary' || variant === 'gradient' ? 'rgba(255, 255, 255, 0.3)' : `${theme.colors.primary}40`}
+          />
+        </View>
       ) : (
         <>
           {icon && iconPosition === 'left' && icon}

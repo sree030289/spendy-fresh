@@ -1,8 +1,15 @@
 // functions/index.js - Fixed without region syntax and Node 18+ compatible
+// Updated: 2025-10-11 - Fixed nodemailer email sending
 require('dotenv').config();
 const functions = require('firebase-functions');
+const { defineSecret } = require('firebase-functions/params');
 const cors = require('cors')({ origin: true });
 const admin = require('firebase-admin');
+const nodemailer = require('nodemailer');
+
+// Define secrets for email configuration
+const emailUser = defineSecret('EMAIL_USER');
+const emailPassword = defineSecret('EMAIL_PASSWORD');
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
@@ -604,20 +611,21 @@ meetnsplitApp.put('/auth/profile', authenticateJWT, async (req, res) => {
 async function sendWelcomeEmail(email, fullName) {
   console.log(`📧 Sending welcome email to: ${email}`);
   
-  const nodemailer = require('nodemailer');
-  
+  // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
   const transporter = nodemailer.createTransport({
-    host: 'smtp.office365.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: {
-      user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
-      pass: process.env.EMAIL_PASSWORD || 'vnzdrkkydkzqklvq'
-    },
+    host: process.env.SMTP_HOST || 'smtpout.secureserver.net',
+    port: parseInt(process.env.SMTP_PORT || '465'),
+    secure: true,
+    secureConnection: false, // TLS requires secureConnection to be false
     tls: {
       ciphers: 'SSLv3',
       rejectUnauthorized: false
+    },
+    requireTLS: true,
+    debug: true,
+    auth: {
+      user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
+      pass: process.env.EMAIL_PASSWORD
     }
   });
 
@@ -678,7 +686,7 @@ async function sendWelcomeEmail(email, fullName) {
             Questions or need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
           </p>
           <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
-            Meet-n-Split - Smart Money Management | Welcome aboard! 🚀
+            Meet-n-Split - Smart Expense Spliting APP | Welcome aboard! 🚀
           </p>
         </div>
       </div>
@@ -739,14 +747,22 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
 
     // Send email with OTP
     try {
-      const nodemailer = require('nodemailer');
-      
-      // Create transporter (configured for Microsoft/Outlook)
-      const transporter = nodemailer.createTransporter({
-        service: 'hotmail', // Works for all Microsoft/Outlook emails
+      console.log('🔧 Creating SMTP transporter for password reset OTP (using global nodemailer)');
+      // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtpout.secureserver.net',
+        port: parseInt(process.env.SMTP_PORT || '465'),
+        secure: true,
+        secureConnection: false, // TLS requires secureConnection to be false
+        tls: {
+          ciphers: 'SSLv3',
+          rejectUnauthorized: false
+        },
+        requireTLS: true,
+        debug: true,
         auth: {
           user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
-          pass: process.env.EMAIL_PASSWORD || 'your-microsoft-password'
+          pass: process.env.EMAIL_PASSWORD
         }
       });
 
@@ -759,7 +775,7 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
             <!-- Header Banner with Logo -->
             <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 30px 20px; border-radius: 10px; color: white;">
               <h1 style="margin: 0; font-size: 28px; font-weight: bold;">� Meet-n-Split</h1>
-              <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
+              <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Expense Spliting APP</p>
             </div>
             
             <div style="text-align: center; margin-bottom: 30px;">
@@ -794,7 +810,7 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
                 Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
               </p>
               <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
-                Meet-n-Split - Smart Money Management | This is an automated message.
+                Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
               </p>
             </div>
           </div>
@@ -1200,8 +1216,18 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
             passwordLength: emailPass ? emailPass.length : 0,
           });
           
+          // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
           const transporter = nodemailer.createTransport({
-            service: "gmail",
+            host: process.env.SMTP_HOST || "smtpout.secureserver.net",
+            port: parseInt(process.env.SMTP_PORT || "465"),
+            secure: true,
+            secureConnection: false, // TLS requires secureConnection to be false
+            tls: {
+              ciphers: "SSLv3",
+              rejectUnauthorized: false,
+            },
+            requireTLS: true,
+            debug: true,
             auth: {
               user: emailUser,
               pass: emailPass,
@@ -1276,7 +1302,7 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
                   `invitations from this person, you can ignore this email.
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
-                  Meet-n-Split - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
                 </p>
               </div>
             </div>
@@ -7911,6 +7937,8 @@ meetnsplitApp.post('/friends/check-registration', async (req, res) => {
 });
 
 // Export Meet-n-Split API as Firebase Function
+// For Gen 2 functions, secrets are automatically available as environment variables
+// after being set with: firebase functions:secrets:set EMAIL_PASSWORD
 exports.meetnsplitApi = functions.https.onRequest(meetnsplitApp);
 
 // ===== COMPREHENSIVE NOTIFICATION API ENDPOINTS =====
@@ -8669,13 +8697,22 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
         
         // Send email reminder to both registered and unregistered users
         try {
-          const nodemailer = require('nodemailer');
           
-          const transporter = nodemailer.createTransporter({
-            service: 'hotmail', // Works for all Microsoft/Outlook emails
+          // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
+          const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || "smtpout.secureserver.net",
+            port: parseInt(process.env.SMTP_PORT || "465"),
+            secure: true,
+            secureConnection: false, // TLS requires secureConnection to be false
+            tls: {
+              ciphers: "SSLv3",
+              rejectUnauthorized: false,
+            },
+            requireTLS: true,
+            debug: true,
             auth: {
               user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
-              pass: process.env.EMAIL_PASSWORD || 'your-microsoft-password'
+              pass: process.env.EMAIL_PASSWORD
             }
           });
 
@@ -8715,7 +8752,7 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
                   This reminder was sent by ${senderData.fullName} (${senderData.email}).
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
-                  Meet-n-Split - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
                 </p>
               </div>
             </div>
@@ -9162,12 +9199,21 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
       try {
         const nodemailer = require('nodemailer');
         
-        // Create transporter using Microsoft/Outlook service
-  const transporter = nodemailer.createTransporter({
-    service: 'hotmail', // Works for all Microsoft/Outlook emails
+        // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtpout.secureserver.net",
+    port: parseInt(process.env.SMTP_PORT || "465"),
+    secure: true,
+    secureConnection: false, // TLS requires secureConnection to be false
+    tls: {
+      ciphers: "SSLv3",
+      rejectUnauthorized: false,
+    },
+    requireTLS: true,
+    debug: true,
     auth: {
       user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
-      pass: process.env.EMAIL_PASSWORD || 'your-microsoft-password'
+      pass: process.env.EMAIL_PASSWORD
     }
   });        // Determine email content based on invite type
         let subject, htmlContent;
@@ -9179,7 +9225,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
               <!-- Header Banner with Logo -->
               <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 30px 20px; border-radius: 10px; color: white;">
                 <h1 style="margin: 0; font-size: 28px; font-weight: bold;">💰 Meet-n-Split</h1>
-                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Expense Spliting APP</p>
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
@@ -9220,7 +9266,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
                   This reminder was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
-                  Meet-n-Split - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
                 </p>
               </div>
             </div>
@@ -9233,7 +9279,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
               <!-- Header Banner with Logo -->
               <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 30px 20px; border-radius: 10px; color: white;">
                 <h1 style="margin: 0; font-size: 28px; font-weight: bold;">💰 Meet-n-Split</h1>
-                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Expense Spliting APP</p>
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
@@ -9286,7 +9332,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
                   This invitation was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
-                  Meet-n-Split - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
                 </p>
               </div>
             </div>

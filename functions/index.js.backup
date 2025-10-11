@@ -668,7 +668,7 @@ async function sendWelcomeEmail(email, fullName) {
             Questions or need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
           </p>
           <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
-            Meet-n-Split - Smart Money Management | Welcome aboard! 🚀
+            Meet-n-Split - Smart Expense Spliting APP | Welcome aboard! 🚀
           </p>
         </div>
       </div>
@@ -749,7 +749,7 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
             <!-- Header Banner with Logo -->
             <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 30px 20px; border-radius: 10px; color: white;">
               <h1 style="margin: 0; font-size: 28px; font-weight: bold;">� Meet-n-Split</h1>
-              <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
+              <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Expense Spliting APP</p>
             </div>
             
             <div style="text-align: center; margin-bottom: 30px;">
@@ -784,7 +784,7 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
                 Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
               </p>
               <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
-                Meet-n-Split - Smart Money Management | This is an automated message.
+                Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
               </p>
             </div>
           </div>
@@ -1253,7 +1253,7 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
                   `invitations from this person, you can ignore this email.
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
-                  Meet-n-Split - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
                 </p>
               </div>
             </div>
@@ -8154,7 +8154,7 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
                   This reminder was sent by ${senderData.fullName} (${senderData.email}).
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 10px 0 0 0;">
-                  Meet-n-Split - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
                 </p>
               </div>
             </div>
@@ -8618,7 +8618,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
               <!-- Header Banner with Logo -->
               <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 30px 20px; border-radius: 10px; color: white;">
                 <h1 style="margin: 0; font-size: 28px; font-weight: bold;">💰 Meet-n-Split</h1>
-                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Expense Spliting APP</p>
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
@@ -8659,7 +8659,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
                   This reminder was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
-                  Meet-n-Split - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
                 </p>
               </div>
             </div>
@@ -8672,7 +8672,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
               <!-- Header Banner with Logo -->
               <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #B0004F 0%, #D91A72 100%); padding: 30px 20px; border-radius: 10px; color: white;">
                 <h1 style="margin: 0; font-size: 28px; font-weight: bold;">💰 Meet-n-Split</h1>
-                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Money Management</p>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Smart Expense Spliting APP</p>
               </div>
               
               <div style="text-align: center; margin-bottom: 30px;">
@@ -8725,7 +8725,7 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
                   This invitation was sent by ${fromUserName} (${fromUserEmail}). Need help? Contact us at <a href="mailto:admin@meetnsplit.com" style="color: #B0004F;">admin@meetnsplit.com</a>
                 </p>
                 <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
-                  Meet-n-Split - Smart Money Management | This is an automated message.
+                  Meet-n-Split - Smart Expense Spliting APP | This is an automated message.
                 </p>
               </div>
             </div>

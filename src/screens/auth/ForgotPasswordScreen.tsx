@@ -67,42 +67,49 @@ export default function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
-      await resetPassword(email.trim().toLowerCase());
-      setSent(true);
-      Alert.alert(
-        'Reset Email Sent', 
-        'Check your email for password reset instructions. The email may take a few minutes to arrive.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Auto-redirect after 5 seconds
-              setTimeout(() => {
-                if (navigation.canGoBack()) {
-                  navigation.goBack();
-                } else {
-                  navigation.navigate('Login' as never);
-                }
-              }, 5000);
-            }
-          }
-        ]
-      );
+      const normalizedEmail = email.trim().toLowerCase();
+      const result = await resetPassword(normalizedEmail);
+      
+      console.log('🔄 Navigating to ChangePassword with email:', normalizedEmail);
+      
+      // OTP has been sent via admin@meetnsplit.com
+      // Use setLoading(false) before navigation to prevent any state issues
+      setLoading(false);
+      
+      // Use setTimeout to ensure state is updated before navigation
+      setTimeout(() => {
+        // Try using push instead of navigate to force navigation
+        if ((navigation as any).push) {
+          console.log('🚀 Using navigation.push()');
+          (navigation as any).push('ChangePassword', { 
+            email: normalizedEmail,
+            sessionId: result?.sessionId 
+          });
+        } else {
+          console.log('🚀 Using navigation.navigate()');
+          (navigation as any).navigate('ChangePassword', { 
+            email: normalizedEmail,
+            sessionId: result?.sessionId 
+          });
+        }
+        
+        console.log('✅ Navigation command executed');
+        
+        // Show success message after navigation
+        setTimeout(() => {
+          Alert.alert(
+            'OTP Sent!', 
+            'A 6-digit verification code has been sent to your email. Please check your inbox (and spam folder).'
+          );
+        }, 300);
+      }, 100);
     } catch (error: any) {
       console.log('Password reset error:', error);
+      setLoading(false);
       
-      let errorMessage = 'Failed to send reset email. Please try again.';
-      if (error.message && error.message.includes('Firebase:')) {
-        const firebaseErrorMatch = error.message.match(/\(([^)]+)\)/);
-        if (firebaseErrorMatch) {
-          const errorCode = firebaseErrorMatch[1];
-          errorMessage = getFirebaseErrorMessage(errorCode);
-        }
-      }
+      let errorMessage = error.message || 'Failed to send verification code. Please try again.';
       
       Alert.alert('Error', errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 

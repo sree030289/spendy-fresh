@@ -1,0 +1,47 @@
+[debug] [2025-10-11T06:26:47.877Z] ----------------------------------------------------------------------
+[debug] [2025-10-11T06:26:47.884Z] Command:       /Users/sreeramvennapusa/.nvm/versions/node/v22.16.0/bin/node /Users/sreeramvennapusa/.nvm/versions/node/v22.16.0/bin/firebase deploy --only functions --force
+[debug] [2025-10-11T06:26:47.884Z] CLI Version:   14.15.2
+[debug] [2025-10-11T06:26:47.884Z] Platform:      darwin
+[debug] [2025-10-11T06:26:47.885Z] Node Version:  v22.16.0
+[debug] [2025-10-11T06:26:47.885Z] Time:          Sat Oct 11 2025 17:26:47 GMT+1100 (Australian Eastern Daylight Time)
+[debug] [2025-10-11T06:26:47.885Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-10-11T06:26:47.992Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-10-11T06:26:47.993Z] > authorizing via signed-in user (svaagsolutions@gmail.com)
+[debug] [2025-10-11T06:26:47.993Z] [iam] checking project spendy-97913 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-10-11T06:26:47.993Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:47.993Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:47.994Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/spendy-97913:testIamPermissions [none]
+[debug] [2025-10-11T06:26:47.994Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/spendy-97913:testIamPermissions x-goog-quota-user=projects/spendy-97913
+[debug] [2025-10-11T06:26:47.994Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/spendy-97913:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-10-11T06:26:48.500Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/spendy-97913:testIamPermissions 200
+[debug] [2025-10-11T06:26:48.500Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/spendy-97913:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-10-11T06:26:48.500Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:48.500Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:48.500Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/spendy-97913/serviceAccounts/spendy-97913@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-10-11T06:26:48.500Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/spendy-97913/serviceAccounts/spendy-97913@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-10-11T06:26:50.251Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/spendy-97913/serviceAccounts/spendy-97913@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-10-11T06:26:50.251Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/spendy-97913/serviceAccounts/spendy-97913@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'spendy-97913'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run lint
+[info] ✔  functions: Finished running predeploy script. 
+[debug] [2025-10-11T06:26:51.192Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:51.192Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:51.192Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/spendy-97913 [none]
+[debug] [2025-10-11T06:26:51.564Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/spendy-97913 200
+[debug] [2025-10-11T06:26:51.564Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/spendy-97913 {"projectNumber":"576826934856","projectId":"spendy-97913","lifecycleState":"ACTIVE","name":"spendy","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-05-27T11:27:54.080895Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-10-11T06:26:51.566Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:51.566Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:51.566Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/spendy-97913/adminSdkConfig [none]
+[debug] [2025-10-11T06:26:53.316Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/spendy-97913/adminSdkConfig 200
+[debug] [2025-10-11T06:26:53.316Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/spendy-97913/adminSdkConfig {"projectId":"spendy-97913","storageBucket":"spendy-97913.firebasestorage.app"}
+[debug] [2025-10-11T06:26:53.317Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:53.317Z] Checked if tokens are valid: true, expires at: 1760165827450
+[debug] [2025-10-11T06:26:53.318Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/spendy-97913/configs [none]

@@ -28,8 +28,13 @@ export default function ChangePasswordScreen() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [step, setStep] = useState<'email' | 'otp' | 'password'>('email');
+  
+  // Get email from navigation params (if coming from Forgot Password screen)
+  const route = navigation.getState?.()?.routes?.[navigation.getState?.()?.index ?? 0];
+  const emailFromParams = (route as any)?.params?.email;
+  
   const [formData, setFormData] = useState({
-    email: user?.email || '',
+    email: emailFromParams || user?.email || '',
     otp: '',
     newPassword: '',
     confirmPassword: '',
@@ -45,6 +50,22 @@ export default function ChangePasswordScreen() {
 
   // Email service instance
   const emailService = EmailService.getInstance();
+  
+  // Debug: Log when component mounts and params received
+  React.useEffect(() => {
+    console.log('🔑 ChangePasswordScreen mounted');
+    console.log('📧 Email from params:', emailFromParams);
+    console.log('👤 User email:', user?.email);
+  }, []);
+  
+  // If email was passed and OTP already sent, skip to OTP step
+  React.useEffect(() => {
+    if (emailFromParams) {
+      console.log('✅ Setting up for OTP entry with email:', emailFromParams);
+      setOtpSent(true);
+      setStep('otp');
+    }
+  }, [emailFromParams]);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

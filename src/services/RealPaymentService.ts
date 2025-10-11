@@ -62,11 +62,11 @@ class RealPaymentService {
   // IMPORTANT: These must match EXACTLY what's configured in RevenueCat dashboard and StoreKit configuration
   private readonly PRODUCT_IDS = {
     monthly: Platform.select({
-      ios: ENV.isProduction ? 'com.meetnsplit.app.Monthly' : 'com.meetnsplit.app.dev.Monthly',
+      ios: ENV.isProduction ? 'monthly199' : 'monthly199',
       android: 'meetnsplit_monthly_subscription',
     }) || '',
     yearly: Platform.select({
-      ios: ENV.isProduction ? 'com.meetnsplit.app.Annual' : 'com.meetnsplit.app.dev.Annual',
+      ios: ENV.isProduction ? 'annualy1099' : 'annualy1099',
       android: 'meetnsplit_yearly_subscription',
     }) || '',
     lifetime: Platform.select({

@@ -431,13 +431,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const resetPassword = async (email: string) => {
     try {
-      setIsLoading(true);
-      // TODO: Implement reset password API endpoint
-      console.log('Password reset - endpoint not implemented yet');
-      throw new Error('Password reset feature coming soon');
+      // Don't set isLoading here - it triggers App.tsx re-render
+      // The ForgotPasswordScreen manages its own loading state
+      
+      // Use EmailService to send OTP via backend API (admin@meetnsplit.com)
+      const { EmailService } = require('@/services/EmailService');
+      const emailService = EmailService.getInstance();
+      
+      const result = await emailService.sendOTP(email);
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to send password reset email');
+      }
+      
+      console.log('✅ Password reset OTP sent successfully via admin@meetnsplit.com');
+      
+      // Return success - the calling component will handle navigation
+      return result;
     } catch (error) {
       console.error('Reset password error:', error);
-      setIsLoading(false);
       throw error;
     }
   };
