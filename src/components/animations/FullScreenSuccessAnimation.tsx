@@ -212,44 +212,52 @@ const FullScreenSuccessAnimation: React.FC<FullScreenSuccessAnimationProps> = ({
 
   return (
     <Animated.View style={[styles.container, overlayAnimatedStyle]}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent />
       
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#B0004F', '#D91A72']}
-        style={styles.background}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
+      {/* Modern White Background with subtle pattern */}
+      <View style={styles.background}>
+        {/* Decorative circles */}
+        <View style={[styles.decorativeCircle, styles.circle1]} />
+        <View style={[styles.decorativeCircle, styles.circle2]} />
+        <View style={[styles.decorativeCircle, styles.circle3]} />
+      </View>
 
-      {/* Floating Particles */}
-      <View style={[styles.particle, styles.particle1]} />
-      <View style={[styles.particle, styles.particle2]} />
-      <View style={[styles.particle, styles.particle3]} />
-      <View style={[styles.particle, styles.particle4]} />
-      <View style={[styles.particle, styles.particle5]} />
+      {/* Floating Confetti/Particles */}
+      <View style={[styles.confetti, styles.confetti1]} />
+      <View style={[styles.confetti, styles.confetti2]} />
+      <View style={[styles.confetti, styles.confetti3]} />
+      <View style={[styles.confetti, styles.confetti4]} />
+      <View style={[styles.confetti, styles.confetti5]} />
+      <View style={[styles.confetti, styles.confetti6]} />
 
       <View style={styles.contentContainer}>
         {/* Pulse Rings */}
         <Animated.View style={[styles.pulseRing1, pulse1AnimatedStyle]} />
         <Animated.View style={[styles.pulseRing2, pulse2AnimatedStyle]} />
 
-        {/* Success Circle */}
+        {/* Success Circle with gradient */}
         <Animated.View style={[styles.successCircle, circleAnimatedStyle]}>
-          <Animated.View style={[styles.checkmark, checkmarkAnimatedStyle]}>
-            <Svg width={90} height={90} viewBox="0 0 100 100">
-              <Path
-                d="M15 50 L35 70 L85 25"
-                stroke="#4CAF50"
-                strokeWidth={8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-                strokeDasharray={200}
-                strokeDashoffset={interpolate(checkmarkProgress.value, [0, 1], [200, 0])}
-              />
-            </Svg>
-          </Animated.View>
+          <LinearGradient
+            colors={['#10B981', '#059669']}
+            style={styles.circleGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Animated.View style={[styles.checkmark, checkmarkAnimatedStyle]}>
+              <Svg width={90} height={90} viewBox="0 0 100 100">
+                <Path
+                  d="M15 50 L35 70 L85 25"
+                  stroke="#FFFFFF"
+                  strokeWidth={8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                  strokeDasharray={200}
+                  strokeDashoffset={interpolate(checkmarkProgress.value, [0, 1], [200, 0])}
+                />
+              </Svg>
+            </Animated.View>
+          </LinearGradient>
         </Animated.View>
 
         {/* Text Content */}
@@ -277,7 +285,7 @@ const FullScreenSuccessAnimation: React.FC<FullScreenSuccessAnimationProps> = ({
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={['#FFFFFF', '#F3F4F6']}
+              colors={['#B0004F', '#D91A72']}
               style={styles.buttonGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -308,6 +316,33 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: '#FFFFFF',
+  },
+  decorativeCircle: {
+    position: 'absolute',
+    borderRadius: 9999,
+    opacity: 0.05,
+  },
+  circle1: {
+    width: 500,
+    height: 500,
+    backgroundColor: '#10B981',
+    top: -250,
+    right: -200,
+  },
+  circle2: {
+    width: 400,
+    height: 400,
+    backgroundColor: '#B0004F',
+    bottom: -200,
+    left: -150,
+  },
+  circle3: {
+    width: 300,
+    height: 300,
+    backgroundColor: '#3B82F6',
+    top: '30%',
+    left: -100,
   },
   contentContainer: {
     alignItems: 'center',
@@ -318,18 +353,20 @@ const styles = StyleSheet.create({
   successCircle: {
     width: 180,
     height: 180,
-    borderWidth: 6,
-    borderColor: '#4CAF50',
     borderRadius: 90,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
     marginBottom: 50,
+    overflow: 'hidden',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  circleGradient: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 20,
   },
   checkmark: {
     justifyContent: 'center',
@@ -340,7 +377,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderWidth: 3,
-    borderColor: 'rgba(76, 175, 80, 0.4)',
+    borderColor: 'rgba(16, 185, 129, 0.2)',
     borderRadius: 110,
     top: '50%',
     left: '50%',
@@ -352,7 +389,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderWidth: 3,
-    borderColor: 'rgba(76, 175, 80, 0.4)',
+    borderColor: 'rgba(16, 185, 129, 0.15)',
     borderRadius: 130,
     top: '50%',
     left: '50%',
@@ -360,30 +397,32 @@ const styles = StyleSheet.create({
     marginLeft: -130,
   },
   successTitle: {
-    color: '#FFFFFF',
+    color: '#1F2937',
     fontSize: 42,
     fontWeight: '700',
-    marginBottom: 20,
+    marginBottom: 16,
     textAlign: 'center',
-    letterSpacing: 1,
-    textShadowColor: 'rgba(255, 255, 255, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 20,
+    letterSpacing: -0.5,
   },
   successMessage: {
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: '#4B5563',
     fontSize: 20,
-    fontWeight: '400',
+    fontWeight: '500',
     textAlign: 'center',
     lineHeight: 28,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   successSubtitle: {
-    color: 'rgba(76, 175, 80, 0.9)',
+    color: '#10B981',
     fontSize: 16,
-    fontWeight: '500',
-    marginTop: 15,
+    fontWeight: '600',
+    marginTop: 12,
     textAlign: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   buttonContainer: {
     position: 'absolute',
@@ -395,9 +434,9 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#4CAF50',
+    shadowColor: '#B0004F',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -407,44 +446,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    color: '#B0004F',
+    color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  particle: {
+  confetti: {
     position: 'absolute',
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    borderRadius: 2,
   },
-  particle1: {
-    width: 6,
-    height: 6,
-    left: '20%',
-    top: '30%',
-  },
-  particle2: {
-    width: 4,
-    height: 4,
-    right: '20%',
+  confetti1: {
+    width: 10,
+    height: 10,
+    backgroundColor: '#10B981',
+    left: '15%',
     top: '25%',
+    transform: [{ rotate: '45deg' }],
   },
-  particle3: {
+  confetti2: {
     width: 8,
     height: 8,
-    left: '60%',
+    backgroundColor: '#B0004F',
+    right: '20%',
     top: '20%',
+    borderRadius: 4,
   },
-  particle4: {
-    width: 5,
-    height: 5,
-    left: '30%',
+  confetti3: {
+    width: 12,
+    height: 12,
+    backgroundColor: '#3B82F6',
+    left: '65%',
+    top: '18%',
+    transform: [{ rotate: '30deg' }],
+  },
+  confetti4: {
+    width: 8,
+    height: 8,
+    backgroundColor: '#F59E0B',
+    left: '25%',
+    bottom: '28%',
+    borderRadius: 4,
+  },
+  confetti5: {
+    width: 10,
+    height: 10,
+    backgroundColor: '#8B5CF6',
+    right: '25%',
     bottom: '30%',
+    transform: [{ rotate: '60deg' }],
   },
-  particle5: {
-    width: 7,
-    height: 7,
-    right: '30%',
-    bottom: '25%',
+  confetti6: {
+    width: 6,
+    height: 6,
+    backgroundColor: '#EC4899',
+    right: '40%',
+    top: '35%',
+    borderRadius: 3,
   },
 });
 
