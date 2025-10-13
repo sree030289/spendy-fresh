@@ -24,7 +24,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
-    "public": "dist",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -73,8 +73,20 @@
     ],
     "rewrites": [
       {
-        "source": "**",
-        "destination": "/index.html"
+        "source": "/privacy",
+        "destination": "/privacy.html"
+      },
+      {
+        "source": "/terms",
+        "destination": "/terms.html"
+      },
+      {
+        "source": "/contact-us",
+        "destination": "/contact-us.html"
+      },
+      {
+        "source": "/qr/:groupId",
+        "destination": "/qr-fallback.html"
       }
     ]
   },

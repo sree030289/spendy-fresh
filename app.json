@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.meetnsplit.app",
+      "bundleIdentifier": "com.meetnsplit.app.dev",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera for QR code scanning to quickly add expenses and split bills.",

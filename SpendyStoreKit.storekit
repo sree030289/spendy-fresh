@@ -29,9 +29,9 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "0.99",
+          "displayPrice" : "1.99",
           "familyShareable" : false,
-          "id" : "com.svaag.spendy.dev.Monthly",
+          "id" : "monthly199",
           "introductoryOffer" : null,
           "localizations" : [
             {
@@ -40,7 +40,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.meetnsplit.app.dev.Monthly",
+          "productID" : "monthly199",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Monthly Premium",
           "subscriptionGroupID" : "21482551",
@@ -55,7 +55,7 @@
           ],
           "displayPrice" : "10.99",
           "familyShareable" : false,
-          "id" : "com.svaag.spendy.dev.Annual",
+          "id" : "annualy1099",
           "introductoryOffer" : null,
           "localizations" : [
             {
@@ -64,33 +64,9 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.meetnsplit.app.dev.Annual",
+          "productID" : "annualy1099",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Annual Premium",
-          "subscriptionGroupID" : "21482551",
-          "type" : "RecurringSubscription"
-        },
-        {
-          "adHocOffers" : [
-
-          ],
-          "codeOffers" : [
-
-          ],
-          "displayPrice" : "49.99",
-          "familyShareable" : false,
-          "id" : "com.svaag.spendy.dev.Lifetime",
-          "introductoryOffer" : null,
-          "localizations" : [
-            {
-              "description" : "Lifetime access to all premium features",
-              "displayName" : "Lifetime Premium",
-              "locale" : "en_US"
-            }
-          ],
-          "productID" : "com.meetnsplit.app.dev.Lifetime",
-          "recurringSubscriptionPeriod" : "P99Y",
-          "referenceName" : "Lifetime Premium",
           "subscriptionGroupID" : "21482551",
           "type" : "RecurringSubscription"
         }

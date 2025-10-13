@@ -40,7 +40,7 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "0.99",
+          "displayPrice" : "1.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "6736108071",
@@ -48,13 +48,13 @@
           "localizations" : [
             {
               "description" : "Premium features with unlimited groups, members, and advanced analytics",
-              "displayName" : "Premium Monthly",
+              "displayName" : "Monthly Premium",
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.meetnsplit.app.dev.Monthly",
+          "productID" : "monthly199",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Premium Monthly Dev",
+          "referenceName" : "Monthly Premium",
           "subscriptionGroupID" : "21481258",
           "type" : "RecurringSubscription",
           "winbackOffers" : [
@@ -76,41 +76,13 @@
           "localizations" : [
             {
               "description" : "Premium features with unlimited groups, members, and advanced analytics. Save 8% with yearly plan!",
-              "displayName" : "Premium Yearly",
+              "displayName" : "Annual Premium",
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.meetnsplit.app.dev.Annual",
+          "productID" : "annualy1099",
           "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Premium Yearly Dev",
-          "subscriptionGroupID" : "21481258",
-          "type" : "RecurringSubscription",
-          "winbackOffers" : [
-
-          ]
-        },
-        {
-          "adHocOffers" : [
-
-          ],
-          "codeOffers" : [
-
-          ],
-          "displayPrice" : "49.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "6736108073",
-          "introductoryOffer" : null,
-          "localizations" : [
-            {
-              "description" : "Lifetime access to all premium features",
-              "displayName" : "Premium Lifetime",
-              "locale" : "en_US"
-            }
-          ],
-          "productID" : "com.meetnsplit.app.dev.Lifetime",
-          "recurringSubscriptionPeriod" : "P99Y",
-          "referenceName" : "Premium Lifetime Dev",
+          "referenceName" : "Annual Premium",
           "subscriptionGroupID" : "21481258",
           "type" : "RecurringSubscription",
           "winbackOffers" : [

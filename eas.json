@@ -34,6 +34,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6670917583",
+        "appleId": "admin@meetnsplit.com",
+        "appleTeamId": "GPQZV337FJ"
+      }
+    }
   }
 }

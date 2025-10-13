@@ -611,21 +611,18 @@ meetnsplitApp.put('/auth/profile', authenticateJWT, async (req, res) => {
 async function sendWelcomeEmail(email, fullName) {
   console.log(`📧 Sending welcome email to: ${email}`);
   
-  // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
+  // Microsoft 365 SMTP Configuration - Port 587 STARTTLS (Working locally!)
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtpout.secureserver.net',
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: true,
-    secureConnection: false, // TLS requires secureConnection to be false
-    tls: {
-      ciphers: 'SSLv3',
-      rejectUnauthorized: false
-    },
-    requireTLS: true,
-    debug: true,
+    host: process.env.SMTP_HOST || 'smtp.office365.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false, // use STARTTLS
     auth: {
       user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
       pass: process.env.EMAIL_PASSWORD
+    },
+    tls: {
+      ciphers: 'SSLv3',
+      rejectUnauthorized: false
     }
   });
 
@@ -747,22 +744,18 @@ meetnsplitApp.post('/auth/send-password-reset-otp', async (req, res) => {
 
     // Send email with OTP
     try {
-      console.log('🔧 Creating SMTP transporter for password reset OTP (using global nodemailer)');
-      // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
+      // Microsoft 365 SMTP Configuration - Port 587 STARTTLS (Working locally!)
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtpout.secureserver.net',
-        port: parseInt(process.env.SMTP_PORT || '465'),
-        secure: true,
-        secureConnection: false, // TLS requires secureConnection to be false
-        tls: {
-          ciphers: 'SSLv3',
-          rejectUnauthorized: false
-        },
-        requireTLS: true,
-        debug: true,
+        host: process.env.SMTP_HOST || 'smtp.office365.com',
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: false, // use STARTTLS
         auth: {
           user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
           pass: process.env.EMAIL_PASSWORD
+        },
+        tls: {
+          ciphers: 'SSLv3',
+          rejectUnauthorized: false
         }
       });
 
@@ -1216,22 +1209,19 @@ meetnsplitApp.post('/friends/requests/send', authenticateJWT, async (req, res) =
             passwordLength: emailPass ? emailPass.length : 0,
           });
           
-          // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
+          // Microsoft 365 SMTP Configuration - Port 587 STARTTLS (Working locally!)
           const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || "smtpout.secureserver.net",
-            port: parseInt(process.env.SMTP_PORT || "465"),
-            secure: true,
-            secureConnection: false, // TLS requires secureConnection to be false
-            tls: {
-              ciphers: "SSLv3",
-              rejectUnauthorized: false,
-            },
-            requireTLS: true,
-            debug: true,
+            host: process.env.SMTP_HOST || "smtp.office365.com",
+            port: parseInt(process.env.SMTP_PORT || "587"),
+            secure: false, // use STARTTLS
             auth: {
               user: emailUser,
               pass: emailPass,
             },
+            tls: {
+              ciphers: "SSLv3",
+              rejectUnauthorized: false,
+            }
           });
 
           // Create deep link for friend request
@@ -8698,21 +8688,18 @@ meetnsplitApp.post('/friends/requests/:requestId/remind', authenticateJWT, async
         // Send email reminder to both registered and unregistered users
         try {
           
-          // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
+          // Microsoft 365 SMTP Configuration - Port 465 SSL
           const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || "smtpout.secureserver.net",
-            port: parseInt(process.env.SMTP_PORT || "465"),
-            secure: true,
-            secureConnection: false, // TLS requires secureConnection to be false
-            tls: {
-              ciphers: "SSLv3",
-              rejectUnauthorized: false,
-            },
-            requireTLS: true,
-            debug: true,
+            host: process.env.SMTP_HOST || "smtp.office365.com",
+            port: parseInt(process.env.SMTP_PORT || "587"),
+            secure: false, // use STARTTLS
             auth: {
               user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
               pass: process.env.EMAIL_PASSWORD
+            },
+            tls: {
+              ciphers: "SSLv3",
+              rejectUnauthorized: false,
             }
           });
 
@@ -9199,21 +9186,18 @@ meetnsplitApp.post('/invites/send', async (req, res) => {
       try {
         const nodemailer = require('nodemailer');
         
-        // GoDaddy SMTP Configuration - Enhanced for Microsoft 365
+        // Microsoft 365 SMTP Configuration (Working!)
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtpout.secureserver.net",
-    port: parseInt(process.env.SMTP_PORT || "465"),
-    secure: true,
-    secureConnection: false, // TLS requires secureConnection to be false
-    tls: {
-      ciphers: "SSLv3",
-      rejectUnauthorized: false,
-    },
-    requireTLS: true,
-    debug: true,
+    host: process.env.SMTP_HOST || "smtp.office365.com",
+    port: parseInt(process.env.SMTP_PORT || "587"),
+    secure: false, // use STARTTLS
     auth: {
       user: process.env.EMAIL_USER || 'admin@meetnsplit.com',
       pass: process.env.EMAIL_PASSWORD
+    },
+    tls: {
+      ciphers: "SSLv3",
+      rejectUnauthorized: false,
     }
   });        // Determine email content based on invite type
         let subject, htmlContent;
@@ -9952,3 +9936,256 @@ meetnsplitApp.post('/test-notification', authenticateJWT, async (req, res) => {
     });
   }
 });
+
+// ============================================================================
+// CONTACT US ENDPOINT
+// ============================================================================
+
+// Contact us form submission
+meetnsplitApp.post('/contact-us', async (req, res) => {
+  try {
+    const { name, email, subject, message } = req.body;
+
+    // Validation
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email address'
+      });
+    }
+
+    console.log(`📧 Contact form submission from: ${name} <${email}>`);
+
+    // Get email password from environment variable
+    const emailPassword = process.env.MEETNSPLIT_EMAIL_PASSWORD;
+    if (!emailPassword) {
+      console.error('❌ MEETNSPLIT_EMAIL_PASSWORD not configured');
+      return res.status(500).json({
+        success: false,
+        message: 'Email service not configured'
+      });
+    }
+
+    // Create email transporter
+    const transporter = nodemailer.createTransport({
+      host: "smtp.office365.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: "admin@meetnsplit.com",
+        pass: emailPassword,
+      },
+      tls: {
+        ciphers: "SSLv3",
+        rejectUnauthorized: false
+      },
+    });
+
+    const messageHtml = message.replace(/\n/g, '<br>');
+
+    // Email content
+    const mailOptions = {
+      from: '"Meet-n-Split Contact Form" <admin@meetnsplit.com>',
+      to: 'admin@meetnsplit.com',
+      subject: `Contact-us - ${subject}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #B0004F 0%, #8B0040 100%); color: white; padding: 30px; text-align: center;">
+            <h1 style="margin: 0;">New Contact Form Submission</h1>
+          </div>
+
+          <div style="padding: 30px; background-color: #f8f9fa;">
+            <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <h2 style="color: #B0004F; margin-top: 0;">Contact Details</h2>
+
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef; font-weight: bold; width: 120px;">Name:</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef;">${name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef; font-weight: bold;">Email:</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef;"><a href="mailto:${email}">${email}</a></td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef; font-weight: bold;">Subject:</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef;">${subject}</td>
+                </tr>
+              </table>
+
+              <h3 style="color: #B0004F; margin-top: 25px; margin-bottom: 15px;">Message:</h3>
+              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; border-left: 4px solid #B0004F;">
+                ${messageHtml}
+              </div>
+
+              <div style="margin-top: 25px; padding: 15px; background-color: #fff5f5; border-radius: 6px; border: 1px solid #B0004F;">
+                <p style="margin: 0; color: #666; font-size: 14px;">
+                  <strong>Reply to:</strong> ${email}<br>
+                  <strong>Received:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })} UTC
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
+            <p>This is an automated email from the Meet-n-Split contact form.</p>
+            <p>&copy; 2025 Meet-n-Split. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+      replyTo: email
+    };
+
+    // Send email
+    await transporter.sendMail(mailOptions);
+
+    console.log(`✅ Contact email sent successfully from ${email}`);
+
+    res.json({
+      success: true,
+      message: 'Your message has been sent successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Contact form error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send message. Please try again later.'
+    });
+  }
+});
+
+// ============================================================================
+// CONTACT US ENDPOINT
+// ============================================================================
+
+// Contact us form submission
+meetnsplitApp.post('/contact-us', async (req, res) => {
+  try {
+    const { name, email, subject, message } = req.body;
+
+    // Validation
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email address'
+      });
+    }
+
+    console.log(`📧 Contact form submission from: ${name} <${email}>`);
+
+    // Get email password from environment variable
+    const emailPassword = process.env.MEETNSPLIT_EMAIL_PASSWORD;
+    if (!emailPassword) {
+      console.error('❌ MEETNSPLIT_EMAIL_PASSWORD not configured');
+      return res.status(500).json({
+        success: false,
+        message: 'Email service not configured'
+      });
+    }
+
+    // Create email transporter
+    const transporter = nodemailer.createTransport({
+      host: "smtp.office365.com",
+      port: 587,
+      secure: false, // use STARTTLS
+      auth: {
+        user: "admin@meetnsplit.com",
+        pass: emailPassword,
+      },
+      tls: {
+        ciphers: "SSLv3",
+        rejectUnauthorized: false 
+      },
+    });
+
+    // Email content
+    const mailOptions = {
+      from: '"Meet-n-Split Contact Form" <admin@meetnsplit.com>',
+      to: 'admin@meetnsplit.com',
+      subject: `Contact-us - ${subject}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #B0004F 0%, #8B0040 100%); color: white; padding: 30px; text-align: center;">
+            <h1 style="margin: 0;">New Contact Form Submission</h1>
+          </div>
+          
+          <div style="padding: 30px; background-color: #f8f9fa;">
+            <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <h2 style="color: #B0004F; margin-top: 0;">Contact Details</h2>
+              
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef; font-weight: bold; width: 120px;">Name:</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef;">${name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef; font-weight: bold;">Email:</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef;"><a href="mailto:${email}">${email}</a></td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef; font-weight: bold;">Subject:</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e9ecef;">${subject}</td>
+                </tr>
+              </table>
+              
+              <h3 style="color: #B0004F; margin-top: 25px; margin-bottom: 15px;">Message:</h3>
+              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; border-left: 4px solid #B0004F;">
+                ${message.replace(/\n/g, '<br>')}
+              </div>
+              
+              <div style="margin-top: 25px; padding: 15px; background-color: #fff5f5; border-radius: 6px; border: 1px solid #B0004F;">
+                <p style="margin: 0; color: #666; font-size: 14px;">
+                  <strong>Reply to:</strong> ${email}<br>
+                  <strong>Received:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })} UTC
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
+            <p>This is an automated email from the Meet-n-Split contact form.</p>
+            <p>&copy; 2025 Meet-n-Split. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+      replyTo: email
+    };
+
+    // Send email
+    await transporter.sendMail(mailOptions);
+
+    console.log(`✅ Contact email sent successfully from ${email}`);
+
+    res.json({
+      success: true,
+      message: 'Your message has been sent successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Contact form error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send message. Please try again later.'
+    });
+  }
+});
+

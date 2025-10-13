@@ -60,14 +60,15 @@ class RealPaymentService {
 
   // Product identifiers for App Store and Play Store
   // IMPORTANT: These must match EXACTLY what's configured in RevenueCat dashboard and StoreKit configuration
+  // For Android: Must use base plan format "subscriptionId:basePlanId" as configured in RevenueCat
   private readonly PRODUCT_IDS = {
     monthly: Platform.select({
       ios: ENV.isProduction ? 'monthly199' : 'monthly199',
-      android: 'meetnsplit_monthly_subscription',
+      android: 'monthly199:monthly-base', // ✅ MUST match RevenueCat product identifier exactly!
     }) || '',
     yearly: Platform.select({
       ios: ENV.isProduction ? 'annualy1099' : 'annualy1099',
-      android: 'meetnsplit_yearly_subscription',
+      android: 'annualy1099:yearly-base', // ✅ MUST match RevenueCat product identifier exactly!
     }) || '',
     lifetime: Platform.select({
       ios: ENV.isProduction ? 'com.meetnsplit.app.Lifetime' : 'com.meetnsplit.app.dev.Lifetime',
@@ -92,6 +93,9 @@ class RealPaymentService {
       console.log('🔧 isProduction:', ENV.isProduction);
       console.log('🔧 isDevelopment:', ENV.isDevelopment);
       console.log('📦 Product IDs being used:', this.PRODUCT_IDS);
+      console.log('🔑 RevenueCat API Key:', this.REVENUECAT_API_KEY?.substring(0, 15) + '...');
+      console.log('👤 User ID:', userId);
+      console.log('📱 Platform:', Platform.OS);
       
       if (this.isInitialized) {
         console.log('✅ RealPaymentService already initialized');
@@ -99,13 +103,15 @@ class RealPaymentService {
       }
 
       // Configure RevenueCat
-      await Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+      await Purchases.setLogLevel(Purchases.LOG_LEVEL.VERBOSE);
       
+      console.log('⚙️ Configuring RevenueCat with API key...');
       if (Platform.OS === 'ios') {
         await Purchases.configure({ apiKey: this.REVENUECAT_API_KEY, appUserID: userId });
       } else {
         await Purchases.configure({ apiKey: this.REVENUECAT_API_KEY, appUserID: userId });
       }
+      console.log('✅ RevenueCat configured successfully');
 
       // Set user attributes for analytics
       if (userId) {
@@ -132,8 +138,34 @@ class RealPaymentService {
   async loadOfferings(): Promise<PurchasesOffering | null> {
     try {
       console.log('📦 Loading subscription offerings...');
+      console.log('📦 Calling Purchases.getOfferings()...');
+      console.log('📱 Platform:', Platform.OS);
+      console.log('🔑 API Key in use:', this.REVENUECAT_API_KEY?.substring(0, 20) + '...');
       
       const offerings = await Purchases.getOfferings();
+      console.log('📦 Raw offerings response:', JSON.stringify(offerings, null, 2));
+      console.log('📦 Current offering:', offerings.current ? 'FOUND' : 'NULL');
+      console.log('📦 All offerings:', offerings.all ? Object.keys(offerings.all) : 'NULL');
+      
+      // Android-specific debugging
+      if (Platform.OS === 'android') {
+        console.log('🤖 ANDROID DEBUG:');
+        console.log('  - Expected product IDs:', this.PRODUCT_IDS);
+        console.log('  - Offerings keys:', offerings.all ? Object.keys(offerings.all) : []);
+        console.log('  - Current offering exists:', !!offerings.current);
+        if (offerings.current) {
+          console.log('  - Available packages count:', offerings.current.availablePackages?.length || 0);
+          offerings.current.availablePackages?.forEach((pkg, idx) => {
+            console.log(`  - Package ${idx}:`, {
+              packageType: pkg.packageType,
+              identifier: pkg.identifier,
+              productId: pkg.product.identifier,
+              price: pkg.product.priceString,
+            });
+          });
+        }
+      }
+      
       this.currentOfferings = offerings.current;
       
       if (this.currentOfferings) {
@@ -147,12 +179,15 @@ class RealPaymentService {
           }))
         });
       } else {
-        console.warn('⚠️ No current offerings available');
+        console.error('⚠️⚠️⚠️ No current offerings available!');
+        console.error('This means RevenueCat returned offerings but NO offering is set as "current"');
+        console.error('Available offerings:', offerings.all ? Object.keys(offerings.all) : 'NONE');
       }
 
       return this.currentOfferings;
     } catch (error) {
       console.error('❌ Failed to load offerings:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
       return null;
     }
   }
@@ -162,11 +197,16 @@ class RealPaymentService {
    */
   async getAvailableProducts(): Promise<PaymentProduct[]> {
     try {
+      console.log('💰 getAvailableProducts() called');
+      console.log('💰 __DEV__ mode:', __DEV__);
+      console.log('💰 Current offerings exists:', !!this.currentOfferings);
+      
       // DEVELOPMENT MOCK: Return mock products when RevenueCat fails (for testing UI)
       if (__DEV__) {
         console.log('🧪 DEV MODE: Checking if mock products needed...');
 
         if (!this.currentOfferings) {
+          console.log('🔄 No offerings cached, loading...');
           await this.loadOfferings();
         }
 
@@ -370,10 +410,17 @@ class RealPaymentService {
       }
 
       if (!this.currentOfferings) {
+        console.log('⚠️ No currentOfferings cached, loading now...');
         await this.loadOfferings();
       }
 
       if (!this.currentOfferings) {
+        console.error('❌❌❌ CRITICAL: Still no currentOfferings after loadOfferings()!');
+        console.error('This means RevenueCat.getOfferings() returned null or empty');
+        console.error('Check:');
+        console.error('1. StoreKit config product IDs match App Store Connect');
+        console.error('2. RevenueCat offering "default" is set as current');
+        console.error('3. Products exist in App Store Connect and are "Ready to Submit"');
         return {
           success: false,
           error: 'No subscription plans available'

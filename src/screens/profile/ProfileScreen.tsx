@@ -1001,6 +1001,10 @@ export default function ProfileScreen() {
 
   const handleSubscriptionPurchase = async (plan: 'monthly' | 'yearly', promoCode?: string) => {
     try {
+      console.log('🛒 handleSubscriptionPurchase called');
+      console.log('📦 Plan:', plan);
+      console.log('🎟️ Promo code:', promoCode);
+      
       if (!user?.id) {
         Alert.alert('Error', 'User not authenticated');
         return;
@@ -1009,9 +1013,14 @@ export default function ProfileScreen() {
       // Use RealPaymentService instead of SubscriptionService for actual purchases
       const RealPaymentService = (await import('@/services/RealPaymentService')).default;
       const paymentService = RealPaymentService.getInstance();
+      
+      console.log('🔧 Initializing payment service...');
       await paymentService.initialize(user.id);
-
+      
+      console.log('💳 Calling purchaseSubscription...');
       const result = await paymentService.purchaseSubscription(plan, promoCode);
+      
+      console.log('📊 Purchase result:', result);
 
       if (result.success) {
         // Update global user state via auth context
