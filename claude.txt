@@ -1,0 +1,344 @@
+Content is user-generated and unverified.
+CLAUDE.md - MeetNSplit Project Context
+This document provides context about the MeetNSplit project to help Claude understand the codebase and answer questions effectively.
+
+Project Overview
+MeetNSplit (also known as Spendy) is a React Native mobile application for expense splitting and financial management. It allows users to split bills, track expenses with friends and groups, scan receipts, and manage settlements.
+
+Tech Stack
+Frontend: React Native with Expo SDK 53
+Backend: Firebase Cloud Functions (Serverless)
+Database: Firebase Firestore
+Authentication: Custom JWT implementation via ApiService
+Navigation: React Navigation 7 (bottom tabs + stack navigation)
+State Management: React Context API (AuthProvider, ThemeProvider)
+Notifications: Expo Notifications + Custom notification system
+Payments: RevenueCat for subscriptions
+Package Manager: Yarn
+Project Structure
+spendy-fresh/
+├── src/
+│   ├── components/         # Reusable UI components
+│   │   ├── common/        # Basic components (buttons, inputs, etc.)
+│   │   ├── modals/        # Modal dialogs
+│   │   ├── screens/       # Screen-specific components
+│   │   └── tour/          # App tour/onboarding
+│   ├── screens/           # Main app screens
+│   │   ├── auth/          # Login, Register, ForgotPassword
+│   │   ├── main/          # RealSplittingScreen (main app)
+│   │   └── profile/       # Profile management
+│   ├── services/          # Business logic & API services
+│   │   ├── api/           # ApiService (REST API client)
+│   │   ├── firebase/      # Firebase-specific services
+│   │   ├── notifications/ # Notification management
+│   │   └── qr/            # QR code services
+│   ├── hooks/             # React hooks (useAuth, useTheme, etc.)
+│   ├── navigation/        # Navigation configuration
+│   ├── utils/             # Utility functions
+│   └── constants/         # App constants & theme
+├── functions/             # Firebase Cloud Functions (backend)
+│   ├── api/              # API route handlers
+│   ├── config/           # Firebase config
+│   └── index.js          # Main functions entry point
+├── App.tsx               # Root component
+└── package.json          # Dependencies & scripts
+Architecture Overview
+Data Flow
+User Interaction 
+  → React Component 
+  → useAuth/Context 
+  → ApiService 
+  → Firebase Cloud Functions 
+  → Firestore Database
+Key Architectural Patterns
+Serverless Backend: All backend operations handled by Firebase Cloud Functions
+Singleton Services: ApiService, NotificationService, etc. use singleton pattern
+Context-based State: Global state managed via React Context (Auth, Theme)
+Modal-heavy UI: Most interactions happen through modals rather than navigation
+Token-based Auth: Custom JWT authentication with session persistence
+Core Services
+ApiService (src/services/api/ApiService.ts)
+The central API client that handles all communication with Firebase Cloud Functions:
+
+Authentication (login, register, logout)
+User management
+Groups & expenses CRUD
+Friends management
+Notifications
+Settlements & payments
+Token management & session persistence
+Key Methods:
+
+login(email, password)
+register(userData)
+getUserProfile()
+getUserGroups()
+createExpense(expenseData)
+getFriends()
+AuthProvider (src/hooks/useAuth.tsx)
+Manages authentication state across the app:
+
+User session management
+Token refresh
+Profile data caching
+Login/logout flows
+NotificationService
+Handles push notifications and in-app notification system:
+
+Expo Notifications integration
+Smart notification scheduling
+Notification permissions
+Badge management
+Firebase Cloud Functions
+Located in /functions/, the backend is a single Node.js serverless application:
+
+Main Endpoints (functions/index.js)
+meetnsplitApi: Main HTTP API for all operations
+processReminderNotifications: Scheduled task (every 5 minutes)
+sendDailyExpenseReminders: Scheduled task (daily at 8 PM)
+cleanupOldNotifications: Scheduled task (daily at 2 AM)
+API Routes
+All routes are under the meetnsplitApi function:
+
+/auth/* - Authentication
+/users/* - User management
+/groups/* - Group operations
+/expenses/* - Expense management
+/friends/* - Friend requests & management
+/notifications/* - Notification handling
+/settlements/* - Payment settlements
+Navigation Structure
+Main Navigation Flow
+App.tsx
+  ├── Auth Flow (not logged in)
+  │   ├── LoginScreen
+  │   ├── RegisterScreen
+  │   └── ForgotPasswordScreen
+  │
+  └── Main Flow (logged in)
+      ├── RealSplittingScreen (TabNavigator)
+      │   ├── Split Tab
+      │   ├── Smart Money Tab
+      │   ├── Add Button (Center)
+      │   ├── Reminders Tab
+      │   └── Profile Tab
+      ├── ProfileScreen
+      └── ChangePasswordScreen
+Bottom Tab Navigation
+The app uses a custom tab navigator with 5 tabs:
+
+Split - Main expense splitting screen
+Smart Money - Analytics & insights (placeholder)
+Add - Central action button (opens UnifiedActionModal)
+Reminders - Reminders management (placeholder)
+Profile - User profile & settings
+Modal System
+Most user interactions use modals:
+
+UnifiedActionModal - Main action picker
+AddExpenseModal - Create expense
+GroupChatModal - Group messaging
+ReceiptScannerModal - Receipt scanning
+ExpenseDetailModal - View expense details
+SettlementModal - Payment settlements
+Many more...
+Key Features
+Expense Management
+Create individual or group expenses
+Split bills equally or by custom amounts
+Receipt scanning with AI
+Expense categories
+Multiple currencies
+Group Management
+Create groups with friends
+Group chat functionality
+Shared expenses
+Group balances
+Member management
+Settlement System
+Track who owes whom
+Multiple settlement options (bank transfer, cash, etc.)
+Settlement history
+Reminders for outstanding debts
+Smart Features
+Receipt scanning (OCR)
+Expense analytics
+AI-powered categorization
+QR code sharing
+Deep linking
+Subscription System
+Free tier with limitations
+Premium subscription (Monthly/Yearly)
+RevenueCat integration
+In-app purchases
+Development Commands
+Main App
+bash
+# Start development server
+yarn start                    # Start Expo
+yarn android                  # Run on Android
+yarn ios                      # Run on iOS
+yarn web                      # Run on web
+
+# Environment management
+yarn env:local                # Switch to local Firebase
+yarn env:development          # Switch to dev Firebase
+yarn env:production           # Switch to prod Firebase
+yarn env:status               # Check current environment
+
+# Testing
+yarn test                     # Run Jest tests
+yarn test:api                 # Run API E2E tests
+Firebase Functions
+bash
+cd functions
+
+# Local development
+npm run serve                 # Start Firebase emulators
+npm run logs                  # View function logs
+
+# Deployment
+npm run deploy                # Deploy to Firebase
+Environment Configuration
+The app supports three environments:
+
+Local - Local Firebase emulators
+Development - Dev Firebase project (spendy-97913)
+Production - Prod Firebase project (spendy-c01cc)
+Configuration files:
+
+.env - Current environment config (gitignored)
+.env.local.example - Local environment template
+.env.development.example - Dev environment template
+.env.production.example - Prod environment template
+Important Notes
+Authentication Flow
+Custom JWT-based authentication (not Firebase Auth)
+Tokens stored in AsyncStorage
+Session persistence across app restarts
+Automatic token refresh
+No biometric auth (partially implemented but disabled)
+Data Handling
+All data operations go through ApiService
+Firestore is the source of truth
+Local caching in AsyncStorage
+Graceful 404 handling for new users (returns empty arrays)
+Deals Feature Status
+REMOVED - Deals functionality has been completely removed
+DealsAPI.ts deleted
+Deep links redirect to Main screen
+App tour updated to remove deals references
+Notifications
+Uses Expo Notifications
+Custom "Smart Money" notification system
+Scheduled reminders for expenses
+Push notifications for settlements
+Daily expense summary notifications
+Known Issues
+Biometric authentication partially implemented but disabled
+Some Firebase emulator API errors in development
+iOS StoreKit configuration needed for RevenueCat testing
+Common Patterns
+Creating a Modal
+typescript
+// 1. Import the modal component
+import MyModal from '@/components/modals/MyModal';
+
+// 2. Add state in parent component
+const [showMyModal, setShowMyModal] = useState(false);
+
+// 3. Render modal with visibility control
+<MyModal 
+  visible={showMyModal}
+  onClose={() => setShowMyModal(false)}
+  // other props
+/>
+Making API Calls
+typescript
+// 1. Get ApiService instance
+const apiService = ApiService.getInstance();
+
+// 2. Make the call with try-catch
+try {
+  const data = await apiService.someMethod(params);
+  // Handle success
+} catch (error) {
+  console.error('Error:', error);
+  // Handle error
+}
+Using Authentication
+typescript
+// In a component
+const { user, isLoading, logout } = useAuth();
+
+// Check if logged in
+if (!user) {
+  // Not logged in
+}
+
+// Access user data
+const userId = user?.id;
+const userName = user?.name;
+Accessing Theme
+typescript
+const { theme, toggleTheme } = useTheme();
+
+// Use theme colors
+<View style={{ backgroundColor: theme.colors.background }}>
+Firestore Collections
+users - User profiles & settings
+groups - Group information
+expenses - All expense records
+settlements - Payment settlements
+notifications - User notifications
+friends - Friend relationships
+friendRequests - Pending friend requests
+groupMessages - Group chat messages
+reminders - Expense reminders
+subscriptions - User subscriptions
+qrCodes - QR code mappings
+Testing
+Unit Tests
+Jest configuration in jest.config.js
+Tests in __tests__ directories
+Run with yarn test
+E2E API Tests
+Playwright-based API tests
+Located in tests/e2e/specs/
+Run with yarn test:api
+Deployment
+Mobile App
+Uses EAS (Expo Application Services)
+Builds configured in eas.json
+Profiles: development, preview, production
+GitHub Actions workflow for iOS deployment
+Firebase Functions
+Deploy with npm run deploy from functions directory
+GitHub Actions workflow for automatic deployment
+Separate prod and dev projects
+Getting Started
+Install dependencies: yarn install
+Set up environment: Copy .env.local.example to .env
+Install functions dependencies: cd functions && npm install
+Start emulators (optional): cd functions && npm run serve
+Start app: yarn start
+Run on device: yarn ios or yarn android
+Troubleshooting
+"Cannot find module" errors
+Run yarn install and restart Metro bundler
+Clear cache: expo start -c
+Firebase connection issues
+Check .env file exists and has correct config
+Verify Firebase project ID matches
+Check internet connection
+Build errors
+Clear cache: yarn cache clean
+Delete node_modules and reinstall: rm -rf node_modules && yarn install
+For iOS: cd ios && pod install
+Resources
+Firebase Console: https://console.firebase.google.com
+Expo Dashboard: https://expo.dev
+GitHub Repository: [Add your repo URL]
+API Documentation: See /functions/README.md
+Last Updated: October 2025 Project Version: 1.0.0 Expo SDK: 53 React Native: Latest via Expo
+
