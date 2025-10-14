@@ -24,6 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/common/Button';
 import CurrencyModal from '@/components/modals/CurrencyModal';
 import SubscriptionModal from '@/components/modals/SubscriptionModal';
+import { SubscriptionDetailsModal } from '@/components/modals/SubscriptionDetailsModal';
 import { TermsPrivacyModal } from '@/components/modals/TermsPrivacyModal';
 
 import { SubscriptionService, UserSubscription, SubscriptionPlan } from '@/services/SubscriptionService';
@@ -40,6 +41,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showSubscriptionDetailsModal, setShowSubscriptionDetailsModal] = useState(false);
   const [showTermsPrivacyModal, setShowTermsPrivacyModal] = useState(false);
   const [cachedProfilePicture, setCachedProfilePicture] = useState<string | null>(null);
   const [imageRefreshKey, setImageRefreshKey] = useState(0);
@@ -999,7 +1001,7 @@ export default function ProfileScreen() {
   //   }
   // };
 
-  const handleSubscriptionPurchase = async (plan: 'monthly' | 'yearly', promoCode?: string) => {
+  const handleSubscriptionPurchase = async (plan: 'monthly' | 'yearly', promoCode?: string): Promise<{ success: boolean }> => {
     try {
       console.log('🛒 handleSubscriptionPurchase called');
       console.log('📦 Plan:', plan);
@@ -1007,7 +1009,7 @@ export default function ProfileScreen() {
       
       if (!user?.id) {
         Alert.alert('Error', 'User not authenticated');
-        return;
+        return { success: false };
       }
 
       // Use RealPaymentService instead of SubscriptionService for actual purchases
@@ -1023,6 +1025,13 @@ export default function ProfileScreen() {
       console.log('📊 Purchase result:', result);
 
       if (result.success) {
+        // ✅ IMMEDIATE UPDATE: Update local state immediately
+        setUser(prev => prev ? {
+          ...prev,
+          isPremium: true,
+          subscriptionStatus: 'premium'
+        } : prev);
+
         // Update global user state via auth context
         if (updateUser) {
           await updateUser({
@@ -1031,21 +1040,21 @@ export default function ProfileScreen() {
           });
         }
 
-        setShowSubscriptionModal(false);
-        Alert.alert('Success! 🎉', 'Welcome to Premium!', [
-          {
-            text: 'Awesome!',
-            onPress: () => {
-              loadSubscriptionData();
-            }
-          }
-        ]);
+        // Reload subscription data to show correct info
+        await loadSubscriptionData();
+
+        // ✅ Return success to modal (modal will show success screen)
+        return { success: true };
       } else if (!result.userCancelled) {
         Alert.alert('Purchase Failed', result.error || 'Please try again.');
+        return { success: false };
       }
+      
+      return { success: false };
     } catch (error) {
       console.error('Subscription purchase error:', error);
       Alert.alert('Error', 'Failed to process subscription. Please try again.');
+      return { success: false };
     }
   };
 
@@ -1057,13 +1066,13 @@ export default function ProfileScreen() {
         [
           { text: 'Cancel', style: 'cancel' },
           {
+            text: 'View Details',
+            onPress: () => setShowSubscriptionDetailsModal(true)
+          },
+          {
             text: 'Cancel Subscription',
             style: 'destructive',
             onPress: handleCancelSubscription
-          },
-          {
-            text: 'View Details',
-            onPress: () => setShowSubscriptionModal(true)
           }
         ]
       );
@@ -1076,31 +1085,40 @@ export default function ProfileScreen() {
     try {
       if (!user?.id) return;
 
+      const expiryDate = subscription?.currentPeriodEnd 
+        ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { 
+            month: 'long', 
+            day: 'numeric', 
+            year: 'numeric' 
+          })
+        : 'the end of your billing period';
+
       Alert.alert(
-        'Cancel Subscription',
-        'Are you sure you want to cancel your premium subscription? You will lose access to premium features at the end of your current billing period.',
+        'Cancel Premium Subscription',
+        `You'll continue to have access to Premium features until ${expiryDate}.\n\nYou'll lose access to:\n• Unlimited groups and members\n• Advanced analytics & insights\n• Priority customer support\n• Data export to CSV\n\nAre you sure you want to cancel?`,
         [
           { text: 'Keep Subscription', style: 'cancel' },
           {
             text: 'Cancel Subscription',
             style: 'destructive',
-            onPress: async () => {
-              const subscriptionService = SubscriptionService.getInstance();
-              const result = await subscriptionService.cancelSubscription(user.id);
+            onPress: () => {
+              // Open App Store subscriptions
+              Linking.openURL('https://apps.apple.com/account/subscriptions');
               
-              if (result.success) {
-                Alert.alert('Subscription Cancelled', result.message);
-                // Reload subscription data
-                loadSubscriptionData();
-              } else {
-                Alert.alert('Error', result.message);
-              }
+              // Show follow-up alert
+              setTimeout(() => {
+                Alert.alert(
+                  'Cancel in App Store',
+                  'To complete cancellation:\n\n1. Find "MeetNSplit" in your subscriptions\n2. Tap "Cancel Subscription"\n3. Confirm cancellation\n\nYour premium access will continue until ' + expiryDate,
+                  [{ text: 'Got It' }]
+                );
+              }, 1000);
             }
           }
         ]
       );
     } catch (error) {
-      Alert.alert('Error', 'Failed to cancel subscription');
+      Alert.alert('Error', 'Failed to open subscription management');
     }
   };
 
@@ -1137,6 +1155,38 @@ export default function ProfileScreen() {
     if (percentage >= 0.9) return theme.colors.error;
     if (percentage >= 0.7) return theme.colors.warning;
     return theme.colors.success;
+  };
+
+  const getSubscriptionStatusText = () => {
+    if (!subscription || subscription.plan !== 'premium') return null;
+
+    // If cancelled, show expiry date
+    if (subscription.status === 'cancelled' && subscription.currentPeriodEnd) {
+      const expiryDate = new Date(subscription.currentPeriodEnd);
+      const daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      
+      if (daysLeft > 0) {
+        return `Access until ${expiryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      } else {
+        return 'Expired';
+      }
+    }
+
+    // If active, show renewal info
+    if (subscription.status === 'active' && usageStats?.daysUntilRenewal) {
+      const days = usageStats.daysUntilRenewal;
+      
+      if (days < 7) {
+        return `Renews in ${days} day${days === 1 ? '' : 's'}`;
+      } else if (subscription.currentPeriodEnd) {
+        return `Renews on ${new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric' 
+        })}`;
+      }
+    }
+
+    return null;
   };
 
   if (!user) return null;
@@ -1307,9 +1357,16 @@ export default function ProfileScreen() {
                     ]}>
                       {subscription?.plan === 'premium' ? '⭐ Premium' : '🆓 Free Plan'}
                     </Text>
-                    {subscription?.plan === 'premium' && usageStats?.daysUntilRenewal && (
-                      <Text style={[styles.subscriptionSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>
-                        Renews in {usageStats.daysUntilRenewal} days
+                    {subscription?.plan === 'premium' && getSubscriptionStatusText() && (
+                      <Text style={[
+                        styles.subscriptionSubtitle, 
+                        { 
+                          color: subscription.status === 'cancelled' 
+                            ? 'rgba(255,255,255,0.6)' 
+                            : 'rgba(255,255,255,0.8)' 
+                        }
+                      ]}>
+                        {getSubscriptionStatusText()}
                       </Text>
                     )}
                     {subscription?.plan === 'free' && (
@@ -1504,6 +1561,19 @@ export default function ProfileScreen() {
         reason="premium_feature"
         featureName="Premium Subscription"
         canClose={true}
+      />
+
+      {/* Subscription Details Modal */}
+      <SubscriptionDetailsModal
+        visible={showSubscriptionDetailsModal}
+        onClose={() => setShowSubscriptionDetailsModal(false)}
+        subscription={subscription ? {
+          plan: subscription.plan,
+          nextBillingDate: subscription.currentPeriodEnd,
+          price: subscription.plan === 'premium' ? (subscriptionPlan?.price ? `$${subscriptionPlan.price}` : undefined) : undefined,
+          status: subscription.status,
+          expirationDate: subscription.currentPeriodEnd
+        } : null}
       />
 
       {/* Terms & Privacy Modal */}

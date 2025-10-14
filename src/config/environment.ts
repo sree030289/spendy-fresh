@@ -123,11 +123,11 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     revenueCat: {
       apiKeys: {
         apple: extra.revenueCat?.apiKeys?.apple || 'appl_bdCTSCZSfskNyyVLTMoTVJwspUr',
-        google: extra.revenueCat?.apiKeys?.google || 'goog_mQiNRXHKgAdxqTCsVRGjShjPzrg',
+        google: extra.revenueCat?.apiKeys?.google || 'goog_hMTRaUVpkTQVOGVcZwIasbKIOui',
       },
       appIds: {
         apple: extra.revenueCat?.appIds?.apple || 'app4ca9e06d8f',
-        google: extra.revenueCat?.appIds?.google || 'appa291f8b62a',
+        google: extra.revenueCat?.appIds?.google || 'appc1c134abb2',
       },
     },
     external: {

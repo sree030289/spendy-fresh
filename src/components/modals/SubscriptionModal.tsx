@@ -23,7 +23,7 @@ const { width, height } = Dimensions.get('window');
 interface SubscriptionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubscribe: (plan: 'monthly' | 'yearly', promoCode?: string) => void;
+  onSubscribe: (plan: 'monthly' | 'yearly', promoCode?: string) => Promise<{success: boolean}>; // ✅ Returns promise with success
   reason?: 'firstTime' | 'dailyPrompt' | 'groupLimit' | 'memberLimit' | 'transactionLimit' | 'premium_feature';
   featureName?: string;
   canClose?: boolean;
@@ -49,6 +49,7 @@ export default function SubscriptionModal({
   const [canCloseModal, setCanCloseModal] = useState(canClose);
   const [countdown, setCountdown] = useState(autoCloseAfter || 0);
   const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false); // ✅ Add success state
   
   // Real-time coupon code validation
   const [promoValidation, setPromoValidation] = useState<CouponValidationResult & {
@@ -415,7 +416,10 @@ export default function SubscriptionModal({
   const handleSubscribe = async () => {
     setLoading(true);
     try {
-      onSubscribe(selectedPlan, promoCode || undefined);
+      const result = await onSubscribe(selectedPlan, promoCode || undefined);
+      if (result.success) {
+        setShowSuccess(true); // ✅ Show success screen instead of closing
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to process subscription. Please try again.');
     } finally {
@@ -444,6 +448,54 @@ export default function SubscriptionModal({
           <View style={styles.header}>
             <Text style={styles.loadingText}>Loading subscription options...</Text>
           </View>
+        </View>
+      </FullscreenModal>
+    );
+  }
+
+  // ✅ Show success screen after purchase
+  if (showSuccess) {
+    return (
+      <FullscreenModal visible={visible} onClose={() => {}} title="" showBackButton={false}>
+        <View style={styles.successContainer}>
+          <Text style={styles.successEmoji}>🎉</Text>
+          <Text style={styles.successTitle}>Welcome to Premium!</Text>
+          <Text style={styles.successSubtitle}>
+            You now have access to all premium features
+          </Text>
+          
+          <View style={styles.successFeatures}>
+            <View style={styles.successFeatureRow}>
+              <Text style={styles.successCheckmark}>✓</Text>
+              <Text style={styles.successFeatureText}>Unlimited groups and expenses</Text>
+            </View>
+            <View style={styles.successFeatureRow}>
+              <Text style={styles.successCheckmark}>✓</Text>
+              <Text style={styles.successFeatureText}>Unlimited members per group</Text>
+            </View>
+            <View style={styles.successFeatureRow}>
+              <Text style={styles.successCheckmark}>✓</Text>
+              <Text style={styles.successFeatureText}>Unlimited transactions</Text>
+            </View>
+            <View style={styles.successFeatureRow}>
+              <Text style={styles.successCheckmark}>✓</Text>
+              <Text style={styles.successFeatureText}>Advanced analytics & insights</Text>
+            </View>
+            <View style={styles.successFeatureRow}>
+              <Text style={styles.successCheckmark}>✓</Text>
+              <Text style={styles.successFeatureText}>Priority support</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.successButton}
+            onPress={() => {
+              setShowSuccess(false);
+              onClose();
+            }}
+          >
+            <Text style={styles.successButtonText}>Get Started</Text>
+          </TouchableOpacity>
         </View>
       </FullscreenModal>
     );
@@ -1301,5 +1353,64 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     flex: 1,
+  },
+  // ✅ Success screen styles
+  successContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: 'white',
+  },
+  successEmoji: {
+    fontSize: 80,
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 40,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  successFeatures: {
+    width: '100%',
+    marginBottom: 40,
+  },
+  successFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  successCheckmark: {
+    fontSize: 20,
+    color: '#10b981',
+    marginRight: 12,
+    fontWeight: 'bold',
+  },
+  successFeatureText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  successButton: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
+  successButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

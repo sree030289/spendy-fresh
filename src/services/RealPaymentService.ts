@@ -37,7 +37,7 @@ export interface PromoCode {
   usedCount: number;
   applicablePlans: string[];
   isActive: boolean;
-  currency?: string; // for fixed amount discounts
+  currency?: string;
 }
 
 export interface PaymentResult {
@@ -59,19 +59,19 @@ class RealPaymentService {
   }) || '';
 
   // Product identifiers for App Store and Play Store
-  // IMPORTANT: These must match EXACTLY what's configured in RevenueCat dashboard and StoreKit configuration
-  // For Android: Must use base plan format "subscriptionId:basePlanId" as configured in RevenueCat
+  // CRITICAL: Must match EXACTLY what's in App Store Connect and RevenueCat
+  // Note: "annualy1099" has intentional typo matching App Store Connect configuration
   private readonly PRODUCT_IDS = {
     monthly: Platform.select({
-      ios: ENV.isProduction ? 'monthly199' : 'monthly199',
-      android: 'monthly199:monthly-base', // ✅ MUST match RevenueCat product identifier exactly!
+      ios: 'monthly199',
+      android: 'monthly199:monthly-base',
     }) || '',
     yearly: Platform.select({
-      ios: ENV.isProduction ? 'annualy1099' : 'annualy1099',
-      android: 'annualy1099:yearly-base', // ✅ MUST match RevenueCat product identifier exactly!
+      ios: 'annualy1099', // ✅ FIXED: Match App Store Connect product ID (with typo)
+      android: 'annualy1099:yearly-base', // ✅ Match RevenueCat Android product
     }) || '',
     lifetime: Platform.select({
-      ios: ENV.isProduction ? 'com.meetnsplit.app.Lifetime' : 'com.meetnsplit.app.dev.Lifetime',
+      ios: 'com.meetnsplit.app.Lifetime',
       android: 'meetnsplit_lifetime_subscription',
     }) || '',
   };
@@ -88,47 +88,101 @@ class RealPaymentService {
    */
   async initialize(userId?: string): Promise<void> {
     try {
-      console.log('🚀 Initializing RealPaymentService...');
+      console.log('════════════════════════════════════════════════════════');
+      console.log('🚀 INITIALIZING REAL PAYMENT SERVICE');
+      console.log('════════════════════════════════════════════════════════');
+      console.log('📱 Platform:', Platform.OS);
       console.log('🔧 Environment:', ENV.environment);
       console.log('🔧 isProduction:', ENV.isProduction);
       console.log('🔧 isDevelopment:', ENV.isDevelopment);
-      console.log('📦 Product IDs being used:', this.PRODUCT_IDS);
-      console.log('🔑 RevenueCat API Key:', this.REVENUECAT_API_KEY?.substring(0, 15) + '...');
-      console.log('👤 User ID:', userId);
-      console.log('📱 Platform:', Platform.OS);
+      console.log('👤 User ID:', userId || 'NOT PROVIDED');
+      console.log('────────────────────────────────────────────────────────');
+      console.log('🔑 RevenueCat Configuration:');
+      console.log('  - API Key (first 20 chars):', this.REVENUECAT_API_KEY?.substring(0, 20) + '...');
+      console.log('  - API Key length:', this.REVENUECAT_API_KEY?.length);
+      console.log('  - API Key starts with:', this.REVENUECAT_API_KEY?.substring(0, 5));
+      console.log('  - App ID (iOS):', ENV.revenueCat.appIds.apple);
+      console.log('  - App ID (Android):', ENV.revenueCat.appIds.google);
+      console.log('────────────────────────────────────────────────────────');
+      console.log('📦 Product IDs Configuration:');
+      console.log('  - Monthly:', this.PRODUCT_IDS.monthly);
+      console.log('  - Yearly:', this.PRODUCT_IDS.yearly);
+      console.log('  - Lifetime:', this.PRODUCT_IDS.lifetime);
+      console.log('════════════════════════════════════════════════════════');
       
       if (this.isInitialized) {
-        console.log('✅ RealPaymentService already initialized');
+        console.log('✅ RealPaymentService already initialized, skipping...');
         return;
       }
 
-      // Configure RevenueCat
-      await Purchases.setLogLevel(Purchases.LOG_LEVEL.VERBOSE);
-      
-      console.log('⚙️ Configuring RevenueCat with API key...');
-      if (Platform.OS === 'ios') {
-        await Purchases.configure({ apiKey: this.REVENUECAT_API_KEY, appUserID: userId });
-      } else {
-        await Purchases.configure({ apiKey: this.REVENUECAT_API_KEY, appUserID: userId });
+      // Validate API Key
+      if (!this.REVENUECAT_API_KEY || this.REVENUECAT_API_KEY.length < 20) {
+        console.error('❌ CRITICAL: Invalid RevenueCat API key!');
+        console.error('  - Key length:', this.REVENUECAT_API_KEY?.length || 0);
+        console.error('  - Key value:', this.REVENUECAT_API_KEY || 'EMPTY');
+        throw new Error('Invalid RevenueCat API key configuration');
       }
-      console.log('✅ RevenueCat configured successfully');
+
+      // Validate API Key format
+      const expectedPrefix = Platform.OS === 'ios' ? 'appl_' : 'goog_';
+      if (!this.REVENUECAT_API_KEY.startsWith(expectedPrefix)) {
+        console.error('❌ CRITICAL: Wrong API key type!');
+        console.error('  - Expected prefix:', expectedPrefix);
+        console.error('  - Actual prefix:', this.REVENUECAT_API_KEY.substring(0, 5));
+        console.error('  - Make sure you are using PUBLIC SDK keys, not SECRET keys!');
+        throw new Error(`Wrong RevenueCat API key type for ${Platform.OS}`);
+      }
+
+      console.log('✅ API Key validation passed');
+
+      // Set log level to verbose for debugging
+      await Purchases.setLogLevel(Purchases.LOG_LEVEL.VERBOSE);
+      console.log('✅ RevenueCat log level set to VERBOSE');
+      
+      // Configure RevenueCat
+      console.log('⚙️ Configuring RevenueCat SDK...');
+      await Purchases.configure({ 
+        apiKey: this.REVENUECAT_API_KEY, 
+        appUserID: userId 
+      });
+      console.log('✅ RevenueCat SDK configured successfully');
 
       // Set user attributes for analytics
       if (userId) {
+        console.log('📝 Setting user attributes...');
         await Purchases.setAttributes({
           '$displayName': userId,
           'platform': Platform.OS,
+          'environment': ENV.environment,
         });
+        console.log('✅ User attributes set');
       }
+
+      // Verify configuration by getting customer info
+      console.log('🔍 Verifying configuration by fetching customer info...');
+      const customerInfo = await Purchases.getCustomerInfo();
+      console.log('✅ Customer info fetched successfully:', {
+        originalAppUserId: customerInfo.originalAppUserId,
+        activeSubscriptions: Object.keys(customerInfo.activeSubscriptions),
+        activeEntitlements: Object.keys(customerInfo.entitlements.active),
+      });
 
       this.isInitialized = true;
       console.log('✅ RealPaymentService initialized successfully');
+      console.log('════════════════════════════════════════════════════════');
       
       // Load current offerings
       await this.loadOfferings();
-    } catch (error) {
-      console.error('❌ Failed to initialize RealPaymentService:', error);
-      throw new Error('Payment service initialization failed');
+    } catch (error: any) {
+      console.error('════════════════════════════════════════════════════════');
+      console.error('❌ FAILED TO INITIALIZE REALPAYMENTSERVICE');
+      console.error('════════════════════════════════════════════════════════');
+      console.error('Error type:', error.constructor?.name || 'Unknown');
+      console.error('Error message:', error.message || 'No message');
+      console.error('Error code:', error.code || 'No code');
+      console.error('Full error:', JSON.stringify(error, null, 2));
+      console.error('════════════════════════════════════════════════════════');
+      throw new Error(`Payment service initialization failed: ${error.message}`);
     }
   }
 
@@ -137,57 +191,111 @@ class RealPaymentService {
    */
   async loadOfferings(): Promise<PurchasesOffering | null> {
     try {
-      console.log('📦 Loading subscription offerings...');
-      console.log('📦 Calling Purchases.getOfferings()...');
+      console.log('════════════════════════════════════════════════════════');
+      console.log('📦 LOADING SUBSCRIPTION OFFERINGS');
+      console.log('════════════════════════════════════════════════════════');
       console.log('📱 Platform:', Platform.OS);
-      console.log('🔑 API Key in use:', this.REVENUECAT_API_KEY?.substring(0, 20) + '...');
+      console.log('🔑 Using API Key:', this.REVENUECAT_API_KEY?.substring(0, 20) + '...');
+      console.log('────────────────────────────────────────────────────────');
       
+      console.log('⏳ Calling Purchases.getOfferings()...');
       const offerings = await Purchases.getOfferings();
-      console.log('📦 Raw offerings response:', JSON.stringify(offerings, null, 2));
-      console.log('📦 Current offering:', offerings.current ? 'FOUND' : 'NULL');
-      console.log('📦 All offerings:', offerings.all ? Object.keys(offerings.all) : 'NULL');
       
-      // Android-specific debugging
-      if (Platform.OS === 'android') {
-        console.log('🤖 ANDROID DEBUG:');
-        console.log('  - Expected product IDs:', this.PRODUCT_IDS);
-        console.log('  - Offerings keys:', offerings.all ? Object.keys(offerings.all) : []);
-        console.log('  - Current offering exists:', !!offerings.current);
-        if (offerings.current) {
-          console.log('  - Available packages count:', offerings.current.availablePackages?.length || 0);
-          offerings.current.availablePackages?.forEach((pkg, idx) => {
-            console.log(`  - Package ${idx}:`, {
-              packageType: pkg.packageType,
-              identifier: pkg.identifier,
-              productId: pkg.product.identifier,
-              price: pkg.product.priceString,
-            });
+      console.log('────────────────────────────────────────────────────────');
+      console.log('📦 RAW OFFERINGS RESPONSE:');
+      console.log(JSON.stringify(offerings, null, 2));
+      console.log('────────────────────────────────────────────────────────');
+      console.log('📊 Offerings Summary:');
+      console.log('  - Current offering exists:', !!offerings.current);
+      console.log('  - Current offering ID:', offerings.current?.identifier || 'NONE');
+      console.log('  - All offerings count:', offerings.all ? Object.keys(offerings.all).length : 0);
+      console.log('  - All offerings IDs:', offerings.all ? Object.keys(offerings.all) : 'NONE');
+      console.log('────────────────────────────────────────────────────────');
+      
+      if (offerings.current) {
+        console.log('✅ CURRENT OFFERING FOUND!');
+        console.log('  - Identifier:', offerings.current.identifier);
+        console.log('  - Server Description:', offerings.current.serverDescription);
+        console.log('  - Available Packages:', offerings.current.availablePackages.length);
+        console.log('────────────────────────────────────────────────────────');
+        
+        if (offerings.current.availablePackages.length === 0) {
+          console.error('⚠️ WARNING: Current offering has ZERO packages!');
+          console.error('This means:');
+          console.error('  1. Products are not attached to packages in RevenueCat');
+          console.error('  2. Products may not have entitlements attached');
+          console.error('  3. Offering configuration is incomplete');
+        } else {
+          console.log('📦 PACKAGES IN CURRENT OFFERING:');
+          offerings.current.availablePackages.forEach((pkg, idx) => {
+            console.log(`\n  Package ${idx + 1}:`);
+            console.log('    - Package Identifier:', pkg.identifier);
+            console.log('    - Package Type:', pkg.packageType);
+            console.log('    - Product ID:', pkg.product.identifier);
+            console.log('    - Product Title:', pkg.product.title);
+            console.log('    - Product Description:', pkg.product.description);
+            console.log('    - Price:', pkg.product.priceString);
+            console.log('    - Currency:', pkg.product.currencyCode);
+            console.log('    - Subscription Period:', pkg.product.subscriptionPeriod || 'N/A');
           });
         }
+      } else {
+        console.error('❌ NO CURRENT OFFERING FOUND!');
+        console.error('This is a CRITICAL issue. Possible causes:');
+        console.error('  1. No offering is marked as "current" in RevenueCat dashboard');
+        console.error('  2. API key is incorrect or doesn\'t have access to offerings');
+        console.error('  3. RevenueCat project configuration issue');
+        console.error('');
+        console.error('Available offerings:', offerings.all ? Object.keys(offerings.all).join(', ') : 'NONE');
+        
+        if (offerings.all && Object.keys(offerings.all).length > 0) {
+          console.error('');
+          console.error('⚠️ Offerings exist but none is marked as CURRENT!');
+          console.error('Fix: Go to RevenueCat Dashboard → Offerings → Set one as current');
+        }
+      }
+      
+      console.log('════════════════════════════════════════════════════════');
+      
+      // Platform-specific debugging
+      if (Platform.OS === 'android') {
+        console.log('🤖 ANDROID-SPECIFIC DEBUG INFO:');
+        console.log('  - Expected Monthly ID:', this.PRODUCT_IDS.monthly);
+        console.log('  - Expected Yearly ID:', this.PRODUCT_IDS.yearly);
+        console.log('  - Note: Android uses "productId:basePlanId" format');
+        console.log('════════════════════════════════════════════════════════');
+      } else if (Platform.OS === 'ios') {
+        console.log('🍎 iOS-SPECIFIC DEBUG INFO:');
+        console.log('  - Expected Monthly ID:', this.PRODUCT_IDS.monthly);
+        console.log('  - Expected Yearly ID:', this.PRODUCT_IDS.yearly);
+        console.log('  - App Store Connect Status: Check if products are "Approved"');
+        console.log('  - Sandbox Testing: Make sure sandbox tester is signed in');
+        console.log('════════════════════════════════════════════════════════');
       }
       
       this.currentOfferings = offerings.current;
       
-      if (this.currentOfferings) {
-        console.log('✅ Loaded offerings:', {
-          identifier: this.currentOfferings.identifier,
-          packagesCount: this.currentOfferings.availablePackages.length,
-          products: this.currentOfferings.availablePackages.map(pkg => ({
-            identifier: pkg.product.identifier,
-            price: pkg.product.priceString,
-            period: pkg.packageType,
-          }))
-        });
-      } else {
-        console.error('⚠️⚠️⚠️ No current offerings available!');
-        console.error('This means RevenueCat returned offerings but NO offering is set as "current"');
-        console.error('Available offerings:', offerings.all ? Object.keys(offerings.all) : 'NONE');
+      if (!this.currentOfferings) {
+        console.error('❌ Setting currentOfferings to NULL due to missing current offering');
       }
 
       return this.currentOfferings;
-    } catch (error) {
-      console.error('❌ Failed to load offerings:', error);
-      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+    } catch (error: any) {
+      console.error('════════════════════════════════════════════════════════');
+      console.error('❌ FAILED TO LOAD OFFERINGS');
+      console.error('════════════════════════════════════════════════════════');
+      console.error('Error type:', error.constructor?.name || 'Unknown');
+      console.error('Error message:', error.message || 'No message');
+      console.error('Error code:', error.code || 'No code');
+      console.error('Error userInfo:', error.userInfo || 'No userInfo');
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+      console.error('────────────────────────────────────────────────────────');
+      console.error('Common causes:');
+      console.error('  1. Network connectivity issues');
+      console.error('  2. Invalid API key');
+      console.error('  3. RevenueCat service outage');
+      console.error('  4. App configuration mismatch (bundle ID / package name)');
+      console.error('════════════════════════════════════════════════════════');
       return null;
     }
   }
@@ -197,21 +305,34 @@ class RealPaymentService {
    */
   async getAvailableProducts(): Promise<PaymentProduct[]> {
     try {
-      console.log('💰 getAvailableProducts() called');
-      console.log('💰 __DEV__ mode:', __DEV__);
-      console.log('💰 Current offerings exists:', !!this.currentOfferings);
+      console.log('════════════════════════════════════════════════════════');
+      console.log('💰 GETTING AVAILABLE PRODUCTS');
+      console.log('════════════════════════════════════════════════════════');
+      console.log('__DEV__ mode:', __DEV__);
+      console.log('Current offerings exists:', !!this.currentOfferings);
       
-      // DEVELOPMENT MOCK: Return mock products when RevenueCat fails (for testing UI)
-      if (__DEV__) {
-        console.log('🧪 DEV MODE: Checking if mock products needed...');
+      if (!this.currentOfferings) {
+        console.log('⚠️ No offerings cached, attempting to load...');
+        await this.loadOfferings();
+      }
 
-        if (!this.currentOfferings) {
-          console.log('🔄 No offerings cached, loading...');
-          await this.loadOfferings();
-        }
-
-        if (!this.currentOfferings) {
-          console.log('🎭 No offerings from RevenueCat, using MOCK PRODUCTS for development testing');
+      if (!this.currentOfferings) {
+        const errorMsg = 'No subscription offerings available from RevenueCat.\n\n' +
+                        'Checklist:\n' +
+                        '  ✓ Products configured in RevenueCat dashboard\n' +
+                        '  ✓ Products have entitlements attached\n' +
+                        '  ✓ Offering "default" is marked as CURRENT\n' +
+                        '  ✓ Packages exist in the offering\n' +
+                        '  ✓ API keys are correct\n\n' +
+                        'Expected Product IDs:\n' +
+                        `  - Monthly: ${this.PRODUCT_IDS.monthly}\n` +
+                        `  - Yearly: ${this.PRODUCT_IDS.yearly}\n`;
+        console.error('❌ ' + errorMsg);
+        
+        // DEVELOPMENT MOCK: Return mock products for UI testing
+        if (__DEV__) {
+          console.log('🎭 DEV MODE: Returning MOCK PRODUCTS for UI testing');
+          console.log('   (These are NOT real products from stores)');
           return [
             {
               identifier: this.PRODUCT_IDS.monthly,
@@ -229,35 +350,25 @@ class RealPaymentService {
               priceString: '$10.99',
               currencyCode: 'USD',
             },
-            {
-              identifier: this.PRODUCT_IDS.lifetime,
-              description: 'Lifetime access to all premium features',
-              title: 'Lifetime Premium',
-              price: '49.99',
-              priceString: '$49.99',
-              currencyCode: 'USD',
-            },
           ];
         }
-      }
-
-      if (!this.currentOfferings) {
-        const errorMsg = 'No subscription offerings available from RevenueCat. This usually means:\n\n' +
-                        '1. Products are not configured in RevenueCat dashboard\n' +
-                        '2. Products are in "Missing Metadata" status in App Store Connect\n' +
-                        '3. Offering ID in RevenueCat doesn\'t match\n\n' +
-                        'Expected Product IDs:\n' +
-                        `- Monthly: ${this.PRODUCT_IDS.monthly}\n` +
-                        `- Yearly: ${this.PRODUCT_IDS.yearly}\n` +
-                        `- Lifetime: ${this.PRODUCT_IDS.lifetime}`;
-        console.error('❌ ' + errorMsg);
+        
         throw new Error(errorMsg);
       }
 
       const products: PaymentProduct[] = [];
 
+      console.log('📦 Processing', this.currentOfferings.availablePackages.length, 'packages...');
+      
       for (const pkg of this.currentOfferings.availablePackages) {
         const product = pkg.product;
+        
+        console.log('────────────────────────────────────────────────────────');
+        console.log('Processing package:', pkg.identifier);
+        console.log('  - Product ID:', product.identifier);
+        console.log('  - Title:', product.title);
+        console.log('  - Price:', product.priceString);
+        console.log('  - Currency:', product.currencyCode);
 
         const paymentProduct: PaymentProduct = {
           identifier: product.identifier,
@@ -270,6 +381,7 @@ class RealPaymentService {
 
         // Add intro pricing if available
         if (product.introPrice) {
+          console.log('  - Has intro price:', product.introPrice.priceString);
           paymentProduct.introPrice = {
             price: product.introPrice.price.toString(),
             priceString: product.introPrice.priceString,
@@ -281,14 +393,22 @@ class RealPaymentService {
         products.push(paymentProduct);
       }
 
-      console.log('💰 Available products:', products);
+      console.log('════════════════════════════════════════════════════════');
+      console.log('✅ Successfully retrieved', products.length, 'products');
+      console.log('Product IDs:', products.map(p => p.identifier).join(', '));
+      console.log('════════════════════════════════════════════════════════');
+      
       return products;
-    } catch (error) {
-      console.error('❌ Failed to get products:', error);
+    } catch (error: any) {
+      console.error('════════════════════════════════════════════════════════');
+      console.error('❌ FAILED TO GET PRODUCTS');
+      console.error('════════════════════════════════════════════════════════');
+      console.error('Error:', error.message || error);
+      console.error('════════════════════════════════════════════════════════');
 
-      // DEVELOPMENT FALLBACK: Return mock products for UI testing
+      // DEVELOPMENT FALLBACK
       if (__DEV__) {
-        console.log('🎭 Error in production flow, using MOCK PRODUCTS for development');
+        console.log('🎭 DEV MODE: Returning MOCK PRODUCTS after error');
         return [
           {
             identifier: this.PRODUCT_IDS.monthly,
@@ -306,14 +426,6 @@ class RealPaymentService {
             priceString: '$10.99',
             currencyCode: 'USD',
           },
-          {
-            identifier: this.PRODUCT_IDS.lifetime,
-            description: 'Lifetime access to all premium features',
-            title: 'Lifetime Premium',
-            price: '49.99',
-            priceString: '$49.99',
-            currencyCode: 'USD',
-          },
         ];
       }
 
@@ -329,84 +441,28 @@ class RealPaymentService {
     promoCode?: string
   ): Promise<PaymentResult> {
     try {
-      console.log('💳 Initiating purchase:', { plan, promoCode });
-
-      // DEVELOPMENT MOCK: Simulate purchase for UI testing
-      if (__DEV__ && !this.currentOfferings) {
-        console.log('🎭 DEV MODE: Simulating purchase (no real transaction)');
-
-        // Simulate a delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // In dev mode, update subscription in Firebase AND backend API
-        try {
-          const currentUserId = await Purchases.getCustomerInfo().then(info => info.originalAppUserId).catch(() => null);
-
-          if (currentUserId) {
-            console.log('🎭 DEV MODE: Updating subscription for user:', currentUserId);
-
-            const now = new Date();
-            const periodEnd = new Date(now);
-
-            if (plan === 'yearly') {
-              periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-            } else if (plan === 'monthly') {
-              periodEnd.setMonth(periodEnd.getMonth() + 1);
-            } else {
-              // lifetime
-              periodEnd.setFullYear(periodEnd.getFullYear() + 100);
-            }
-
-            // Update Firebase subscription collection
-            const subscriptionRef = doc(db, 'subscriptions', currentUserId);
-            await setDoc(subscriptionRef, {
-              userId: currentUserId,
-              plan: 'premium',
-              status: 'active',
-              subscriptionType: plan,
-              currentPeriodStart: Timestamp.fromDate(now),
-              currentPeriodEnd: Timestamp.fromDate(periodEnd),
-              cancelAtPeriodEnd: false,
-              paymentProvider: 'mock_dev',
-              updatedAt: Timestamp.now(),
-              promoCode: promoCode || null,
-              mockPurchase: true,
-            }, { merge: true });
-
-            // CRITICAL: Update user's isPremium status in backend
-            // This uses the API service to update the user profile
-            const ApiServiceModule = await import('@/services/api/ApiService');
-            const apiService = ApiServiceModule.ApiService.getInstance();
-
-            await apiService.updateUserProfile({
-              isPremium: true,
-              subscriptionStatus: 'premium',
-            });
-
-            console.log('✅ DEV MODE: User marked as premium in Firebase AND backend');
-          }
-        } catch (error) {
-          console.error('❌ DEV MODE: Failed to update subscription:', error);
-        }
-
-        return {
-          success: true,
-          userCancelled: false,
-          // Note: Mock purchase - user is now premium for testing
-        };
-      }
+      console.log('════════════════════════════════════════════════════════');
+      console.log('💳 INITIATING PURCHASE');
+      console.log('════════════════════════════════════════════════════════');
+      console.log('Plan:', plan);
+      console.log('Promo code:', promoCode || 'None');
+      console.log('Platform:', Platform.OS);
+      console.log('────────────────────────────────────────────────────────');
 
       // Validate promo code if provided
       let discountedPrice: number | null = null;
       if (promoCode) {
+        console.log('🏷️ Validating promo code...');
         const promoValidation = await this.validatePromoCode(promoCode, plan);
         if (!promoValidation.valid) {
+          console.error('❌ Promo code invalid:', promoValidation.error);
           return {
             success: false,
             error: promoValidation.error || 'Invalid promo code'
           };
         }
         discountedPrice = promoValidation.discountedPrice;
+        console.log('✅ Promo code valid, discounted price:', discountedPrice);
       }
 
       if (!this.currentOfferings) {
@@ -415,12 +471,8 @@ class RealPaymentService {
       }
 
       if (!this.currentOfferings) {
-        console.error('❌❌❌ CRITICAL: Still no currentOfferings after loadOfferings()!');
-        console.error('This means RevenueCat.getOfferings() returned null or empty');
-        console.error('Check:');
-        console.error('1. StoreKit config product IDs match App Store Connect');
-        console.error('2. RevenueCat offering "default" is set as current');
-        console.error('3. Products exist in App Store Connect and are "Ready to Submit"');
+        console.error('❌ CRITICAL: Still no currentOfferings after loadOfferings()!');
+        console.error('Cannot proceed with purchase');
         return {
           success: false,
           error: 'No subscription plans available'
@@ -429,27 +481,41 @@ class RealPaymentService {
 
       // Find the appropriate package
       const targetProductId = this.PRODUCT_IDS[plan];
+      console.log('🔍 Looking for product ID:', targetProductId);
+      console.log('Available packages:', this.currentOfferings.availablePackages.length);
+      
       const purchasePackage = this.currentOfferings.availablePackages.find(
         pkg => pkg.product.identifier === targetProductId
       );
 
       if (!purchasePackage) {
+        console.error('❌ Package not found for product ID:', targetProductId);
+        console.error('Available product IDs:', 
+          this.currentOfferings.availablePackages.map(p => p.product.identifier).join(', ')
+        );
         return {
           success: false,
           error: `${plan} subscription not available`
         };
       }
 
-      // Attempt purchase
-      console.log('🛒 Purchasing package:', purchasePackage.product.identifier);
+      console.log('✅ Found package:', purchasePackage.identifier);
+      console.log('   Product:', purchasePackage.product.title);
+      console.log('   Price:', purchasePackage.product.priceString);
+      console.log('────────────────────────────────────────────────────────');
 
+      // Attempt purchase
+      console.log('🛒 Calling Purchases.purchasePackage()...');
       const purchaseResult = await Purchases.purchasePackage(purchasePackage);
 
-      console.log('✅ Purchase successful:', {
-        customerInfo: purchaseResult.customerInfo.originalAppUserId,
-        activeSubscriptions: Object.keys(purchaseResult.customerInfo.activeSubscriptions),
-        entitlements: Object.keys(purchaseResult.customerInfo.entitlements.active)
-      });
+      console.log('════════════════════════════════════════════════════════');
+      console.log('✅ PURCHASE SUCCESSFUL!');
+      console.log('════════════════════════════════════════════════════════');
+      console.log('Customer Info:');
+      console.log('  - User ID:', purchaseResult.customerInfo.originalAppUserId);
+      console.log('  - Active Subscriptions:', Object.keys(purchaseResult.customerInfo.activeSubscriptions));
+      console.log('  - Active Entitlements:', Object.keys(purchaseResult.customerInfo.entitlements.active));
+      console.log('════════════════════════════════════════════════════════');
 
       // Record promo code usage if used
       if (promoCode && purchaseResult.customerInfo.activeSubscriptions[targetProductId]) {
@@ -471,10 +537,19 @@ class RealPaymentService {
       };
 
     } catch (error: any) {
-      console.error('❌ Purchase failed:', error);
+      console.error('════════════════════════════════════════════════════════');
+      console.error('❌ PURCHASE FAILED');
+      console.error('════════════════════════════════════════════════════════');
+      console.error('Error type:', error.constructor?.name || 'Unknown');
+      console.error('Error message:', error.message || 'No message');
+      console.error('Error code:', error.code || 'No code');
+      console.error('User cancelled:', error.userCancelled || false);
+      console.error('Full error:', JSON.stringify(error, null, 2));
+      console.error('════════════════════════════════════════════════════════');
 
       // Handle user cancellation
       if (error.userCancelled) {
+        console.log('ℹ️ User cancelled the purchase');
         return {
           success: false,
           userCancelled: true,
@@ -494,6 +569,8 @@ class RealPaymentService {
         errorMessage = error.message;
       }
 
+      console.error('Returning error to user:', errorMessage);
+
       return {
         success: false,
         error: errorMessage
@@ -506,15 +583,17 @@ class RealPaymentService {
    */
   async restorePurchases(): Promise<PaymentResult> {
     try {
-      console.log('🔄 Restoring purchases...');
+      console.log('════════════════════════════════════════════════════════');
+      console.log('🔄 RESTORING PURCHASES');
+      console.log('════════════════════════════════════════════════════════');
       
       const customerInfo = await Purchases.restorePurchases();
       
-      console.log('✅ Restore successful:', {
-        userId: customerInfo.originalAppUserId,
-        activeSubscriptions: Object.keys(customerInfo.activeSubscriptions),
-        entitlements: Object.keys(customerInfo.entitlements.active)
-      });
+      console.log('✅ Restore successful');
+      console.log('  - User ID:', customerInfo.originalAppUserId);
+      console.log('  - Active Subscriptions:', Object.keys(customerInfo.activeSubscriptions));
+      console.log('  - Active Entitlements:', Object.keys(customerInfo.entitlements.active));
+      console.log('════════════════════════════════════════════════════════');
 
       // Update subscription status in Firebase based on restored purchases
       if (Object.keys(customerInfo.activeSubscriptions).length > 0) {
@@ -527,7 +606,11 @@ class RealPaymentService {
       };
 
     } catch (error: any) {
-      console.error('❌ Restore failed:', error);
+      console.error('════════════════════════════════════════════════════════');
+      console.error('❌ RESTORE FAILED');
+      console.error('════════════════════════════════════════════════════════');
+      console.error('Error:', error.message || error);
+      console.error('════════════════════════════════════════════════════════');
       return {
         success: false,
         error: error.message || 'Failed to restore purchases'
@@ -556,10 +639,16 @@ class RealPaymentService {
       const customerInfo = await this.getCustomerInfo();
       if (!customerInfo) return false;
 
-      const hasActiveEntitlement = Object.keys(customerInfo.entitlements.active).length > 0;
-      const hasActiveSubscription = Object.keys(customerInfo.activeSubscriptions).length > 0;
+      // Check for 'premium' entitlement (this is the correct way)
+      const hasPremiumEntitlement = customerInfo.entitlements.active['premium'] !== undefined;
       
-      return hasActiveEntitlement || hasActiveSubscription;
+      console.log('🔐 Subscription check:', {
+        hasPremiumEntitlement,
+        activeEntitlements: Object.keys(customerInfo.entitlements.active),
+        activeSubscriptions: Object.keys(customerInfo.activeSubscriptions)
+      });
+      
+      return hasPremiumEntitlement;
     } catch (error) {
       console.error('❌ Failed to check subscription status:', error);
       return false;
@@ -578,7 +667,6 @@ class RealPaymentService {
     try {
       console.log('🏷️ Validating promo code:', code);
 
-      // Get promo code from Firebase
       const promoDoc = await getDoc(doc(db, 'promoCodes', code.toUpperCase()));
       
       if (!promoDoc.exists()) {
@@ -587,28 +675,23 @@ class RealPaymentService {
 
       const promoData = promoDoc.data() as PromoCode;
       
-      // Check if promo code is active
       if (!promoData.isActive) {
         return { valid: false, error: 'Promo code is no longer active' };
       }
 
-      // Check date validity
       const now = new Date();
       if (now < promoData.validFrom || now > promoData.validUntil) {
         return { valid: false, error: 'Promo code has expired' };
       }
 
-      // Check usage limit
       if (promoData.usageLimit && promoData.usedCount >= promoData.usageLimit) {
         return { valid: false, error: 'Promo code usage limit reached' };
       }
 
-      // Check if applicable to this plan
       if (!promoData.applicablePlans.includes(plan) && !promoData.applicablePlans.includes('all')) {
         return { valid: false, error: `Promo code not valid for ${plan} plan` };
       }
 
-      // Get original price
       const products = await this.getAvailableProducts();
       const targetProductId = this.PRODUCT_IDS[plan];
       const product = products.find(p => p.identifier === targetProductId);
@@ -620,7 +703,6 @@ class RealPaymentService {
       const originalPrice = parseFloat(product.price);
       let discountedPrice = originalPrice;
 
-      // Calculate discount
       if (promoData.discountType === 'percentage') {
         discountedPrice = originalPrice * (1 - promoData.discountValue / 100);
       } else if (promoData.discountType === 'fixed') {
@@ -653,7 +735,6 @@ class RealPaymentService {
     try {
       const promoDocRef = doc(db, 'promoCodes', code.toUpperCase());
       
-      // Increment usage count
       await updateDoc(promoDocRef, {
         usedCount: (await getDoc(promoDocRef)).data()?.usedCount + 1 || 1,
         lastUsed: Timestamp.now(),
@@ -678,7 +759,8 @@ class RealPaymentService {
     try {
       const userId = customerInfo.originalAppUserId;
       
-      // Calculate subscription period
+      console.log('💾 Updating Firebase subscription for user:', userId);
+      
       const now = new Date();
       const periodEnd = new Date(now);
       
@@ -688,7 +770,6 @@ class RealPaymentService {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
-      // Get subscription document reference
       const subscriptionRef = doc(db, 'subscriptions', userId);
       
       const subscriptionData = {
@@ -709,7 +790,7 @@ class RealPaymentService {
 
       await setDoc(subscriptionRef, subscriptionData, { merge: true });
       
-      console.log('💾 Updated subscription in Firebase:', subscriptionData);
+      console.log('✅ Firebase subscription updated successfully');
     } catch (error) {
       console.error('❌ Failed to update subscription in Firebase:', error);
     }
@@ -722,24 +803,24 @@ class RealPaymentService {
     try {
       const userId = customerInfo.originalAppUserId;
       
+      console.log('🔄 Syncing subscription with Firebase for user:', userId);
+      
       if (Object.keys(customerInfo.activeSubscriptions).length === 0) {
-        // No active subscriptions
         const subscriptionRef = doc(db, 'subscriptions', userId);
         await updateDoc(subscriptionRef, {
           status: 'inactive',
           updatedAt: Timestamp.now()
         });
+        console.log('✅ Marked subscription as inactive');
         return;
       }
 
-      // Has active subscription - determine the plan type
       const hasYearly = Object.keys(customerInfo.activeSubscriptions).some(key => 
         key.includes('yearly') || key.includes('annual')
       );
       
       const plan = hasYearly ? 'yearly' : 'monthly';
       
-      // Update subscription status
       const subscriptionRef = doc(db, 'subscriptions', userId);
       await updateDoc(subscriptionRef, {
         plan: 'premium',
@@ -748,7 +829,7 @@ class RealPaymentService {
         updatedAt: Timestamp.now()
       });
 
-      console.log('🔄 Synced subscription with Firebase');
+      console.log('✅ Subscription synced successfully');
     } catch (error) {
       console.error('❌ Failed to sync subscription with Firebase:', error);
     }
@@ -759,13 +840,15 @@ class RealPaymentService {
    */
   async cancelSubscription(userId: string): Promise<{ success: boolean; message: string }> {
     try {
-      // Note: RevenueCat doesn't handle cancellation directly - users need to cancel through App Store/Play Store
-      // We just update the local state
+      console.log('🚫 Cancelling subscription for user:', userId);
+      
       const subscriptionRef = doc(db, 'subscriptions', userId);
       await updateDoc(subscriptionRef, {
         cancelAtPeriodEnd: true,
         updatedAt: Timestamp.now()
       });
+
+      console.log('✅ Subscription marked for cancellation');
 
       return {
         success: true,
@@ -785,8 +868,9 @@ class RealPaymentService {
    */
   async setUserId(userId: string): Promise<void> {
     try {
+      console.log('👤 Setting user ID for RevenueCat:', userId);
       await Purchases.logIn(userId);
-      console.log('👤 Set user ID for RevenueCat:', userId);
+      console.log('✅ User ID set successfully');
     } catch (error) {
       console.error('❌ Failed to set user ID:', error);
     }
@@ -797,8 +881,9 @@ class RealPaymentService {
    */
   async logOut(): Promise<void> {
     try {
+      console.log('👋 Logging out from RevenueCat');
       await Purchases.logOut();
-      console.log('👋 Logged out from RevenueCat');
+      console.log('✅ Logged out successfully');
     } catch (error) {
       console.error('❌ Failed to log out from RevenueCat:', error);
     }
