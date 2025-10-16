@@ -770,6 +770,7 @@ class RealPaymentService {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
+      // 1. Update subscriptions collection
       const subscriptionRef = doc(db, 'subscriptions', userId);
       
       const subscriptionData = {
@@ -789,10 +790,21 @@ class RealPaymentService {
       };
 
       await setDoc(subscriptionRef, subscriptionData, { merge: true });
+      console.log('✅ Subscription document updated');
+
+      // 2. Update user's isPremium field in users collection
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        isPremium: true,
+        subscriptionStatus: 'premium',
+        updatedAt: Timestamp.now()
+      });
+      console.log('✅ User isPremium field updated');
       
-      console.log('✅ Firebase subscription updated successfully');
+      console.log('✅ Firebase subscription and user updated successfully');
     } catch (error) {
       console.error('❌ Failed to update subscription in Firebase:', error);
+      throw error; // Re-throw so caller knows it failed
     }
   }
 

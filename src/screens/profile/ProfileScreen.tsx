@@ -1375,22 +1375,20 @@ export default function ProfileScreen() {
                       </Text>
                     )}
                   </View>
-                  <TouchableOpacity
-                    style={[
-                      styles.manageButton,
-                      { 
-                        backgroundColor: subscription?.plan === 'premium' ? 'rgba(255,255,255,0.2)' : theme.colors.primary,
-                      }
-                    ]}
-                    onPress={handleManageSubscription}
-                  >
-                    <Text style={[
-                      styles.manageButtonText,
-                      { color: subscription?.plan === 'premium' ? 'white' : 'white' }
-                    ]}>
-                      {subscription?.plan === 'premium' ? 'Manage' : 'Upgrade'}
-                    </Text>
-                  </TouchableOpacity>
+                  {/* Only show Manage/Upgrade button for free users */}
+                  {subscription?.plan === 'free' && (
+                    <TouchableOpacity
+                      style={[
+                        styles.manageButton,
+                        { backgroundColor: theme.colors.primary }
+                      ]}
+                      onPress={handleManageSubscription}
+                    >
+                      <Text style={[styles.manageButtonText, { color: 'white' }]}>
+                        Upgrade
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* Usage Stats */}

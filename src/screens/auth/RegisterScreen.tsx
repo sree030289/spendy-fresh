@@ -23,7 +23,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { MeetNSplitLogo } from '@/components/common/MeetNSplitLogo';
 import { BrandHeader } from '@/components/common/BrandHeader';
 import { Button } from '@/components/common/Button';
-import { BiometricService } from '@/services/biometric';
 import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
 import { COUNTRIES, POPULAR_COUNTRIES, CURRENCIES } from '@/constants/countries';
 import CountryCodePicker, { Country, findCountryByCode, convertToPickerCountry } from '@/components/common/CountryCodePicker';
@@ -33,7 +32,6 @@ export default function RegisterScreen() {
   const { theme } = useTheme();
   const { register, user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [currencySearchQuery, setCurrencySearchQuery] = useState('');
@@ -180,12 +178,8 @@ export default function RegisterScreen() {
       // Check for duplicates (you can enhance this)
       await checkDuplicateUser(formData.email, formData.mobile);
 
-      const biometricAvailable = await BiometricService.isAvailable();
-      if (biometricAvailable) {
-        setShowBiometricPrompt(true);
-      } else {
-        await completeRegistration(false);
-      }
+      // Skip biometric prompt and complete registration with biometric disabled
+      await completeRegistration(false);
     } catch (error: any) {
       console.log('Registration error:', error);
       
@@ -474,47 +468,6 @@ export default function RegisterScreen() {
     );
   };
 
-  const BiometricPrompt = () => (
-    <Modal
-      visible={showBiometricPrompt}
-      animationType="fade"
-      transparent={true}
-    >
-      <View style={styles.biometricModalOverlay}>
-        <View style={[styles.biometricContent, { backgroundColor: theme.colors.background }]}>
-          <View style={styles.biometricIcon}>
-            <Icon name="fingerprint" size={64} color={theme.colors.primary}  />
-          </View>
-          <Text style={[styles.biometricTitle, { color: theme.colors.text }]}>
-            Enable Biometric Login?
-          </Text>
-          <Text style={[styles.biometricSubtitle, { color: theme.colors.textSecondary }]}>
-            Use Face ID or Fingerprint for quick and secure access to your account
-          </Text>
-          <View style={styles.biometricButtons}>
-            <Button
-              title="Enable"
-              onPress={() => {
-                setShowBiometricPrompt(false);
-                completeRegistration(true);
-              }}
-              style={styles.biometricButton}
-            />
-            <Button
-              title="Skip"
-              onPress={() => {
-                setShowBiometricPrompt(false);
-                completeRegistration(false);
-              }}
-              variant="outline"
-              style={styles.biometricButton}
-            />
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Brand Header */}
@@ -791,7 +744,6 @@ export default function RegisterScreen() {
       </KeyboardAvoidingView>
 
       <CurrencyPicker />
-      <BiometricPrompt />
     </SafeAreaView>
   );
 }

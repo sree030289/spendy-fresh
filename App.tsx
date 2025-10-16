@@ -297,7 +297,7 @@ const AppNavigator = () => {
     return () => clearInterval(interval);
   }, [user?.id]);
 
-  const handleSubscriptionPurchase = async (plan: 'monthly' | 'yearly', promoCode?: string) => {
+  const handleSubscriptionPurchase = async (plan: 'monthly' | 'yearly', promoCode?: string): Promise<{ success: boolean }> => {
     try {
       console.log('🛒 Starting subscription purchase:', { plan, promoCode });
 
@@ -308,22 +308,22 @@ const AppNavigator = () => {
       const result = await paymentService.purchaseSubscription(plan, promoCode);
 
       if (result.success) {
+        // Close the modal - success screen will be shown in subscription modal
         setSubscriptionModal(prev => ({ ...prev, visible: false, canClose: true }));
-
-        CrossPlatformAlert.alert(
-          'Success! 🎉',
-          'Welcome to Premium! You now have unlimited access to all features.',
-          [{ text: 'Awesome!' }]
-        );
+        return { success: true };
       } else if (!result.userCancelled) {
         CrossPlatformAlert.alert(
           'Purchase Failed',
           result.error || 'Unable to complete purchase. Please try again.'
         );
+        return { success: false };
       }
+      
+      return { success: false };
     } catch (error) {
       console.error('Subscription purchase error:', error);
       CrossPlatformAlert.alert('Error', 'Failed to process subscription. Please try again.');
+      return { success: false };
     }
   };
 
