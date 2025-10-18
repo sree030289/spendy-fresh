@@ -1,4 +1,4 @@
-// src/components/modals/SubscriptionModal.tsx - Updated with Firebase-driven configuration
+// src/components/modals/SubscriptionModal.tsx - Updated with Store promotional offers
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,12 +11,13 @@ import {
   Platform,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import SubscriptionConfigService, { SubscriptionConfig } from '@/services/firebase/SubscriptionConfigService';
-import CouponService, { CouponValidationResult } from '@/services/firebase/CouponService';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/utils/currency';
+import Purchases from 'react-native-purchases';
 
 const { width, height } = Dimensions.get('window');
 
@@ -51,10 +52,18 @@ export default function SubscriptionModal({
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false); // ✅ Add success state
   
-  // Real-time coupon code validation
-  const [promoValidation, setPromoValidation] = useState<CouponValidationResult & {
+  // Refs for keyboard handling
+  const scrollViewRef = React.useRef<ScrollView>(null);
+  const promoInputRef = React.useRef<View>(null);
+  
+  // Real-time promo code validation
+  const [promoValidation, setPromoValidation] = useState<{
+    valid: boolean;
     originalPrice?: number;
     isValidating?: boolean;
+    error?: string;
+    discountedPrice?: number;
+    availablePromoCodes?: string[];
   }>({ valid: false });
   
   // Real pricing from payment service
@@ -172,10 +181,10 @@ export default function SubscriptionModal({
     }
   };
 
-  // Real-time promo code validation
+  // Real-time promo code validation - check if code exists in store
   useEffect(() => {
     const validatePromoCode = async () => {
-      if (!promoCode.trim() || !user?.id) {
+      if (!promoCode.trim()) {
         setPromoValidation({ valid: false });
         return;
       }
@@ -183,46 +192,87 @@ export default function SubscriptionModal({
       setPromoValidation({ valid: false, isValidating: true });
 
       try {
-        // Use new CouponService for validation
-        const couponService = CouponService.getInstance();
-        await couponService.initialize();
+        // Check if the promo code exists in the App Store/Play Store
+        const productId = selectedPlan === 'yearly' ? 'annualy1099' : 'monthly199';
+        const offerings = await Purchases.getOfferings();
+        const currentOffering = offerings.current;
         
-        // Get current pricing
-        const pricing = getCurrentPricing();
-        const currentPrice = selectedPlan === 'yearly' ? pricing.yearlyPrice : pricing.monthlyPrice;
-        
-        const validation = await couponService.validateCoupon(
-          promoCode.trim(),
-          selectedPlan,
-          currentPrice,
-          pricing.currency
+        if (!currentOffering) {
+          console.log('❌ No current offering found');
+          setPromoValidation({ valid: false, isValidating: false });
+          return;
+        }
+
+        const purchasePackage = currentOffering.availablePackages.find(
+          pkg => pkg.product.identifier === productId
         );
+
+        if (!purchasePackage) {
+          console.log('❌ Package not found:', productId);
+          setPromoValidation({ valid: false, isValidating: false });
+          return;
+        }
+
+        // Check if promotional offer exists for this code
+        const discounts = purchasePackage.product.discounts || [];
+        const availablePromoCodes = discounts
+          .map((discount: any) => discount.identifier || discount.offerIdentifier)
+          .filter(Boolean);
         
-        setPromoValidation({
-          valid: validation.valid,
-          error: validation.error,
-          discountedPrice: validation.discountedPrice,
-          originalPrice: currentPrice,
-          discountAmount: validation.discountAmount,
-          coupon: validation.coupon,
-          isValidating: false
+        const promoExists = discounts.some((discount: any) => {
+          const discountId = discount.identifier || discount.offerIdentifier;
+          return discountId?.toLowerCase() === promoCode.trim().toLowerCase();
         });
-        
-        console.log('🏷️ Promo validation result:', validation);
+
+        if (promoExists) {
+          setPromoValidation({
+            valid: true,
+            isValidating: false,
+            originalPrice: selectedPlan === 'yearly' ? getCurrentPricing().yearlyPrice : getCurrentPricing().monthlyPrice,
+            availablePromoCodes, // Store available codes for error message
+          });
+          console.log('✅ Promo code found in store:', promoCode.trim());
+        } else {
+          setPromoValidation({ 
+            valid: false, 
+            isValidating: false,
+            availablePromoCodes, // Store available codes for error message
+          });
+          console.log('❌ Promo code not found in store:', promoCode.trim());
+          console.log('   Available codes:', availablePromoCodes);
+        }
       } catch (error) {
-        console.error('❌ Promo validation error:', error);
-        setPromoValidation({
-          valid: false,
-          error: 'Unable to validate promo code',
-          isValidating: false
-        });
+        console.error('❌ Error validating promo code:', error);
+        setPromoValidation({ valid: false, isValidating: false });
       }
     };
 
-    // Debounce validation - increased to reduce flickering
+    // Debounce validation
     const timeoutId = setTimeout(validatePromoCode, 1000);
     return () => clearTimeout(timeoutId);
-  }, [promoCode, selectedPlan, user?.id, subscriptionConfig]);
+  }, [promoCode, selectedPlan, subscriptionConfig]);
+
+  // Keyboard handling - scroll promo input into view when keyboard opens
+  useEffect(() => {
+    if (!showPromoInput) return;
+
+    const keyboardWillShow = () => {
+      // Scroll down to bring promo section into view
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    };
+    
+    const showListener = Platform.OS === 'ios' 
+      ? 'keyboardWillShow'
+      : 'keyboardDidShow';
+
+    const subscription = Keyboard.addListener(showListener, keyboardWillShow);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [showPromoInput]);
 
   // Get current pricing from config - prioritize real pricing from payment service
   const getCurrentPricing = () => {
@@ -535,13 +585,15 @@ export default function SubscriptionModal({
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 20}
       >
         <ScrollView 
+          ref={scrollViewRef}
           style={styles.container}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}
         >
         {/* Enhanced Header Banner */}
         <View style={styles.enhancedHeaderBanner}>
@@ -668,7 +720,10 @@ export default function SubscriptionModal({
         {subscriptionConfig?.displayConfig.promoCodeEnabled && (
           <View style={styles.compactPromoSection}>
             {showPromoInput ? (
-              <View style={styles.compactPromoContainer}>
+              <View 
+                ref={promoInputRef}
+                style={styles.compactPromoContainer}
+              >
                 {/* Input Container */}
                 <View style={[
                   styles.compactPromoInputContainer,
@@ -684,6 +739,14 @@ export default function SubscriptionModal({
                     onChangeText={setPromoCode}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    returnKeyType="done"
+                    enablesReturnKeyAutomatically={true}
+                    blurOnSubmit={true}
+                    onSubmitEditing={() => {
+                      if (promoCode.trim() && !promoValidation.isValidating) {
+                        setPromoValidation({ valid: false, isValidating: true });
+                      }
+                    }}
                   />
                   {promoValidation.isValidating && (
                     <Text style={styles.promoStatus}>⏳</Text>
@@ -709,20 +772,8 @@ export default function SubscriptionModal({
                 {/* Apply Button - Outside the input container */}
                 <TouchableOpacity
                   style={styles.applyPromoButton}
-                  onPress={async () => {
-                    if (promoCode.trim() && promoValidation.valid) {
-                      try {
-                        const couponService = CouponService.getInstance();
-                        const applied = await couponService.applyCoupon(promoCode.trim());
-                        
-                        if (applied) {
-                          console.log(`✅ Coupon ${promoCode.trim()} applied successfully`);
-                          // You might want to show a success message here
-                        }
-                      } catch (error) {
-                        console.error('❌ Error applying coupon:', error);
-                      }
-                    } else if (promoCode.trim()) {
+                  onPress={() => {
+                    if (promoCode.trim() && !promoValidation.isValidating) {
                       // Trigger validation manually if not validated yet
                       setPromoValidation({ valid: false, isValidating: true });
                     }
@@ -730,14 +781,29 @@ export default function SubscriptionModal({
                   disabled={!promoCode.trim() || promoValidation.isValidating}
                 >
                   <Text style={styles.applyPromoText}>
-                    {promoValidation.valid ? 'Apply' : 'Validate'}
+                    {promoValidation.isValidating ? 'Checking...' : promoValidation.valid ? 'Applied' : 'Validate'}
                   </Text>
                 </TouchableOpacity>
                 
                 {/* Compact Promo validation feedback */}
-                {promoValidation.valid && promoValidation.coupon && (
-                  <Text style={styles.compactPromoSuccessText}>
-                    🎉 {promoValidation.coupon.discountPercent}% OFF - Save {formatCurrency(promoValidation.discountAmount || 0, currency)}!
+                {promoValidation.valid && (
+                  <View>
+                    <Text style={styles.compactPromoSuccessText}>
+                      ✅ Promo code accepted
+                    </Text>
+                    <Text style={styles.compactPromoInfoText}>
+                      💡 Discount will be applied by App Store/Play Store at checkout
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Show error for invalid codes */}
+                {!promoValidation.valid && !promoValidation.isValidating && promoCode.trim().length > 0 && (
+                  <Text style={styles.compactPromoErrorText}>
+                    ❌ Promo code not found.
+                    {(promoValidation as any).availablePromoCodes?.length > 0 && (
+                      ` Available: ${(promoValidation as any).availablePromoCodes.join(', ')}`
+                    )}
                   </Text>
                 )}
                 
@@ -1270,6 +1336,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
     marginTop: 4,
+  },
+  compactPromoInfoText: {
+    color: '#6c757d',
+    fontSize: 9,
+    textAlign: 'center',
+    fontWeight: '400',
+    marginTop: 4,
+    paddingHorizontal: 8,
   },
   compactPromoErrorText: {
     color: '#dc3545',

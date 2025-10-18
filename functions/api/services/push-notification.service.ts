@@ -124,17 +124,17 @@ export class PushNotificationService {
     let body: string;
     
     if (data.friendCount === 1) {
-      body = `Welcome to Spendy! ${data.friendNames[0]} is now your friend.`;
+      body = `Welcome to MeetnSplit! ${data.friendNames[0]} is now your friend.`;
     } else {
       const namesList = data.friendNames.slice(0, 2).join(', ');
       const remaining = data.friendCount - 2;
       const friendsText = remaining > 0 ? `${namesList} and ${remaining} others` : namesList;
-      body = `Welcome to Spendy! ${friendsText} are now your friends.`;
+      body = `Welcome to MeetnSplit! ${friendsText} are now your friends.`;
     }
 
     return await PushNotificationService.sendToDevice({
       token: data.recipientToken,
-      title: 'Welcome to Spendy!',
+      title: 'Welcome to MeetnSplit!',
       body,
       data: {
         type: 'welcome',

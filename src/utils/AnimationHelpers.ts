@@ -97,7 +97,7 @@ export const SuccessAnimations = {
   friendInviteSent: (method: string): FullScreenSuccessOptions => ({
     title: 'Invitation Sent! 📧',
     message: `Invitation sent via ${method}!`,
-    subtitle: 'They will receive a link to join Spendy',
+    subtitle: 'They will receive a link to join Meet n Split',
     buttonText: 'Continue',
   }),
 

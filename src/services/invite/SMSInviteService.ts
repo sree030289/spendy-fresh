@@ -234,9 +234,9 @@ export class SMSInviteService {
    */
   private getDefaultMessage(isRegistered?: boolean): string {
     if (isRegistered) {
-      return '🎉 You have a friend request on Spendy! Open the app to accept it.';
+      return '🎉 You have a friend request on MeetnSplit! Open the app to accept it.';
     } else {
-      return '👋 You\'re invited to join Spendy! Download the app to split expenses with friends: https://spendy.app/download';
+      return '👋 You\'re invited to join MeetnSplit! Download the app to split expenses with friends: https://meetnsplit.app';
     }
   }
 
@@ -563,7 +563,7 @@ export class SMSInviteService {
       try {
         const result = await Share.share({
           message: shareMessage,
-          title: 'Invite Friends to Spendy'
+          title: 'Invite Friends to MeetnSplit'
         });
 
         if (result.action === Share.sharedAction) {

@@ -223,6 +223,12 @@ export class SubscriptionService {
     }
   }
 
+  // Public method to clear subscription cache (useful after purchases)
+  clearSubscriptionCache(userId: string): void {
+    console.log('🗑️ Clearing subscription cache for user:', userId);
+    this.clearCache(`subscription_${userId}`);
+  }
+
   async isPremiumUser(userId: string): Promise<boolean> {
     try {
       const subscription = await this.getUserSubscription(userId);

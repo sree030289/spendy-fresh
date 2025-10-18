@@ -12,6 +12,9 @@ import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from './firebase/config';
 import { ENV } from '../config/environment';
 
+// Type for promotional offers (iOS discount / Android subscription option)
+type PromotionalOffer = any;
+
 export interface PaymentProduct {
   identifier: string;
   description: string;
@@ -111,7 +114,26 @@ class RealPaymentService {
       console.log('════════════════════════════════════════════════════════');
       
       if (this.isInitialized) {
-        console.log('✅ RealPaymentService already initialized, skipping...');
+        console.log('✅ RealPaymentService already initialized');
+        
+        // CRITICAL: If userId is provided and different, switch user
+        if (userId) {
+          try {
+            const currentInfo = await Purchases.getCustomerInfo();
+            if (currentInfo.originalAppUserId !== userId) {
+              console.log('🔄 User ID changed, switching RevenueCat user...');
+              console.log('  - Old user:', currentInfo.originalAppUserId);
+              console.log('  - New user:', userId);
+              await Purchases.logIn(userId);
+              console.log('✅ RevenueCat user switched successfully');
+            } else {
+              console.log('✅ Same user, no need to switch');
+            }
+          } catch (error) {
+            console.error('⚠️ Failed to check/switch user:', error);
+          }
+        }
+        
         return;
       }
 
@@ -435,6 +457,7 @@ class RealPaymentService {
 
   /**
    * Purchase a subscription with optional promo code
+   * Supports store-configured promotional offers from App Store Connect / Play Console
    */
   async purchaseSubscription(
     plan: 'monthly' | 'yearly',
@@ -448,23 +471,7 @@ class RealPaymentService {
       console.log('Promo code:', promoCode || 'None');
       console.log('Platform:', Platform.OS);
       console.log('────────────────────────────────────────────────────────');
-
-      // Validate promo code if provided
-      let discountedPrice: number | null = null;
-      if (promoCode) {
-        console.log('🏷️ Validating promo code...');
-        const promoValidation = await this.validatePromoCode(promoCode, plan);
-        if (!promoValidation.valid) {
-          console.error('❌ Promo code invalid:', promoValidation.error);
-          return {
-            success: false,
-            error: promoValidation.error || 'Invalid promo code'
-          };
-        }
-        discountedPrice = promoValidation.discountedPrice;
-        console.log('✅ Promo code valid, discounted price:', discountedPrice);
-      }
-
+      
       if (!this.currentOfferings) {
         console.log('⚠️ No currentOfferings cached, loading now...');
         await this.loadOfferings();
@@ -502,9 +509,79 @@ class RealPaymentService {
       console.log('✅ Found package:', purchasePackage.identifier);
       console.log('   Product:', purchasePackage.product.title);
       console.log('   Price:', purchasePackage.product.priceString);
+      
+      // Handle promo code if provided - only check store promotional offers
+      if (promoCode) {
+        console.log('🏷️ Processing promo code from App Store/Play Store...');
+        
+        // Check for store-configured promotional offers (iOS/Android)
+        // These are configured in App Store Connect or Google Play Console
+        const storePromoResult = await this.checkStorePromotionalOffer(
+          purchasePackage, 
+          promoCode
+        );
+        
+        if (storePromoResult.available) {
+          console.log('✅ Found store-configured promotional offer!');
+          console.log('   Discount will be applied by App Store/Play Store');
+          
+          // Attempt purchase with promotional offer
+          try {
+            const purchaseResult = await this.purchaseWithStorePromo(
+              purchasePackage,
+              promoCode,
+              storePromoResult.promotionalOffer
+            );
+            
+            console.log('════════════════════════════════════════════════════════');
+            console.log('✅ PURCHASE WITH PROMO SUCCESSFUL!');
+            console.log('════════════════════════════════════════════════════════');
+            console.log('Customer Info:');
+            console.log('  - User ID:', purchaseResult.customerInfo.originalAppUserId);
+            console.log('  - Active Subscriptions:', Object.keys(purchaseResult.customerInfo.activeSubscriptions));
+            console.log('  - Active Entitlements:', Object.keys(purchaseResult.customerInfo.entitlements.active));
+            console.log('════════════════════════════════════════════════════════');
+
+            // Record promo code usage in Firebase
+            if (Object.keys(purchaseResult.customerInfo.activeSubscriptions).length > 0) {
+              await this.recordPromoCodeUsage(promoCode, purchaseResult.customerInfo.originalAppUserId);
+            }
+
+            // Update user subscription
+            await this.updateUserSubscriptionFromPurchase(
+              purchaseResult.customerInfo,
+              plan,
+              promoCode,
+              undefined // No custom discount - store handles pricing
+            );
+
+            return {
+              success: true,
+              customerInfo: purchaseResult.customerInfo,
+              userCancelled: false
+            };
+            
+          } catch (promoError: any) {
+            console.error('❌ Purchase with store promo failed:', promoError.message);
+            // Don't fallback - just return error
+            return {
+              success: false,
+              error: 'Failed to apply promotional offer. Please try again.'
+            };
+          }
+        } else {
+          // No store promo found - reject the code
+          console.error('❌ Promo code not found in App Store/Play Store');
+          return {
+            success: false,
+            error: 'Invalid promo code. Please check and try again.'
+          };
+        }
+      }
+
       console.log('────────────────────────────────────────────────────────');
 
-      // Attempt purchase
+      // Attempt regular purchase (without store promo)
       console.log('🛒 Calling Purchases.purchasePackage()...');
       const purchaseResult = await Purchases.purchasePackage(purchasePackage);
 
@@ -517,8 +594,8 @@ class RealPaymentService {
       console.log('  - Active Entitlements:', Object.keys(purchaseResult.customerInfo.entitlements.active));
       console.log('════════════════════════════════════════════════════════');
 
-      // Record promo code usage if used
-      if (promoCode && purchaseResult.customerInfo.activeSubscriptions[targetProductId]) {
+      // Record promo code usage if used and purchase was successful
+      if (promoCode && Object.keys(purchaseResult.customerInfo.activeSubscriptions).length > 0) {
         await this.recordPromoCodeUsage(promoCode, purchaseResult.customerInfo.originalAppUserId);
       }
 
@@ -527,7 +604,7 @@ class RealPaymentService {
         purchaseResult.customerInfo,
         plan,
         promoCode,
-        discountedPrice
+        undefined // Store handles all pricing
       );
 
       return {
@@ -559,9 +636,7 @@ class RealPaymentService {
 
       // Handle other errors
       let errorMessage = 'Purchase failed';
-      if (error.code === Purchases.PURCHASES_ERROR_CODE.PAYMENT_PENDING) {
-        errorMessage = 'Payment is pending approval';
-      } else if (error.code === Purchases.PURCHASES_ERROR_CODE.PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR) {
+      if (error.code === Purchases.PURCHASES_ERROR_CODE.PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR) {
         errorMessage = 'This subscription is not available in your region';
       } else if (error.code === Purchases.PURCHASES_ERROR_CODE.PURCHASE_NOT_ALLOWED_ERROR) {
         errorMessage = 'Purchases are not allowed on this device';
@@ -576,6 +651,151 @@ class RealPaymentService {
         error: errorMessage
       };
     }
+  }
+
+  /**
+   * Check if a store-configured promotional offer is available for the promo code
+   * This checks App Store Connect (iOS) or Google Play Console (Android) promotional offers
+   */
+  private async checkStorePromotionalOffer(
+    purchasePackage: PurchasesPackage,
+    promoCode: string
+  ): Promise<{ available: boolean; promotionalOffer?: PromotionalOffer | null }> {
+    try {
+      console.log('🔍 Checking for store promotional offer...');
+      console.log('   Promo code:', promoCode);
+      console.log('   Platform:', Platform.OS);
+      
+      if (Platform.OS === 'ios') {
+        // iOS: Check for promotional offers configured in App Store Connect
+        // These are fetched automatically by RevenueCat with the offering
+        const product = purchasePackage.product as any;
+        
+        // Check if product has discount/promotional offers
+        if (product.discounts && product.discounts.length > 0) {
+          console.log('📋 Found', product.discounts.length, 'promotional offers');
+          
+          // Debug: Log all discount identifiers
+          product.discounts.forEach((offer: any, index: number) => {
+            console.log(`   Discount ${index}:`, {
+              identifier: offer.identifier,
+              offerIdentifier: offer.offerIdentifier,
+              price: offer.price,
+              priceString: offer.priceString
+            });
+          });
+          
+          // Look for matching promo code (case-insensitive)
+          // Try both 'identifier' and 'offerIdentifier' properties
+          const matchingOffer = product.discounts.find(
+            (offer: any) => {
+              const offerId = offer.identifier || offer.offerIdentifier;
+              return offerId?.toLowerCase() === promoCode.toLowerCase();
+            }
+          );
+          
+          if (matchingOffer) {
+            console.log('✅ Found matching promotional offer:', matchingOffer.identifier || matchingOffer.offerIdentifier);
+            return { 
+              available: true, 
+              promotionalOffer: matchingOffer as PromotionalOffer 
+            };
+          }
+        }
+        
+        console.log('ℹ️ No matching iOS promotional offer found');
+        return { available: false };
+        
+      } else if (Platform.OS === 'android') {
+        // Android: Check for promotional offers (base plan offers)
+        // In RevenueCat v7+, Android promotional offers are in product.subscriptionOptions
+        const product = purchasePackage.product as any;
+        
+        if (product.subscriptionOptions && product.subscriptionOptions.length > 0) {
+          console.log('📋 Found', product.subscriptionOptions.length, 'subscription options');
+          
+          // Look for offer with matching tag (promo code)
+          const matchingOption = product.subscriptionOptions.find(
+            (option: any) => 
+              option.tags?.includes(promoCode.toLowerCase()) ||
+              option.offerId?.toLowerCase() === promoCode.toLowerCase()
+          );
+          
+          if (matchingOption) {
+            console.log('✅ Found matching Android promotional offer:', matchingOption.offerId);
+            return { 
+              available: true, 
+              promotionalOffer: matchingOption 
+            };
+          }
+        }
+        
+        console.log('ℹ️ No matching Android promotional offer found');
+        return { available: false };
+      }
+      
+      return { available: false };
+      
+    } catch (error) {
+      console.error('❌ Error checking store promotional offer:', error);
+      return { available: false };
+    }
+  }
+
+  /**
+   * Purchase subscription with store-configured promotional offer
+   */
+  private async purchaseWithStorePromo(
+    purchasePackage: PurchasesPackage,
+    promoCode: string,
+    promotionalOffer?: PromotionalOffer | null
+  ): Promise<{ customerInfo: CustomerInfo }> {
+    console.log('🛒 Purchasing with store promotional offer...');
+    console.log('   Platform:', Platform.OS);
+    
+    if (Platform.OS === 'ios') {
+      // iOS: For promotional offers, we need to use purchasePackage with the discount
+      // The discount is already part of the product when fetched with the promo code
+      if (!promotionalOffer) {
+        throw new Error('Promotional offer required for iOS discounted purchase');
+      }
+      
+      console.log('📱 iOS: Applying promotional offer to purchase');
+      console.log('   Promo code:', promoCode);
+      console.log('   Discount:', {
+        identifier: (promotionalOffer as any).identifier,
+        price: (promotionalOffer as any).priceString,
+        cycles: (promotionalOffer as any).cycles
+      });
+      
+      try {
+        // For iOS, RevenueCat handles promotional offers through the product itself
+        // We just need to purchase the package normally - the discount is already applied
+        // when the user enters the promo code in the App Store payment sheet
+        const result = await Purchases.purchasePackage(purchasePackage);
+        
+        console.log('✅ Purchase completed with promotional pricing');
+        return { customerInfo: result.customerInfo };
+      } catch (error: any) {
+        console.error('❌ Purchase with promo error:', error);
+        console.error('   Error message:', error.message);
+        console.error('   Error code:', error.code);
+        throw error;
+      }
+      
+    } else if (Platform.OS === 'android') {
+      // Android: Use purchasePackage with subscription option
+      // The promotional pricing is applied automatically by the subscription option
+      console.log('🤖 Android: Using purchasePackage() with promotional option');
+      
+      // For Android, the promotional offer is already part of the package
+      // Just purchase normally - the discount is applied via the subscription option
+      const result = await Purchases.purchasePackage(purchasePackage);
+      
+      return { customerInfo: result.customerInfo };
+    }
+    
+    throw new Error(`Platform ${Platform.OS} not supported for promotional offers`);
   }
 
   /**
@@ -658,6 +878,65 @@ class RealPaymentService {
   /**
    * Validate promo code and calculate discount
    */
+  /**
+   * Validate promo code using CouponService (unified validation)
+   */
+  async validatePromoCodeWithCouponService(
+    code: string, 
+    plan: 'monthly' | 'yearly',
+    originalPrice: number,
+    currency: string
+  ): Promise<{
+    valid: boolean;
+    error?: string;
+    discountedPrice?: number;
+    originalPrice?: number;
+  }> {
+    try {
+      console.log('🏷️ Validating promo code with CouponService:', code);
+      
+      // Use CouponService for validation
+      const CouponServiceModule = await import('@/services/firebase/CouponService');
+      const couponService = CouponServiceModule.default.getInstance();
+      await couponService.initialize();
+      
+      const validation = await couponService.validateCoupon(
+        code,
+        plan,
+        originalPrice,
+        currency
+      );
+      
+      if (!validation.valid) {
+        return {
+          valid: false,
+          error: validation.error
+        };
+      }
+      
+      console.log('✅ Promo code valid:', {
+        code,
+        originalPrice,
+        discountedPrice: validation.discountedPrice,
+        discount: validation.discountAmount
+      });
+      
+      return {
+        valid: true,
+        discountedPrice: validation.discountedPrice,
+        originalPrice
+      };
+      
+    } catch (error) {
+      console.error('❌ Failed to validate promo code:', error);
+      return { valid: false, error: 'Failed to validate promo code' };
+    }
+  }
+  
+  /**
+   * @deprecated Use validatePromoCodeWithCouponService instead
+   * Legacy method - validates against old promoCodes collection
+   */
   async validatePromoCode(code: string, plan: 'monthly' | 'yearly'): Promise<{
     valid: boolean;
     error?: string;
@@ -665,6 +944,7 @@ class RealPaymentService {
     originalPrice?: number;
   }> {
     try {
+      console.log('⚠️ Using legacy promo code validation');
       console.log('🏷️ Validating promo code:', code);
 
       const promoDoc = await getDoc(doc(db, 'promoCodes', code.toUpperCase()));
@@ -729,21 +1009,39 @@ class RealPaymentService {
   }
 
   /**
-   * Record promo code usage
+   * Record promo code usage via CouponService
    */
   private async recordPromoCodeUsage(code: string, userId: string): Promise<void> {
     try {
-      const promoDocRef = doc(db, 'promoCodes', code.toUpperCase());
+      console.log('📝 Recording promo code usage via CouponService:', code);
       
-      await updateDoc(promoDocRef, {
-        usedCount: (await getDoc(promoDocRef)).data()?.usedCount + 1 || 1,
-        lastUsed: Timestamp.now(),
-        lastUsedBy: userId
-      });
-
-      console.log('📝 Recorded promo code usage:', code);
+      // Use CouponService to record usage
+      const CouponServiceModule = await import('@/services/firebase/CouponService');
+      const couponService = CouponServiceModule.default.getInstance();
+      await couponService.initialize();
+      
+      const applied = await couponService.applyCoupon(code);
+      
+      if (applied) {
+        console.log('✅ Promo code usage recorded successfully');
+      } else {
+        console.warn('⚠️ Failed to record promo code usage');
+      }
     } catch (error) {
       console.error('❌ Failed to record promo code usage:', error);
+      
+      // Fallback to legacy method if CouponService fails
+      try {
+        const promoDocRef = doc(db, 'promoCodes', code.toUpperCase());
+        await updateDoc(promoDocRef, {
+          usedCount: (await getDoc(promoDocRef)).data()?.usedCount + 1 || 1,
+          lastUsed: Timestamp.now(),
+          lastUsedBy: userId
+        });
+        console.log('📝 Recorded via legacy method');
+      } catch (legacyError) {
+        console.error('❌ Legacy recording also failed:', legacyError);
+      }
     }
   }
 

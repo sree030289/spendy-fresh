@@ -499,14 +499,15 @@ export class SecureQRService {
 
   // Handle non-app users (fallback to app store)
   static handleNonAppUser(qrUrl: string): void {
+    // App Store URLs - Update these with your actual published app URLs
     const appStoreUrl = Platform.select({
-      ios: 'https://apps.apple.com/app/spendy/id123456789',
-      android: 'https://play.google.com/store/apps/details?id=com.meetnsplit.app'
+      ios: 'https://apps.apple.com/app/spendy-meet-n-split', // iOS App Store URL
+      android: 'https://play.google.com/store/apps/details?id=com.meetnsplit.app' // Android package ID from app.json
     });
 
     if (appStoreUrl) {
       CrossPlatformAlert.alert(
-        'Download Spendy',
+        'Download Meet-n-Split',
         'You need to install Meet-n-Split app to accept this invitation.',
         [
           { text: 'Cancel', style: 'cancel' },

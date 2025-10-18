@@ -42,7 +42,7 @@ import SubscriptionModal from '@/components/modals/SubscriptionModal';
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshUser } = useAuth();
   const [initializing, setInitializing] = useState(true);
   const [authFlowState, setAuthFlowState] = useState<'checking' | 'splash' | 'login' | 'authenticated'>('checking');
   const [showSplash, setShowSplash] = useState(true);
@@ -308,6 +308,17 @@ const AppNavigator = () => {
       const result = await paymentService.purchaseSubscription(plan, promoCode);
 
       if (result.success) {
+        console.log('🔄 Purchase successful! Refreshing user session...');
+        
+        // ✅ CRITICAL: Refresh user profile from API to propagate subscription status
+        try {
+          await refreshUser();
+          console.log('✅ User session refreshed - subscription active globally');
+        } catch (refreshError) {
+          console.error('⚠️ Failed to refresh user session:', refreshError);
+          // Don't fail the purchase if refresh fails
+        }
+        
         // Close the modal - success screen will be shown in subscription modal
         setSubscriptionModal(prev => ({ ...prev, visible: false, canClose: true }));
         return { success: true };

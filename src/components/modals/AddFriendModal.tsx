@@ -283,7 +283,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
         const smsInviteService = SMSInviteService.getInstance();
         const result = await smsInviteService.sendSMSInvite({
           phoneNumber,
-          message: `Hi ${contactName}! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
+          message: `Hi ${contactName}! ${user?.fullName || 'Your friend'} invited you to join MeetnSplit to split expenses together.`,
           countryCode: selectedCountry.code as any,
           senderName: user?.fullName || 'Your friend',
           contactName: contactName // Pass contact name for display in pending list
@@ -324,7 +324,7 @@ export default function AddFriendModal({ visible, onClose, onSubmit, onOpenQRSca
             name: contact.name
           })),
           {
-            message: `Hi! ${user?.fullName || 'Your friend'} invited you to join Spendy to split expenses together.`,
+            message: `Hi! ${user?.fullName || 'Your friend'} invited you to join Meet n Split to split expenses together.`,
             countryCode: selectedCountry.code as any,
             senderName: user?.fullName || 'Your friend'
           }

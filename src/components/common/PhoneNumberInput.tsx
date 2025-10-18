@@ -91,7 +91,38 @@ export default function PhoneNumberInput({
   const handleTextChange = (text: string) => {
     // Remove formatting characters for storage
     const cleanText = text.replace(/[\s\-\(\)]/g, '');
-    onChangeText(cleanText);
+    
+    // Enforce maximum length based on country
+    // Most countries use 10 digits, but allow up to 15 for international compatibility
+    const maxLength = getMaxLengthForCountry(selectedCountry.code);
+    if (cleanText.length <= maxLength) {
+      onChangeText(cleanText);
+    }
+  };
+
+  // Get maximum phone number length for a country
+  const getMaxLengthForCountry = (countryCode: string): number => {
+    // Common phone number lengths by country
+    const lengthMap: { [key: string]: number } = {
+      'US': 10,  // United States
+      'CA': 10,  // Canada
+      'IN': 10,  // India
+      'AU': 10,  // Australia
+      'GB': 10,  // United Kingdom
+      'NZ': 10,  // New Zealand
+      'SG': 8,   // Singapore
+      'CN': 11,  // China
+      'JP': 10,  // Japan
+      'BR': 11,  // Brazil
+      'MX': 10,  // Mexico
+      'FR': 9,   // France
+      'DE': 11,  // Germany
+      'IT': 10,  // Italy
+      'ES': 9,   // Spain
+    };
+    
+    // Return country-specific length or default to 15 (E.164 maximum)
+    return lengthMap[countryCode] || 15;
   };
 
   const getInputBorderColor = () => {

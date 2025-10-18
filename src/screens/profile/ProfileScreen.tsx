@@ -37,7 +37,7 @@ import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const { theme, isDark, toggleTheme } = useTheme();
-  const { user, logout, updateUser, uploadProfilePicture } = useAuth();
+  const { user, logout, updateUser, refreshUser, uploadProfilePicture } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -1025,19 +1025,27 @@ export default function ProfileScreen() {
       console.log('📊 Purchase result:', result);
 
       if (result.success) {
-        // ✅ IMMEDIATE UPDATE: Update local state immediately
-        setUser(prev => prev ? {
-          ...prev,
-          isPremium: true,
-          subscriptionStatus: 'premium'
-        } : prev);
-
-        // Update global user state via auth context
-        if (updateUser) {
-          await updateUser({
-            isPremium: true,
-            subscriptionStatus: 'premium'
-          });
+        console.log('🔄 Purchase successful! Refreshing user profile...');
+        
+        // ✅ CRITICAL: Refresh user profile from API to get updated isPremium from Firebase
+        // This ensures the subscription status is propagated throughout the entire app
+        try {
+          await refreshUser();
+          console.log('✅ User profile refreshed - subscription active globally');
+        } catch (refreshError) {
+          console.error('⚠️ Failed to refresh user profile:', refreshError);
+          // Don't fail the purchase flow if refresh fails
+          // Fallback: Try manual update
+          if (updateUser) {
+            try {
+              await updateUser({
+                isPremium: true,
+                subscriptionStatus: 'premium'
+              });
+            } catch (updateError) {
+              console.error('⚠️ Manual update also failed:', updateError);
+            }
+          }
         }
 
         // Reload subscription data to show correct info

@@ -1586,7 +1586,7 @@ meetnsplitApp.post('/friends/requests/send-sms', authenticateJWT, async (req, re
           requestId: friendRequestRef.id,
           isRegistered: false,
           recipientPhone: normalizedPhone,
-          smsMessage: `👋 ${senderData.fullName} invited you to join Spendy! Download the app and they'll be added as your friend automatically: https://spendy.app/download?invite=${friendRequestRef.id}`
+          smsMessage: `👋 ${senderData.fullName} invited you to join Meet-n-Split! Download the app and they'll be added as your friend automatically: https://meetnsplit.com invite=${friendRequestRef.id}`
         }
       });
     }
@@ -1690,7 +1690,7 @@ meetnsplitApp.post('/friends/requests/send-sms', authenticateJWT, async (req, re
         isRegistered: true,
         recipientPhone: normalizedPhone,
         recipientName: targetUserData.fullName,
-        smsMessage: `🎉 ${senderData.fullName} sent you a friend request on Spendy! Open the app to accept it.`
+        smsMessage: `🎉 ${senderData.fullName} sent you a friend request on MeetnSplit! Open the app to accept it.`
       }
     });
 
@@ -6024,7 +6024,7 @@ meetnsplitApp.post('/notifications/send', authenticateJWT, async (req, res) => {
 meetnsplitApp.get('/health', (req, res) => {
   res.json({
     success: true,
-    message: 'Spendy API is running on Firebase Functions',
+    message: 'meetnsplit API is running on Firebase Functions',
     timestamp: new Date().toISOString(),
     environment: 'production',
     version: '1.0.0',
@@ -7486,11 +7486,11 @@ meetnsplitApp.get('/gmail/callback', async (req, res) => {
     console.log(`✅ Gmail connected successfully for user: ${userId}, email: ${userInfo.email}`);
     
     // Redirect to app with success and real email
-    res.redirect(`com.spendy.app://oauth?success=true&email=${encodeURIComponent(userInfo.email)}`);
+    res.redirect(`com.meetnsplit.app.dev://oauth?success=true&email=${encodeURIComponent(userInfo.email)}`);
     
   } catch (error) {
     console.error('Gmail OAuth callback error:', error);
-    res.redirect(`com.spendy.app://oauth?error=${encodeURIComponent(error.message)}`);
+    res.redirect(`com.om.meetnsplit.app.dev://oauth?error=${encodeURIComponent(error.message)}`);
   }
 });
 
@@ -7703,7 +7703,7 @@ meetnsplitApp.post('/invites/unified/check-registration', async (req, res) => {
                 ? '🎉 SMS Invite Accepted!' 
                 : '🎉 Friend Request Accepted!';
               const notificationBody = inviteType === 'sms_invite'
-                ? `${newUserData.fullName} joined Spendy from your SMS invite and you're now friends!`
+                ? `${newUserData.fullName} joined MeetnSplit from your SMS invite and you're now friends!`
                 : `${newUserData.fullName} joined Meet-n-Split and you're now friends!`;
 
               const notification = {
@@ -7874,7 +7874,7 @@ meetnsplitApp.post('/friends/check-registration', async (req, res) => {
                 ? '🎉 SMS Invite Accepted!' 
                 : '🎉 Friend Request Accepted!';
               const notificationBody = inviteType === 'sms_invite'
-                ? `${newUserData.fullName} joined Spendy from your SMS invite and you're now friends!`
+                ? `${newUserData.fullName} joined MeetnSplit from your SMS invite and you're now friends!`
                 : `${newUserData.fullName} joined Meet-n-Split and you're now friends!`;
 
               const notification = {
@@ -8233,7 +8233,7 @@ meetnsplitApp.post('/friends/requests/:requestId/accept', authenticateJWT, async
       userId: requestData.fromUserId,
       type: 'friend_accepted',
       title: '🎉 Friend Request Accepted',
-      message: `${accepterData.fullName} accepted your friend request! You're now friends on Spendy.`,
+      message: `${accepterData.fullName} accepted your friend request! You're now friends on MeetnSplit.`,
       data: {
         friendId: userId,
         friendName: accepterData.fullName,
@@ -8499,8 +8499,8 @@ meetnsplitApp.delete('/friends/:friendId', authenticateJWT, async (req, res) => 
     const action = isBlocked ? 'blocked' : 'removed';
     const title = isBlocked ? '🚫 You were blocked' : '💔 Friendship ended';
     const message = isBlocked 
-      ? `${removerData.fullName} has blocked you on Spendy.`
-      : `${removerData.fullName} is no longer your friend on Spendy.`;
+      ? `${removerData.fullName} has blocked you on MeetnSplit.`
+      : `${removerData.fullName} is no longer your friend on MeetnSplit.`;
 
     // Send notification to removed friend
     await db.collection('appNotifications').add({

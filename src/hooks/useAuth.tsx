@@ -19,6 +19,7 @@ interface AuthContextType {
   }) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  refreshUser: () => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   uploadProfilePicture: (imageUri: string) => Promise<string>;
@@ -344,6 +345,54 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const refreshUser = async () => {
+    if (!user) throw new Error('No user logged in');
+    
+    try {
+      console.log('🔄 Refreshing user profile from API...');
+      
+      // Clear subscription cache to ensure fresh data
+      const SubscriptionService = (await import('@/services/SubscriptionService')).SubscriptionService;
+      const subscriptionService = SubscriptionService.getInstance();
+      subscriptionService.clearSubscriptionCache(user.id);
+      console.log('🗑️ Subscription cache cleared');
+      
+      // Get fresh profile data from API
+      const profileData = await apiService.getProfile();
+      
+      // Get current biometric preference
+      const storedBiometric = await AsyncStorage.getItem('@spendy_biometric_enabled');
+      const biometricFromStorage = storedBiometric ? JSON.parse(storedBiometric) : false;
+      const finalBiometricSetting = biometricFromStorage || user.biometricEnabled;
+      
+      // Create updated user object with fresh API data
+      const refreshedUser: User = {
+        ...user,
+        id: profileData.id,
+        email: profileData.email,
+        fullName: profileData.fullName,
+        currency: profileData.currency,
+        profilePicture: profileData.profileImage || (profileData as any).profilePicture || user.profilePicture,
+        profileImage: profileData.profileImage || (profileData as any).profilePicture || user.profileImage,
+        isPremium: profileData.isPremium, // ✅ This gets the updated value from Firebase
+        biometricEnabled: finalBiometricSetting,
+        mobile: (profileData as any).mobile || (profileData as any).phoneNumber || user.mobile,
+        phoneNumber: (profileData as any).phoneNumber || (profileData as any).mobile || user.phoneNumber,
+        subscriptionStatus: profileData.isPremium ? 'premium' : 'expired',
+        updatedAt: new Date(),
+      };
+      
+      // Update AsyncStorage and state
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(refreshedUser));
+      setUser(refreshedUser);
+      
+      console.log('✅ User profile refreshed successfully. isPremium:', refreshedUser.isPremium);
+    } catch (error) {
+      console.error('❌ Refresh user error:', error);
+      throw error;
+    }
+  };
+
   const updateUser = async (updates: Partial<User>) => {
     if (!user) throw new Error('No user logged in');
     
@@ -595,6 +644,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     register,
     logout,
     updateUser,
+    refreshUser,
     updatePassword,
     resetPassword,
     uploadProfilePicture,

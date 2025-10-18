@@ -486,7 +486,7 @@ Download Spendy to search thousands of deals from Australian retailers!`;
       'og:image': deal.imageUrl || 'https://app.spendy.com.au/assets/default-deal-image.jpg',
       'og:url': this.generateUniversalLink(LinkType.DEAL, deal.id),
       'og:type': 'product',
-      'og:site_name': 'Spendy',
+      'og:site_name': 'MeetnSplit',
       'twitter:card': 'summary_large_image',
       'twitter:title': `${deal.title} - ${deal.discount}% OFF`,
       'twitter:description': deal.description || `Amazing deal from ${deal.businessName || 'Spendy'}`,
