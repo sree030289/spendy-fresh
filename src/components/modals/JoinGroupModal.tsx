@@ -24,7 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface JoinGroupModalProps {
   visible: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (groupId?: string) => void;
   userId: string;
 }
 
@@ -78,7 +78,8 @@ export default function JoinGroupModal({
             text: 'OK',
             onPress: () => {
               setInviteCode('');
-              onSuccess();
+              // Pass the groupId to onSuccess so parent can open GroupDetails
+              onSuccess(groupId);
               onClose();
             }
           }

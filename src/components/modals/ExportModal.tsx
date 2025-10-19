@@ -57,7 +57,8 @@ export default function ExportModal({
         onClose();
         
         if ((global as any).showSubscriptionModal) {
-          (global as any).showSubscriptionModal('premium_feature', 'Group Export', false);
+          // Show subscription modal with canClose = true to allow users to go back
+          (global as any).showSubscriptionModal('premium_feature', 'Group Export', true);
         } else {
           Alert.alert(
             'Premium Feature',

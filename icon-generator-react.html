@@ -50,7 +50,8 @@
           };
 
           const IconComponent = ({ size, isIOS = false, isAdaptive = false, className = '' }) => {
-            const baseFontSize = Math.max(size / 8, 8);
+            // INCREASED from size / 8 to size / 6 for bigger text (33% larger)
+            const baseFontSize = Math.max(size / 6, 10);
             const nFontSize = baseFontSize * 0.8;
             const lineWidth = baseFontSize * 0.6;
             const lineOffset = baseFontSize * 0.8;
@@ -176,7 +177,8 @@
             const isIOS = type === 'ios';
             const isAdaptive = type === 'android-adaptive';
             
-            const baseFontSize = Math.max(spec.size / 8, 8);
+            // INCREASED from spec.size / 8 to spec.size / 6 for bigger text (33% larger)
+            const baseFontSize = Math.max(spec.size / 6, 10);
             const nFontSize = baseFontSize * 0.8;
             const lineWidth = baseFontSize * 0.6;
             const lineOffset = baseFontSize * 0.8;

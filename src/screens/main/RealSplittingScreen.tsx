@@ -4435,9 +4435,18 @@ export default function RealSplittingScreen() {
       <JoinGroupModal
         visible={showJoinGroup}
         onClose={() => setShowJoinGroup(false)}
-        onSuccess={() => {
+        onSuccess={(groupId?: string) => {
           // Refresh data after successfully joining a group
           onRefresh();
+          
+          // If groupId is provided, open the GroupDetails modal for the newly joined group
+          if (groupId) {
+            const joinedGroup = groups.find(g => g.id === groupId);
+            if (joinedGroup) {
+              setSelectedGroup(joinedGroup);
+              setGroupDetailsVisible(true);
+            }
+          }
         }}
         userId={user?.id || ''}
       />

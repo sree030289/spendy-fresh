@@ -557,11 +557,11 @@ export default function ProfileScreen() {
   const uploadProfilePictureToFirebase = async (imageUri: string, userId: string): Promise<string> => {
     try {
       console.log('☁️ Starting Firebase Storage upload for profile picture...');
-      
+
       // Get Firebase Storage instance
       const { getFirebaseStorage } = await import('@/services/firebase/config');
       const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-      
+
       const storage = await getFirebaseStorage();
       console.log('✅ Firebase Storage instance obtained');
       
@@ -571,16 +571,16 @@ export default function ProfileScreen() {
       if (!response.ok) {
         throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
       }
-      
+
       const blob = await response.blob();
       console.log('✅ Image converted to blob:', { size: blob.size, type: blob.type });
-      
+
       // Create storage reference with timestamp for uniqueness
       const timestamp = Date.now();
       const filename = `profiles/${userId}/${timestamp}.jpg`;
       const storageRef = ref(storage, filename);
       console.log('📁 Storage reference created:', filename);
-      
+
       // Upload the blob
       console.log('📤 Uploading to Firebase Storage...');
       const uploadResult = await uploadBytes(storageRef, blob, {
@@ -591,12 +591,12 @@ export default function ProfileScreen() {
         }
       });
       console.log('✅ Upload completed:', uploadResult.metadata.name);
-      
+
       // Get download URL
       console.log('🔗 Getting download URL...');
       const downloadURL = await getDownloadURL(storageRef);
       console.log('✅ Download URL obtained:', downloadURL.substring(0, 50) + '...');
-      
+
       return downloadURL;
     } catch (error: any) {
       console.error('❌ Firebase Storage upload failed:', error);
@@ -928,7 +928,26 @@ export default function ProfileScreen() {
   };
 
   const handleCurrencyUpdate = async (newCurrency: string) => {
-    await updateUser({ currency: newCurrency });
+    try {
+      await updateUser({ currency: newCurrency });
+      setShowCurrencyModal(false);
+      
+      // Force refresh user to ensure state propagates
+      await refreshUser();
+      
+      Alert.alert(
+        '✓ Currency Updated',
+        `Your currency has been changed to ${newCurrency}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('❌ Currency update failed:', error);
+      Alert.alert(
+        'Update Failed',
+        'Could not update currency. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   // const handleBiometricToggle = async () => {

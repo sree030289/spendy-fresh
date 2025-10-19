@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App Icon Generator - Let'Split</title>
+    <title>App Icon Generator - Meet n Split</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -12,10 +12,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
+            max-width: 1200psreeus: 12px;
             padding: 40px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
@@ -82,7 +79,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎨 Let'Split App Icon Generator</h1>
+        <h1>🎨 Meet n Split App Icon Generator</h1>
         
         <div class="icon-preview">
             <div class="icon-item">
@@ -146,7 +143,7 @@
                 <li><strong>Update app.json</strong> to reference the new icon paths</li>
             </ol>
             
-            <p><strong>💡 Tip:</strong> The icon features "Let'Split" in bold white text on your app's maroon red gradient background, perfectly matching your brand theme!</p>
+            <p><strong>💡 Tip:</strong> The icon features "Meet n Split" in bold white text on your app's maroon red gradient background, perfectly matching your brand theme!</p>
         </div>
     </div>
 
@@ -188,14 +185,13 @@
             roundRect(ctx, 0, 0, actualSize, actualSize, cornerRadius);
             ctx.fill();
             
-            // Draw text
-            ctx.fillStyle = 'white';
+            // Draw text - INCREASED font size for better visibility
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // Responsive font size
-            let fontSize = actualSize * 0.117; // Responsive to icon size
-            ctx.font = `900 ${fontSize}px -apple-system, BlinkMacSystemFont, SF Pro Display, Helvetica Neue, Arial, sans-serif`;
+            // Responsive font size - INCREASED for bigger, more visible text
+            let fontSize = actualSize * 0.16; // Main text size
+            let nFontSize = actualSize * 0.18; // Bigger "n" in middle
             
             // Add text shadow
             ctx.shadowColor = 'rgba(0,0,0,0.4)';
@@ -203,30 +199,83 @@
             ctx.shadowOffsetX = actualSize * 0.003;
             ctx.shadowOffsetY = actualSize * 0.006;
             
-            // Draw main text
-            ctx.fillText("Let'Split", actualSize / 2, actualSize / 2);
+            // Draw "Meet" on top
+            ctx.fillStyle = 'white';
+            ctx.font = `900 ${fontSize}px -apple-system, BlinkMacSystemFont, SF Pro Display, Helvetica Neue, Arial, sans-serif`;
+            ctx.fillText("Meet", actualSize / 2, actualSize * 0.32);
             
-            // Add decorative dots
-            ctx.shadowColor = 'transparent';
-            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            // Draw orange decorative lines beside "n" - DARKER & BOLDER
+            const lineY = actualSize / 2;
+            const lineLength = actualSize * 0.12;
+            const lineThickness = actualSize * 0.020; // Increased thickness
+            const nWidth = actualSize * 0.08;
             
-            // Top and bottom dots
+            ctx.fillStyle = '#FF5722'; // Darker orange color
+            ctx.shadowColor = 'rgba(0,0,0,0.3)'; // Add shadow to lines
+            ctx.shadowBlur = actualSize * 0.003;
+            
+            // Left line
+            ctx.fillRect(
+              actualSize / 2 - nWidth - lineLength - actualSize * 0.02,
+              lineY - lineThickness / 2,
+              lineLength,
+              lineThickness
+            );
+            
+            // Right line
+            ctx.fillRect(
+              actualSize / 2 + nWidth + actualSize * 0.02,
+              lineY - lineThickness / 2,
+              lineLength,
+              lineThickness
+            );
+            
+            // Draw "n" in the middle (bigger and bolder)
+            ctx.shadowColor = 'rgba(0,0,0,0.5)'; // Darker shadow for n
+            ctx.shadowBlur = actualSize * 0.006;
+            ctx.fillStyle = 'white';
+            ctx.font = `900 ${nFontSize}px -apple-system, BlinkMacSystemFont, SF Pro Display, Helvetica Neue, Arial, sans-serif`;
+            ctx.fillText("n", actualSize / 2, actualSize / 2);
+            
+            // Draw "Split" on bottom with orange dot on "i"
+            ctx.font = `900 ${fontSize}px -apple-system, BlinkMacSystemFont, SF Pro Display, Helvetica Neue, Arial, sans-serif`;
+            ctx.shadowColor = 'rgba(0,0,0,0.4)';
+            ctx.shadowBlur = actualSize * 0.004;
+            
+            const splitY = actualSize * 0.68;
+            
+            // First, draw "Spl" and "t" parts only (skip "i")
+            ctx.fillStyle = 'white';
+            const fullText = "Split";
+            const textMetrics = ctx.measureText(fullText);
+            const fullWidth = textMetrics.width;
+            
+            // Measure individual parts
+            const splWidth = ctx.measureText("Spl").width;
+            const iWidth = ctx.measureText("i").width;
+            
+            // Draw "Spl"
+            const startX = actualSize / 2 - fullWidth / 2;
+            ctx.fillText("Spl", startX + splWidth / 2, splitY);
+            
+            // Draw "t"
+            const tX = startX + splWidth + iWidth;
+            const tWidth = ctx.measureText("t").width;
+            ctx.fillText("t", tX + tWidth / 2, splitY);
+            
+            // Draw "i" stem without dot (using pipe character which has no dot)
+            const iX = startX + splWidth + iWidth / 2;
+            ctx.fillText("ı", iX, splitY); // Dotless i
+            
+            // Calculate exact position of "i" dot
+            const iCenterX = iX;
+            
+            // Draw ONLY orange dot on "i" - DARKER & BIGGER
+            ctx.shadowColor = 'rgba(0,0,0,0.3)';
+            ctx.shadowBlur = actualSize * 0.002;
+            ctx.fillStyle = '#FF5722'; // Darker orange color (same as lines)
             ctx.beginPath();
-            ctx.arc(actualSize / 2, actualSize * 0.27, actualSize * 0.004, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            ctx.beginPath();
-            ctx.arc(actualSize / 2, actualSize * 0.73, actualSize * 0.004, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            // Side dots
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.beginPath();
-            ctx.arc(actualSize * 0.215, actualSize / 2, actualSize * 0.003, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            ctx.beginPath();
-            ctx.arc(actualSize * 0.785, actualSize / 2, actualSize * 0.003, 0, 2 * Math.PI);
+            ctx.arc(iCenterX, splitY - fontSize * 0.52, fontSize * 0.11, 0, 2 * Math.PI); // Bigger dot
             ctx.fill();
         }
         

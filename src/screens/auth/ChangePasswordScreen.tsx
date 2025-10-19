@@ -217,7 +217,15 @@ export default function ChangePasswordScreen() {
         [
           {
             text: 'OK',
-            onPress: () => navigation.goBack()
+            onPress: () => {
+              // If coming from forgot password flow, navigate to Login screen
+              // Otherwise, go back (for logged-in users changing password)
+              if (emailFromParams) {
+                navigation.navigate('Login' as never);
+              } else {
+                navigation.goBack();
+              }
+            }
           }
         ]
       );
