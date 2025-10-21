@@ -439,6 +439,33 @@ class ApiService {
     await this.clearAuthToken();
   }
 
+  async deleteAccount(): Promise<{ success: boolean; message: string; pendingBalances?: any[] }> {
+    try {
+      const response = await this.makeRequest<{ pendingBalances?: any[] }>('/auth/account', {
+        method: 'DELETE'
+      });
+      
+      if (response.success) {
+        // Clear auth token after successful deletion
+        await this.clearAuthToken();
+        return { success: true, message: response.message };
+      } else {
+        // Handle pending balances error
+        if (response.error === 'PENDING_BALANCES' && response.data?.pendingBalances) {
+          return {
+            success: false,
+            message: response.message,
+            pendingBalances: response.data.pendingBalances
+          };
+        }
+        throw new Error(response.message || 'Failed to delete account');
+      }
+    } catch (error: any) {
+      console.error('Delete account error:', error);
+      throw error;
+    }
+  }
+
   async healthCheck(): Promise<boolean> {
     try {
       const response = await this.makeRequest('/health');

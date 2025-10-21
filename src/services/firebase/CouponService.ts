@@ -1,5 +1,5 @@
 // src/services/firebase/CouponService.ts
-import { getFirestore, doc, getDoc, updateDoc, increment, collection, query, where, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, updateDoc, setDoc, increment, collection, query, where, getDocs } from 'firebase/firestore';
 
 export interface CouponCode {
   code: string;
@@ -101,7 +101,17 @@ class CouponService {
 
       const couponDoc = doc(this.db, 'appConfig', 'couponCodes');
       
-      // Increment usage count
+      // Check if document exists first
+      const docSnapshot = await getDoc(couponDoc);
+      
+      if (!docSnapshot.exists()) {
+        console.warn('⚠️ Coupon document does not exist. Skipping usage count increment.');
+        // For store promo codes like LAUNCH50, we don't need to track usage in Firebase
+        // The actual validation and discount happens via App Store
+        return true;
+      }
+
+      // Increment usage count only if document exists
       const updatePath = `${couponCode}.usageCount`;
       await updateDoc(couponDoc, {
         [updatePath]: increment(1)
@@ -112,7 +122,9 @@ class CouponService {
 
     } catch (error) {
       console.error('❌ Error applying coupon:', error);
-      return false;
+      // Don't fail the entire flow if usage tracking fails
+      console.warn('⚠️ Continuing despite usage tracking error');
+      return true;
     }
   }
 

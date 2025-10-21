@@ -336,7 +336,8 @@ const COLLECTIONS = {
   FRIENDS: 'friendships',
   FRIEND_REQUESTS: 'FriendRequests',
   SETTLEMENTS: 'settlements',
-  NOTIFICATIONS: 'notifications'
+  NOTIFICATIONS: 'notifications',
+  ACTIVITIES: 'activities'
 };
 
 // ===== AUTHENTICATION ROUTES =====
@@ -602,6 +603,231 @@ meetnsplitApp.put('/auth/profile', authenticateJWT, async (req, res) => {
       success: false,
       message: 'Failed to update profile',
       error: 'PROFILE_UPDATE_ERROR'
+    });
+  }
+});
+
+// Delete Account
+meetnsplitApp.delete('/auth/account', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log(`🗑️ Account deletion requested for user: ${userId}`);
+
+    // Step 1: Check for pending balances across all groups
+    const groupsSnapshot = await db.collection(COLLECTIONS.GROUPS)
+      .where('memberIds', 'array-contains', userId)
+      .where('isActive', '==', true)
+      .get();
+
+    const pendingBalances = [];
+    
+    for (const groupDoc of groupsSnapshot.docs) {
+      const groupData = groupDoc.data();
+      const groupId = groupDoc.id;
+      
+      // Get all expenses for this group
+      const expensesSnapshot = await db.collection(COLLECTIONS.EXPENSES)
+        .where('groupId', '==', groupId)
+        .where('isActive', '==', true)
+        .get();
+
+      // Calculate balances for this group
+      const balanceMap = {};
+      
+      expensesSnapshot.docs.forEach(expenseDoc => {
+        const expense = expenseDoc.data();
+        const paidBy = expense.paidBy;
+        const splits = expense.splits || [];
+
+        // Initialize balances
+        if (!balanceMap[paidBy]) balanceMap[paidBy] = 0;
+        
+        splits.forEach(split => {
+          const splitUserId = split.userId;
+          if (!balanceMap[splitUserId]) balanceMap[splitUserId] = 0;
+          
+          if (splitUserId !== paidBy) {
+            balanceMap[paidBy] += split.amount;
+            balanceMap[splitUserId] -= split.amount;
+          }
+        });
+      });
+
+      // Check if user has non-zero balance
+      if (balanceMap[userId] && Math.abs(balanceMap[userId]) > 0.01) {
+        pendingBalances.push({
+          groupId: groupId,
+          groupName: groupData.name,
+          balance: balanceMap[userId],
+          owes: balanceMap[userId] < 0,
+          amount: Math.abs(balanceMap[userId])
+        });
+      }
+    }
+
+    // If there are pending balances, prevent deletion
+    if (pendingBalances.length > 0) {
+      console.log(`❌ Cannot delete account - user has pending balances in ${pendingBalances.length} group(s)`);
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete account with pending settlements',
+        error: 'PENDING_BALANCES',
+        data: {
+          pendingBalances: pendingBalances
+        }
+      });
+    }
+
+    // Step 2: Get user data for cleanup
+    const userDoc = await db.collection(COLLECTIONS.USERS).doc(userId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    const userData = userDoc.data();
+    console.log(`🔍 Starting account deletion for: ${userData.email}`);
+
+    // Step 3: Delete or cleanup user data across collections
+    const batch = db.batch();
+    let deletedCount = 0;
+
+    // 3a. Remove user from all groups
+    for (const groupDoc of groupsSnapshot.docs) {
+      const groupData = groupDoc.data();
+      const memberIds = (groupData.memberIds || []).filter(id => id !== userId);
+      const members = (groupData.members || []).filter(m => m.userId !== userId && m.id !== userId);
+      
+      if (memberIds.length === 0) {
+        // If user was the last member, mark group as inactive
+        batch.update(groupDoc.ref, {
+          isActive: false,
+          deletedAt: new Date(),
+          deletedBy: userId,
+          updatedAt: new Date()
+        });
+      } else {
+        // Remove user from group
+        batch.update(groupDoc.ref, {
+          memberIds: memberIds,
+          members: members,
+          updatedAt: new Date()
+        });
+      }
+      deletedCount++;
+    }
+
+    // 3b. Delete friend relationships
+    const friendshipsSnapshot = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user1Id', '==', userId)
+      .get();
+    
+    friendshipsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
+
+    const friendshipsSnapshot2 = await db.collection(COLLECTIONS.FRIENDS)
+      .where('user2Id', '==', userId)
+      .get();
+    
+    friendshipsSnapshot2.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
+
+    // 3c. Delete friend requests
+    const requestsSnapshot = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('fromUserId', '==', userId)
+      .get();
+    
+    requestsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
+
+    const requestsSnapshot2 = await db.collection(COLLECTIONS.FRIEND_REQUESTS)
+      .where('toUserId', '==', userId)
+      .get();
+    
+    requestsSnapshot2.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
+
+    // 3d. Delete activities
+    const activitiesSnapshot = await db.collection(COLLECTIONS.ACTIVITIES)
+      .where('userId', '==', userId)
+      .get();
+    
+    activitiesSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
+
+    // 3e. Delete bank accounts
+    const bankAccountsSnapshot = await db.collection('bankAccounts')
+      .where('userId', '==', userId)
+      .get();
+    
+    bankAccountsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
+
+    // 3f. Delete subscriptions
+    const subscriptionDoc = await db.collection('subscriptions').doc(userId).get();
+    if (subscriptionDoc.exists) {
+      batch.delete(subscriptionDoc.ref);
+      deletedCount++;
+    }
+
+    // 3g. Delete notifications
+    const notificationsSnapshot = await db.collection('appNotifications')
+      .where('userId', '==', userId)
+      .get();
+    
+    notificationsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
+
+    // Step 4: Mark user account as deleted (soft delete for audit trail)
+    batch.update(db.collection(COLLECTIONS.USERS).doc(userId), {
+      isDeleted: true,
+      deletedAt: new Date(),
+      email: `deleted_${userId}@deleted.meetnsplit.com`,
+      mobile: '',
+      phoneNumber: '',
+      normalizedMobile: '',
+      password: '', // Clear password
+      updatedAt: new Date()
+    });
+
+    // Commit all changes
+    await batch.commit();
+
+    console.log(`✅ Account deleted successfully for user: ${userId}`);
+    console.log(`📊 Deleted/Updated ${deletedCount} related records`);
+
+    res.json({
+      success: true,
+      message: 'Account deleted successfully',
+      data: {
+        deletedRecords: deletedCount
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Delete account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete account',
+      error: 'DELETE_ACCOUNT_ERROR',
+      details: error.message
     });
   }
 });

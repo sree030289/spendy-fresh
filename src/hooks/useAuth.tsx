@@ -18,6 +18,7 @@ interface AuthContextType {
     biometricEnabled: boolean;
   }) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<{ success: boolean; message: string; pendingBalances?: any[] }>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -345,6 +346,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const deleteAccount = async (): Promise<{ success: boolean; message: string; pendingBalances?: any[] }> => {
+    if (!user) throw new Error('No user logged in');
+    
+    try {
+      setIsLoading(true);
+      console.log('Attempting account deletion...');
+      
+      const result = await apiService.deleteAccount();
+      
+      if (result.success) {
+        // Clear all user data on successful deletion
+        await clearAuthData();
+        await AsyncStorage.removeItem('@spendy_last_email');
+        await AsyncStorage.removeItem('@spendy_biometric_enabled');
+        await AsyncStorage.removeItem('@spendy_session_timestamp');
+        
+        if (user?.id) {
+          await AsyncStorage.removeItem(`@spendy_biometric_enabled_${user.id}`);
+        }
+        
+        setUser(null);
+        console.log('✅ Account deleted successfully');
+      }
+      
+      setIsLoading(false);
+      return result;
+    } catch (error: any) {
+      console.error('Delete account error:', error);
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
   const refreshUser = async () => {
     if (!user) throw new Error('No user logged in');
     
@@ -643,6 +677,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     login,
     register,
     logout,
+    deleteAccount,
     updateUser,
     refreshUser,
     updatePassword,

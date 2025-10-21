@@ -37,7 +37,7 @@ import { PhoneNumberService } from '@/services/invite/PhoneNumberService';
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const { theme, isDark, toggleTheme } = useTheme();
-  const { user, logout, updateUser, refreshUser, uploadProfilePicture } = useAuth();
+  const { user, logout, deleteAccount, updateUser, refreshUser, uploadProfilePicture } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -923,6 +923,66 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      '⚠️ Delete Account',
+      'Are you sure you want to permanently delete your account? This action cannot be undone.\n\nWe will check for any pending settlements before deletion.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const result = await deleteAccount();
+              
+              if (!result.success && result.pendingBalances) {
+                // Show pending balances alert
+                const balancesList = result.pendingBalances
+                  .map(b => {
+                    const owesOrOwed = b.owes ? 'You owe' : 'You are owed';
+                    return `• ${b.groupName}: ${owesOrOwed} $${b.amount.toFixed(2)}`;
+                  })
+                  .join('\n');
+                
+                Alert.alert(
+                  '⚠️ Pending Settlements',
+                  `You have pending balances that must be settled before deleting your account:\n\n${balancesList}\n\nPlease settle all balances and try again.`,
+                  [{ text: 'OK' }]
+                );
+              } else if (result.success) {
+                // Account deleted successfully
+                Alert.alert(
+                  '✓ Account Deleted',
+                  'Your account has been permanently deleted. You will now be logged out.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Navigate to login screen
+                        navigation.navigate('Login' as never);
+                      }
+                    }
+                  ]
+                );
+              }
+            } catch (error: any) {
+              console.error('Delete account error:', error);
+              Alert.alert(
+                'Error',
+                error.message || 'Failed to delete account. Please try again.',
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleChangePassword = () => {
     navigation.navigate('ChangePassword' as never);
   };
@@ -1478,6 +1538,13 @@ export default function ProfileScreen() {
             icon="lock-closed-outline"
             title="Change Password"
             onPress={handleChangePassword}
+          />
+          
+          <ProfileItem
+            icon="trash-outline"
+            title="Delete Account"
+            onPress={handleDeleteAccount}
+            valueColor={theme.colors.error}
           />
           
           {/* <ProfileItem
