@@ -29,6 +29,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
   const scannerManager = QRScannerManager.getInstance();
   const isProcessingRef = useRef(false);
   const lastScanTimeRef = useRef<number>(0);
+  const isClosingRef = useRef(false);  // Track if close is in progress
 
   useEffect(() => {
     (async () => {
@@ -48,6 +49,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
       setProcessing(false);
       isProcessingRef.current = false;
       lastScanTimeRef.current = 0;
+      isClosingRef.current = false;  // Reset closing flag
     }
   }, [visible]);
 
@@ -140,7 +142,14 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
 
   if (hasPermission === null) {
     return (
-      <Modal visible={visible} animationType="slide">
+      <Modal 
+        visible={visible} 
+        animationType="slide"
+        onRequestClose={() => {
+          console.log('🔴 Modal onRequestClose triggered - closing scanner');
+          onClose();
+        }}
+      >
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <View style={styles.centerContent}>
             <Text style={[styles.message, { color: theme.colors.text }]}>
@@ -154,11 +163,43 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
 
   if (hasPermission === false) {
     return (
-      <Modal visible={visible} animationType="slide">
+      <Modal 
+        visible={visible} 
+        animationType="slide"
+        onRequestClose={() => {
+          console.log('🔴 Modal onRequestClose triggered - closing scanner');
+          onClose();
+        }}
+      >
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose}>
-              <Icon name="close" size={24} color={theme.colors.text}  />
+          <View style={[styles.header, { zIndex: 9999, elevation: 10 }]}>
+            <TouchableOpacity 
+              style={styles.headerButton}
+              onPress={(e) => {
+                // Prevent multiple close attempts
+                if (isClosingRef.current) {
+                  console.log('🚫 Close already in progress, ignoring');
+                  return;
+                }
+                
+                // Stop event propagation
+                if (e && e.stopPropagation) {
+                  e.stopPropagation();
+                }
+                
+                console.log('🔴 Close button pressed - closing permission screen');
+                isClosingRef.current = true;
+                onClose();
+                
+                setTimeout(() => {
+                  isClosingRef.current = false;
+                }, 500);
+              }}
+              activeOpacity={0.7}
+              hitSlop={{ top: 40, bottom: 40, left: 40, right: 40 }}
+              pressRetentionOffset={{ top: 40, bottom: 40, left: 40, right: 40 }}
+            >
+              <Icon name="close" size={28} color={theme.colors.text}  />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
               Camera Access
@@ -187,7 +228,20 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
   }
 
   return (
-    <Modal visible={visible} animationType="slide">
+    <Modal 
+      visible={visible} 
+      animationType="slide"
+      presentationStyle="overFullScreen"
+      transparent={false}
+      onRequestClose={() => {
+        console.log('🔴 Modal onRequestClose triggered - closing scanner');
+        // Reset state before closing
+        setScanned(false);
+        setProcessing(false);
+        isProcessingRef.current = false;
+        onClose();
+      }}
+    >
       <SafeAreaView style={styles.container}>
         <CameraView
           style={styles.camera}
@@ -198,23 +252,60 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
           }}
         />
         
-        <View style={styles.overlay}>
-          {/* Header */}
-          <View style={styles.header}>
+        <View style={styles.overlay} pointerEvents="box-none">
+          {/* Header - Changed to 'auto' to capture touch events */}
+          <View style={styles.header} pointerEvents="auto">
             <TouchableOpacity 
               style={[
                 styles.headerButton,
                 processing && { opacity: 0.6 }
               ]} 
-              onPress={(e) => {
-                e.stopPropagation();
-                if (!processing) {
-                  onClose();
-                }
+              onPressIn={() => {
+                console.log('👆 Close button PRESS IN detected');
               }}
-              disabled={processing}
+              onPressOut={() => {
+                console.log('👆 Close button PRESS OUT detected');
+              }}
+              onPress={(e) => {
+                console.log('👆 Close button ON PRESS triggered');
+                
+                // Prevent multiple close attempts
+                if (isClosingRef.current) {
+                  console.log('🚫 Close already in progress, ignoring');
+                  return;
+                }
+                
+                // Stop event propagation to prevent parent modal from intercepting
+                if (e && e.stopPropagation) {
+                  e.stopPropagation();
+                }
+                
+                console.log('🔴 Close button pressed - closing scanner');
+                console.log('🔴 Current state:', { scanned, processing, visible });
+                
+                // Set closing flag
+                isClosingRef.current = true;
+                
+                // Don't wait for processing to finish, just close immediately
+                setScanned(false);
+                setProcessing(false);
+                isProcessingRef.current = false;
+                
+                console.log('🔴 Calling onClose callback...');
+                // Call onClose directly without any delay
+                onClose();
+                console.log('🔴 onClose callback completed');
+                
+                // Reset closing flag after a delay
+                setTimeout(() => {
+                  isClosingRef.current = false;
+                }, 500);
+              }}
+              activeOpacity={0.7}
+              hitSlop={{ top: 40, bottom: 40, left: 40, right: 40 }}
+              pressRetentionOffset={{ top: 40, bottom: 40, left: 40, right: 40 }}
             >
-              <Icon name="close" size={24} color="white"  />
+              <Icon name="close" size={28} color="white"  />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>
               {processing ? 'Processing...' : 'Scan QR Code'}
@@ -223,7 +314,7 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
           </View>
 
           {/* Scanning Area */}
-          <View style={styles.scanningArea}>
+          <View style={styles.scanningArea} pointerEvents="none">
             <View style={[
               styles.scanFrame,
               processing && { borderColor: 'orange' },
@@ -240,15 +331,16 @@ export default function QRCodeScanner({ visible, onQRCodeScanned, onClose }: QRC
           </View>
 
           {/* Bottom Actions */}
-          <View style={styles.bottomActions}>
+          <View style={styles.bottomActions} pointerEvents="box-none">
             {(scanned && !processing) && (
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={(e) => {
-                  e.stopPropagation();
+                onPress={() => {
+                  console.log('🔄 Scan Again pressed');
                   handleManualReset();
                 }}
                 disabled={processing}
+                activeOpacity={0.7}
               >
                 <Icon name="refresh" size={20} color="white"  />
                 <Text style={styles.actionButtonText}>Scan Again</Text>
@@ -298,14 +390,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 20,
+    zIndex: 9999,
+    elevation: 10,
   },
   headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    zIndex: 10000,
   },
   headerTitle: {
     color: 'white',

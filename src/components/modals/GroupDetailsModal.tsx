@@ -289,15 +289,19 @@ export default function GroupDetailsModal({
     // Remove forced re-render to reduce unnecessary refreshing
   }, [localGroupData, currentUser?.id, calculateGroupBalance]);
 
-  // Sync local group data with prop changes
+  // Sync local group data with prop changes only when modal is not visible
+  // This prevents the glitch when opening the modal
   useEffect(() => {
     console.log('📊 GroupDetailsModal: group prop changed:', {
       groupName: group?.name,
       groupId: group?.id,
       hasGroup: !!group,
+      visible,
       groupKeys: group ? Object.keys(group) : []
     });
-    if (group) {
+    
+    // Only update localGroupData if modal is not visible or if it's a different group
+    if (group && (!visible || !localGroupData || localGroupData.id !== group.id)) {
       // Ensure the group has an id field
       if (!group.id) {
         console.error('❌ Group prop is missing id field:', group);
@@ -305,13 +309,18 @@ export default function GroupDetailsModal({
       setLocalGroupData(group);
       console.log('✅ GroupDetailsModal: localGroupData set with id:', group.id);
     }
-  }, [group]);
+  }, [group, visible, localGroupData?.id]);
 
+  // Reset active tab and load fresh data only once when modal becomes visible
   useEffect(() => {
-    if (visible && group) {
+    if (visible && group?.id) {
+      // Reset tab
+      setActiveTab(initialTab);
+      
+      // Load fresh data from server (this will update localGroupData internally)
       loadGroupData();
     }
-  }, [visible, loadGroupData]);
+  }, [visible, group?.id, initialTab]);
 
   useEffect(() => {
     if (!visible || !localGroupData) {
@@ -569,7 +578,7 @@ export default function GroupDetailsModal({
     if (member.balance !== 0) {
       CrossPlatformAlert.alert(
         'Cannot Remove Admin',
-        `${member.userData?.fullName || 'This member'} has pending balances (${member.balance > 0 ? 'owes' : 'is owed'} ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
+        `${member.userData?.fullName || 'This member'} has pending balances (${member.balance > 0 ? 'is owed' : 'owes'} ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(member.balance).toFixed(2)}). Please settle all expenses before removing admin privileges.`,
         [{ text: 'OK' }]
       );
       return;
@@ -630,8 +639,8 @@ export default function GroupDetailsModal({
       console.log('❌ Cannot remove member - has pending balance:', calculatedBalance);
       
       const balanceText = calculatedBalance > 0 
-        ? `You owe ${member.userData?.fullName || 'this member'} ${getCurrencySymbol(currentUser?.currency || 'USD')}${Math.abs(calculatedBalance).toFixed(2)}`
-        : `${member.userData?.fullName || 'This member'} owes ${getCurrencySymbol(currentUser?.currency || 'USD')}${Math.abs(calculatedBalance).toFixed(2)}`;
+        ? `You get ${getCurrencySymbol(currentUser?.currency || 'USD')}${Math.abs(calculatedBalance).toFixed(2)} from ${member.userData?.fullName || 'this member'}`
+        : `You pay ${member.userData?.fullName || 'this member'} ${getCurrencySymbol(currentUser?.currency || 'USD')}${Math.abs(calculatedBalance).toFixed(2)}`;
 
       CrossPlatformAlert.alert(
         'Cannot Remove Member',
@@ -806,6 +815,42 @@ export default function GroupDetailsModal({
     if (!localGroupData) return;
     setEditGroupName(localGroupData.name || '');
     setShowEditGroupModal(true);
+  };
+
+  // ✅ ADDED: Premium check for Group QR Code
+  const handleShowGroupQRCode = async () => {
+    if (!currentUser?.id) return;
+
+    try {
+      // Check if user has premium subscription
+      const isPremium = await subscriptionHelper.checkQRCodeAccess(currentUser.id);
+      
+      if (isPremium) {
+        // User has premium - show QR code
+        setShowQRModal(true);
+      } else {
+        // User doesn't have premium - show upgrade prompt
+        CrossPlatformAlert.alert(
+          '🎁 Premium Feature',
+          'Group QR codes are a premium feature! Upgrade to premium to:\n\n• Share group QR codes\n• Scan to join groups instantly\n• Get unlimited group members\n• Access all premium features',
+          [
+            { text: 'Maybe Later', style: 'cancel' },
+            {
+              text: 'Upgrade to Premium',
+              onPress: () => {
+                // Open subscription modal (you can pass this as a prop or use navigation)
+                console.log('User wants to upgrade to premium');
+                CrossPlatformAlert.alert('Coming Soon', 'Subscription upgrade will be available in the next update');
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error checking premium status:', error);
+      // On error, still allow showing QR (fail gracefully)
+      setShowQRModal(true);
+    }
   };
 
   const handleSaveGroupName = async () => {
@@ -1018,24 +1063,24 @@ export default function GroupDetailsModal({
                   Settled
                 </Text>
               </>
-            ) : calculatedBalance < 0 ? (
-              // Negative balance from calculation: this member owes the current user
+            ) : calculatedBalance > 0 ? (
+              // Positive balance from calculation: this member owes the current user (you GET money)
               <>
                 <Text style={[styles.balanceAmount, styles.balancePositive]}>
                   +{getCurrencySymbol(user?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
                 </Text>
                 <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
-                  Owes you
+                  You get
                 </Text>
               </>
             ) : (
-              // Positive balance from calculation: current user owes this member
+              // Negative balance from calculation: current user owes this member (you PAY money)
               <>
                 <Text style={[styles.balanceAmount, styles.balanceNegative]}>
                   {getCurrencySymbol(user?.currency || 'USD')}{Math.abs(calculatedBalance).toFixed(2)}
                 </Text>
                 <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>
-                  You owe
+                  You pay
                 </Text>
               </>
             )}
@@ -1378,7 +1423,7 @@ export default function GroupDetailsModal({
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]}
-                      onPress={() => setShowQRModal(true)}
+                      onPress={handleShowGroupQRCode}
                     >
                       <Icon name="qrCode" size={16} color="white"  />
                       <Text style={styles.primaryBtnText}>QR Code</Text>
@@ -1836,7 +1881,7 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     position: 'absolute',
-    top: 35, // Lower to avoid battery/status bar
+    top: 60, // ✅ FIXED: Moved down from 35 to avoid blocking by status bar/notch
     left: 20,
     width: 40,
     height: 40,
@@ -1848,7 +1893,7 @@ const styles = StyleSheet.create({
   },
   settleBtn: {
     position: 'absolute',
-    top: 35, // Same as back button
+    top: 60, // ✅ FIXED: Moved down from 35 to match back button and avoid blocking
     right: 20,
     flexDirection: 'row',
     alignItems: 'center',

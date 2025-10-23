@@ -54,8 +54,6 @@ const styles = StyleSheet.create({
   header: {
     justifyContent: 'center',
     alignItems: 'center',
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
     width: '100%',
     paddingTop: 10,
     position: 'relative',

@@ -2374,14 +2374,14 @@ export default function RealSplittingScreen() {
       insights.push({
         type: 'settlement' as const,
         title: 'You\'re in the green! 💚',
-        description: `You're owed ${getCurrencySymbol(user?.currency || 'USD')}${(totalOwed - totalOwing).toFixed(2)} more than you owe. Consider collecting from friends.`,
+        description: `You get back ${getCurrencySymbol(user?.currency || 'USD')}${(totalOwed - totalOwing).toFixed(2)} more than you pay. Consider collecting from friends.`,
         icon: '💰'
       });
     } else if (totalOwing > totalOwed) {
       insights.push({
         type: 'settlement' as const,
         title: 'Time to settle up! 💳',
-        description: `You owe ${getCurrencySymbol(user?.currency || 'USD')}${(totalOwing - totalOwed).toFixed(2)} more than you're owed. Consider making payments.`,
+        description: `You pay ${getCurrencySymbol(user?.currency || 'USD')}${(totalOwing - totalOwed).toFixed(2)} more than you get back. Consider making payments.`,
         icon: '💸'
       });
     }
@@ -2829,14 +2829,14 @@ export default function RealSplittingScreen() {
               <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
                 <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{(totalOwed || 0).toFixed(2)}</Text>
               </Text>
-              <Text style={styles.balanceLabel}>You're owed</Text>
+              <Text style={styles.balanceLabel}>You get</Text>
             </View>
             
             <View style={styles.balanceItem}>
               <Text style={styles.balanceAmount} numberOfLines={1} adjustsFontSizeToFit>
                 <Text>{getCurrencySymbol(user?.currency || 'USD')}</Text><Text>{(totalOwing || 0).toFixed(2)}</Text>
               </Text>
-              <Text style={styles.balanceLabel}>You owe</Text>
+              <Text style={styles.balanceLabel}>You pay</Text>
             </View>
             
             <View style={styles.balanceItem}>
@@ -3495,7 +3495,7 @@ export default function RealSplittingScreen() {
                                 <Text style={[styles.simpleFriendAmountLabel, {
                                   color: owesYou ? theme.colors.success : theme.colors.error
                                 }]}>
-                                  {owesYou ? 'owes you' : 'you owe'}
+                                  {owesYou ? 'you get' : 'you pay'}
                                 </Text>
                                 <Text style={[styles.simpleFriendAmount, {
                                   color: owesYou ? theme.colors.success : theme.colors.error
@@ -3524,11 +3524,11 @@ export default function RealSplittingScreen() {
                                       onPress={() => {
                                         console.log('ℹ️ Info icon clicked for:', friendName);
                                         const breakdown = balanceEntry.breakdown.entries
-                                          .map((e: any) => `${e.groupName}: ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(e.balance).toFixed(2)} ${e.balance > 0 ? 'owed to you' : 'you owe'}`)
+                                          .map((e: any) => `${e.groupName}: ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(e.balance).toFixed(2)} ${e.balance > 0 ? 'you get' : 'you pay'}`)
                                           .join('\n');
                                         Alert.alert(
                                           `Balance with ${friendName}`,
-                                          `Net: ${getCurrencySymbol(user?.currency || 'USD')}${amount.toFixed(2)} ${owesYou ? 'owed to you' : 'you owe'}\n\nBreakdown:\n${breakdown}\n\nTip: Click "Settle up" to see all settlements across groups.`,
+                                          `Net: ${getCurrencySymbol(user?.currency || 'USD')}${amount.toFixed(2)} ${owesYou ? 'you get' : 'you pay'}\n\nBreakdown:\n${breakdown}\n\nTip: Click "Settle up" to see all settlements across groups.`,
                                           [{ text: 'Got it' }]
                                         );
                                       }}
@@ -3865,6 +3865,22 @@ export default function RealSplittingScreen() {
                       if (hasAccess) {
                         setSelectedGroup(group);
                         setShowQRCode(true);
+                      } else {
+                        // User doesn't have premium - show upgrade prompt
+                        CrossPlatformAlert.alert(
+                          '🎁 Premium Feature',
+                          'Group QR codes are a premium feature! Upgrade to premium to:\n\n• Share group QR codes\n• Scan to join groups instantly\n• Get unlimited group members\n• Access all premium features',
+                          [
+                            { text: 'Maybe Later', style: 'cancel' },
+                            {
+                              text: 'Upgrade to Premium',
+                              onPress: () => {
+                                console.log('User wants to upgrade to premium');
+                                CrossPlatformAlert.alert('Coming Soon', 'Subscription upgrade will be available in the next update');
+                              }
+                            }
+                          ]
+                        );
                       }
                     }}
                     style={styles.groupActionButton}
@@ -3886,7 +3902,7 @@ export default function RealSplittingScreen() {
                 <View style={styles.groupStat}>
                   <Text style={[styles.groupStatLabel, { color: theme.colors.textSecondary }]}>
                     {shareStatus === 'settled' ? 'Settled up' : 
-                     shareStatus === 'owed' ? 'You\'re owed' : 'You owe'}
+                     shareStatus === 'owed' ? 'You get back' : 'You pay'}
                   </Text>
                   <Text style={[
                     styles.groupStatValue, 
@@ -3993,8 +4009,8 @@ export default function RealSplittingScreen() {
     let statusDisplay = '';
     if (hasBalance) {
       statusDisplay = balance > 0 
-        ? `Owes you ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`
-        : `You owe ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`;
+        ? `You get ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`
+        : `You pay ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`;
     } else {
       statusDisplay = '✅ All settled up - Safe to remove';
     }
@@ -4015,8 +4031,8 @@ export default function RealSplittingScreen() {
 
     if (hasBalance) {
       const balanceText = balance > 0 
-        ? `${friend.friendData.fullName} owes you ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`
-        : `You owe ${friend.friendData.fullName} ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`;
+        ? `You get ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)} from ${friend.friendData.fullName}`
+        : `You pay ${friend.friendData.fullName} ${getCurrencySymbol(user?.currency || 'USD')}${Math.abs(balance).toFixed(2)}`;
 
       Alert.alert(
         'Cannot Remove Friend',
@@ -4455,33 +4471,38 @@ export default function RealSplittingScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
-      {/* Brand Header with Profile */}
-      <BrandHeader 
-        height={120}
-        showProfileButton={true}
-        onProfilePress={() => navigation.navigate('Profile' as never)}
-        profileContent={
-          <TouchableOpacity 
-            style={styles.profileCircleButton}
-            onPress={() => navigation.navigate('Profile' as never)}
-          >
-            {user?.profilePicture || user?.profileImage ? (
-              <Image 
-                source={{ uri: user.profilePicture || user.profileImage }} 
-                style={styles.profileImage}
-                onError={() => {
-                  // If image fails to load, will show fallback initials
-                  console.log('Profile image failed to load, showing initials');
-                }}
-              />
-            ) : (
-              <Text style={styles.profileText}>
-                {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        }
-      />
+      {/* Maroon Header Container with curved bottom - stops before tabs */}
+      <View style={styles.headerWrapper}>
+        <View style={[styles.statusBarFill, { backgroundColor: theme.colors.brand }]} />
+        <View style={[styles.brandHeaderContainer, { backgroundColor: theme.colors.brand }]}>
+          <BrandHeader 
+            height={120}
+            showProfileButton={true}
+            onProfilePress={() => navigation.navigate('Profile' as never)}
+            profileContent={
+              <TouchableOpacity 
+                style={styles.profileCircleButton}
+                onPress={() => navigation.navigate('Profile' as never)}
+              >
+                {user?.profilePicture || user?.profileImage ? (
+                  <Image 
+                    source={{ uri: user.profilePicture || user.profileImage }} 
+                    style={styles.profileImage}
+                    onError={() => {
+                      // If image fails to load, will show fallback initials
+                      console.log('Profile image failed to load, showing initials');
+                    }}
+                  />
+                ) : (
+                  <Text style={styles.profileText}>
+                    {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            }
+          />
+        </View>
+      </View>
       
       {/* Tab Navigation */}
       <View style={[styles.tabNavigation, { backgroundColor: theme.colors.background }]}>
@@ -4519,6 +4540,7 @@ export default function RealSplittingScreen() {
         style={[
           styles.tabContainer,
           {
+            backgroundColor: theme.colors.background,
             opacity: tabOpacity,
             transform: [{ translateX: slideAnimation }]
           }
@@ -4981,6 +5003,21 @@ const additionalStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerWrapper: {
+    position: 'relative',
+  },
+  statusBarFill: {
+    position: 'absolute',
+    top: -200,
+    left: 0,
+    right: 0,
+    height: 200,
+  },
+  brandHeaderContainer: {
+    borderBottomLeftRadius: 35,
+    borderBottomRightRadius: 35,
+    overflow: 'hidden',
   },
   loadingContainer: {
     flex: 1,
