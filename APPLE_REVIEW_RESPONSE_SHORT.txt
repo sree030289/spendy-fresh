@@ -1,0 +1,77 @@
+Response to Apple App Review Team
+App: Meet-n-Split | Submission: 9086e030-13be-4e63-a0fe-f01dde4c8f95 | Date: Oct 22, 2025
+
+Thank you for your feedback. We have addressed all issues:
+
+=== RESOLVED ISSUES ===
+
+1. iPad Screenshots (2.3.3) - FIXED
+✓ Replaced all screenshots with proper iPad device screenshots
+✓ All required iPad screenshot slots filled with correct images
+
+2. Terms of Use & Subscription Metadata (3.1.2) - FIXED
+
+App Store Connect:
+✓ Added Terms: https://spendy-97913.web.app/terms.html
+✓ Added Privacy Policy: https://spendy-97913.web.app/privacy.html
+
+In-App Binary (Subscription Modal):
+✓ Subscription title, length, and price displayed
+✓ FUNCTIONAL LINKS to Terms and Privacy Policy added
+✓ Users tap links at bottom of subscription modal before subscribing
+
+3. Account Deletion (5.1.1v) - IMPLEMENTED & TESTED
+✓ Location: Profile → Account Settings → Delete Account
+✓ Checks for pending balances before deletion
+✓ Deletes all user data: friendships, groups, activities, notifications
+✓ Session cleared, redirected to login
+✓ Tested and working in production
+
+=== QUESTION 1: Why phone number required? ===
+
+1. Expense Splitting: Add friends from contacts by phone for quick expense splitting
+2. SMS Invitations: Invite friends via SMS, stored in E.164 format for matching
+3. Duplicate Prevention: Validate phone numbers to prevent multiple accounts
+4. User Identification: Unique identifier to find and connect with friends
+
+Technical: Phone numbers validated using libphonenumber-js, normalized to E.164 format
+
+=== QUESTION 2: Do you upload contacts? ===
+
+NO - We DO NOT upload or sync entire contact lists.
+
+What We Store:
+1. User's own phone/email (registration)
+2. Selected contact phone numbers ONLY when user explicitly chooses to invite them
+
+What We DON'T Do:
+✗ No bulk contact upload
+✗ No background syncing
+✗ No contact details beyond phone numbers
+✗ Contacts only accessed when user taps "Add from Contacts"
+✗ Users manually select which contacts to invite
+✗ App works fully without contacts permission
+
+Privacy: All data stored securely in Firebase with proper access controls. Users can delete account and all data anytime.
+
+=== SUMMARY ===
+
+All guidelines addressed:
+✓ 2.3.3 iPad Screenshots - Fixed
+✓ 3.1.2 Terms & Subscription Metadata - Fixed in App Store + In-App
+✓ 5.1.1(v) Account Deletion - Implemented & Tested
+✓ 2.1 Privacy - Detailed explanations provided
+
+Build 30 (v1.0.0) uploaded with:
+- Account deletion fully working
+- Terms/Privacy links in subscription modal
+- Backend fixes deployed
+- Ready for re-review
+
+Backend: https://meetnsplitapi-k5mlmspqua-uc.a.run.app
+Support: admin@meetnsplit.com
+Website: https://spendy-97913.web.app
+
+Thank you for ensuring our app meets Apple's standards.
+
+Meet-n-Split Development Team

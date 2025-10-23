@@ -23,13 +23,25 @@ Thank you for reviewing Meet-n-Split and providing detailed feedback. We have ad
 
 ---
 
-### 2. **Terms of Use Link** (Guideline 3.1.2) - ✅ FIXED
-**Issue:** The app description mentioned Terms of Use but did not include a functional link.
+### 2. **Terms of Use & Subscription Metadata** (Guideline 3.1.2) - ✅ FIXED
+**Issue:** The app description mentioned Terms of Use but did not include a functional link. Additionally, subscription modal needed to include required links for auto-renewable subscriptions.
 
-**Resolution:**
+**Resolution - App Store Connect:**
 - ✅ Added functional Terms of Use (EULA) link in app description: https://spendy-97913.web.app/terms.html
-- ✅ Added Privacy Policy link: https://spendy-97913.web.app/privacy.html
+- ✅ Added Privacy Policy link in app description: https://spendy-97913.web.app/privacy.html
 - ✅ Both documents are accessible, properly formatted, and specific to Meet-n-Split
+
+**Resolution - In-App Binary:**
+As required by Guideline 3.1.2 for auto-renewable subscriptions, our subscription modal now includes:
+- ✅ Subscription title: "Premium"
+- ✅ Subscription length: "Monthly" and "Yearly" options clearly displayed
+- ✅ Subscription price: Displayed prominently with currency
+- ✅ **Functional links to Terms of Use (EULA) and Privacy Policy** - Added directly in the subscription modal UI
+- ✅ Users can tap these links to view the full terms and privacy policy before subscribing
+
+**Location in App:** The subscription modal (displayed when users upgrade to Premium) now includes clickable links at the bottom:
+- "Terms of Use (EULA)" → Opens https://spendy-97913.web.app/terms.html
+- "Privacy Policy" → Opens https://spendy-97913.web.app/privacy.html
 
 ---
 
@@ -156,7 +168,7 @@ The stored phone numbers are used exclusively for:
 | Issue | Status | Evidence |
 |-------|--------|----------|
 | iPad Screenshots | ✅ Fixed | New screenshots uploaded to App Store Connect |
-| Terms of Use Link | ✅ Fixed | Links added in app description |
+| Terms of Use & Subscription Metadata | ✅ Fixed | Links added in app description AND in-app subscription modal |
 | Account Deletion | ✅ Implemented | Feature available in Profile → Account Settings |
 | Phone Number Usage | ✅ Clarified | Detailed explanation provided above |
 | Contact Upload | ✅ Clarified | Explained limited, user-controlled storage |
@@ -167,12 +179,17 @@ The stored phone numbers are used exclusively for:
 
 All issues have been resolved and the app is now compliant with Apple's guidelines:
 
-- ✅ Guideline 2.3.3 (iPad Screenshots)
-- ✅ Guideline 3.1.2 (Terms of Use)
-- ✅ Guideline 5.1.1(v) (Account Deletion)
-- ✅ Privacy concerns addressed with detailed explanations
+- ✅ Guideline 2.3.3 (iPad Screenshots) - Proper iPad screenshots uploaded
+- ✅ Guideline 3.1.2 (Terms of Use & Subscription Metadata) - Links in App Store Connect AND in-app binary
+- ✅ Guideline 5.1.1(v) (Account Deletion) - Full in-app deletion implemented
+- ✅ Guideline 2.1 (Privacy - Phone Number & Contacts) - Detailed explanations provided
 
-We have uploaded a new build (version 1.0, build X) with the account deletion feature fully implemented and tested. The app is ready for re-review.
+We have uploaded a new build (version 1.0.0, build 30) with all features fully implemented and tested, including:
+- Account deletion functionality
+- Terms of Use and Privacy Policy links in subscription modal
+- All backend fixes deployed to production
+
+The app is ready for re-review.
 
 Thank you for your thorough review process. We appreciate your guidance in ensuring our app meets Apple's high standards for user privacy and experience.
 
@@ -182,6 +199,6 @@ Thank you for your thorough review process. We appreciate your guidance in ensur
 Meet-n-Split Development Team
 
 **Support Contact:** admin@meetnsplit.com  
-**App Website:** https://spendy-97913.web.app  
-**Privacy Policy:** https://spendy-97913.web.app/privacy.html  
-**Terms of Use:** https://spendy-97913.web.app/terms.html
+**App Website:** https://meetnsplit.com  
+**Privacy Policy:** https://meetnsplit.com/privacy.html  
+**Terms of Use:** https://meetnsplit.com/terms.html

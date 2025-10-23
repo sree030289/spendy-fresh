@@ -1,0 +1,160 @@
+Response to Apple App Review Team
+App Name: Meet-n-Split
+Submission ID: 9086e030-13be-4e63-a0fe-f01dde4c8f95
+Date: October 22, 2025
+
+Dear Apple App Review Team,
+
+Thank you for reviewing Meet-n-Split. We have addressed all issues mentioned in your rejection. Below are the changes made:
+
+========================================
+RESOLVED ISSUES
+========================================
+
+1. iPad Screenshots (Guideline 2.3.3) - FIXED
+   - Replaced all screenshots with proper iPad device screenshots
+   - Screenshots now show app running on actual iPad devices
+   - All required iPad screenshot slots filled
+
+2. Terms of Use & Subscription Metadata (Guideline 3.1.2) - FIXED
+
+   App Store Connect:
+   - Added Terms of Use (EULA): https://spendy-97913.web.app/terms.html
+   - Added Privacy Policy: https://spendy-97913.web.app/privacy.html
+
+   In-App Binary (Subscription Modal):
+   - Subscription title: "Premium"
+   - Subscription length: "Monthly" and "Yearly" options displayed
+   - Subscription price: Shown with currency
+   - FUNCTIONAL LINKS to Terms of Use and Privacy Policy added in subscription modal
+   - Users can tap these links before subscribing
+
+   Location: When users open subscription modal, clickable links appear at bottom:
+   - "Terms of Use (EULA)" → Opens https://spendy-97913.web.app/terms.html
+   - "Privacy Policy" → Opens https://spendy-97913.web.app/privacy.html
+
+3. Account Deletion (Guideline 5.1.1v) - IMPLEMENTED & TESTED
+
+   Implementation:
+   - Delete Account in Profile → Account Settings → Delete Account
+   - User sees confirmation dialog
+   - System checks for pending balances before deletion
+   - If unsettled expenses exist, deletion blocked with detailed list
+   - If no pending balances, account deleted immediately
+   - All data removed: friendships, groups, activities, notifications, subscriptions
+   - Session cleared and redirected to login
+   - Deleted accounts cannot log back in
+   - Tested and verified working in production
+
+========================================
+RESPONSES TO YOUR QUESTIONS
+========================================
+
+Question 1: Why does the app require phone number for registration?
+
+Phone numbers are required for:
+
+1. Expense Splitting with Contacts
+   Users can add friends directly from contacts by phone number for quick expense splitting.
+
+2. SMS Friend Invitations
+   Users can invite friends who don't have the app via SMS. Phone numbers are stored in E.164 international format for accurate matching when invited users register.
+
+3. Duplicate Account Prevention
+   Phone numbers are validated to prevent users from creating multiple accounts.
+
+4. User Identification
+   Phone numbers serve as unique identifiers to help users find and connect with friends on the platform.
+
+Technical:
+- Phone numbers validated using libphonenumber-js library
+- All normalized to E.164 international format
+- Users can still use core features without providing contacts access
+
+Question 2: Does your app upload user's contacts to our server?
+
+SHORT ANSWER: Meet-n-Split DOES NOT upload or sync entire contact lists to our servers.
+
+WHAT WE STORE:
+
+1. User's Own Information (Registration):
+   When a user registers, we store their email and phone number for:
+   - User authentication and account management
+   - Finding and connecting with other registered users
+   - Sending friend requests and invitations
+
+2. Selected Contacts for Invitations (User-Initiated Only):
+   When a user explicitly selects specific contacts to invite, we store only those phone numbers to:
+   - Check if those phone numbers are registered users
+   - Create friend request records
+   - Track pending SMS invitations
+   - Match users when invited contacts later register
+
+WHAT WE DO NOT DO:
+
+- NO bulk contact upload
+- NO background syncing
+- NO contact details beyond phone numbers (no names, emails, addresses)
+- Contacts only accessed when user taps "Add from Contacts"
+- Users manually select which contacts to invite
+- Users can revoke contacts permission anytime through device Settings
+- App functions fully without contacts permission
+
+DATA USAGE:
+Stored phone numbers used exclusively for:
+- Matching users for friend requests
+- SMS-based invitation system
+- Preventing duplicate accounts
+- Connecting users who mutually invite each other
+
+PRIVACY & SECURITY:
+- Phone numbers stored in E.164 international format
+- Secure storage in Firebase Firestore with proper access controls
+- Users can delete account and all data anytime
+- We comply with data protection regulations
+
+========================================
+SUMMARY OF CHANGES
+========================================
+
+Issue                                   | Status | Evidence
+iPad Screenshots                        | Fixed  | Uploaded to App Store Connect
+Terms/Subscription Metadata             | Fixed  | Links in app description AND in-app binary
+Account Deletion                        | Done   | Profile → Account Settings
+Phone Number Usage                      | Clear  | Detailed explanation above
+Contact Upload                          | Clear  | Limited, user-controlled storage
+
+========================================
+COMPLIANCE VERIFICATION
+========================================
+
+All issues resolved per Apple guidelines:
+
+- Guideline 2.3.3 (iPad Screenshots) - Proper iPad screenshots uploaded
+- Guideline 3.1.2 (Terms & Subscription Metadata) - Links in App Store Connect AND in-app binary
+- Guideline 5.1.1(v) (Account Deletion) - Full in-app deletion implemented
+- Guideline 2.1 (Privacy - Phone & Contacts) - Detailed explanations provided
+
+========================================
+BUILD INFORMATION
+========================================
+
+We have uploaded Build 30 (version 1.0.0) with:
+- Account deletion functionality fully implemented and tested
+- Terms of Use and Privacy Policy links in subscription modal
+- All backend fixes deployed to production API
+- CouponService updated for App Store promotional offers
+
+Backend API: https://meetnsplitapi-k5mlmspqua-uc.a.run.app
+
+The app is ready for re-review.
+
+Thank you for your thorough review process. We appreciate your guidance in ensuring our app meets Apple's high standards.
+
+Sincerely,
+Meet-n-Split Development Team
+
+Support Contact: admin@meetnsplit.com
+App Website: https://spendy-97913.web.app
+Privacy Policy: https://spendy-97913.web.app/privacy.html
+Terms of Use: https://spendy-97913.web.app/terms.html

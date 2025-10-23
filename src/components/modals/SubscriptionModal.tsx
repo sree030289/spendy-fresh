@@ -12,6 +12,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Keyboard,
+  Linking,
 } from 'react-native';
 import FullscreenModal from '@/components/common/FullscreenModal';
 import SubscriptionConfigService, { SubscriptionConfig } from '@/services/firebase/SubscriptionConfigService';
@@ -846,6 +847,23 @@ export default function SubscriptionModal({
           <Text style={styles.termsText}>
             Cancel anytime • Secure payment • 30-day guarantee
           </Text>
+
+          {/* Apple Required: Terms of Use and Privacy Policy Links */}
+          <View style={styles.legalLinksContainer}>
+            <TouchableOpacity 
+              onPress={() => Linking.openURL('https://spendy-97913.web.app/terms.html')}
+              style={styles.legalLinkButton}
+            >
+              <Text style={styles.legalLinkText}>Terms of Use (EULA)</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalDivider}>•</Text>
+            <TouchableOpacity 
+              onPress={() => Linking.openURL('https://spendy-97913.web.app/privacy.html')}
+              style={styles.legalLinkButton}
+            >
+              <Text style={styles.legalLinkText}>Privacy Policy</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1114,6 +1132,28 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  legalLinksContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingHorizontal: 20,
+  },
+  legalLinkButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  legalLinkText: {
+    fontSize: 13,
+    color: '#B0004F',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+  },
+  legalDivider: {
+    fontSize: 13,
+    color: '#666',
+    marginHorizontal: 8,
   },
   priceContainer: {
     alignItems: 'center',
