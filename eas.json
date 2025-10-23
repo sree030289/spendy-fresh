@@ -27,7 +27,7 @@
       }
     },
     "production": {
-      "autoIncrement": true,
+      "autoIncrement": false,
       "env": {
         "SPENDY_ENV": "production"
       }
