@@ -220,19 +220,28 @@ export default function SubscriptionModal({
           .map((discount: any) => discount.identifier || discount.offerIdentifier)
           .filter(Boolean);
         
-        const promoExists = discounts.some((discount: any) => {
+        // Find the matching discount to get the discounted price
+        const matchingDiscount = discounts.find((discount: any) => {
           const discountId = discount.identifier || discount.offerIdentifier;
           return discountId?.toLowerCase() === promoCode.trim().toLowerCase();
         });
 
-        if (promoExists) {
+        if (matchingDiscount) {
+          const originalPrice = selectedPlan === 'yearly' ? getCurrentPricing().yearlyPrice : getCurrentPricing().monthlyPrice;
+          // Extract discounted price - handle both number and string formats
+          const discountPrice = matchingDiscount.price || matchingDiscount.priceString;
+          const discountedPrice = typeof discountPrice === 'number' ? discountPrice : parseFloat(discountPrice || String(originalPrice));
+          
           setPromoValidation({
             valid: true,
             isValidating: false,
-            originalPrice: selectedPlan === 'yearly' ? getCurrentPricing().yearlyPrice : getCurrentPricing().monthlyPrice,
-            availablePromoCodes, // Store available codes for error message
+            originalPrice,
+            discountedPrice, // ✅ Set the discounted price from the promotional offer
+            availablePromoCodes,
           });
           console.log('✅ Promo code found in store:', promoCode.trim());
+          console.log('💰 Original price:', originalPrice);
+          console.log('🏷️ Discounted price:', discountedPrice);
         } else {
           setPromoValidation({ 
             valid: false, 
