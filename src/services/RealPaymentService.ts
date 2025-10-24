@@ -752,30 +752,55 @@ class RealPaymentService {
   ): Promise<{ customerInfo: CustomerInfo }> {
     console.log('🛒 Purchasing with store promotional offer...');
     console.log('   Platform:', Platform.OS);
+    console.log('   Promo code:', promoCode);
     
     if (Platform.OS === 'ios') {
-      // iOS: For promotional offers, we need to use purchasePackage with the discount
-      // The discount is already part of the product when fetched with the promo code
-      if (!promotionalOffer) {
-        throw new Error('Promotional offer required for iOS discounted purchase');
-      }
+      // iOS: For App Store Connect promotional OFFER CODES (not subscription offers)
+      // We need to use the StoreKit redemption flow
+      // RevenueCat handles this automatically when we call purchasePackage
       
-      console.log('📱 iOS: Applying promotional offer to purchase');
-      console.log('   Promo code:', promoCode);
-      console.log('   Discount:', {
-        identifier: (promotionalOffer as any).identifier,
-        price: (promotionalOffer as any).priceString,
-        cycles: (promotionalOffer as any).cycles
-      });
+      console.log('📱 iOS: Purchasing with App Store Connect promo code');
+      console.log('   Note: User will be prompted to redeem the code in App Store');
       
       try {
-        // For iOS, RevenueCat handles promotional offers through the product itself
-        // We just need to purchase the package normally - the discount is already applied
-        // when the user enters the promo code in the App Store payment sheet
-        const result = await Purchases.purchasePackage(purchasePackage);
+        // For promotional offer codes from App Store Connect:
+        // 1. User must redeem the code in App Store first, OR
+        // 2. Present the code redemption sheet
         
-        console.log('✅ Purchase completed with promotional pricing');
-        return { customerInfo: result.customerInfo };
+        // Check if this is a promotional offer discount vs offer code
+        if (promotionalOffer && (promotionalOffer as any).identifier) {
+          // This is a subscription offer (introductory/promotional pricing)
+          console.log('💳 Using purchaseDiscountedPackage for subscription offer...');
+          console.log('   Discount:', {
+            identifier: (promotionalOffer as any).identifier,
+            price: (promotionalOffer as any).priceString,
+          });
+          
+          const result = await Purchases.purchaseDiscountedPackage(
+            purchasePackage,
+            promotionalOffer as any
+          );
+          
+          console.log('✅ Purchase completed with promotional pricing');
+          return { customerInfo: result.customerInfo };
+        } else {
+          // This is an offer code - present redemption sheet
+          console.log('🎟️ Presenting App Store offer code redemption sheet...');
+          
+          // For offer codes, we need to present the StoreKit redemption sheet
+          // RevenueCat v7+ supports this via presentCodeRedemptionSheet
+          if (Purchases.presentCodeRedemptionSheet) {
+            await Purchases.presentCodeRedemptionSheet();
+            // After user redeems, we need to refresh customer info
+            const customerInfo = await Purchases.getCustomerInfo();
+            return { customerInfo };
+          } else {
+            // Fallback: Try regular purchase (user may have already redeemed)
+            console.log('⚠️ Code redemption sheet not available, trying regular purchase...');
+            const result = await Purchases.purchasePackage(purchasePackage);
+            return { customerInfo: result.customerInfo };
+          }
+        }
       } catch (error: any) {
         console.error('❌ Purchase with promo error:', error);
         console.error('   Error message:', error.message);
