@@ -228,20 +228,45 @@ export default function SubscriptionModal({
 
         if (matchingDiscount) {
           const originalPrice = selectedPlan === 'yearly' ? getCurrentPricing().yearlyPrice : getCurrentPricing().monthlyPrice;
+          
           // Extract discounted price - handle both number and string formats
-          const discountPrice = matchingDiscount.price || matchingDiscount.priceString;
-          const discountedPrice = typeof discountPrice === 'number' ? discountPrice : parseFloat(discountPrice || String(originalPrice));
+          console.log('📦 Raw discount object:', matchingDiscount);
+          console.log('   price:', matchingDiscount.price, typeof matchingDiscount.price);
+          console.log('   priceString:', matchingDiscount.priceString);
+          
+          let discountedPrice = originalPrice; // Default to original price
+          
+          // Try to get the price in order of preference
+          if (typeof matchingDiscount.price === 'number') {
+            discountedPrice = matchingDiscount.price;
+          } else if (matchingDiscount.priceString) {
+            // Parse price string (e.g., "$0.00", "0.00")
+            const parsed = parseFloat(matchingDiscount.priceString.replace(/[^0-9.]/g, ''));
+            if (!isNaN(parsed)) {
+              discountedPrice = parsed;
+            }
+          } else if (matchingDiscount.price) {
+            // Try parsing as string
+            const parsed = parseFloat(String(matchingDiscount.price).replace(/[^0-9.]/g, ''));
+            if (!isNaN(parsed)) {
+              discountedPrice = parsed;
+            }
+          }
+          
+          console.log('💰 Calculated prices:', {
+            original: originalPrice,
+            discounted: discountedPrice,
+            isValid: !isNaN(discountedPrice)
+          });
           
           setPromoValidation({
             valid: true,
             isValidating: false,
             originalPrice,
-            discountedPrice, // ✅ Set the discounted price from the promotional offer
+            discountedPrice: isNaN(discountedPrice) ? originalPrice : discountedPrice,
             availablePromoCodes,
           });
           console.log('✅ Promo code found in store:', promoCode.trim());
-          console.log('💰 Original price:', originalPrice);
-          console.log('🏷️ Discounted price:', discountedPrice);
         } else {
           setPromoValidation({ 
             valid: false, 
