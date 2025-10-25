@@ -763,43 +763,45 @@ class RealPaymentService {
       console.log('   Note: User will be prompted to redeem the code in App Store');
       
       try {
-        // For promotional offer codes from App Store Connect:
-        // 1. User must redeem the code in App Store first, OR
-        // 2. Present the code redemption sheet
+        // For App Store Connect promotional offer codes (like "MEETNSPLIT100"):
+        // These are NOT subscription offers - they are redemption codes
+        // We need to present the StoreKit code redemption sheet
         
-        // Check if this is a promotional offer discount vs offer code
-        if (promotionalOffer && (promotionalOffer as any).identifier) {
-          // This is a subscription offer (introductory/promotional pricing)
-          console.log('💳 Using purchaseDiscountedPackage for subscription offer...');
-          console.log('   Discount:', {
-            identifier: (promotionalOffer as any).identifier,
-            price: (promotionalOffer as any).priceString,
-          });
-          
-          const result = await Purchases.purchaseDiscountedPackage(
-            purchasePackage,
-            promotionalOffer as any
-          );
-          
-          console.log('✅ Purchase completed with promotional pricing');
-          return { customerInfo: result.customerInfo };
-        } else {
-          // This is an offer code - present redemption sheet
-          console.log('🎟️ Presenting App Store offer code redemption sheet...');
-          
-          // For offer codes, we need to present the StoreKit redemption sheet
-          // RevenueCat v7+ supports this via presentCodeRedemptionSheet
-          if (Purchases.presentCodeRedemptionSheet) {
+        console.log('🎟️ Presenting App Store offer code redemption sheet...');
+        console.log('   Promo code:', promoCode);
+        
+        // Present the StoreKit redemption sheet
+        // RevenueCat v7+ supports this via presentCodeRedemptionSheet
+        if (Purchases.presentCodeRedemptionSheet) {
+          try {
             await Purchases.presentCodeRedemptionSheet();
-            // After user redeems, we need to refresh customer info
+            console.log('✅ Code redemption sheet presented');
+            
+            // After user redeems, we need to refresh customer info and purchase
             const customerInfo = await Purchases.getCustomerInfo();
+            
+            // If they successfully redeemed, purchase the package
+            if (customerInfo) {
+              console.log('🔄 Attempting purchase after code redemption...');
+              const result = await Purchases.purchasePackage(purchasePackage);
+              console.log('✅ Purchase completed with redeemed code');
+              return { customerInfo: result.customerInfo };
+            }
+            
             return { customerInfo };
-          } else {
-            // Fallback: Try regular purchase (user may have already redeemed)
-            console.log('⚠️ Code redemption sheet not available, trying regular purchase...');
+          } catch (sheetError: any) {
+            console.error('❌ Code redemption sheet error:', sheetError);
+            // If sheet was cancelled or failed, try regular purchase
+            // (user may have already redeemed the code)
+            console.log('⚠️ Falling back to regular purchase...');
             const result = await Purchases.purchasePackage(purchasePackage);
             return { customerInfo: result.customerInfo };
           }
+        } else {
+          // Fallback: Try regular purchase (user may have already redeemed)
+          console.log('⚠️ Code redemption sheet not available, trying regular purchase...');
+          const result = await Purchases.purchasePackage(purchasePackage);
+          return { customerInfo: result.customerInfo };
         }
       } catch (error: any) {
         console.error('❌ Purchase with promo error:', error);
