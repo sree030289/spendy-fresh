@@ -220,62 +220,25 @@ export default function SubscriptionModal({
           .map((discount: any) => discount.identifier || discount.offerIdentifier)
           .filter(Boolean);
         
-        // Find the matching discount to get the discounted price
-        const matchingDiscount = discounts.find((discount: any) => {
-          const discountId = discount.identifier || discount.offerIdentifier;
-          return discountId?.toLowerCase() === promoCode.trim().toLowerCase();
+        // For App Store promotional offer CODES (not subscription offers),
+        // we cannot get the discounted price in advance.
+        // The price will be shown by App Store during redemption.
+        
+        // Just validate that we can attempt redemption
+        console.log('🎟️ Promotional offer codes require redemption via App Store');
+        console.log('   Code entered:', promoCode.trim());
+        console.log('   Available subscription offers:', availablePromoCodes);
+        
+        // Set as valid - we'll let App Store handle validation during purchase
+        setPromoValidation({
+          valid: true,
+          isValidating: false,
+          originalPrice: selectedPlan === 'yearly' ? getCurrentPricing().yearlyPrice : getCurrentPricing().monthlyPrice,
+          // Don't set discountedPrice - we don't know it yet
+          availablePromoCodes,
         });
-
-        if (matchingDiscount) {
-          const originalPrice = selectedPlan === 'yearly' ? getCurrentPricing().yearlyPrice : getCurrentPricing().monthlyPrice;
-          
-          // Extract discounted price - handle both number and string formats
-          console.log('📦 Raw discount object:', matchingDiscount);
-          console.log('   price:', matchingDiscount.price, typeof matchingDiscount.price);
-          console.log('   priceString:', matchingDiscount.priceString);
-          
-          let discountedPrice = originalPrice; // Default to original price
-          
-          // Try to get the price in order of preference
-          if (typeof matchingDiscount.price === 'number') {
-            discountedPrice = matchingDiscount.price;
-          } else if (matchingDiscount.priceString) {
-            // Parse price string (e.g., "$0.00", "0.00")
-            const parsed = parseFloat(matchingDiscount.priceString.replace(/[^0-9.]/g, ''));
-            if (!isNaN(parsed)) {
-              discountedPrice = parsed;
-            }
-          } else if (matchingDiscount.price) {
-            // Try parsing as string
-            const parsed = parseFloat(String(matchingDiscount.price).replace(/[^0-9.]/g, ''));
-            if (!isNaN(parsed)) {
-              discountedPrice = parsed;
-            }
-          }
-          
-          console.log('💰 Calculated prices:', {
-            original: originalPrice,
-            discounted: discountedPrice,
-            isValid: !isNaN(discountedPrice)
-          });
-          
-          setPromoValidation({
-            valid: true,
-            isValidating: false,
-            originalPrice,
-            discountedPrice: isNaN(discountedPrice) ? originalPrice : discountedPrice,
-            availablePromoCodes,
-          });
-          console.log('✅ Promo code found in store:', promoCode.trim());
-        } else {
-          setPromoValidation({ 
-            valid: false, 
-            isValidating: false,
-            availablePromoCodes, // Store available codes for error message
-          });
-          console.log('❌ Promo code not found in store:', promoCode.trim());
-          console.log('   Available codes:', availablePromoCodes);
-        }
+        
+        console.log('✅ Promo code will be validated by App Store during purchase');
       } catch (error) {
         console.error('❌ Error validating promo code:', error);
         setPromoValidation({ valid: false, isValidating: false });
@@ -692,19 +655,7 @@ export default function SubscriptionModal({
               </View>
               
               <View style={styles.compactPlanPriceRow}>
-                {promoValidation.valid && selectedPlan === 'yearly' && promoValidation.discountedPrice !== undefined ? (
-                  <View style={styles.priceContainer}>
-                    <Text style={[styles.compactPlanPrice, styles.originalPrice]}>
-                      {formatCurrency(yearlyPrice, currency)}
-                    </Text>
-                    <Text style={styles.compactPlanPrice}>
-                      {promoValidation.discountedPrice === 0 ? 'FREE' : formatCurrency(promoValidation.discountedPrice, currency)}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.compactPlanPrice}>{formatCurrency(yearlyPrice, currency)}</Text>
-                )}
-                
+                <Text style={styles.compactPlanPrice}>{formatCurrency(yearlyPrice, currency)}</Text>
                 <Text style={styles.compactPlanPriceSubtext}>{formatCurrency(yearlyMonthlyPrice, currency)}/mo</Text>
               </View>
               
@@ -730,19 +681,7 @@ export default function SubscriptionModal({
               </View>
               
               <View style={styles.compactPlanPriceRow}>
-                {promoValidation.valid && selectedPlan === 'monthly' && promoValidation.discountedPrice !== undefined ? (
-                  <View style={styles.priceContainer}>
-                    <Text style={[styles.compactPlanPrice, styles.originalPrice]}>
-                      {formatCurrency(monthlyPrice, currency)}
-                    </Text>
-                    <Text style={styles.compactPlanPrice}>
-                      {promoValidation.discountedPrice === 0 ? 'FREE' : formatCurrency(promoValidation.discountedPrice, currency)}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.compactPlanPrice}>{formatCurrency(monthlyPrice, currency)}</Text>
-                )}
-                
+                <Text style={styles.compactPlanPrice}>{formatCurrency(monthlyPrice, currency)}</Text>
                 <Text style={styles.compactPlanPriceSubtext}>per month</Text>
               </View>
               
@@ -867,13 +806,7 @@ export default function SubscriptionModal({
             <Text style={styles.subscribeButtonText}>
               {loading 
                 ? 'Processing...' 
-                : (() => {
-                    const currentPrice = selectedPlan === 'yearly' ? yearlyPrice : monthlyPrice;
-                    const finalPrice = promoValidation.valid && promoValidation.discountedPrice 
-                      ? promoValidation.discountedPrice 
-                      : currentPrice;
-                    return `Start Premium - ${formatCurrency(finalPrice, currency)}`;
-                  })()
+                : `Start Premium - ${formatCurrency(selectedPlan === 'yearly' ? yearlyPrice : monthlyPrice, currency)}`
               }
             </Text>
           </TouchableOpacity>
