@@ -759,49 +759,66 @@ class RealPaymentService {
       // We need to use the StoreKit redemption flow
       // RevenueCat handles this automatically when we call purchasePackage
       
-      console.log('📱 iOS: Purchasing with App Store Connect promo code');
-      console.log('   Note: User will be prompted to redeem the code in App Store');
+      console.log('📱 iOS: App Store Connect promotional offer code detected');
+      console.log('   Code:', promoCode);
+      console.log('   Environment:', __DEV__ ? 'Sandbox/Development' : 'Production');
+      
+      // IMPORTANT: Promotional offer codes are environment-specific!
+      // Codes created for production won't work in sandbox and vice versa
       
       try {
-        // For App Store Connect promotional offer codes (like "MEETNSPLIT100"):
-        // These are NOT subscription offers - they are redemption codes
-        // We need to present the StoreKit code redemption sheet
+        // For iOS promo codes, we have two options:
+        // 1. User has already redeemed the code -> Just purchase normally
+        // 2. User hasn't redeemed -> Present redemption sheet
         
-        console.log('🎟️ Presenting App Store offer code redemption sheet...');
-        console.log('   Promo code:', promoCode);
-        
-        // Present the StoreKit redemption sheet
-        // RevenueCat v7+ supports this via presentCodeRedemptionSheet
-        if (Purchases.presentCodeRedemptionSheet) {
-          try {
-            await Purchases.presentCodeRedemptionSheet();
-            console.log('✅ Code redemption sheet presented');
+        // Try regular purchase first (in case code already redeemed)
+        try {
+          console.log('🛒 Attempting purchase (code may be pre-redeemed)...');
+          const result = await Purchases.purchasePackage(purchasePackage);
+          console.log('✅ Purchase successful!');
+          return { customerInfo: result.customerInfo };
+        } catch (purchaseError: any) {
+          console.log('ℹ️ Direct purchase failed:', purchaseError.message);
+          
+          // If purchase failed, code might not be redeemed yet
+          // Present redemption sheet
+          if (Purchases.presentCodeRedemptionSheet && purchaseError.code !== 1) {
+            console.log('🎟️ Presenting code redemption sheet for user to enter code...');
+            console.log('   ⚠️ Note: Code must exist in current environment');
+            console.log('   - Sandbox codes: Must be created for Sandbox in App Store Connect');
+            console.log('   - Production codes: Must be created for Production');
             
-            // After user redeems, we need to refresh customer info and purchase
-            const customerInfo = await Purchases.getCustomerInfo();
-            
-            // If they successfully redeemed, purchase the package
-            if (customerInfo) {
+            try {
+              await Purchases.presentCodeRedemptionSheet();
+              console.log('✅ Code redemption sheet completed');
+              
+              // Refresh customer info after redemption
+              const customerInfo = await Purchases.getCustomerInfo();
+              
+              // Now try purchase again
               console.log('🔄 Attempting purchase after code redemption...');
               const result = await Purchases.purchasePackage(purchasePackage);
-              console.log('✅ Purchase completed with redeemed code');
+              console.log('✅ Purchase completed with discount');
               return { customerInfo: result.customerInfo };
+            } catch (sheetError: any) {
+              console.error('❌ Code redemption error:', sheetError);
+              
+              if (sheetError.code === 1) {
+                throw new Error('Code redemption cancelled');
+              }
+              
+              // Provide helpful error message
+              throw new Error(
+                `Could not redeem code. Please verify:\n` +
+                `1. Code exists for current environment (${__DEV__ ? 'Sandbox' : 'Production'})\n` +
+                `2. Code is still valid and not expired\n` +
+                `3. Code hasn't reached usage limit`
+              );
             }
-            
-            return { customerInfo };
-          } catch (sheetError: any) {
-            console.error('❌ Code redemption sheet error:', sheetError);
-            // If sheet was cancelled or failed, try regular purchase
-            // (user may have already redeemed the code)
-            console.log('⚠️ Falling back to regular purchase...');
-            const result = await Purchases.purchasePackage(purchasePackage);
-            return { customerInfo: result.customerInfo };
+          } else {
+            // Can't present sheet or user cancelled - throw original error
+            throw purchaseError;
           }
-        } else {
-          // Fallback: Try regular purchase (user may have already redeemed)
-          console.log('⚠️ Code redemption sheet not available, trying regular purchase...');
-          const result = await Purchases.purchasePackage(purchasePackage);
-          return { customerInfo: result.customerInfo };
         }
       } catch (error: any) {
         console.error('❌ Purchase with promo error:', error);
