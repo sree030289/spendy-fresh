@@ -502,7 +502,7 @@ export class SecureQRService {
     // App Store URLs - Update these with your actual published app URLs
     const appStoreUrl = Platform.select({
       ios: 'https://apps.apple.com/app/spendy-meet-n-split', // iOS App Store URL
-      android: 'https://play.google.com/store/apps/details?id=com.meetnsplit.app' // Android package ID from app.json
+      android: 'https://play.google.com/store/apps/details?id=com.meetnsplit.app.dev&hl=en_AU' // Android package ID from app.json
     });
 
     if (appStoreUrl) {

@@ -274,8 +274,8 @@ export class SMSInviteService {
    */
   private createEnhancedSMSMessage(senderName: string, isRegistered: boolean): string {
     // TODO: Replace with actual app store links
-    const appStoreLink = 'https://apps.apple.com/app/spendy-meet-n-split';
-    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.spendy.meetnspli';
+    const appStoreLink = 'https://apps.apple.com/app/meet-n-split/id6753645928';
+    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.meetnsplit.app.dev&hl=en_AU';
     const deepLink = 'meetnsplit://friends/pending'; // Deep link to friends pending tab
     
     if (isRegistered) {
@@ -640,8 +640,8 @@ export class SMSInviteService {
    * Create message for group SMS
    */
   private createGroupSMSMessage(senderName: string, recipientCount: number): string {
-    const appStoreLink = 'https://apps.apple.com/app/spendy-meet-n-split';
-    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.spendy.meetnspli';
+    const appStoreLink = 'https://apps.apple.com/app/meet-n-split/id6753645928';
+    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.meetnsplit.app.dev&hl=en_AU';
     
     return `Hello! ${senderName} wants to connect with you on Meet-n-Split app for splitting expenses.\n\nDownload the app:\niOS: ${appStoreLink}\nAndroid: ${playStoreLink}\n\nOnce installed, you'll be automatically added as friends!`;
   }
@@ -650,8 +650,8 @@ export class SMSInviteService {
    * Create message for individual SMS
    */
   private createIndividualSMSMessage(senderName: string): string {
-    const appStoreLink = 'https://apps.apple.com/app/spendy-meet-n-split';
-    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.spendy.meetnspli';
+    const appStoreLink = 'https://apps.apple.com/app/meet-n-split/id6753645928';
+    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.meetnsplit.app.dev&hl=en_AU';
     
     return `Hello! ${senderName} wants to connect with you on Meet-n-Split app for splitting expenses.\n\nDownload the app:\niOS: ${appStoreLink}\nAndroid: ${playStoreLink}\n\nOnce installed, you'll be automatically added as friends!`;
   }

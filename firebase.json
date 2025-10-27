@@ -24,7 +24,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
-    "public": "public",
+    "public": "dist",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -87,6 +87,22 @@
       {
         "source": "/qr/:groupId",
         "destination": "/qr-fallback.html"
+      },
+      {
+        "source": "/join/**",
+        "destination": "/join.html"
+      },
+      {
+        "source": "/download",
+        "destination": "/download.html"
+      },
+      {
+        "source": "/register",
+        "destination": "/register.html"
+      },
+      {
+        "source": "/reset-password",
+        "destination": "/reset-password.html"
       }
     ]
   },

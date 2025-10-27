@@ -9,7 +9,7 @@ const DEEP_LINK_CONFIG = {
   host: 'app.meetnsplit.com',
   appStore: {
     ios: 'https://apps.apple.com/au/app/spendy/id123456789', // Replace with actual App Store ID
-    android: 'https://play.google.com/store/apps/details?id=com.meetnsplit.app', // Replace with actual package name
+    android: 'https://play.google.com/store/apps/details?id=com.meetnsplit.app.dev&hl=en_AU', // Replace with actual package name
   },
   fallbackUrl: 'https://meetnsplit.com',
 };

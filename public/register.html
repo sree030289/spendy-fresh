@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Started - Meet-n-Split</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background-color: #ffffff;
+        }
+        
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 1000;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: #B0004F;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #1a1a1a;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: #B0004F;
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-top: 100px;
+            padding: 60px 30px 100px;
+            min-height: calc(100vh - 400px);
+        }
+        
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        
+        .logo-icon {
+            font-size: 64px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 36px;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 40px;
+        }
+        
+        .info-box {
+            background: linear-gradient(135deg, #B0004F 0%, #8B0040 100%);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 40px;
+            color: white;
+        }
+        
+        .info-box-title {
+            font-weight: 700;
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+        
+        .info-box-text {
+            font-size: 16px;
+            line-height: 1.6;
+            opacity: 0.95;
+        }
+        
+        .steps {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        
+        .step:last-child {
+            margin-bottom: 0;
+        }
+        
+        .step-number {
+            background: linear-gradient(135deg, #B0004F 0%, #8B0040 100%);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            margin-right: 16px;
+            flex-shrink: 0;
+        }
+        
+        .step-text {
+            color: #333;
+            font-size: 16px;
+            line-height: 1.8;
+            padding-top: 4px;
+        }
+        
+        .download-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .download-btn {
+            display: block;
+            color: white;
+            text-decoration: none;
+            padding: 18px 36px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 18px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-align: center;
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .ios-btn {
+            background: #000;
+        }
+        
+        .android-btn {
+            background: #34A853;
+        }
+        
+        @media (min-width: 768px) {
+            .download-buttons {
+                flex-direction: row;
+                gap: 20px;
+            }
+            
+            .download-btn {
+                flex: 1;
+            }
+        }
+        
+        .features-box {
+            background: #f8f9fa;
+            border-left: 4px solid #B0004F;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .features-box-title {
+            font-weight: 700;
+            color: #B0004F;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .features-list {
+            color: #333;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+        
+        /* Footer */
+        footer {
+            background: #1a1a1a;
+            color: white;
+            padding: 60px 30px 30px;
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .footer-section h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #B0004F;
+        }
+
+        .footer-section ul {
+            list-style: none;
+        }
+
+        .footer-section ul li {
+            margin-bottom: 12px;
+        }
+
+        .footer-section a {
+            color: #ccc;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-section a:hover {
+            color: white;
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 30px;
+            border-top: 1px solid #333;
+            color: #999;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 28px;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="/" class="logo">Meet-n-Split</a>
+            <div class="nav-links">
+                <a href="/#features">Features</a>
+                <a href="/privacy">Privacy</a>
+                <a href="/terms">Terms</a>
+                <a href="/contact-us">Contact</a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container">
+            <div class="logo-icon">🎉</div>
+            <h1>Welcome to Meet-n-Split!</h1>
+            <p class="subtitle">Get started in just a few simple steps</p>
+            
+            <div class="info-box">
+                <div class="info-box-title">📱 You've Been Invited!</div>
+                <div class="info-box-text">
+                    Someone has invited you to split expenses on Meet-n-Split. Download the app to get started and join your first group!
+                </div>
+            </div>
+            
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-text">Download the Meet-n-Split app from the App Store</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-text">Create your free account with email and password</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-text">Set up your profile with your name and preferences</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-text">Accept your friend request or join your group!</div>
+                </div>
+            </div>
+            
+            <div class="download-buttons">
+                <a href="https://apps.apple.com/app/meet-n-split/id6753645928" class="download-btn ios-btn" id="iosBtn">
+                    📱 Download for iOS
+                </a>
+                <a href="https://play.google.com/store/apps/details?id=com.meetnsplit.app.dev&hl=en_AU" class="download-btn android-btn" id="androidBtn">
+                    🤖 Download for Android
+                </a>
+            </div>
+            
+            <div class="features-box">
+                <div class="features-box-title">✨ What You Can Do</div>
+                <div class="features-list">
+                    • Split expenses with friends and groups<br>
+                    • Track who owes what in real-time<br>
+                    • Settle up with ease<br>
+                    • Get beautiful expense reports
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-section">
+                <h3>Meet-n-Split</h3>
+                <p style="color: #ccc; margin-top: 10px;">The easiest way to split bills and track group expenses.</p>
+            </div>
+            <div class="footer-section">
+                <h3>Product</h3>
+                <ul>
+                    <li><a href="/#features">Features</a></li>
+                    <li><a href="/#download">Download</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Legal</h3>
+                <ul>
+                    <li><a href="/privacy">Privacy Policy</a></li>
+                    <li><a href="/terms">Terms of Service</a></li>
+                    <li><a href="/contact-us">Contact Us</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Connect</h3>
+                <ul>
+                    <li><a href="mailto:admin@meetnsplit.com">admin@meetnsplit.com</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 Meet-n-Split. All rights reserved.</p>
+        </div>
+    </footer>
+    
+    <script>
+        // Device detection
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        const isAndroid = /android/i.test(userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+        
+        // Highlight the appropriate button based on device
+        if (isAndroid) {
+            document.getElementById('androidBtn').style.border = '3px solid #FFD700';
+            document.getElementById('androidBtn').style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.3)';
+            
+            // Auto-redirect to Play Store on Android
+            setTimeout(() => {
+                window.location.href = 'https://play.google.com/store/apps/details?id=com.meetnsplit.app.dev&hl=en_AU';
+            }, 2000);
+        }
+        
+        if (isIOS) {
+            document.getElementById('iosBtn').style.border = '3px solid #FFD700';
+            document.getElementById('iosBtn').style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.3)';
+            
+            // Auto-redirect to App Store on iOS
+            setTimeout(() => {
+                window.location.href = 'https://apps.apple.com/app/meet-n-split/id6753645928';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

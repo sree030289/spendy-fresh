@@ -13,6 +13,7 @@ import {
   Modal,
   Animated,
   Image,
+  Platform,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -2808,6 +2809,7 @@ export default function RealSplittingScreen() {
 
     return (
       <ScrollView 
+        style={Platform.OS === 'web' ? { flex: 1 } : undefined}
         contentContainerStyle={styles.tabContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -2986,8 +2988,8 @@ export default function RealSplittingScreen() {
             </TouchableOpacity>
           ) : (
             <ScrollView 
+              style={[styles.expenseCardsList, Platform.OS === 'web' ? { flex: 1 } : undefined]}
               showsVerticalScrollIndicator={false}
-              style={styles.expenseCardsList}
             >
               {expenses.slice(0, 5).map((expense) => (
                 <TouchableOpacity
@@ -3255,6 +3257,7 @@ export default function RealSplittingScreen() {
     return (
       <>
         <ScrollView 
+          style={Platform.OS === 'web' ? { flex: 1 } : undefined}
           contentContainerStyle={styles.tabContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -5003,6 +5006,10 @@ const additionalStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    ...(Platform.OS === 'web' && {
+      height: '100vh',
+      overflow: 'hidden',
+    }),
   },
   headerWrapper: {
     position: 'relative',
@@ -5090,6 +5097,9 @@ const styles = StyleSheet.create({
   tabContent: {
     flexGrow: 1,
     padding: 20,
+    ...(Platform.OS === 'web' && {
+      minHeight: '100%',
+    }),
   },
   tabHeader: {
     flexDirection: 'row',
